@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTO Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--MyPhotoRepository 인터페이스의 메서드들과 매핑-->
+<mapper namespace="com.ssafy.nearzoom.domain.myroom.repository.MyPhotoRepository">
+
+  <!--  MyPhotoRepository의 findPhotosByCondition 메서드와 매핑-->
+  <!--  반환 타입은 MyPhotoResponse record와 일치해야 함-->
+  <select id="findPhotoByCondition"
+    resultType="com.ssafy.nearzoom.domain.myroom.dto.MyPhotoResponse">
+    SELECT p.photo_id AS photoId,
+    p.image_url AS imageUrl,
+    p.created_at AS createdAt,
+    IF(pl.photo_id IS NULL, FALSE, TRUE) AS liked,
+    p.editable AS editable,
+    (
+    SELECT GROUP_CONCAT(SUBSTRING_INDEX(u.user_email, '@',
+    1))<!-- 한 사진에 태깅된 유저들(photo_tag)의 이메일 중 '@' 앞부분만 추출해 ,로 묶어서 보여줌-> 추후에 프론트에서 태그 뱃지로 활용 예정!-->
+    FROM photo_tag pt
+    JOIN user u ON pt.user_id=u.user_id
+    WHERE pt.photo_id=p.photo_id
+    )AS partners
+    FROM photo p
+    LEFT JOIN photo_like pl ON p.photo.id=pl.photo_id AND pl.user_id=#{userId}
+    WHERE p.user_id=#{userId}
+
+    <if test="cond.startDate !=null">
+      AND DATE(p.created_at) &gt;= #{cond.startDate}
+    </if>
+    <if test="cond.endDate !=null">
+      AND DATE(p.created_at) &lt;= #{cond.endDate}
+    </if>
+    <if test="cond.liked !=null">
+      <choose>
+        <when test="cond.liked == true">
+          AND pl.photo_id IS NOT NULL
+        </when>
+        <otherwise>
+          AND pl.photo_id IS NULL
+        </otherwise>
+      </choose>
+    </if>
+
+    -- 이메일 앞부분(아이디)이 특정 값에 포함된 사용자가 태그된 사진만 조회
+    <if test="cond.partnerEmails !=null and cond.partnerEmails.size() > 0">
+      AND EXISTS(
+      SELECT 1
+      FROM photo_tag pt
+      JOIN user u ON pt.user_id = u.user_id
+      WHERE pt.photo_id=p.photo_id
+      AND SUBSTRING_INDEX(u.user_email, '@', 1) IN
+      <foreach item="email" collection="cond.partnerEmails" open="(" separator="," close=")">
+        #{email}
+      </foreach>
+      )
+    </if>
+
+    -- 커서 기반 페이지네이션-무한 스크롤을 위한 커서 방식
+    <if test="cond.cursor !=null">
+      AND p.photo_id &lt; #{cond.cursor}
+    </if>
+
+    -- 최신순 정렬
+    -- limit 값만큼만 조회-> cond.limit에 따라 프론트에서 요청 개수 조절 가능
+    ORDER BY p.photo_id DESC
+    LIMIT #{cond.limit}
+  </select>
+</mapper>

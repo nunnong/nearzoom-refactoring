@@ -3,3 +3,12 @@ spring:
     import: optional:file:.env[.properties]
   profiles:
     default: local
+
+#mapper-locations: resources/mapper/하위 폴더에 XML mapper를 두는 것을 기준으로 설정
+#type-aliases-package: 엔티티가 위치한 패키지
+#map-underscore-to-camel-case: true: DB 필드를 camelCase로 자동 매핑
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.ssafy.nearzoom.domain.myroom.entity
+  configuration:
+    map-underscore-to-camel-case: true

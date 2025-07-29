@@ -24,6 +24,10 @@ repositories {
 }
 
 dependencies {
+    //JWT 파싱 및 인증 Claim 추출 담당 의존성 추가(AuthUtil 클래스 추가되면서 의존성 추가됨)
+    //JWT로 사용자 인증/파싱할 때 반드시 필요!
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
     implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -35,6 +39,12 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    //MyBatis 관련 의존성 추가
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.2'
+
+    //MyBatis+MySQL 조합이라면 JDBC 드라이버도 필요
+    runtimeOnly 'com.mysql:mysql-connector-j'
 
     implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.3'
