@@ -5,8 +5,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-@MapperScan(basePackages = "com.ssafy.nearzoom.domain.myroom.repository",
-            annotationClass = org.apache.ibatis.annotations.Mapper.class)
+@MapperScan("com.ssafy.nearzoom.domain.myroom.repository")
 
 public class NearzoomApplication {
 

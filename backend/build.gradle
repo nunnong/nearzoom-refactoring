@@ -41,7 +41,7 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
     //MyBatis 관련 의존성 추가
-    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.2'
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3'
 
     //MyBatis+MySQL 조합이라면 JDBC 드라이버도 필요
     runtimeOnly 'com.mysql:mysql-connector-j'
