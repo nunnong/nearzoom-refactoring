@@ -7,7 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 @Mapper
-public interface MyPhotoRepository {
+public interface MyPhotoMapper {
 
     //    반환 타입이 List<MyPhotoResponse> 형태인 findPhotosByCondition 메서드
     List<MyPhotoResponse> findPhotosByCondition(

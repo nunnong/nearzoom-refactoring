@@ -69,7 +69,9 @@ public class SecurityConfig {
 
         http.authorizeHttpRequests(
             (auth) -> auth
-                .requestMatchers("/auth/refresh", "user/logout", "/api/s3-test/**").permitAll()
+                .requestMatchers("/auth/refresh", "user/logout", "/api/s3-test/**",
+                    "myroom/photos/**")
+                .permitAll()
                 .anyRequest().authenticated());
 
         http.sessionManagement(

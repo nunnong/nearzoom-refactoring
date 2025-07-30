@@ -3,7 +3,7 @@ package com.ssafy.nearzoom.domain.myroom.service;
 import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoListCondition;
 import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoListResponse;
 import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoResponse;
-import com.ssafy.nearzoom.domain.myroom.repository.MyPhotoRepository;
+import com.ssafy.nearzoom.domain.myroom.repository.MyPhotoMapper;
 import com.ssafy.nearzoom.global.auth.util.AuthUtil;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +18,7 @@ public interface MyRoomService {
     @RequiredArgsConstructor
     class MyRoomServiceImpl implements MyRoomService {
 
-        private final MyPhotoRepository photoRepository;
+        private final MyPhotoMapper photoRepository;
         private final AuthUtil authUtil;
 
         @Override

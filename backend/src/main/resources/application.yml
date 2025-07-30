@@ -8,7 +8,7 @@ spring:
 #type-aliases-package: 엔티티가 위치한 패키지
 #map-underscore-to-camel-case: true: DB 필드를 camelCase로 자동 매핑
 mybatis:
-  mapper-locations: classpath:mapper/**/*.xml
+  mapper-locations: classpath:/mappers/**/*.xml
   type-aliases-package: com.ssafy.nearzoom.domain.myroom.entity
   configuration:
     map-underscore-to-camel-case: true
