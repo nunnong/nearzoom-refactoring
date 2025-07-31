@@ -1,30 +1,22 @@
 package com.ssafy.nearzoom.global.auth.util;
 
+import com.ssafy.nearzoom.global.auth.oauth2.dto.CustomOAuth2User;
+import com.ssafy.nearzoom.global.exception.ApiException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
 public class AuthUtil {
 
-    /**
-     * JWT Claims에서 userId를 Long 타입으로 추출
-     */
-    public Long getUserId(Authentication authentication) {
-        Jwt jwt = extractJwt(authentication);
-        Object userId = jwt.getClaims().get("userId");
-        return Long.valueOf(userId.toString());
-    }
+    public String getUserEmail(Authentication authentication) {
 
-    /**
-     * Authentication 객체에서 JWT 객체를 안전하게 추출
-     */
-    private Jwt extractJwt(Authentication authentication) {
-        if (authentication == null || !(authentication.getPrincipal() instanceof Jwt)) {
-            throw new IllegalArgumentException("Invalid authentication principal: not a JWT");
+        if (authentication == null
+            || !(authentication.getPrincipal() instanceof CustomOAuth2User customUser)) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "로그인 정보가 올바르지 않습니다.");
         }
-        return (Jwt) authentication.getPrincipal();
+        return customUser.getEmail();
     }
 }
