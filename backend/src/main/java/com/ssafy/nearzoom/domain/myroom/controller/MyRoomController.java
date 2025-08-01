@@ -18,7 +18,7 @@ public class MyRoomController {
     private final MyRoomService myRoomService;
 
     /**
-     * 사진 조회 + 각종 필터(좋아요,친구,날짜 등 모든 조합) liked: Boolean(좋아요 여부) partnerEmails:comma-seperated(함께 찍은
+     * 사진 조회 + 각종 필터(좋아요,친구,날짜 등 모든 조합) heart: Boolean(좋아요 여부) partnerEmails:comma-seperated(함께 찍은
      * 유저 이메일) startDate, endDate: YYYY-MM-DD 형식 cursor: Long(커서 기반 페이징) limit: Integer(페이지 크기별 개수
      * 제한)
      */

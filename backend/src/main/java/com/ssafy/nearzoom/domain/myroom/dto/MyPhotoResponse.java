@@ -7,9 +7,9 @@ public record MyPhotoResponse(
     Long photoId,
     String imageUrl,
     LocalDateTime createdAt,
-    boolean liked,
+    Integer heart,
     boolean editable,
-    List<String> partners
+    String partnerEmails
 ) {
 
 }

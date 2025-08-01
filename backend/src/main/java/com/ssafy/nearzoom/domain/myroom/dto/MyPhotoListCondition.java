@@ -6,7 +6,7 @@ import java.util.List;
 public record MyPhotoListCondition(
     Long cursor,
     int limit,
-    Boolean liked,
+    Boolean heart,
     List<String> partnerEmails,
     LocalDate startDate,
     LocalDate endDate
