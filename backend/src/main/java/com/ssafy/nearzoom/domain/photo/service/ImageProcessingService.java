@@ -36,7 +36,7 @@ public class ImageProcessingService {
   private final RedisTemplate<String, String> redisTemplate;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
-  public ProcessingServerResponse processImage(Long roomId) {
+  public ProcessingServerResponse processImage(String roomId) {
     String roomKey = "room:" + roomId;
     Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
 
@@ -56,12 +56,12 @@ public class ImageProcessingService {
   }
 
   private ProcessingServerResponse sendRequestToImageServer(
-      ImageServerRequest serverRequest, Long roomId, String backgroundPromptId) {
+      ImageServerRequest serverRequest, String roomId, String backgroundPromptId) {
 
     try {
       ImageServerResponse serverResponse = imageServerWebClient
           .post()
-          .uri("/process")
+          .uri("/image/jobs")
           .bodyValue(serverRequest)
 
           .retrieve()
@@ -102,14 +102,14 @@ public class ImageProcessingService {
   }
 
   private ProcessingServerResponse handleSuccessResponse(
-      ImageServerResponse serverResponse, Long roomId, String backgroundPromptId) {
+      ImageServerResponse serverResponse, String roomId, String backgroundPromptId) {
 
-    if (serverResponse == null || serverResponse.jobId() == null) {
+    if (serverResponse == null || serverResponse.data() == null || serverResponse.data().jobId() == null) {
       throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
           "이미지 서버에서 올바른 응답을 받지 못했습니다.");
     }
 
-    String jobId = serverResponse.jobId();
+    String jobId = serverResponse.data().jobId();
 
     if (backgroundPromptId != null) { // 이 부분에 대한 검토 필요
       redisTemplate.opsForValue().set(
@@ -130,7 +130,7 @@ public class ImageProcessingService {
         jobId,
         "이미지 서버로 전송 완료",
         String.format("서버 응답: %s (상태: %s)",
-            "처리 요청이 성공적으로 접수되었습니다.", serverResponse.status())
+            "처리 요청이 성공적으로 접수되었습니다.", serverResponse.data().status())
     );
   }
 

@@ -1,5 +1,7 @@
 package com.ssafy.nearzoom.domain.photo.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.nearzoom.domain.photo.dto.webhook.ImageProcessingCompletedWebhook;
 import com.ssafy.nearzoom.domain.photo.dto.webhook.ImageProcessingFailedWebhook;
 import com.ssafy.nearzoom.domain.photo.service.WebhookService;
@@ -16,7 +18,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class WebhookController {
 
   private final WebhookService webhookService;
-
   @PostMapping("/image-processing/completed")
   public ResponseEntity<String> handleImageProcessingCompleted(
       @RequestBody ImageProcessingCompletedWebhook webhook) {
