@@ -13,7 +13,6 @@ interface ShareModalProps {
   isOpen: boolean
   image: ImageItem | null
   onClose: () => void
-  onShareInstagram: (imageId: string) => void
   onShareKakao: (imageId: string) => void
 }
 
@@ -21,15 +20,9 @@ const ShareModal: React.FC<ShareModalProps> = ({
   isOpen,
   image,
   onClose,
-  onShareInstagram,
   onShareKakao,
 }) => {
   if (!isOpen || !image) return null
-
-  const handleInstagramShare = () => {
-    onShareInstagram(image.id)
-    onClose()
-  }
 
   const handleKakaoShare = () => {
     onShareKakao(image.id)
@@ -81,24 +74,6 @@ const ShareModal: React.FC<ShareModalProps> = ({
 
           {/* Share Options */}
           <div className="space-y-3">
-            {/* Instagram Share */}
-            <button
-              onClick={handleInstagramShare}
-              className="flex w-full items-center space-x-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400">
-                <img 
-                  src="/instagram-logo.svg" 
-                  alt="Instagram" 
-                  className="h-6 w-6"
-                />
-              </div>
-              <div>
-                <p className="font-medium text-gray-900">인스타그램으로 공유</p>
-                <p className="text-sm text-gray-500">스토리 또는 피드에 공유하기</p>
-              </div>
-            </button>
-
             {/* KakaoTalk Share */}
             <button
               onClick={handleKakaoShare}

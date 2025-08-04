@@ -1,17 +1,19 @@
 'use client'
 
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
-import { useState, type JSX } from 'react'
+import { type JSX } from 'react'
 import KakaoLoginButton from '@/components/page/main/KakaoLoginButton'
 import GoogleLoginButton from '@/components/page/main/GoogleLoginButton'
 
-const LoginModal = (): JSX.Element => {
-  const [isOpen, setIsOpen] = useState(true)
+interface LoginModalProps {
+  isOpen: boolean
+  onClose: () => void
+}
 
-  const close = () => setIsOpen(false)
+const LoginModal = ({ isOpen, onClose }: LoginModalProps): JSX.Element => {
 
   return (
-    <Dialog open={isOpen} onClose={close} className="relative z-10">
+    <Dialog open={isOpen} onClose={onClose} className="relative z-10">
       {/* 배경 오버레이 */}
       <div
         className="fixed inset-0 bg-black/30 backdrop-blur-sm"
@@ -20,7 +22,23 @@ const LoginModal = (): JSX.Element => {
 
       {/* 모달 컨테이너 */}
       <div className="fixed inset-0 z-10 flex items-center justify-center p-4">
-        <DialogPanel className="w-full max-w-sm rounded-xl bg-white p-6 shadow-md">
+        <DialogPanel className="w-full max-w-sm rounded-xl bg-white p-6 shadow-md relative">
+          {/* X 버튼 */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors group"
+            aria-label="닫기"
+          >
+            <svg 
+              className="w-4 h-4 text-gray-600 group-hover:text-gray-800" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
           {/* 제목 */}
           <DialogTitle
             as="h3"

@@ -8,7 +8,7 @@ interface ImageItem {
 }
 
 const STORAGE_KEY = 'nearzoom_images'
-const REFERENCE_STORAGE_KEY = 'nearzoom_reference_images'
+const REFERENCE_STORAGE_KEY = 'nearzoom_reference_image'
 
 export const saveImageToLocal = (image: ImageItem): void => {
   try {
@@ -94,55 +94,54 @@ export const clearAllImages = (): void => {
   }
 }
 
-// 참고 이미지 관리 기능들
+// 참고 이미지 관리 기능들 (단일 이미지)
 export const saveReferenceImage = (imageData: string): void => {
   try {
-    const existingImages = getReferenceImages()
-    console.log('💾 Saving reference image')
-    console.log('📋 Existing reference images count:', existingImages.length)
+    console.log('💾 Saving reference image (single)')
     
-    const newImage = {
+    const referenceImage = {
       id: `ref_${Date.now()}`,
       src: imageData,
       uploadedAt: new Date().toISOString()
     }
     
-    const updatedImages = [newImage, ...existingImages] // 맨 앞에 추가
-    console.log('📋 Updated reference images count:', updatedImages.length)
-    
-    localStorage.setItem(REFERENCE_STORAGE_KEY, JSON.stringify(updatedImages))
+    localStorage.setItem(REFERENCE_STORAGE_KEY, JSON.stringify(referenceImage))
     console.log('✅ Successfully saved reference image')
   } catch (error) {
     console.error('❌ Failed to save reference image:', error)
   }
 }
 
-export const getReferenceImages = (): Array<{id: string, src: string, uploadedAt: string}> => {
+export const getReferenceImage = (): {id: string, src: string, uploadedAt: string} | null => {
   try {
-    const imagesData = localStorage.getItem(REFERENCE_STORAGE_KEY)
-    return imagesData ? JSON.parse(imagesData) : []
+    const imageData = localStorage.getItem(REFERENCE_STORAGE_KEY)
+    return imageData ? JSON.parse(imageData) : null
   } catch (error) {
-    console.error('❌ Failed to load reference images from localStorage:', error)
-    return []
+    console.error('❌ Failed to load reference image from localStorage:', error)
+    return null
   }
 }
 
-export const deleteReferenceImage = (imageId: string): void => {
+export const deleteReferenceImage = (): void => {
   try {
-    const existingImages = getReferenceImages()
-    const filteredImages = existingImages.filter(img => img.id !== imageId)
-    localStorage.setItem(REFERENCE_STORAGE_KEY, JSON.stringify(filteredImages))
-    console.log('🗑️ Deleted reference image:', imageId)
+    localStorage.removeItem(REFERENCE_STORAGE_KEY)
+    console.log('🗑️ Deleted reference image')
   } catch (error) {
     console.error('❌ Failed to delete reference image:', error)
   }
 }
 
-export const clearAllReferenceImages = (): void => {
+export const clearReferenceImage = (): void => {
   try {
     localStorage.removeItem(REFERENCE_STORAGE_KEY)
-    console.log('🗑️ Cleared all reference images from localStorage')
+    console.log('🗑️ Cleared reference image from localStorage')
   } catch (error) {
-    console.error('❌ Failed to clear reference images from localStorage:', error)
+    console.error('❌ Failed to clear reference image from localStorage:', error)
   }
+}
+
+// 하위 호환성을 위한 기존 함수들 (deprecated)
+export const getReferenceImages = (): Array<{id: string, src: string, uploadedAt: string}> => {
+  const singleImage = getReferenceImage()
+  return singleImage ? [singleImage] : []
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { CameraIcon, BookmarkIcon, UserIcon } from '@heroicons/react/24/outline'
+import { CameraIcon, UserIcon } from '@heroicons/react/24/outline'
 
 interface MenuItem {
   id: string
@@ -21,7 +21,6 @@ interface SideListProps {
   isOpen?: boolean
   userProfile?: UserProfile
   onUploadSelfie?: () => void
-  onSaved?: () => void
   onAccount?: () => void
   onClose?: () => void
 }
@@ -31,7 +30,6 @@ const SideList: React.FC<SideListProps> = ({
   isOpen = true,
   userProfile,
   onUploadSelfie,
-  onSaved,
   onAccount,
   onClose,
 }) => {
@@ -41,12 +39,6 @@ const SideList: React.FC<SideListProps> = ({
       label: 'Upload Selfie',
       icon: CameraIcon,
       onClick: onUploadSelfie,
-    },
-    {
-      id: 'saved',
-      label: 'Saved',
-      icon: BookmarkIcon,
-      onClick: onSaved,
     },
     {
       id: 'account',
@@ -127,11 +119,13 @@ const SideList: React.FC<SideListProps> = ({
                     </div>
                   )}
                 </div>
-                <div className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full ring-2 ring-slate-900 ${
-                  userProfile ? 'bg-green-500' : 'bg-slate-600 animate-pulse'
-                }`}></div>
+                <div
+                  className={`absolute -right-1 -bottom-1 h-5 w-5 rounded-full ring-2 ring-slate-900 ${
+                    userProfile ? 'bg-green-500' : 'animate-pulse bg-slate-600'
+                  }`}
+                ></div>
               </div>
-              
+
               {/* User Info */}
               <div className="text-center">
                 {userProfile?.name ? (
@@ -142,7 +136,7 @@ const SideList: React.FC<SideListProps> = ({
                   <div className="h-5 w-24 animate-pulse rounded bg-slate-600"></div>
                 )}
                 {userProfile?.email ? (
-                  <p className="text-xs text-slate-400 truncate max-w-[200px]">
+                  <p className="max-w-[200px] truncate text-xs text-slate-400">
                     {userProfile.email}
                   </p>
                 ) : (
