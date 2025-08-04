@@ -27,7 +27,7 @@
     </if>
     <if test="cond.heart != null">
       <choose>
-        <when test="cond.heart == true">
+        <when test="cond.heart">
           AND a.heart = 1
         </when>
         <otherwise>
@@ -38,15 +38,44 @@
 
     <if test="cond.partnerEmails != null and cond.partnerEmails.size() > 0">
       <foreach item="email" collection="cond.partnerEmails" open="AND (" separator=" OR " close=")">
-        p.user_list LIKE CONCAT('%"', #{email}, '"%')
+        p.user_list LIKE CONCAT('%', #{email}, '%')
       </foreach>
     </if>
 
-    <if test="cond.cursor != null">
+    <if test="cond.cursor != null and cond.cursor > 0">
       AND p.photo_id &lt; #{cond.cursor}
     </if>
 
     ORDER BY p.photo_id DESC
     LIMIT #{cond.limit}
   </select>
+
+  <update id="updateHeart">
+    UPDATE archive
+    SET heart =
+    <choose>
+      <when test="heart == true">1</when>
+      <otherwise>0</otherwise>
+    </choose>
+    WHERE user_id = #{userId}
+    AND photo_id = #{photoId}
+  </update>
+
+  <update id="softDeletePhoto">
+    UPDATE archive
+    SET deleted_at = NOW()
+    WHERE user_id = #{userId}
+      AND photo_id = #{photoId}
+  </update>
+
+  <update id="markAsEdited">
+    UPDATE archive
+    SET editable = false,
+        updated_at = NOW()
+    WHERE user_id = #{userId}
+      AND photo_id = #{photoId}
+      AND editable = true
+  </update>
+
+
 </mapper>
