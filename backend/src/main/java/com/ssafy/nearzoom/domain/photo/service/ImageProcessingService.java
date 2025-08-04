@@ -57,11 +57,11 @@ public class ImageProcessingService {
 
   private ProcessingServerResponse sendRequestToImageServer(
       ImageServerRequest serverRequest, Long roomId, String backgroundPromptId) {
-
+      String uploadUrl = "/upload"; ///image/jobs
     try {
       ImageServerResponse serverResponse = imageServerWebClient
           .post()
-          .uri("/image/jobs")
+          .uri(uploadUrl)
           .bodyValue(serverRequest)
 
           .retrieve()

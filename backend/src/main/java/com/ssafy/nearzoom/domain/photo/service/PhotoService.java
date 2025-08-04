@@ -5,6 +5,7 @@ import com.ssafy.nearzoom.domain.photo.dto.imageInfo.PhotoSelectionRequest;
 import com.ssafy.nearzoom.domain.photo.dto.webhook.ImageProcessingResult;
 import com.ssafy.nearzoom.domain.photo.entity.PhotoPrompt;
 import com.ssafy.nearzoom.domain.photo.repository.PhotoPromptRepository;
+import com.ssafy.nearzoom.domain.user.entity.Social;
 import com.ssafy.nearzoom.domain.user.entity.User;
 import com.ssafy.nearzoom.domain.user.repository.UserRepository;
 import com.ssafy.nearzoom.global.auth.jwt.JWTUtil;
@@ -17,7 +18,9 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PhotoService {
@@ -107,10 +110,12 @@ public class PhotoService {
 
     String accessToken = authHeader.substring(7);
     String email = jwtUtil.getEmail(accessToken);
+    Social social = jwtUtil.getSocial(accessToken);
 
-    User user = userRepository.getByEmail(email);
+    User user = userRepository.getByEmailAndSocial(email, social);
     if (user == null) {
       throw new ApiException(HttpStatus.UNAUTHORIZED, "사용자를 찾을 수 없습니다.");
     }
   }
+
 }
