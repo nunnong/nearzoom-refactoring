@@ -1,10 +1,11 @@
-package com.ssafy.nearzoom.domain.photo.service;
+package com.ssafy.nearzoom.domain.photoPrompt.service;
 
-import com.ssafy.nearzoom.domain.photo.dto.webhook.ImageProcessingCompletedWebhook;
-import com.ssafy.nearzoom.domain.photo.dto.webhook.ImageProcessingFailedWebhook;
-import com.ssafy.nearzoom.domain.photo.entity.PhotoPrompt;
-import com.ssafy.nearzoom.domain.photo.entity.PhotoPrompt.PromptStatus;
-import com.ssafy.nearzoom.domain.photo.repository.PhotoPromptRepository;
+import com.ssafy.nearzoom.domain.photo.service.PhotoService;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingCompletedWebhook;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingFailedWebhook;
+import com.ssafy.nearzoom.domain.photoPrompt.entity.PhotoPrompt;
+import com.ssafy.nearzoom.domain.photoPrompt.entity.PromptStatus;
+import com.ssafy.nearzoom.domain.photoPrompt.repository.PhotoPromptRepository;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import java.time.Duration;
 import java.util.HashMap;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class WebhookService {
 
+  private final PhotoService photoService;
   private final PhotoPromptRepository photoPromptRepository;
   private final RedisTemplate<String, String> redisTemplate;
 
@@ -90,6 +92,9 @@ public class WebhookService {
 
     redisTemplate.opsForHash().putAll(resultKey, resultData);
     redisTemplate.expire(resultKey, Duration.ofHours(24));
+
+
+    photoService.saveCompletedPhoto(webhook);
   }
 
   private void saveFailureResult(ImageProcessingFailedWebhook webhook) {

@@ -1,6 +1,6 @@
-package com.ssafy.nearzoom.domain.photo.repository;
+package com.ssafy.nearzoom.domain.photoPrompt.repository;
 
-import com.ssafy.nearzoom.domain.photo.entity.PhotoPrompt;
+import com.ssafy.nearzoom.domain.photoPrompt.entity.PhotoPrompt;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

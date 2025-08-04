@@ -1,4 +1,4 @@
-package com.ssafy.nearzoom.domain.photo.config;
+package com.ssafy.nearzoom.domain.photoPrompt.config;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;

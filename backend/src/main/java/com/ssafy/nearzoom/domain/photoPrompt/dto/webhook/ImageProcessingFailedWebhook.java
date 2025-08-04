@@ -1,6 +1,4 @@
-package com.ssafy.nearzoom.domain.photo.dto.webhook;
-
-import com.fasterxml.jackson.annotation.JsonProperty;
+package com.ssafy.nearzoom.domain.photoPrompt.dto.webhook;
 
 public record ImageProcessingFailedWebhook(
     String event,

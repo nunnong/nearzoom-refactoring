@@ -1,4 +1,4 @@
-package com.ssafy.nearzoom.domain.photo.dto.imageServer;
+package com.ssafy.nearzoom.domain.photoPrompt.dto.imageServer;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

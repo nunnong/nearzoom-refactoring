@@ -1,4 +1,4 @@
-package com.ssafy.nearzoom.domain.photo.dto.webhook;
+package com.ssafy.nearzoom.domain.photoPrompt.dto.webhook;
 
 import java.util.List;
 

@@ -1,4 +1,4 @@
-package com.ssafy.nearzoom.domain.photo.dto.imageServer;
+package com.ssafy.nearzoom.domain.photoPrompt.dto.imageServer;
 
 public record ProcessingOptions(
     String type,        // "color" | "prompt"

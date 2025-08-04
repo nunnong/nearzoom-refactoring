@@ -1,4 +1,4 @@
-package com.ssafy.nearzoom.domain.photo.dto.webhook;
+package com.ssafy.nearzoom.domain.photoPrompt.dto.webhook;
 
 public record ImageProcessingError(
     String code,

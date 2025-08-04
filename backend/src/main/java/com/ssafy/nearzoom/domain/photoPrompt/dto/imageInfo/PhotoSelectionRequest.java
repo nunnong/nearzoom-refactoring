@@ -1,4 +1,4 @@
-package com.ssafy.nearzoom.domain.photo.dto.imageInfo;
+package com.ssafy.nearzoom.domain.photoPrompt.dto.imageInfo;
 
 import java.util.List;
 

@@ -1,8 +1,8 @@
-package com.ssafy.nearzoom.domain.photo.controller;
+package com.ssafy.nearzoom.domain.photoPrompt.controller;
 
-import com.ssafy.nearzoom.domain.photo.dto.webhook.ImageProcessingCompletedWebhook;
-import com.ssafy.nearzoom.domain.photo.dto.webhook.ImageProcessingFailedWebhook;
-import com.ssafy.nearzoom.domain.photo.service.WebhookService;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingCompletedWebhook;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingFailedWebhook;
+import com.ssafy.nearzoom.domain.photoPrompt.service.WebhookService;
 import com.ssafy.nearzoom.global.response.ApiResponse;
 import java.util.HashMap;
 import java.util.Map;

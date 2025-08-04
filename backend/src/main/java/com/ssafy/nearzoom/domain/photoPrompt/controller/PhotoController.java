@@ -1,10 +1,9 @@
-package com.ssafy.nearzoom.domain.photo.controller;
+package com.ssafy.nearzoom.domain.photoPrompt.controller;
 
-import com.ssafy.nearzoom.domain.photo.dto.imageInfo.BackgroundInfoRequest;
-import com.ssafy.nearzoom.domain.photo.dto.imageInfo.PhotoSelectionRequest;
-import com.ssafy.nearzoom.domain.photo.dto.imageServer.ProcessingServerResponse;
-import com.ssafy.nearzoom.domain.photo.dto.webhook.ImageProcessingResult;
-import com.ssafy.nearzoom.domain.photo.service.PhotoService;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.imageInfo.BackgroundInfoRequest;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.imageInfo.PhotoSelectionRequest;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingResult;
+import com.ssafy.nearzoom.domain.photoPrompt.service.PhotoPromptService;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import com.ssafy.nearzoom.global.response.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class PhotoController {
 
-  private final PhotoService photoService;
+  private final PhotoPromptService photoService;
 
   @PostMapping("/selection")
   public ResponseEntity<ApiResponse<Map<String, Object>>> savePhotoSelection(

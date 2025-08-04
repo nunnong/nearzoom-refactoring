@@ -1,16 +1,16 @@
-package com.ssafy.nearzoom.domain.photo.service;
+package com.ssafy.nearzoom.domain.photoPrompt.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ssafy.nearzoom.domain.photo.dto.imageServer.ImageServerRequest;
-import com.ssafy.nearzoom.domain.photo.dto.imageServer.ImageServerResponse;
-import com.ssafy.nearzoom.domain.photo.dto.imageServer.ProcessingOptions;
-import com.ssafy.nearzoom.domain.photo.dto.imageServer.ProcessingServerResponse;
-import com.ssafy.nearzoom.domain.photo.dto.imageServer.RoomImageData;
-import com.ssafy.nearzoom.domain.photo.dto.webhook.ImageProcessingResult;
-import com.ssafy.nearzoom.domain.photo.entity.PhotoPrompt;
-import com.ssafy.nearzoom.domain.photo.entity.PhotoPrompt.PromptStatus;
-import com.ssafy.nearzoom.domain.photo.repository.PhotoPromptRepository;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.imageServer.ImageServerRequest;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.imageServer.ImageServerResponse;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.imageServer.ProcessingOptions;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.imageServer.ProcessingServerResponse;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.imageServer.RoomImageData;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingResult;
+import com.ssafy.nearzoom.domain.photoPrompt.entity.PhotoPrompt;
+import com.ssafy.nearzoom.domain.photoPrompt.entity.PromptStatus;
+import com.ssafy.nearzoom.domain.photoPrompt.repository.PhotoPromptRepository;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import java.time.Duration;
 import java.util.Arrays;
@@ -111,18 +111,18 @@ public class ImageProcessingService {
 
     String jobId = serverResponse.data().jobId();
 
-    if (backgroundPromptId != null) { // 이 부분에 대한 검토 필요
+    if (backgroundPromptId != null) {
       redisTemplate.opsForValue().set(
           "job:" + jobId,
           backgroundPromptId,
-          Duration.ofHours(24)
+          Duration.ofMinutes(30)
       );
     }
 
     redisTemplate.opsForValue().set(
         "job_room:" + jobId,
         String.valueOf(roomId),
-        Duration.ofHours(24)
+        Duration.ofMinutes(30)
     );
 
     return new ProcessingServerResponse(

@@ -8,11 +8,17 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import com.ssafy.nearzoom.global.common.BaseEntity;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 @Entity
 @Table(name = "PHOTO")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Photo {
+public class Photo extends BaseEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -28,30 +34,10 @@ public class Photo {
   @Column(name = "roomId", length = 100, nullable = false)
   private String roomId;
 
-  @CreationTimestamp
-  @Column(name = "created_at", nullable = false)
-  private LocalDateTime createdAt;
-
-  @UpdateTimestamp
-  @Column(name = "updated_at")
-  private LocalDateTime updatedAt;
-
-  @Column(name = "deleted_at")
-  private LocalDateTime deletedAt;
-
   // 생성자
   public Photo(String imgUrl, String roomId, String userList) {
     this.imgUrl = imgUrl;
     this.roomId = roomId;
     this.userList = userList;
-  }
-
-  public void updateUserList(String userList) {
-    this.userList = userList;
-  }
-
-  // 소프트 삭제
-  public void markDeleted() {
-    this.deletedAt = LocalDateTime.now();
   }
 }
