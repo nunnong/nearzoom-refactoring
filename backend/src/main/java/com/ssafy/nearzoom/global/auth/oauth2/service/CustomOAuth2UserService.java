@@ -45,17 +45,17 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         Social social = Social.valueOf(registrationId.toUpperCase());
         String profileImage = oAuth2Response.getProfileImage();
 
-        User user = userRepository.findByuserEmailAndDeletedAtIsNull(email)
+        User user = userRepository.findByUserEmailAndSocialTypeAndDeletedAtIsNull(email, social)
             .map(existing -> {
-                if (existing.getSocialType() != social) {
-                    throw new SocialMismatchException(email, existing.getSocialType());
-                }
                 existing.update(oAuth2Response);
                 return existing;
             })
             .orElseGet(() ->
-                userRepository.findByuserEmail(email)
+                userRepository.findByUserEmailAndSocialType(email, social)
                     .map(deletedUser -> {
+                        if (deletedUser.getSocialType() != social) {
+                            throw new SocialMismatchException(email, deletedUser.getSocialType());
+                        }
                         deletedUser.restore();
                         deletedUser.update(oAuth2Response);
                         return deletedUser;
