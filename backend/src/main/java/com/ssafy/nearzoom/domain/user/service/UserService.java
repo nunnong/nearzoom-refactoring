@@ -1,11 +1,15 @@
 package com.ssafy.nearzoom.domain.user.service;
 
+import com.ssafy.nearzoom.domain.user.dto.UserAuthInfoResponse;
 import com.ssafy.nearzoom.domain.user.dto.UserInfoResponse;
+import com.ssafy.nearzoom.domain.user.entity.Social;
 import com.ssafy.nearzoom.domain.user.entity.User;
 import com.ssafy.nearzoom.domain.user.repository.UserRepository;
 import com.ssafy.nearzoom.global.auth.jwt.JWTUtil;
 import com.ssafy.nearzoom.global.auth.jwt.service.RefreshTokenService;
+import com.ssafy.nearzoom.global.auth.util.AuthUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,15 +21,23 @@ public class UserService {
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
 
-    public void logout(String accessToken) {
+    public void logout(Authentication authentication) {
 
-        String email = jwtUtil.getEmail(accessToken);
+        UserAuthInfoResponse userAuthInfo = AuthUtil.getUserAuthInfo(authentication);
+
+        String email = userAuthInfo.email();
+
         refreshTokenService.delete(email);
     }
 
-    public UserInfoResponse getUserInfo(String email) {
+    public UserInfoResponse getUserInfo(Authentication authentication) {
 
-        User user = userRepository.getByEmail(email);
+        UserAuthInfoResponse userAuthInfo = AuthUtil.getUserAuthInfo(authentication);
+
+        String email = userAuthInfo.email();
+        Social social = userAuthInfo.social();
+
+        User user = userRepository.getByEmailAndSocial(email, social);
 
         String nickname = user.getUserName();
         String profileImage = user.getProfileImage();
@@ -34,9 +46,14 @@ public class UserService {
     }
 
     @Transactional
-    public void signout(String accessToken) {
-        String email = jwtUtil.getEmail(accessToken);
-        User user = userRepository.getByEmail(email);
+    public void signout(Authentication authentication) {
+        UserAuthInfoResponse userAuthInfo = AuthUtil.getUserAuthInfo(authentication);
+
+        String email = userAuthInfo.email();
+        Social social = userAuthInfo.social();
+
+        User user = userRepository.getByEmailAndSocial(email, social);
+
         user.markDeleted();
         refreshTokenService.delete(email);
     }
