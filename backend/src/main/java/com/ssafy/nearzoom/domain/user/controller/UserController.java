@@ -2,7 +2,6 @@ package com.ssafy.nearzoom.domain.user.controller;
 
 import com.ssafy.nearzoom.domain.user.dto.UserInfoResponse;
 import com.ssafy.nearzoom.domain.user.service.UserService;
-import com.ssafy.nearzoom.global.auth.oauth2.dto.CustomOAuth2User;
 import com.ssafy.nearzoom.global.response.ApiResponse;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,7 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,11 +25,9 @@ public class UserController {
 
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest request,
-        HttpServletResponse response) {
+        HttpServletResponse response, Authentication authentication) {
 
-        String authHeader = request.getHeader("Authorization");
-        String accessToken = authHeader.substring(7);
-        userService.logout(accessToken);
+        userService.logout(authentication);
 
         HttpSession session = request.getSession(false);
         if (session != null) {
@@ -56,18 +53,16 @@ public class UserController {
 
     @GetMapping("/userInfo")
     public ResponseEntity<ApiResponse<UserInfoResponse>> getUserInfo(
-        @AuthenticationPrincipal CustomOAuth2User customUser) {
-        UserInfoResponse info = userService.getUserInfo(customUser.getEmail());
+        Authentication authentication) {
+        UserInfoResponse info = userService.getUserInfo(authentication);
         return ApiResponse.ok(info);
     }
 
     @DeleteMapping("/signout")
     public ResponseEntity<ApiResponse<Void>> withdraw(HttpServletRequest request,
-        HttpServletResponse response) {
+        HttpServletResponse response, Authentication authentication) {
 
-        String authHeader = request.getHeader("Authorization");
-        String accessToken = authHeader.substring(7);
-        userService.signout(accessToken);
+        userService.signout(authentication);
 
         HttpSession session = request.getSession(false);
         if (session != null) {
