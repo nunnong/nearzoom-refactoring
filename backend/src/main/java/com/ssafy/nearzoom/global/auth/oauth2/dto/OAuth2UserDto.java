@@ -16,7 +16,7 @@ public record OAuth2UserDto(
     String role
 ) {
 
-    public OAuth2UserDto(String email) {
-        this(null, email, null, null, null);
+    public OAuth2UserDto(String email, Social social) {
+        this(null, email, null, social, null);
     }
 }

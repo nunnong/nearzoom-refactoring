@@ -35,7 +35,7 @@ public class JWTUtil {
         return Jwts.builder()
             .claim("name", name)
             .claim("email", email)
-            .claim("social", social)
+            .claim("social", social.name())
             .claim("category", "access")
             .issuedAt(new Date())
             .expiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
@@ -43,9 +43,10 @@ public class JWTUtil {
             .compact();
     }
 
-    public String createRefreshToken(String email) {
+    public String createRefreshToken(String email, Social social) {
         return Jwts.builder()
             .claim("email", email)
+            .claim("social", social.name())
             .claim("category", "refresh")
             .issuedAt(new Date())
             .expiration(new Date(System.currentTimeMillis() + refreshTokenExpiration))
@@ -69,8 +70,10 @@ public class JWTUtil {
     }
 
     public Social getSocial(String token) {
-        return Jwts.parser().setSigningKey(secretKey).build().parseClaimsJws(token).getBody()
-            .get("social", Social.class);
+        String socialStr = Jwts.parser().setSigningKey(secretKey).build().parseClaimsJws(token)
+            .getBody()
+            .get("social", String.class);    // 무조건 String.class로!
+        return socialStr != null ? Social.valueOf(socialStr) : null;
     }
 
     // 수정
