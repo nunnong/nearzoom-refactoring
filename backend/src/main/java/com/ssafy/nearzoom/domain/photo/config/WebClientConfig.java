@@ -12,11 +12,10 @@ public class WebClientConfig {
   @Bean
   @Qualifier("imageServerWebClient")
   public WebClient imageServerWebClient(
-      @Value("${image-server.base-url}") String baseUrl,
-      @Value("${image-server.timeout:10}") int timeoutMinutes) {
+      @Value("${image-server.url}") String imageServerUrl) {
 
     return WebClient.builder()
-        .baseUrl(baseUrl)
+        .baseUrl(imageServerUrl)
         .defaultHeader("Content-Type", "application/json")
         .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024))
         .build();

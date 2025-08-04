@@ -95,7 +95,6 @@ public class PhotoService {
     imageProcessingService.processImage(backgroundRequest.roomId());
   }
 
-  //미파악=================================
   public ImageProcessingResult getProcessingResult(String jobId) {
     return imageProcessingService.getProcessingResult(jobId);
   }

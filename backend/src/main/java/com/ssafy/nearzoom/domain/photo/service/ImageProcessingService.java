@@ -36,7 +36,7 @@ public class ImageProcessingService {
   private final RedisTemplate<String, String> redisTemplate;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
-  public ProcessingServerResponse processImage(String roomId) {
+  public ProcessingServerResponse processImage(Long roomId) {
     String roomKey = "room:" + roomId;
     Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
 
@@ -56,7 +56,7 @@ public class ImageProcessingService {
   }
 
   private ProcessingServerResponse sendRequestToImageServer(
-      ImageServerRequest serverRequest, String roomId, String backgroundPromptId) {
+      ImageServerRequest serverRequest, Long roomId, String backgroundPromptId) {
 
     try {
       ImageServerResponse serverResponse = imageServerWebClient
@@ -102,7 +102,7 @@ public class ImageProcessingService {
   }
 
   private ProcessingServerResponse handleSuccessResponse(
-      ImageServerResponse serverResponse, String roomId, String backgroundPromptId) {
+      ImageServerResponse serverResponse, Long roomId, String backgroundPromptId) {
 
     if (serverResponse == null || serverResponse.data() == null || serverResponse.data().jobId() == null) {
       throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
