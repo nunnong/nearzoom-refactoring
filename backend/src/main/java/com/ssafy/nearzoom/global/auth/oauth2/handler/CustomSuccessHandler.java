@@ -1,5 +1,6 @@
 package com.ssafy.nearzoom.global.auth.oauth2.handler;
 
+import com.ssafy.nearzoom.domain.user.entity.Social;
 import com.ssafy.nearzoom.global.auth.jwt.JWTUtil;
 import com.ssafy.nearzoom.global.auth.jwt.service.RefreshTokenService;
 import com.ssafy.nearzoom.global.auth.oauth2.dto.CustomOAuth2User;
@@ -32,8 +33,9 @@ public class CustomSuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         CustomOAuth2User customUserDetail = (CustomOAuth2User) authentication.getPrincipal();
         String email = customUserDetail.getEmail();
+        Social social = customUserDetail.getSocial();
 
-        String refreshToken = jwtUtil.createRefreshToken(email);
+        String refreshToken = jwtUtil.createRefreshToken(email, social);
 
         refreshTokenService.save(email, refreshToken);
 
