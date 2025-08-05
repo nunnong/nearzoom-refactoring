@@ -1,6 +1,7 @@
 package com.ssafy.nearzoom.domain.user.controller;
 
 import com.ssafy.nearzoom.domain.user.dto.UserInfoResponse;
+import com.ssafy.nearzoom.domain.user.entity.Social;
 import com.ssafy.nearzoom.domain.user.service.UserService;
 import com.ssafy.nearzoom.global.response.ApiResponse;
 import jakarta.servlet.http.Cookie;
@@ -52,9 +53,8 @@ public class UserController {
 
 
     @GetMapping("/userInfo")
-    public ResponseEntity<ApiResponse<UserInfoResponse>> getUserInfo(
-        Authentication authentication) {
-        UserInfoResponse info = userService.getUserInfo(authentication);
+    public ResponseEntity<ApiResponse<UserInfoResponse>> getUserInfo(String email, Social social) {
+        UserInfoResponse info = userService.getUserInfo(email, social);
         return ApiResponse.ok(info);
     }
 
