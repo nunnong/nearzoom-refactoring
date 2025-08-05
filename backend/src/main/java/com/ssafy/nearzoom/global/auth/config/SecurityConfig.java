@@ -20,7 +20,6 @@ import org.springframework.web.cors.CorsConfiguration;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
-
     private final CustomOAuth2UserService customOAuth2UserService;
     private final CustomSuccessHandler customSuccessHandler;
     private final JWTUtil jwtUtil;
@@ -69,6 +68,10 @@ public class SecurityConfig {
 
         http.authorizeHttpRequests(
             (auth) -> auth
+                .requestMatchers("/test/**").permitAll()
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/api-docs/**",
+                    "/swagger-resources/**", "/webjars/**").permitAll()
+                .requestMatchers("/photoprompt/**").permitAll()  // 이 줄 추가!
                 .requestMatchers("/auth/refresh", "user/logout", "/api/s3-test/**",
                     "myroom/photos/**")
                 .permitAll()
