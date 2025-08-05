@@ -47,7 +47,6 @@ pipeline {
                 // docker compose로 모든 컨테이너 띄우기
                 sh '''
                     cd backend
-                    cd $WORKSPACE
                     docker compose down || true
                     docker compose up -d --build
                     docker compose ps
