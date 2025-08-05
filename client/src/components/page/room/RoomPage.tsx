@@ -1,9 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUserStore } from './providers/AuthProvider'
+import { PhotoBoothProvider } from './providers/PhotoBoothProvider'
 import PhotoBooth from './components/PhotoBooth'
+import { RoomContext } from '@livekit/components-react'
+import { Room, RoomConnectOptions } from 'livekit-client'
+import { ConnectionDetails } from './types/livekit'
+
+const CONN_DETAILS_ENDPOINT = '/api/connection-details'
 
 type RoomPageProps = {
   roomName: string
@@ -11,13 +17,54 @@ type RoomPageProps = {
 
 export default function RoomPage({ roomName }: RoomPageProps) {
   const [mounted, setMounted] = useState(false)
+  const [connectionDetails, setConnectionDetails] = useState<ConnectionDetails | undefined>(undefined)
+  const [isConnecting, setIsConnecting] = useState(false)
+  const [connectionError, setConnectionError] = useState<string | null>(null)
+  
   const username = useUserStore(state => state.username)
   const router = useRouter()
 
+  const room = useMemo(() => new Room(), [])
+
+  const connectOptions = useMemo((): RoomConnectOptions => {
+    return {
+      autoSubscribe: true,
+    }
+  }, [])
+
+  // 토큰 가져오기 함수
+  const fetchConnectionDetails = useCallback(async () => {
+    if (!username || !roomName) return
+
+    try {
+      setIsConnecting(true)
+      setConnectionError(null)
+
+      const url = new URL(CONN_DETAILS_ENDPOINT, window.location.origin)
+      url.searchParams.append('roomName', roomName)
+      url.searchParams.append('participantName', username)
+
+      const response = await fetch(url.toString())
+      if (!response.ok) {
+        throw new Error(`Failed to fetch connection details: ${response.statusText}`)
+      }
+
+      const data: ConnectionDetails = await response.json()
+      setConnectionDetails(data)
+    } catch (error) {
+      console.error('Error fetching connection details:', error)
+      setConnectionError(error instanceof Error ? error.message : 'Unknown error')
+    } finally {
+      setIsConnecting(false)
+    }
+  }, [username, roomName])
+
+  // 마운트 체크
   useEffect(() => {
     setMounted(true)
   }, [])
 
+  // username 체크 및 리다이렉트
   useEffect(() => {
     if (mounted && !username) {
       const redirectUrl = `/room/${roomName}`
@@ -25,7 +72,38 @@ export default function RoomPage({ roomName }: RoomPageProps) {
     }
   }, [mounted, username, roomName, router])
 
-  // 서버와 클라이언트에서 동일한 렌더링 보장
+  // 토큰 가져오기
+  useEffect(() => {
+    if (mounted && username && !connectionDetails && !isConnecting) {
+      fetchConnectionDetails()
+    }
+  }, [mounted, username, connectionDetails, isConnecting, fetchConnectionDetails])
+
+  // LiveKit Room 연결
+  useEffect(() => {
+    if (connectionDetails && room) {
+      const connectToRoom = async () => {
+        try {
+          await room.connect(connectionDetails.serverUrl, connectionDetails.participantToken, connectOptions)
+          console.log('Successfully connected to room:', connectionDetails.roomName)
+        } catch (error) {
+          console.error('Failed to connect to room:', error)
+          setConnectionError('Room 연결에 실패했습니다.')
+        }
+      }
+
+      connectToRoom()
+    }
+
+    // Cleanup
+    return () => {
+      if (room) {
+        room.disconnect()
+      }
+    }
+  }, [connectionDetails, room, connectOptions])
+
+  // 로딩 상태들
   if (!mounted) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -46,5 +124,37 @@ export default function RoomPage({ roomName }: RoomPageProps) {
     )
   }
 
-  return <PhotoBooth />
+  if (isConnecting || !connectionDetails) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg">방에 연결 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (connectionError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg text-red-600">연결 오류: {connectionError}</p>
+          <button
+            onClick={fetchConnectionDetails}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            다시 시도
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <PhotoBoothProvider>
+      <RoomContext.Provider value={room}>
+        <PhotoBooth />
+      </RoomContext.Provider>
+    </PhotoBoothProvider>
+  )
 }

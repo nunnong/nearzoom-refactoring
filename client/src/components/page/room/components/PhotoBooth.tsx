@@ -1,16 +1,15 @@
 'use client'
 
 import Header from './Header'
-import { useUserStore } from '../providers/AuthProvider'
-import { PhotoBoothState } from '../stores/userStore'
+import { usePhotoBoothStore } from '../providers/PhotoBoothProvider'
+import { PhotoBoothState } from '../stores/photoboothStore'
 import WaitingComponent from './waiting/WaitingComponent'
 import PhotoshootComponent from './photoshoot/PhotoshootComponent'
 import PhotoSelectComponent from './photo-select/PhotoSelectComponent'
 
 export default function PhotoBooth() {
-  const photoBoothState = useUserStore(state => state.photoBoothState)
-  const nextPhotoBoothState = useUserStore(state => state.nextPhotoBoothState)
-  const setPhotoBoothState = useUserStore(state => state.setPhotoBoothState)
+  const { photoBoothState, nextPhotoBoothState, setPhotoBoothState } =
+    usePhotoBoothStore(state => state)
 
   // 공통 룸 정보
   const roomInfo = {
