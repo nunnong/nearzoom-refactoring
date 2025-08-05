@@ -73,7 +73,6 @@ mybatis:
 image-server:
   url: ${IMAGE_SERVER_URL}
 
-
 webclient:
   max-memory-size: 10485760
 
