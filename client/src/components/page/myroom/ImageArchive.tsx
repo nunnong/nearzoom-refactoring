@@ -1,7 +1,5 @@
 'use client'
 
-import React, { useState } from 'react'
-import Masonry from 'react-masonry-css'
 import {
   HeartIcon,
   ShareIcon,
@@ -9,9 +7,12 @@ import {
   PencilIcon,
 } from '@heroicons/react/24/outline'
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid'
+import React, { useState } from 'react'
+import Masonry from 'react-masonry-css'
+
 import DeleteConfirmModal from './DeleteConfirmModal'
-import ShareModal from './ShareModal'
 import EditConfirmModal from './EditConfirmModal'
+import ShareModal from './ShareModal'
 
 interface ImageItem {
   id: string

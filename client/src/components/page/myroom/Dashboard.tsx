@@ -1,22 +1,24 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import React, { useEffect } from 'react'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+
 import {
   getImagesFromLocal,
   updateImageInLocal,
   deleteImageFromLocal,
   initializeTestImages,
 } from '@/utils/localStorage'
+import { saveReferenceImage } from '@/utils/localStorage'
 
+import HomeButton from './HomeButton'
 import ImageArchive from './ImageArchive'
+import LogoutButton from './LogoutButton'
 import SearchBox from './SearchBox'
 import SideList from './SideList'
 import UploadSelfieModal from './UploadSelfieModal'
-import HomeButton from './HomeButton'
-import LogoutButton from './LogoutButton'
-import { saveReferenceImage } from '@/utils/localStorage'
+
 
 interface ImageItem {
   id: string

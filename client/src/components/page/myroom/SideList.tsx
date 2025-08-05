@@ -1,7 +1,7 @@
 'use client'
 
-import React from 'react'
 import { CameraIcon, UserIcon } from '@heroicons/react/24/outline'
+import React from 'react'
 
 interface MenuItem {
   id: string

@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, ChangeEvent } from 'react'
 import { MagnifyingGlassIcon, XMarkIcon, HeartIcon, CalendarIcon, PencilIcon } from '@heroicons/react/24/outline'
+import React, { useState, ChangeEvent } from 'react'
 
 interface Filter {
   id: string

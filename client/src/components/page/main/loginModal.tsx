@@ -2,8 +2,9 @@
 
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
 import { type JSX } from 'react'
-import KakaoLoginButton from '@/components/page/main/KakaoLoginButton'
+
 import GoogleLoginButton from '@/components/page/main/GoogleLoginButton'
+import KakaoLoginButton from '@/components/page/main/KakaoLoginButton'
 
 interface LoginModalProps {
   isOpen: boolean

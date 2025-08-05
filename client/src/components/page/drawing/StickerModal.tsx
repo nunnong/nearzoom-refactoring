@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useRef } from 'react'
 import { XMarkIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
+import React, { useState, useRef } from 'react'
 
 interface StickerModalProps {
   isOpen: boolean

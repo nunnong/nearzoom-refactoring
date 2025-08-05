@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
 import { XMarkIcon, PhotoIcon, XCircleIcon, TrashIcon } from '@heroicons/react/24/outline'
+import React, { useState, useRef, useEffect } from 'react'
+
 import { getReferenceImage, deleteReferenceImage } from '@/utils/localStorage'
 
 interface UploadSelfieModalProps {

@@ -1,7 +1,7 @@
 'use client'
 
-import React from 'react'
 import { XMarkIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
+import React from 'react'
 
 interface ImageItem {
   id: string
@@ -60,7 +60,7 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
           {/* Message */}
           <div className="text-center">
             <p className="mb-2 text-sm font-medium text-gray-900">
-              "{image.alt}"
+              {image.alt}
             </p>
             <p className="text-sm text-gray-600">
               이 사진을 영구적으로 삭제하시겠습니까?

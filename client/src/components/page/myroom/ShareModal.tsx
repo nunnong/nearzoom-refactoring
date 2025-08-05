@@ -1,7 +1,7 @@
 'use client'
 
-import React from 'react'
 import { XMarkIcon, ShareIcon } from '@heroicons/react/24/outline'
+import React from 'react'
 
 interface ImageItem {
   id: string
