@@ -48,7 +48,7 @@ pipeline {
                 sh '''
                     cd backend
                     docker compose down || true
-                    docker compose up -d --jenkins
+                    docker compose up -d --build
                     docker compose ps
                 '''
             }
