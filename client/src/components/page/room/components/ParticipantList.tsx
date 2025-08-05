@@ -1,29 +1,18 @@
 'use client'
 
+import { useParticipants } from '@livekit/components-react'
 import StartButton from './StartButton'
 
-interface Participant {
-  id: string
-  email: string
-  name?: string
-  avatar?: string
-  isHost: boolean
-  isMicOn: boolean
-  isCameraOn: boolean
-  isConnected: boolean
-}
-
 interface ParticipantListProps {
-  participants: Participant[]
   showStartButton?: boolean
   onStartCall?: () => void
 }
 
 export default function ParticipantList({
-  participants,
   showStartButton = true,
   onStartCall = () => console.log('📞 Call started'),
 }: ParticipantListProps) {
+  const participants = useParticipants()
   return (
     <div className="flex-1 rounded-2xl border border-[#2D3243]/10 bg-white p-6 shadow-lg">
       <div className="mb-6 flex items-center justify-between">
@@ -39,12 +28,12 @@ export default function ParticipantList({
       <div className="mb-6 space-y-3">
         {participants.map(participant => (
           <div
-            key={participant.id}
+            key={participant.identity}
             className="flex cursor-pointer items-center gap-3 rounded-xl bg-[#D0D6ED]/30 p-3 transition-all hover:translate-x-1 hover:scale-[1.02] hover:bg-[#D0D6ED]/50"
           >
             <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[#2D3243] font-semibold text-white transition-transform hover:scale-110">
-              {(participant.name || participant.email)[0].toUpperCase()}
-              {participant.isConnected && (
+              {participant.name ? participant.name[0].toUpperCase() : participant.identity[0].toUpperCase()}
+              {participant.connectionQuality !== 'unknown' && (
                 <div className="absolute -right-1 -bottom-1 h-3 w-3 animate-pulse rounded-full border-2 border-white bg-[#C9D76D]" />
               )}
             </div>
@@ -52,31 +41,16 @@ export default function ParticipantList({
             <div className="min-w-0 flex-1">
               <div className="mb-1 flex items-center gap-2">
                 <span className="truncate text-sm font-medium text-[#2D3243]">
-                  {participant.name || participant.email}
+                  {participant.name || participant.identity}
                 </span>
-                {participant.isHost && (
-                  <svg
-                    className="h-4 w-4 flex-shrink-0 text-[#C9D76D]"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5 4a3 3 0 00-3 3v6a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H5zm-1 9v-1h5v2H5a1 1 0 01-1-1zm7 1h4a1 1 0 001-1v-1h-5v2zm0-4h5V8h-5v2zM9 8H4v2h5V8z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                )}
               </div>
-              {participant.email && (
-                <p className="truncate text-xs text-[#2D3243]/70">
-                  {participant.email}
-                </p>
-              )}
+              <p className="truncate text-xs text-[#2D3243]/70">
+                {participant.identity}
+              </p>
             </div>
 
             <div className="flex items-center gap-1">
-              {!participant.isMicOn && (
+              {participant.isMicrophoneEnabled === false && (
                 <svg
                   className="h-4 w-4 text-[#D86F4A]"
                   fill="none"
@@ -97,7 +71,7 @@ export default function ParticipantList({
                   />
                 </svg>
               )}
-              {!participant.isCameraOn && (
+              {participant.isCameraEnabled === false && (
                 <svg
                   className="h-4 w-4 text-[#D86F4A]"
                   fill="none"

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useParticipants, useLocalParticipant } from '@livekit/components-react'
 import CompletionModal from './CompletionModal'
 import ProgressBar from './ProgressBar'
 import ScreenShareArea from './ScreenShareArea'
@@ -8,64 +9,28 @@ import Timer from './Timer'
 import Sidebar from '../Sidebar'
 import { cn } from '@/lib/utils'
 
-interface Participant {
-  id: string
-  email: string
-  name?: string
-  avatar?: string
-  isHost: boolean
-  isMicOn: boolean
-  isCameraOn: boolean
-  isConnected: boolean
-}
-
-interface CurrentUser {
-  id: string
-  email: string
-  name?: string
-  avatar?: string
-  isMicOn: boolean
-  isCameraOn: boolean
-  isHost: boolean
-}
-
 interface PhotoshootComponentProps {
-  participants?: Participant[]
-  currentUser?: CurrentUser
   currentCutIndex?: number
   isShooting?: boolean
   timer?: number
   screenStream?: MediaStream
   onStartCut?: () => void
   onCompleteCut?: () => void
-  onMicToggle?: () => void
-  onCameraToggle?: () => void
-  onLeaveRoom?: () => void
   onComplete?: () => void
   className?: string
 }
 
 export default function PhotoshootComponent({
-  participants = [],
-  currentUser = {
-    id: 'me',
-    email: 'ssafy123.5@gmail.com',
-    name: '김싸피',
-    isMicOn: true,
-    isCameraOn: true,
-    isHost: true,
-  },
   isShooting = false,
   timer = 0,
   screenStream,
   currentCutIndex = 1,
   onStartCut = () => {},
-  onMicToggle = () => {},
-  onCameraToggle = () => {},
-  onLeaveRoom = () => {},
   onComplete = () => {},
   className,
 }: PhotoshootComponentProps) {
+  const participants = useParticipants()
+  const localParticipant = useLocalParticipant()
   const [testTimer, setTestTimer] = useState(0)
   const [testShooting, setTestShooting] = useState(false)
   const [showCompletionModal, setShowCompletionModal] = useState(false)
@@ -89,53 +54,11 @@ export default function PhotoshootComponent({
     }, 1000)
   }
 
-  const mockParticipants: Participant[] = [
-    {
-      id: '1',
-      name: '김싸피',
-      email: 'ssafy123.5@gmail.com',
-      isHost: true,
-      isMicOn: true,
-      isCameraOn: true,
-      isConnected: true,
-    },
-    {
-      id: '2',
-      name: '박싸피',
-      email: 'park.4@gmail.com',
-      isHost: false,
-      isMicOn: false,
-      isCameraOn: true,
-      isConnected: true,
-    },
-    {
-      id: '3',
-      name: '이싸피',
-      email: 'lee.3@kakao.com',
-      isHost: false,
-      isMicOn: true,
-      isCameraOn: false,
-      isConnected: true,
-    },
-    {
-      id: '4',
-      name: '최싸피',
-      email: 'choi.2@kakao.com',
-      isHost: false,
-      isMicOn: true,
-      isCameraOn: true,
-      isConnected: true,
-    },
-  ]
-
-  const displayParticipants =
-    participants.length > 0 ? participants : mockParticipants
-
-  const participantWebcams = displayParticipants.map(participant => ({
-    id: participant.id,
-    name: participant.name || participant.email,
+  const participantWebcams = participants.map(participant => ({
+    id: participant.identity,
+    name: participant.name || participant.identity,
     stream: undefined,
-    nukiUrl: participant.isCameraOn ? undefined : undefined,
+    nukiUrl: undefined,
   }))
 
   const cutLabels = ['1컷', '2컷', '3컷', '4컷']
@@ -197,14 +120,11 @@ export default function PhotoshootComponent({
 
       {/* 오른쪽: 사이드바 */}
       <Sidebar
-        participants={displayParticipants}
-        currentUser={currentUser}
-        showStartButton={currentUser.isHost}
+        participants={participants}
+        localParticipant={localParticipant}
+        showStartButton={localParticipant?.permissions?.canPublish}
         showLeaveButton={true}
         onStartCall={onStartCut}
-        onMicToggle={onMicToggle}
-        onCameraToggle={onCameraToggle}
-        onLeaveRoom={onLeaveRoom}
       />
 
       {/* 완료 모달 */}

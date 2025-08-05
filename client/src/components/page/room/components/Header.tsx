@@ -1,34 +1,34 @@
 'use client'
 
 import Image from 'next/image'
+import { useRoomContext } from '@livekit/components-react'
 
-interface RoomInfo {
-  id: string
-  url: string
-  title?: string
-  createdAt: string
-}
+export default function Header() {
+  const room = useRoomContext()
 
-interface HeaderProps {
-  roomInfo: RoomInfo
-  onLeaveRoom?: () => void
-  onCopyRoomUrl?: () => void
-}
+  const handleLeaveRoom = () => {
+    if (room) {
+      room.disconnect()
+    }
+    console.log('방 나가기')
+  }
 
-export default function Header({
-  roomInfo,
-  onLeaveRoom = () => {},
-  onCopyRoomUrl = () => {},
-}: HeaderProps) {
   const handleCopyUrl = async () => {
     try {
-      await navigator.clipboard.writeText(`https://${roomInfo.url}`)
+      const currentUrl = window.location.href
+      await navigator.clipboard.writeText(currentUrl)
       alert('URL이 복사되었습니다!')
-      onCopyRoomUrl()
     } catch (err) {
       console.error('복사 실패:', err)
       alert('복사에 실패했습니다.')
     }
+  }
+
+  const roomInfo = {
+    id: room?.name || 'unknown',
+    url: window.location.hostname + window.location.pathname,
+    title: `${room?.name || 'Unknown'} 포토부스`,
+    createdAt: new Date().toLocaleString(),
   }
 
   return (
@@ -37,19 +37,20 @@ export default function Header({
         {/* 왼쪽: 로고 & 방 정보 */}
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-4 transition-transform duration-200 hover:scale-105">
-              <Image
-                src="/link-icon.png"
-                alt="Link Icon"
-                width={28}  
-                height={28}
-                className="rotate-[10deg] opacity-90 drop-shadow-lg"
-              />
+            <Image
+              src="/link-icon.png"
+              alt="Link Icon"
+              width={28}
+              height={28}
+              className="rotate-[10deg] opacity-90 drop-shadow-lg"
+            />
             <div className="relative">
               <div>
-              <h1 className="text-xl font-bold text-white">[Near-zoom]</h1>
-              <p className="text-sm text-[#C9D76D] mt-1 ml-1">{roomInfo.createdAt}</p>
-            </div>
-              
+                <h1 className="text-xl font-bold text-white">[Near-zoom]</h1>
+                <p className="mt-1 ml-1 text-sm text-[#C9D76D]">
+                  {roomInfo.createdAt}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -104,7 +105,7 @@ export default function Header({
         {/* 오른쪽: 설정 버튼 */}
         <div className="flex items-center gap-4">
           <button
-            onClick={onLeaveRoom}
+            onClick={handleLeaveRoom}
             className="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:scale-110 hover:bg-white/10"
           >
             <svg

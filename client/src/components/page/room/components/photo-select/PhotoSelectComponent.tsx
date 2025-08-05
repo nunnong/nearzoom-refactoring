@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useParticipants, useLocalParticipant } from '@livekit/components-react'
 import ControlPanel from '@/components/page/groupcall/ControlPanel'
 import FrameColorSelector from '@/components/page/groupcall/photo-select/FrameColorSelector'
 import PhotoCutSelector from '@/components/page/groupcall/photo-select/PhotoCutSelector'
@@ -9,77 +10,24 @@ import WebCam from '@/components/page/groupcall/photo-select/WebCam'
 import { cn } from '@/lib/utils'
 
 interface PhotoSelectComponentProps {
-  participants?: any[]
-  currentUser?: any
   onComplete?: (selections: {
     cutCount: number
     selectedPhotos: string[]
     frameColor: string
   }) => void
-  onMicToggle?: () => void
-  onCameraToggle?: () => void
-  onLeaveRoom?: () => void
   className?: string
 }
 
 export default function PhotoSelectComponent({
-  participants = [],
-  currentUser = {
-    id: 'me',
-    email: 'ssafy123.5@gmail.com',
-    name: '김싸피',
-    isMicOn: true,
-    isCameraOn: true,
-    isHost: true,
-  },
   onComplete = () => {},
-  onMicToggle = () => {},
-  onCameraToggle = () => {},
-  onLeaveRoom = () => {},
   className,
 }: PhotoSelectComponentProps) {
+  const participants = useParticipants()
+  const localParticipant = useLocalParticipant()
   const [cutCount, setCutCount] = useState<number>(4)
   const [selectedPhotos, setSelectedPhotos] = useState<string[]>([])
   const [frameColor, setFrameColor] = useState<string>('#FFFFFF')
 
-  const mockParticipants = [
-    {
-      id: '1',
-      name: '김싸피',
-      email: 'ssafy123.5@gmail.com',
-      isHost: true,
-      isMicOn: true,
-      isCameraOn: true,
-      isConnected: true,
-    },
-    {
-      id: '2',
-      name: '박싸피',
-      email: 'park.4@gmail.com',
-      isHost: false,
-      isMicOn: true,
-      isCameraOn: true,
-      isConnected: true,
-    },
-    {
-      id: '3',
-      name: '이싸피',
-      email: 'lee.3@kakao.com',
-      isHost: false,
-      isMicOn: false,
-      isCameraOn: true,
-      isConnected: true,
-    },
-    {
-      id: '4',
-      name: '최싸피',
-      email: 'choi.2@kakao.com',
-      isHost: false,
-      isMicOn: true,
-      isCameraOn: false,
-      isConnected: true,
-    },
-  ]
 
   const capturedPhotos = [
     'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&h=400&fit=crop',
@@ -97,7 +45,6 @@ export default function PhotoSelectComponent({
     '#2D3243',
   ]
 
-  const displayParticipants = participants.length > 0 ? participants : mockParticipants
 
   const handleComplete = () => {
     if (selectedPhotos.length === cutCount) {
@@ -160,14 +107,11 @@ export default function PhotoSelectComponent({
       {/* 오른쪽: 사이드바 (참가자 웹캠) */}
       <div className="flex w-80 flex-col gap-6">
         <WebCam
-          participants={displayParticipants}
-          currentUser={currentUser}
+          participants={participants}
+          localParticipant={localParticipant}
         />
         <ControlPanel
-          currentUser={currentUser}
-          onMicToggle={onMicToggle}
-          onCameraToggle={onCameraToggle}
-          onLeaveRoom={onLeaveRoom}
+          localParticipant={localParticipant}
           showLeaveButton={true}
         />
       </div>

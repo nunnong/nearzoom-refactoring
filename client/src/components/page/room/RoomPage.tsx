@@ -17,10 +17,12 @@ type RoomPageProps = {
 
 export default function RoomPage({ roomName }: RoomPageProps) {
   const [mounted, setMounted] = useState(false)
-  const [connectionDetails, setConnectionDetails] = useState<ConnectionDetails | undefined>(undefined)
+  const [connectionDetails, setConnectionDetails] = useState<
+    ConnectionDetails | undefined
+  >(undefined)
   const [isConnecting, setIsConnecting] = useState(false)
   const [connectionError, setConnectionError] = useState<string | null>(null)
-  
+
   const username = useUserStore(state => state.username)
   const router = useRouter()
 
@@ -46,14 +48,18 @@ export default function RoomPage({ roomName }: RoomPageProps) {
 
       const response = await fetch(url.toString())
       if (!response.ok) {
-        throw new Error(`Failed to fetch connection details: ${response.statusText}`)
+        throw new Error(
+          `Failed to fetch connection details: ${response.statusText}`
+        )
       }
 
       const data: ConnectionDetails = await response.json()
       setConnectionDetails(data)
     } catch (error) {
       console.error('Error fetching connection details:', error)
-      setConnectionError(error instanceof Error ? error.message : 'Unknown error')
+      setConnectionError(
+        error instanceof Error ? error.message : 'Unknown error'
+      )
     } finally {
       setIsConnecting(false)
     }
@@ -77,22 +83,29 @@ export default function RoomPage({ roomName }: RoomPageProps) {
     if (mounted && username && !connectionDetails && !isConnecting) {
       fetchConnectionDetails()
     }
-  }, [mounted, username, connectionDetails, isConnecting, fetchConnectionDetails])
+  }, [
+    mounted,
+    username,
+    connectionDetails,
+    isConnecting,
+    fetchConnectionDetails,
+  ])
 
   // LiveKit Room 연결
   useEffect(() => {
     if (connectionDetails && room) {
-      const connectToRoom = async () => {
-        try {
-          await room.connect(connectionDetails.serverUrl, connectionDetails.participantToken, connectOptions)
-          console.log('Successfully connected to room:', connectionDetails.roomName)
-        } catch (error) {
+      room
+        .connect(
+          connectionDetails.serverUrl,
+          connectionDetails.participantToken,
+          connectOptions
+        )
+        .catch(error => {
           console.error('Failed to connect to room:', error)
-          setConnectionError('Room 연결에 실패했습니다.')
-        }
-      }
-
-      connectToRoom()
+        })
+      room.localParticipant.enableCameraAndMicrophone().catch(error => {
+        console.error(error)
+      })
     }
 
     // Cleanup
@@ -141,7 +154,7 @@ export default function RoomPage({ roomName }: RoomPageProps) {
           <p className="text-lg text-red-600">연결 오류: {connectionError}</p>
           <button
             onClick={fetchConnectionDetails}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
           >
             다시 시도
           </button>

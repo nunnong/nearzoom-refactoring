@@ -1,31 +1,32 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-
-interface CurrentUser {
-  id: string
-  email: string
-  name?: string
-  avatar?: string
-  isMicOn: boolean
-  isCameraOn: boolean
-}
+import { useLocalParticipant, useRoomContext } from '@livekit/components-react'
+import { Track } from 'livekit-client'
 
 interface ControlPanelProps {
-  currentUser: CurrentUser
-  onMicToggle?: () => void
-  onCameraToggle?: () => void
-  onLeaveRoom?: () => void
   showLeaveButton?: boolean
 }
 
 export default function ControlPanel({
-  currentUser,
-  onMicToggle = () => console.log('🎤 Mic toggled'),
-  onCameraToggle = () => console.log('📹 Camera toggled'),
-  onLeaveRoom = () => console.log('🚪 Left room'),
   showLeaveButton = true
 }: ControlPanelProps) {
+  const localParticipant = useLocalParticipant()
+  const room = useRoomContext()
+
+  const handleMicToggle = () => {
+    localParticipant.localParticipant?.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled)
+  }
+
+  const handleCameraToggle = () => {
+    localParticipant.localParticipant?.setCameraEnabled(!localParticipant.isCameraEnabled)
+  }
+
+  const handleLeaveRoom = () => {
+    if (room) {
+      room.disconnect()
+    }
+  }
   const buttonBaseClasses =
     'flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110'
 
@@ -34,26 +35,26 @@ export default function ControlPanel({
       <div className="flex justify-center gap-3">
         {/* 마이크 버튼 */}
         <button
-          onClick={onMicToggle}
+          onClick={handleMicToggle}
           className={cn(
             buttonBaseClasses,
             'h-12 w-12',
-            currentUser.isMicOn
+            localParticipant.isMicrophoneEnabled
               ? 'bg-[#D0D6ED] hover:bg-[#D0D6ED]/80'
               : 'bg-[#D86F4A] shadow-lg hover:bg-[#D86F4A]/80'
           )}
-          title={currentUser.isMicOn ? '마이크 끄기' : '마이크 켜기'}
+          title={localParticipant.isMicrophoneEnabled ? '마이크 끄기' : '마이크 켜기'}
         >
           <svg
             className={cn(
               'h-5 w-5',
-              currentUser.isMicOn ? 'text-[#2D3243]' : 'text-white'
+              localParticipant.isMicrophoneEnabled ? 'text-[#2D3243]' : 'text-white'
             )}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
           >
-            {currentUser.isMicOn ? (
+            {localParticipant.isMicrophoneEnabled ? (
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -81,31 +82,31 @@ export default function ControlPanel({
 
         {/* 카메라 버튼 */}
         <button
-          onClick={onCameraToggle}
+          onClick={handleCameraToggle}
           className={cn(
             buttonBaseClasses,
             'h-12 w-12',
-            currentUser.isCameraOn
+            localParticipant.isCameraEnabled
               ? 'bg-[#D0D6ED] hover:bg-[#D0D6ED]/80'
               : 'bg-[#D86F4A] shadow-lg hover:bg-[#D86F4A]/80'
           )}
-          title={currentUser.isCameraOn ? '카메라 끄기' : '카메라 켜기'}
+          title={localParticipant.isCameraEnabled ? '카메라 끄기' : '카메라 켜기'}
         >
           <svg
             className={cn(
               'h-5 w-5',
-              currentUser.isCameraOn ? 'text-[#2D3243]' : 'text-white'
+              localParticipant.isCameraEnabled ? 'text-[#2D3243]' : 'text-white'
             )}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
           >
-            {currentUser.isCameraOn ? (
+            {localParticipant.isCameraEnabled ? (
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
               />
             ) : (
               <>
@@ -124,7 +125,7 @@ export default function ControlPanel({
         {/* 종료 버튼 */}
         {showLeaveButton && (
           <button
-            onClick={onLeaveRoom}
+            onClick={handleLeaveRoom}
             className={cn(
               buttonBaseClasses,
               'h-12 w-12 bg-[#D86F4A] shadow-lg hover:bg-[#D86F4A]/80'
