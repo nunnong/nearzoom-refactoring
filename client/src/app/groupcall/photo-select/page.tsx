@@ -8,6 +8,7 @@ import FrameColorSelector from '@/components/page/groupcall/photo-select/FrameCo
 import PhotoCutSelector from '@/components/page/groupcall/photo-select/PhotoCutSelector'
 import PhotoPicker from '@/components/page/groupcall/photo-select/PhotoPicker'
 import WebCam from '@/components/page/groupcall/photo-select/WebCam'
+import StartButton from '@/components/page/groupcall/StartButton'
 import { cn } from '@/lib/utils'
 
 // 메인 페이지 컴포넌트
@@ -167,17 +168,14 @@ export default function PhotoSelectPage({
 
             {/* 완료 버튼 */}
             <div className="flex justify-center pt-4">
-              <button
-                onClick={handleComplete}
-                disabled={isCompleteDisabled}
-                className={`rounded-lg px-8 py-3 text-lg font-semibold transition-all ${
-                  isCompleteDisabled
-                    ? 'cursor-not-allowed bg-gray-300 text-gray-500'
-                    : 'bg-[#2D3243] text-white shadow-lg hover:bg-[#C9D76D] hover:text-[#2D3243] active:scale-95'
-                }`}
-              >
-                선택 완료
-              </button>
+              <div className="w-48">
+                <StartButton
+                  onClick={handleComplete}
+                  disabled={isCompleteDisabled}
+                >
+                  선택 완료
+                </StartButton>
+              </div>
             </div>
           </div>
         </div>

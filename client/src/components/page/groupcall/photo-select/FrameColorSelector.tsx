@@ -20,7 +20,7 @@ export default function FrameColorSelector({
             key={color}
             className={`h-10 w-10 rounded-full border-2 transition-all hover:scale-110 ${
               frameColor === color
-                ? 'border-[#2D3243] shadow-lg'
+                ? 'border-[#D86F4A] shadow-lg'
                 : 'border-gray-300 hover:border-gray-400'
             }`}
             style={{ backgroundColor: color }}
