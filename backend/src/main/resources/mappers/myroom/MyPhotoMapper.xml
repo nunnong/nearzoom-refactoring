@@ -42,7 +42,7 @@
       </foreach>
     </if>
 
-    <if test="cond.cursor != null and cond.cursor > 0">
+    <if test="cond.cursor != null">
       AND p.photo_id &lt; #{cond.cursor}
     </if>
 

@@ -27,11 +27,34 @@ public class MyRoomServiceImpl implements MyRoomService {
     @Override
     public MyPhotoListResponse getMyPhotos(Authentication authentication, MyPhotoListCondition cond) {
         UserAuthInfoResponse userInfo = authUtil.getUserAuthInfo(authentication);
+        System.out.println(">>> [DEBUG] 👤 UserInfo - Email: " + userInfo.email() + ", Social: " + userInfo.social());
+
         Long userId = userRepository.getByEmailAndSocial(userInfo.email(), userInfo.social()).getUserId();
+        System.out.println(">>> [DEBUG] 🔍 Found userId: " + userId);
+
+        System.out.println(">>> [DEBUG] 📋 Condition - limit: " + cond.limit() +
+            ", cursor: " + cond.cursor() +
+            ", heart: " + cond.heart() +
+            ", partnerEmails: " + cond.partnerEmails() +
+            ", startDate: " + cond.startDate() +
+            ", endDate: " + cond.endDate());
 
         List<MyPhotoResponse> photos = photoRepository.findPhotosByCondition(userId, cond);
+        System.out.println(">>> [DEBUG] 📸 MyBatis 쿼리 결과: " + photos.size() + "개");
+
+        if (photos.isEmpty()) {
+            System.out.println(">>> [DEBUG] ❌ 사진이 없습니다!");
+        } else {
+            System.out.println(">>> [DEBUG] ✅ 첫 번째 사진: photoId=" + photos.get(0).photoId() +
+                ", imageUrl=" + photos.get(0).imageUrl());
+        }
+
         boolean hasNext = photos.size() == cond.limit();
         Long nextCursor = hasNext ? photos.get(photos.size() - 1).photoId() : null;
+
+        System.out.println(">>> [DEBUG] 📊 최종 응답: photos=" + photos.size() +
+            ", hasNext=" + hasNext +
+            ", nextCursor=" + nextCursor);
 
         return new MyPhotoListResponse(photos, hasNext, nextCursor);
     }
