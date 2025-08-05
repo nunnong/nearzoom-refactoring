@@ -6,6 +6,9 @@ import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingResult;
 import com.ssafy.nearzoom.domain.photoPrompt.service.PhotoPromptService;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import com.ssafy.nearzoom.global.response.ApiResponse;
+import com.ssafy.nearzoom.global.swagger.response.ApiResponseConstants.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -21,13 +24,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/photo")
+@RequestMapping("/photoprompt")
 @RequiredArgsConstructor
-public class PhotoController {
+@Tag(name = "PhotoPrompt API", description = "컷, 배경 저장 및 이미지 서버로 요청")
+public class PhotoPromptController {
 
   private final PhotoPromptService photoService;
 
   @PostMapping("/selection")
+  @Operation(summary = "컷 정보 저장", description = "선택한 컷 순서 저장")
+  @PostApiResponses
   public ResponseEntity<ApiResponse<Map<String, Object>>> savePhotoSelection(
       HttpServletRequest request,
       @RequestBody PhotoSelectionRequest selectionRequest) {
@@ -51,6 +57,34 @@ public class PhotoController {
   }
 
   @PostMapping("/background")
+  @Operation(summary = "배경 정보 저장", description = "배경 및 증강용 프롬프트 저장" +
+      """
+      사진의 배경을 설정합니다.
+      
+              **backgroundType별 필수 필드:**
+              - `solid`: colorValue 필수, promptText 무시
+              - `prompt`: promptText 필수, colorValue 무시
+      
+              **예시 요청:**
+              ```json
+              // 단색 배경
+              {
+                "roomId": 123,
+                "backgroundType": "solid",
+                "colorValue": "#FF5733",
+                "imageUrl": "https://example.com/image.jpg"
+              }
+      
+              // 프롬프트 배경
+              {
+                "roomId": 123,
+                "backgroundType": "prompt",
+                "promptText": "아름다운 벚꽃 풍경",
+                "imageUrl": "https://example.com/image.jpg"
+              }
+              ```
+      """)
+  @PostApiResponses
   public ResponseEntity<ApiResponse<Map<String, Object>>> saveBackgroundInfo(
       HttpServletRequest request,
       @RequestBody BackgroundInfoRequest backgroundRequest) {
@@ -75,6 +109,8 @@ public class PhotoController {
   }
 
   @GetMapping("/result/{jobId}")
+  @Operation(summary = "처리 결과 조회", description = "이미지 처리 결과 조회")
+  @GetApiResponses
   public ResponseEntity<ApiResponse<Map<String, Object>>> getProcessingResult(
       @PathVariable String jobId) {
 

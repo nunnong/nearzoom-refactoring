@@ -92,3 +92,14 @@ cloud:
       bucket: ${BUCKET_NAME}
     stack:
       auto: false
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+  packages-to-scan: com.ssafy.nearzoom
+  default-consumes-media-type: application/json
+  default-produces-media-type: application/json

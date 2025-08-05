@@ -4,6 +4,9 @@ import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingComplete
 import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingFailedWebhook;
 import com.ssafy.nearzoom.domain.photoPrompt.service.WebhookService;
 import com.ssafy.nearzoom.global.response.ApiResponse;
+import com.ssafy.nearzoom.global.swagger.response.ApiResponseConstants.PostApiResponses;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -17,11 +20,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/webhooks")
 @RequiredArgsConstructor
+@Tag(name = "Webhook API", description = "외부 서비스 웹훅 처리")
 public class WebhookController {
 
   private final WebhookService webhookService;
 
   @PostMapping("/image-processing/completed")
+  @Operation(summary = "이미지 처리 완료 웹훅", description = "외부 이미지 처리 서비스에서 작업 완료 시 호출되는 웹훅")
+  @PostApiResponses
   public ResponseEntity<ApiResponse<Map<String, Object>>> handleImageProcessingCompleted(
       @RequestBody ImageProcessingCompletedWebhook webhook) {
 
@@ -43,6 +49,8 @@ public class WebhookController {
   }
 
   @PostMapping("/image-processing/failed")
+  @Operation(summary = "이미지 처리 실패 웹훅", description = "외부 이미지 처리 서비스에서 작업 실패 시 호출되는 웹훅")
+  @PostApiResponses
   public ResponseEntity<ApiResponse<Map<String, Object>>> handleImageProcessingFailed(
       @RequestBody ImageProcessingFailedWebhook webhook) {
 
