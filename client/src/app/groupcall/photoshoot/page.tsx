@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 import Header from '@/components/page/groupcall/Header'
+import CompletionModal from '@/components/page/groupcall/photoshoot/CompletionModal'
 import ProgressBar from '@/components/page/groupcall/photoshoot/ProgressBar'
 import ScreenShareArea from '@/components/page/groupcall/photoshoot/ScreenShareArea'
 import Timer from '@/components/page/groupcall/photoshoot/Timer'
@@ -74,7 +75,7 @@ export default function GroupShotRoom({
   isShooting = false,
   timer = 0,
   screenStream,
-  currentCutIndex = 2,
+  currentCutIndex = 4,
   onStartCut = () => {},
   onMicToggle = () => {},
   onCameraToggle = () => {},
@@ -157,7 +158,18 @@ export default function GroupShotRoom({
   }))
 
   // 컷 라벨(진행바 단계)
-  const cutLabels = ['1컷', '2컷', '3컷', '4컷', '완료']
+  const cutLabels = ['1컷', '2컷', '3컷', '4컷']
+  // 현재 컷 인덱스가 마지막 컷을 넘어가면 완료 모달 표시
+  const [showCompletionModal, setShowCompletionModal] = useState(false) 
+  useEffect(() => {
+    if (currentCutIndex >= 4) {
+      setShowCompletionModal(true)
+    }
+  }, [currentCutIndex])
+
+  const handleNextStep = () => {
+    setShowCompletionModal(false)
+  }
 
   return (
     <div className={cn('flex min-h-screen flex-col bg-[#F5F6EF]', className)}>
@@ -223,6 +235,11 @@ export default function GroupShotRoom({
           onLeaveRoom={onLeaveRoom}
         />
       </div>
+      {/* 완료 모달 */}
+      <CompletionModal 
+        isOpen={showCompletionModal}
+        onClose={handleNextStep}
+      />
     </div>
   )
 }

@@ -18,12 +18,12 @@ interface VideoTileProps {
   className?: string
 }
 
-export default function VideoTile({ participant, className }: VideoTileProps) {
+export default function VideoTile({ participant, className, aspect = true }: VideoTileProps & { aspect?: boolean }) {
   return (
     <div
       className={cn(
         'group relative overflow-hidden rounded-2xl shadow-lg transition-all duration-300 hover:scale-[1.02]',
-        'aspect-video',
+        aspect && 'aspect-video',
         participant.isHost &&
           'shadow-xl ring-2 shadow-[#C9D76D]/20 ring-[#C9D76D]',
         className

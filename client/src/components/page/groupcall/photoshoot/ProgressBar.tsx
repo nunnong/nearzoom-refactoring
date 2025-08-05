@@ -1,9 +1,9 @@
 import React from 'react'
 
 interface ProgressBarProps {
-  currentStep: number    // 0~n-1 (현 단계 인덱스)
-  labels: string[]       // 단계별 라벨
-  className?: string     // width 제어 등 외부 스타일링
+  currentStep: number    
+  labels: string[]       
+  className?: string     
 }
 
 export default function ProgressBar({ currentStep, labels, className = '' }: ProgressBarProps) {
@@ -18,9 +18,9 @@ export default function ProgressBar({ currentStep, labels, className = '' }: Pro
                 flex items-center justify-center
                 rounded-full 
                 ${idx < currentStep
-                  ? 'bg-blue-700'
+                  ? 'bg-[#2D3243]'
                   : idx === currentStep
-                  ? 'border-2 border-blue-700 bg-white'
+                  ? 'border-2 border-[#2D3243] bg-white'
                   : 'border border-gray-300 bg-white'
                 }
                 w-6 h-6
@@ -40,13 +40,13 @@ export default function ProgressBar({ currentStep, labels, className = '' }: Pro
                   />
                 </svg>
               ) : idx === currentStep ? (
-                <span className="block w-2 h-2 bg-blue-700 rounded-full"></span>
+                <span className="block w-2 h-2 bg-[#2D3243] rounded-full"></span>
               ) : null}
             </div>
             <span
               className={`mt-1 text-xs whitespace-nowrap ${
                 idx === currentStep
-                  ? 'text-blue-700 font-semibold'
+                  ? 'text-[#2D3243] font-semibold'
                   : 'text-gray-400'
               }`}
             >
@@ -55,7 +55,7 @@ export default function ProgressBar({ currentStep, labels, className = '' }: Pro
           </li>
         ))}
 
-        {/* 선 그리기: 파란색(완료/진행), 회색(이후 단계) */}
+        {/* 선 그리기: #2D3243(완료/진행), 회색(이후 단계) */}
         <svg
           className="absolute left-0 right-0 top-[12px] w-full h-[2px] z-0 pointer-events-none"
           viewBox={`0 0 100 2`}
@@ -72,7 +72,7 @@ export default function ProgressBar({ currentStep, labels, className = '' }: Pro
                 x2={x2}
                 y1={1}
                 y2={1}
-                stroke={isPastOrCurrent ? "#1d4ed8" : "#e5e7eb"}
+                stroke={isPastOrCurrent ? "#2D3243" : "#e5e7eb"}
                 strokeWidth={isPastOrCurrent ? 2 : 1.5}
                 strokeLinecap="round"
               />
