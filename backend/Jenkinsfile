@@ -7,7 +7,7 @@ pipeline {
         // Git 관련 환경변수
         GIT_CREDENTIALS_ID = '9b618287-83a8-468a-84f1-57a90cdc7438'
         GIT_REPO_URL = 'https://lab.ssafy.com/s13-webmobile1-sub1/S13P11A605.git'
-        GIT_BRANCH = 'master'
+        GIT_BRANCH = 'backend'
     }
 
     stages {
