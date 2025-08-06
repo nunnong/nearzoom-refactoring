@@ -20,6 +20,7 @@ import org.springframework.web.cors.CorsConfiguration;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+
     private final CustomOAuth2UserService customOAuth2UserService;
     private final CustomSuccessHandler customSuccessHandler;
     private final JWTUtil jwtUtil;
@@ -31,7 +32,7 @@ public class SecurityConfig {
         http.cors(cors -> cors.configurationSource(request -> {
             CorsConfiguration config = new CorsConfiguration();
 
-            config.setAllowedOrigins(List.of("http://localhost:3000"));
+            config.setAllowedOrigins(List.of("https://nearzoom.store"));
             config.setAllowedMethods(List.of("GET", "POST", "DELETE", "PATCH"));
             config.setAllowedHeaders(List.of("*"));
             config.setAllowCredentials(true);
@@ -68,8 +69,7 @@ public class SecurityConfig {
 
         http.authorizeHttpRequests(
             (auth) -> auth
-                .requestMatchers("/auth/refresh", "user/logout", "/api/s3-test/**",
-                    "myroom/photos/**")
+                .requestMatchers("/auth/refresh", "user/logout")
                 .permitAll()
                 .anyRequest().authenticated());
 
