@@ -3,7 +3,7 @@ import {
   getLiveKitURL,
   randomString,
 } from '@/components/page/room/utils/livekit'
-import { AccessToken, AccessTokenOptions, VideoGrant } from 'livekit-server-sdk'
+import { AccessToken, AccessTokenOptions, VideoGrant, RoomServiceClient } from 'livekit-server-sdk'
 import { NextRequest, NextResponse } from 'next/server'
 
 const API_KEY = process.env.LIVEKIT_API_KEY
@@ -46,13 +46,23 @@ export async function GET(request: NextRequest) {
     if (!randomParticipantPostfix) {
       randomParticipantPostfix = randomString(4)
     }
+
+    // Check if this is the first participant (to assign host role)
+    const isFirstParticipant = await checkIfFirstParticipant(roomName)
+    
+    // Set role metadata
+    const roleMetadata = {
+      role: isFirstParticipant ? "host" : "participant"
+    }
+
     const participantToken = await createParticipantToken(
       {
         identity: `${participantName}__${randomParticipantPostfix}`,
         name: participantName,
-        metadata,
+        metadata: JSON.stringify(roleMetadata),
       },
-      roomName
+      roomName,
+      isFirstParticipant // Pass host status for permissions
     )
 
     // Return connection details
@@ -77,7 +87,8 @@ export async function GET(request: NextRequest) {
 
 function createParticipantToken(
   userInfo: AccessTokenOptions,
-  roomName: string
+  roomName: string,
+  isHost: boolean = false
 ) {
   const at = new AccessToken(API_KEY, API_SECRET, userInfo)
   at.ttl = '5m'
@@ -87,9 +98,30 @@ function createParticipantToken(
     canPublish: true,
     canPublishData: true,
     canSubscribe: true,
+    roomAdmin: isHost, // Give admin permissions to host
   }
   at.addGrant(grant)
   return at.toJwt()
+}
+
+// Function to check if this is the first participant in the room
+async function checkIfFirstParticipant(roomName: string): Promise<boolean> {
+  if (!API_KEY || !API_SECRET || !LIVEKIT_URL) {
+    console.error('LiveKit credentials not configured')
+    return false
+  }
+
+  try {
+    const roomService = new RoomServiceClient(LIVEKIT_URL, API_KEY, API_SECRET)
+    const participants = await roomService.listParticipants(roomName)
+    
+    console.log(`🎯 Room ${roomName} has ${participants.length} existing participants`)
+    return participants.length === 0
+  } catch (error) {
+    // If room doesn't exist or has no participants, this is the first participant
+    console.log(`🎯 Room ${roomName} doesn't exist or has no participants, assigning host role`)
+    return true
+  }
 }
 
 function getCookieExpirationTime(): string {

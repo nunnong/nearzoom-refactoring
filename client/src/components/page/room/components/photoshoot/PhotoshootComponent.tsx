@@ -120,9 +120,7 @@ export default function PhotoshootComponent({
 
       {/* 오른쪽: 사이드바 */}
       <Sidebar
-        participants={participants}
-        localParticipant={localParticipant}
-        showStartButton={localParticipant?.permissions?.canPublish}
+        showStartButton={false}
         showLeaveButton={true}
         onStartCall={onStartCut}
       />

@@ -6,6 +6,7 @@ import { useUserStore } from './providers/AuthProvider'
 import { PhotoBoothProvider } from './providers/PhotoBoothProvider'
 import { CursorProvider } from './providers/CursorProvider'
 import PhotoBooth from './components/PhotoBooth'
+import DebugPanel from './components/DebugPanel'
 import { RoomContext } from '@livekit/components-react'
 import { Room, RoomConnectOptions } from 'livekit-client'
 import { ConnectionDetails } from './types/livekit'
@@ -167,13 +168,14 @@ export default function RoomPage({ roomName }: RoomPageProps) {
 
   return (
     <div ref={containerRef} className="h-full">
-      <PhotoBoothProvider roomName={roomName}>
-        <RoomContext.Provider value={room}>
+      <RoomContext.Provider value={room}>
+        <PhotoBoothProvider roomName={roomName}>
           <CursorProvider containerRef={containerRef}>
-            <PhotoBooth roomName={roomName} />
+            <PhotoBooth />
+            <DebugPanel />
           </CursorProvider>
-        </RoomContext.Provider>
-      </PhotoBoothProvider>
+        </PhotoBoothProvider>
+      </RoomContext.Provider>
     </div>
   )
 }
