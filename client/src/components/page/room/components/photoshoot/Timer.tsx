@@ -29,8 +29,9 @@ export default function Timer({
   const radius = 59
   const circumference = 2 * Math.PI * radius 
   
-  // 진행률 계산 (10초 기준)
-  const progress = seconds > 0 ? (10 - seconds) / 10 : 1
+  // 진행률 계산 (5초 기준으로 수정)
+  const totalSeconds = 5 // 초기 카운트다운 시간
+  const progress = seconds > 0 ? (totalSeconds - seconds) / totalSeconds : 1
   const strokeDashoffset = circumference - (circumference * progress)
 
   return (

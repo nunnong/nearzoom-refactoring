@@ -16,6 +16,7 @@ import {
   createFrameSlice,
   createCutSlice,
   createPhotoSlice,
+  createShootingSlice,
   type PhotoBoothSlice,
 } from '../stores/photobooth'
 import { createRoomLeaderSlice } from '../stores/roomLeaderSlice'
@@ -49,6 +50,7 @@ const createPhotoBoothStore = (roomName: string) => {
     ...createFrameSlice(set, roomName),
     ...createCutSlice(set, get, roomName),
     ...createPhotoSlice(set, get, roomName),
+    ...createShootingSlice(set, get, roomName),
     ...createRoomLeaderSlice(set),
   }))
 }
@@ -171,6 +173,20 @@ export const PhotoBoothProvider = ({
     store.getState().setCurrentUsername(participantIdentity)
     store.getState().setRoomLeader(currentRoomLeader)
     store.getState().setIsRoomLeader(isRoomLeader)
+
+    // 방장인 경우 localStorage에서 캡처된 이미지들 로드
+    if (isRoomLeader && roomNameToSet) {
+      const { loadPhotosFromStorage } = require('../utils/photoStorage')
+      const storedPhotos = loadPhotosFromStorage(roomNameToSet)
+      
+      if (storedPhotos.length > 0) {
+        console.log(`📂 Loaded ${storedPhotos.length} photos from localStorage for host`)
+        store.setState({ capturedImages: storedPhotos })
+      }
+    } else {
+      // 비방장은 캡처된 이미지 없음
+      store.setState({ capturedImages: [] })
+    }
   }, [
     liveKitRoomName,
     roomName,
@@ -206,6 +222,22 @@ export const PhotoBoothProvider = ({
       if (data.selectedPhotos !== undefined) {
         store.setState({ selectedPhotos: data.selectedPhotos })
       }
+      // Shooting slice 상태 업데이트
+      if (data.isShooting !== undefined) {
+        store.setState({ isShooting: data.isShooting })
+      }
+      if (data.shootingTimer !== undefined) {
+        store.setState({ shootingTimer: data.shootingTimer })
+      }
+      if (data.isCapturing !== undefined) {
+        store.setState({ isCapturing: data.isCapturing })
+      }
+      if (data.capturedImages !== undefined) {
+        store.setState({ capturedImages: data.capturedImages })
+      }
+      if (data.currentShootingCut !== undefined) {
+        store.setState({ currentShootingCut: data.currentShootingCut })
+      }
     }
     
     // Yjs 상태 동기화 시작
@@ -214,9 +246,18 @@ export const PhotoBoothProvider = ({
 
     return () => {
       console.log('🧹 Cleaning up Yjs PhotoBooth state for room:', roomName)
+      
+      // 타이머 정리 (방장인 경우)
+      if (isRoomLeader) {
+        const currentState = store.getState()
+        if (typeof currentState.cleanupTimer === 'function') {
+          currentState.cleanupTimer()
+        }
+      }
+      
       if (cleanup) cleanup()
     }
-  }, [roomName, store])
+  }, [roomName, store, isRoomLeader])
 
   return (
     <PhotoBoothStoreContext.Provider value={store}>

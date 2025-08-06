@@ -7,12 +7,14 @@ export type { StateSlice } from './stateSlice'
 export type { FrameSlice } from './frameSlice'
 export type { CutSlice } from './cutSlice'
 export type { PhotoSlice } from './photoSlice'
+export type { ShootingSlice } from './shootingSlice'
 
 // Slice creators export
 export { createStateSlice } from './stateSlice'
 export { createFrameSlice } from './frameSlice'
 export { createCutSlice } from './cutSlice'
 export { createPhotoSlice } from './photoSlice'
+export { createShootingSlice } from './shootingSlice'
 
 // Combined PhotoBooth slice type
 export type PhotoBoothSlice = 
@@ -20,6 +22,7 @@ export type PhotoBoothSlice =
   import('./frameSlice').FrameSlice & 
   import('./cutSlice').CutSlice & 
   import('./photoSlice').PhotoSlice &
+  import('./shootingSlice').ShootingSlice &
   import('../roomLeaderSlice').RoomLeaderSlice
 
 // Room별 WebSocket Provider와 Doc을 관리하는 Map
@@ -87,22 +90,28 @@ export const getPhotoMap = (roomName: string) => {
   return room.ydoc.getMap('photoState')
 }
 
+export const getShootingMap = (roomName: string) => {
+  const room = getOrCreateRoom(roomName)
+  return room.ydoc.getMap('shootingState')
+}
+
 // 하위 호환성을 위한 legacy 함수
 export const getPhotoBoothMap = (roomName: string) => {
   return getStateMap(roomName)
 }
 
-// PhotoBooth 상태 초기화 (방장 관리 제거, 촬영 설정만 관리)
+// PhotoBooth 상태 초기화 (모든 slice 상태 포함)
 export const initializePhotoBoothState = (
   roomName: string,
   onUpdate: (data: any) => void
 ) => {
   const photoBoothMap = getPhotoBoothMap(roomName)
+  const shootingMap = getShootingMap(roomName)
   
   console.log('🎯 Initializing PhotoBooth state for room:', roomName)
   
-  // 변경사항 감지 리스너 설정
-  const updateHandler = () => {
+  // 기본 PhotoBooth 상태 변경사항 감지 리스너
+  const photoBoothUpdateHandler = () => {
     const data = {
       photoBoothState: photoBoothMap.get('photoBoothState'),
       frameColor: photoBoothMap.get('frameColor'),
@@ -114,13 +123,30 @@ export const initializePhotoBoothState = (
     onUpdate(data)
   }
   
-  photoBoothMap.observe(updateHandler)
+  // Shooting 상태 변경사항 감지 리스너
+  const shootingUpdateHandler = () => {
+    const data = {
+      isShooting: shootingMap.get('isShooting'),
+      shootingTimer: shootingMap.get('shootingTimer'),
+      isCapturing: shootingMap.get('isCapturing'),
+      capturedImages: shootingMap.get('capturedImages') || [],
+      currentShootingCut: shootingMap.get('currentShootingCut'),
+    }
+    console.log('🔄 Shooting state updated:', data)
+    onUpdate(data)
+  }
+  
+  // 리스너 등록
+  photoBoothMap.observe(photoBoothUpdateHandler)
+  shootingMap.observe(shootingUpdateHandler)
   
   // 초기 상태 전송
-  updateHandler()
+  photoBoothUpdateHandler()
+  shootingUpdateHandler()
   
   return () => {
-    photoBoothMap.unobserve(updateHandler)
+    photoBoothMap.unobserve(photoBoothUpdateHandler)
+    shootingMap.unobserve(shootingUpdateHandler)
   }
 }
 
@@ -133,31 +159,73 @@ export const updatePhotoBoothState = (roomName: string, state: string) => {
   console.log('🔄 PhotoBooth state set to:', state)
 }
 
-// Frame slice 업데이트
+// Frame slice 업데이트 (photoBoothMap으로 통합)
 export const updateFrameColor = (roomName: string, color: string) => {
-  const frameMap = getFrameMap(roomName)
-  frameMap.set('frameColor', color)
+  const photoBoothMap = getPhotoBoothMap(roomName)
+  photoBoothMap.set('frameColor', color)
   console.log('🔄 Frame color set to:', color)
 }
 
-// Cut slice 업데이트
+// Cut slice 업데이트 (photoBoothMap으로 통합)
 export const updateCutCount = (roomName: string, count: number) => {
-  const cutMap = getCutMap(roomName)
-  cutMap.set('cutCount', count)
+  const photoBoothMap = getPhotoBoothMap(roomName)
+  photoBoothMap.set('cutCount', count)
   console.log('🔄 Cut count set to:', count)
 }
 
 export const updateCurrentCutIndex = (roomName: string, index: number) => {
-  const cutMap = getCutMap(roomName)
-  cutMap.set('currentCutIndex', index)
+  const photoBoothMap = getPhotoBoothMap(roomName)
+  photoBoothMap.set('currentCutIndex', index)
   console.log('🔄 Current cut index set to:', index)
 }
 
-// Photo slice 업데이트
+// Photo slice 업데이트 (photoBoothMap으로 통합)
 export const updateSelectedPhotos = (roomName: string, photos: string[]) => {
-  const photoMap = getPhotoMap(roomName)
-  photoMap.set('selectedPhotos', photos)
+  const photoBoothMap = getPhotoBoothMap(roomName)
+  photoBoothMap.set('selectedPhotos', photos)
   console.log('🔄 Selected photos updated:', photos)
+}
+
+// Shooting slice 업데이트
+export const updateShootingState = (roomName: string, state: Partial<{
+  isShooting: boolean
+  shootingTimer: number
+  isCapturing: boolean
+  currentShootingCut: number
+}>) => {
+  const shootingMap = getShootingMap(roomName)
+  
+  if (state.isShooting !== undefined) {
+    shootingMap.set('isShooting', state.isShooting)
+    console.log('🔄 isShooting set to:', state.isShooting)
+  }
+  
+  if (state.shootingTimer !== undefined) {
+    shootingMap.set('shootingTimer', state.shootingTimer)
+    console.log('🔄 shootingTimer set to:', state.shootingTimer)
+  }
+  
+  if (state.isCapturing !== undefined) {
+    shootingMap.set('isCapturing', state.isCapturing)
+    console.log('🔄 isCapturing set to:', state.isCapturing)
+  }
+  
+  if (state.currentShootingCut !== undefined) {
+    shootingMap.set('currentShootingCut', state.currentShootingCut)
+    console.log('🔄 currentShootingCut set to:', state.currentShootingCut)
+  }
+}
+
+export const updateShootingTimer = (roomName: string, seconds: number) => {
+  const shootingMap = getShootingMap(roomName)
+  shootingMap.set('shootingTimer', seconds)
+  console.log('🔄 Shooting timer set to:', seconds)
+}
+
+export const updateCapturedImages = (roomName: string, images: string[]) => {
+  const shootingMap = getShootingMap(roomName)
+  shootingMap.set('capturedImages', images)
+  console.log('🔄 Captured images updated, count:', images.length)
 }
 
 // Room 연결 해제

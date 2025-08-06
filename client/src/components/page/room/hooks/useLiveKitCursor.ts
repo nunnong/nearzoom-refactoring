@@ -127,7 +127,7 @@ export const useLiveKitCursor = ({
     }
   }, [room, removeCursor, markCursorForRemoval])
   
-  // 커서 위치 업데이트 함수
+  // 커서 위치 업데이트 함수 (로컬 표시 + DataChannel 전송 분리)
   const updateCursorPosition = useCallback((x: number, y: number) => {
     if (!room || !userIdRef.current || !userColorRef.current || !username) {
       console.log('updateCursorPosition: missing dependencies', {
@@ -139,24 +139,24 @@ export const useLiveKitCursor = ({
       return
     }
     
-    // Throttling
+    // 1. 즉시 로컬 커서 업데이트 (실시간 표시용, throttling 없음)
+    const localCursorData: CursorPosition = {
+      x,
+      y,
+      userId: userIdRef.current!,
+      userName: username,
+      color: userColorRef.current!,
+      timestamp: Date.now()
+    }
+    
+    setLocalCursor(localCursorData) // 즉시 실행
+    
+    // 2. DataChannel 전송 (throttled)
     if (throttleRef.current) {
       clearTimeout(throttleRef.current)
     }
     
     throttleRef.current = setTimeout(() => {
-      // Local store 업데이트
-      const localCursorData: CursorPosition = {
-        x,
-        y,
-        userId: userIdRef.current!,
-        userName: username,
-        color: userColorRef.current!,
-        timestamp: Date.now()
-      }
-      
-      setLocalCursor(localCursorData)
-      
       // LiveKit Data Packet으로 다른 사용자들에게 전송
       const cursorPacket: CursorDataPacket = {
         type: 'cursor_update',
@@ -178,7 +178,7 @@ export const useLiveKitCursor = ({
         console.error('Failed to publish cursor data:', error)
       })
       
-      console.log('📡 Published cursor update:', { x, y, topic: 'cursor' })
+      console.log('📡 Published cursor update (throttled):', { x, y, topic: 'cursor' })
     }, throttleMs)
   }, [room, username, setLocalCursor, encoder, throttleMs])
   

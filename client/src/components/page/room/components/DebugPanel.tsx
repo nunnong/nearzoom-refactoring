@@ -17,6 +17,7 @@ export default function DebugPanel({ className = '' }: DebugPanelProps) {
   const cutCount = usePhotoBoothStore(state => state.cutCount)
   const currentCutIndex = usePhotoBoothStore(state => state.currentCutIndex)
   const selectedPhotos = usePhotoBoothStore(state => state.selectedPhotos)
+  const capturedImages = usePhotoBoothStore(state => state.capturedImages)
   
   // Room leader 상태들
   const isRoomLeader = usePhotoBoothStore(state => state.isRoomLeader)
@@ -33,6 +34,7 @@ export default function DebugPanel({ className = '' }: DebugPanelProps) {
   const nextCut = usePhotoBoothStore(state => state.nextCut)
   const resetCutIndex = usePhotoBoothStore(state => state.resetCutIndex)
   const clearSelectedPhotos = usePhotoBoothStore(state => state.clearSelectedPhotos)
+  const clearCapturedImages = usePhotoBoothStore(state => state.clearCapturedImages)
   
   // 개발 환경에서만 표시
   if (process.env.NODE_ENV !== 'development') {
@@ -256,6 +258,44 @@ export default function DebugPanel({ className = '' }: DebugPanelProps) {
                 </div>
               </div>
             </div>
+
+            {/* Captured Photos Gallery (Host Only) */}
+            {isRoomLeader && (
+              <div>
+                <h4 className="text-yellow-400 font-semibold mb-2">📷 Captured Photos (Host Only)</h4>
+                {capturedImages.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="text-gray-300 text-xs">
+                      {capturedImages.length} photo(s) in localStorage
+                    </div>
+                    <div className="grid grid-cols-2 gap-1 max-h-32 overflow-y-auto">
+                      {capturedImages.map((imageData, index) => (
+                        <div key={index} className="relative group">
+                          <img
+                            src={imageData}
+                            alt={`Captured ${index + 1}`}
+                            className="w-full h-16 object-cover rounded border border-gray-600 hover:border-cyan-400 transition-colors"
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center">
+                            <span className="text-white text-xs">#{index + 1}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={clearCapturedImages}
+                      className="w-full px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                    >
+                      Clear All Captured Photos
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-gray-500 text-xs text-center py-3 border border-gray-600 rounded">
+                    No photos captured yet
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Debug Tools */}
             <div>

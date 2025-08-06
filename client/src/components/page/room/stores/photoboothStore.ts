@@ -33,7 +33,7 @@ export type PhotoBoothSlice = PhotoBoothStoreState & PhotoBoothActions & RoomLea
 
 export const defaultPhotoBoothState: PhotoBoothStoreState = {
   photoBoothState: PhotoBoothState.WAITING,
-  currentCutIndex: 1,
+  currentCutIndex: 0,
   selectedPhotos: [],
   frameColor: '#FFFFFF',
   cutCount: 4,
@@ -84,7 +84,7 @@ export const createPhotoBoothSlice = (set: any, get: any, api: any) => ({
   resetPhotoBoothData: () => 
     set((state: any) => ({
       photoBoothState: PhotoBoothState.WAITING,
-      currentCutIndex: 1,
+      currentCutIndex: 0,
       selectedPhotos: [],
       frameColor: '#FFFFFF',
       cutCount: 4,

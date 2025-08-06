@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { useCursorStore } from '../providers/CursorProvider'
+import { useCursorStore, useRealtimeLocalCursor } from '../providers/CursorProvider'
 
 // CSS 애니메이션 정의
 const cursorAnimationStyles = `
@@ -54,31 +54,36 @@ const CursorLabel: React.FC<{ userName: string; color: string }> = ({ userName, 
 )
 
 export const CursorOverlay: React.FC<CursorOverlayProps> = ({ className = '' }) => {
-  const cursors = useCursorStore(state => state.cursors)
-  const localCursor = useCursorStore(state => state.localCursor)
+  // 원격 커서들 (DataChannel로 수신)
+  const remoteCursors = useCursorStore(state => state.cursors)
   const removingCursors = useCursorStore(state => state.removingCursors)
   
-  // 디버깅용 로그 (LiveKit 기반)
-  console.log('🎯 CursorOverlay (LiveKit):', {
-    remoteCursors: cursors.size,
-    remoteCursorsList: Array.from(cursors.entries()).map(([id, cursor]) => ({
+  // 실시간 로컬 커서 (React state로 즉시 반응)
+  const { localCursor, isActive } = useRealtimeLocalCursor()
+  
+  // 디버깅용 로그 (하이브리드 시스템)
+  console.log('🎯 CursorOverlay (Hybrid):', {
+    realtimeLocalCursor: localCursor ? `${localCursor.userName} at ${localCursor.x},${localCursor.y}` : null,
+    isLocalActive: isActive,
+    remoteCursors: remoteCursors.size,
+    remoteCursorsList: Array.from(remoteCursors.entries()).map(([id, cursor]) => ({
       id,
       user: cursor.userName,
       pos: `${cursor.x},${cursor.y}`
-    })),
-    localCursor: localCursor ? `${localCursor.userName} at ${localCursor.x},${localCursor.y}` : null
+    }))
   })
   
   return (
     <div className={`absolute inset-0 pointer-events-none z-50 ${className}`}>
-      {/* 로컬 커서 표시 */}
-      {localCursor && (
+      {/* 실시간 로컬 커서 표시 (즉시 반응) */}
+      {localCursor && isActive && (
         <div
-          className="absolute pointer-events-none transition-all duration-150 ease-out"
+          className="absolute pointer-events-none"
           style={{
             left: localCursor.x - 8, // 중심점 조정
             top: localCursor.y - 8,  // 중심점 조정
             transform: 'translate(0, 0)',
+            // 실시간이므로 transition 없음 (더 반응적)
           }}
         >
           <CursorIcon color={localCursor.color} />
@@ -86,22 +91,23 @@ export const CursorOverlay: React.FC<CursorOverlayProps> = ({ className = '' }) 
         </div>
       )}
       
-      {/* 다른 사용자 커서들 */}
-      {Array.from(cursors.values()).map((cursor) => {
+      {/* 원격 사용자 커서들 (DataChannel로 수신, 부드러운 애니메이션) */}
+      {Array.from(remoteCursors.values()).map((cursor) => {
         const isRemoving = removingCursors.has(cursor.userId)
         return (
           <div
             key={cursor.userId}
-            className={`absolute pointer-events-none transition-all duration-300 ease-out ${
+            className={`absolute pointer-events-none ${
               isRemoving ? 'opacity-0 scale-75' : 'opacity-100 scale-100'
             }`}
             style={{
               left: cursor.x - 8, // 중심점 조정
               top: cursor.y - 8,  // 중심점 조정
               transform: 'translate(0, 0)',
-              transitionProperty: 'opacity, transform',
-              transitionDuration: '300ms',
-              transitionTimingFunction: 'ease-out',
+              // 부드러운 위치 전환 (자연스러운 곡선 보간)
+              transition: isRemoving 
+                ? 'opacity 300ms ease-out, transform 300ms ease-out' 
+                : 'left 100ms cubic-bezier(0.4, 0.0, 0.2, 1), top 100ms cubic-bezier(0.4, 0.0, 0.2, 1), opacity 300ms ease-out, transform 300ms ease-out',
             }}
           >
             <CursorIcon color={cursor.color} />
@@ -110,15 +116,19 @@ export const CursorOverlay: React.FC<CursorOverlayProps> = ({ className = '' }) 
         )
       })}
       
-      {/* 디버깅용 정보 */}
+      {/* 디버깅용 정보 (하이브리드 시스템) */}
       <div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white p-3 text-xs rounded max-w-xs">
-        <div>Local: {localCursor ? '✓' : '✗'}</div>
-        <div>Remote: {cursors.size}</div>
-        {cursors.size > 0 && (
+        <div className="text-yellow-300 font-semibold mb-1">Hybrid Cursor System</div>
+        <div>Local (Realtime): {localCursor && isActive ? '✓' : '✗'}</div>
+        <div>Remote (DataChannel): {remoteCursors.size}</div>
+        {remoteCursors.size > 0 && (
           <div className="mt-1 text-xs opacity-75">
-            Users: {Array.from(cursors.values()).map(c => c.userName).join(', ')}
+            Users: {Array.from(remoteCursors.values()).map(c => c.userName).join(', ')}
           </div>
         )}
+        <div className="mt-1 text-xs text-green-300">
+          Local: {localCursor ? `${localCursor.x},${localCursor.y}` : 'None'}
+        </div>
       </div>
     </div>
   )
