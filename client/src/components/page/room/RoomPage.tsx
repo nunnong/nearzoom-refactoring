@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUserStore } from './providers/AuthProvider'
 import { PhotoBoothProvider } from './providers/PhotoBoothProvider'
+import { CursorProvider } from './providers/CursorProvider'
 import PhotoBooth from './components/PhotoBooth'
 import { RoomContext } from '@livekit/components-react'
 import { Room, RoomConnectOptions } from 'livekit-client'
@@ -25,6 +26,7 @@ export default function RoomPage({ roomName }: RoomPageProps) {
 
   const username = useUserStore(state => state.username)
   const router = useRouter()
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const room = useMemo(() => new Room(), [])
 
@@ -164,10 +166,14 @@ export default function RoomPage({ roomName }: RoomPageProps) {
   }
 
   return (
-    <PhotoBoothProvider>
-      <RoomContext.Provider value={room}>
-        <PhotoBooth />
-      </RoomContext.Provider>
-    </PhotoBoothProvider>
+    <div ref={containerRef} className="h-full">
+      <PhotoBoothProvider roomName={roomName}>
+        <RoomContext.Provider value={room}>
+          <CursorProvider containerRef={containerRef}>
+            <PhotoBooth roomName={roomName} />
+          </CursorProvider>
+        </RoomContext.Provider>
+      </PhotoBoothProvider>
+    </div>
   )
 }
