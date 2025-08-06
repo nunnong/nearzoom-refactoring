@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react'
 
+import ControlPanel from '@/components/page/groupcall/ControlPanel'
 import Header from '@/components/page/groupcall/Header'
+import ParticipantList from '@/components/page/groupcall/ParticipantList'
 import CompletionModal from '@/components/page/groupcall/photoshoot/CompletionModal'
 import ProgressBar from '@/components/page/groupcall/photoshoot/ProgressBar'
 import ScreenShareArea from '@/components/page/groupcall/photoshoot/ScreenShareArea'
 import Timer from '@/components/page/groupcall/photoshoot/Timer'
-import Sidebar from '@/components/page/groupcall/Sidebar'
 import { cn } from '@/lib/utils'
 
 // 타입 정의
@@ -160,7 +161,7 @@ export default function GroupShotRoom({
   // 컷 라벨(진행바 단계)
   const cutLabels = ['1컷', '2컷', '3컷', '4컷']
   // 현재 컷 인덱스가 마지막 컷을 넘어가면 완료 모달 표시
-  const [showCompletionModal, setShowCompletionModal] = useState(false) 
+  const [showCompletionModal, setShowCompletionModal] = useState(false)
   useEffect(() => {
     if (currentCutIndex >= 4) {
       setShowCompletionModal(true)
@@ -172,7 +173,7 @@ export default function GroupShotRoom({
   }
 
   return (
-    <div className={cn('flex min-h-screen flex-col bg-[#F5F6EF]', className)}>
+    <div className={cn('flex min-h-screen flex-col bg-gray-100', className)}>
       {/* Header */}
       <Header
         roomInfo={roomInfo}
@@ -181,65 +182,75 @@ export default function GroupShotRoom({
       />
 
       {/* 메인 컨텐츠 */}
-      <div className="flex flex-1 gap-6 bg-gray-100 px-8 py-6">
-        <div className="relative flex flex-1 flex-col">
-          {/* 진행바 */}
-          <div className="py-3 flex justify-center">
-          <ProgressBar
-            currentStep={currentCutIndex - 1}
-            labels={cutLabels}
-            className="mx-auto"
-          />
-        </div>
-          {/* 화면 공유 영역 */}
-          <div className="flex flex-1 items-center justify-center pb-3">
-            <div className="relative w-full max-w-4xl">
-              <ScreenShareArea
-                screenStream={screenStream}
-                participantWebcams={participantWebcams}
+      <div className="flex flex-1 gap-6 px-8 py-6">
+        {/* 왼쪽: 메인 영역 (흰색 상자) */}
+        <div className="flex flex-1">
+          <div className="relative flex flex-1 flex-col rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            {/* 진행바 */}
+            <div className="flex justify-center py-3">
+              <ProgressBar
+                currentStep={currentCutIndex - 1}
+                labels={cutLabels}
+                className="mx-auto"
               />
+            </div>
 
-              {/* 타이머 오버레이 */}
-              <Timer
-                isActive={testShooting || isShooting}
-                seconds={testShooting ? testTimer : timer}
-              />
+            {/* 화면 공유 영역 */}
+            <div className="flex flex-1 items-center justify-center pb-3">
+              <div className="relative w-full max-w-4xl">
+                <ScreenShareArea
+                  screenStream={screenStream}
+                  participantWebcams={participantWebcams}
+                />
 
-              {/* 테스트 버튼 */}
-              <div className="absolute top-4 left-4 z-40">
-                <button
-                  onClick={startTestTimer}
-                  className="rounded-lg bg-purple-500 px-4 py-2 font-semibold text-white shadow-lg transition-colors hover:bg-purple-600"
-                >
-                  🧪 타이머 테스트
-                </button>
-                {(testShooting || testTimer > 0) && (
-                  <div className="mt-2 rounded bg-black/70 px-3 py-1 text-sm text-white">
-                    테스트: {testTimer}초
-                  </div>
-                )}
+                {/* 타이머 오버레이 */}
+                <Timer
+                  isActive={testShooting || isShooting}
+                  seconds={testShooting ? testTimer : timer}
+                />
+
+                {/* 테스트 버튼 */}
+                <div className="absolute top-4 left-4 z-40">
+                  <button
+                    onClick={startTestTimer}
+                    className="rounded-lg bg-purple-500 px-4 py-2 font-semibold text-white shadow-lg transition-colors hover:bg-purple-600"
+                  >
+                    🧪 타이머 테스트
+                  </button>
+                  {(testShooting || testTimer > 0) && (
+                    <div className="mt-2 rounded bg-black/70 px-3 py-1 text-sm text-white">
+                      테스트: {testTimer}초
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         {/* 오른쪽: 사이드바 */}
-        <Sidebar
-          participants={displayParticipants}
-          currentUser={currentUser}
-          showStartButton={currentUser.isHost}
-          showLeaveButton={true}
-          onStartCall={onStartCut}
-          onMicToggle={onMicToggle}
-          onCameraToggle={onCameraToggle}
-          onLeaveRoom={onLeaveRoom}
-        />
+        <div className="flex w-80 flex-col gap-6">
+          {/* 참가자 목록 */}
+          <ParticipantList
+            participants={displayParticipants}
+            showStartButton={currentUser.isHost}
+            onStartCall={onStartCut}
+            startButtonText="촬영 시작" // 커스텀 텍스트
+          />
+
+          {/* 컨트롤 버튼들 */}
+          <ControlPanel
+            currentUser={currentUser}
+            onMicToggle={onMicToggle}
+            onCameraToggle={onCameraToggle}
+            onLeaveRoom={onLeaveRoom}
+            showLeaveButton={true}
+          />
+        </div>
       </div>
+
       {/* 완료 모달 */}
-      <CompletionModal 
-        isOpen={showCompletionModal}
-        onClose={handleNextStep}
-      />
+      <CompletionModal isOpen={showCompletionModal} onClose={handleNextStep} />
     </div>
   )
 }

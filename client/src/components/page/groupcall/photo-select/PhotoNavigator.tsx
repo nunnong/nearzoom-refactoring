@@ -44,7 +44,7 @@ export default function PhotoNavigator({
           className={`flex h-12 w-12 items-center justify-center rounded-full transition-all duration-200 ${
             isFirstPhoto
               ? 'cursor-not-allowed bg-gray-200 text-gray-400'
-              : 'bg-[#2D3243] text-white shadow-lg hover:bg-[#C9D76D] hover:text-[#2D3243] active:scale-95'
+              : 'bg-[#2d3243]/80 text-white shadow-lg hover:bg-[#2D3243] active:scale-95'
           }`}
         >
           <svg
@@ -113,7 +113,7 @@ export default function PhotoNavigator({
           className={`flex h-12 w-12 items-center justify-center rounded-full transition-all duration-200 ${
             isLastPhoto
               ? 'cursor-not-allowed bg-gray-200 text-gray-400'
-              : 'bg-[#2D3243] text-white shadow-lg hover:bg-[#C9D76D] hover:text-[#2D3243] active:scale-95'
+              : 'bg-[#2d3243]/80 text-white shadow-lg hover:bg-[#2D3243] active:scale-95'
           }`}
         >
           <svg

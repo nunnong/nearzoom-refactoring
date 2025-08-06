@@ -1,12 +1,9 @@
 'use client'
 
-
 import { cn } from '@/lib/utils'
 
 import ControlPanel from './ControlPanel'
 import ParticipantList from './ParticipantList'
-
-
 
 interface Participant {
   id: string

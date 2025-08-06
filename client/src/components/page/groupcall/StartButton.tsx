@@ -41,13 +41,13 @@ export default function StartButton({
 
         if (front) {
           front.style.transform = 'translateY(-6px)'
-          front.style.background = '#D86F4A'
+          front.style.background = '#DC2626' // 더 진한 빨간색 (red-600)
           front.style.transition =
             'transform 250ms cubic-bezier(0.3, 0.7, 0.4, 1.5), background 250ms ease'
         }
         if (edge) {
           edge.style.background =
-            'linear-gradient(to left, #A85439 0%, #D86F4A 8%, #D86F4A 92%, #A85439 100%)'
+            'linear-gradient(to left, #B91C1C 0%, #DC2626 8%, #DC2626 92%, #B91C1C 100%)' // red-700, red-600
         }
         if (shadow) {
           shadow.style.transform = 'translateY(4px)'
@@ -65,13 +65,13 @@ export default function StartButton({
 
         if (front) {
           front.style.transform = 'translateY(-4px)'
-          front.style.background = '#C9D76D'
+          front.style.background = '#D86F4A' // 주황빨강으로 변경
           front.style.transition =
             'transform 600ms cubic-bezier(.3, .7, .4, 1), background 250ms ease'
         }
         if (edge) {
           edge.style.background =
-            'linear-gradient(to left, #B5C45A 0%, #C9D76D 8%, #C9D76D 92%, #B5C45A 100%)'
+            'linear-gradient(to left, #C55A3A 0%, #D86F4A 8%, #D86F4A 92%, #C55A3A 100%)' // 주황빨강 그라데이션
         }
         if (shadow) {
           shadow.style.transform = 'translateY(2px)'
@@ -121,7 +121,7 @@ export default function StartButton({
           height: '100%',
           borderRadius: '12px',
           background:
-            'linear-gradient(to left, #B5C45A 0%, #C9D76D 8%, #C9D76D 92%, #B5C45A 100%)',
+            'linear-gradient(to left, #C55A3A 0%, #D86F4A 8%, #D86F4A 92%, #C55A3A 100%)', // 주황빨강 기본값
           transition: 'background 250ms ease',
         }}
       />
@@ -134,7 +134,7 @@ export default function StartButton({
           borderRadius: '12px',
           fontSize: '1.25rem',
           color: 'white',
-          background: '#C9D76D',
+          background: '#D86F4A', // 주황빨강 기본값
           willChange: 'transform',
           transform: 'translateY(-4px)',
           transition:

@@ -27,10 +27,10 @@ export default function ControlPanel({
   showLeaveButton = true
 }: ControlPanelProps) {
   const buttonBaseClasses =
-    'flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110'
+    'flex items-center justify-center rounded-2xl transition-all duration-200 hover:scale-110 shadow-md'
 
   return (
-    <div className="rounded-2xl border border-[#2D3243]/10 bg-white shadow-lg p-4">
+    <div className="rounded-3xl bg-white/60 backdrop-blur-sm border border-white/30 shadow-lg p-4">
       <div className="flex justify-center gap-3">
         {/* 마이크 버튼 */}
         <button
@@ -39,16 +39,13 @@ export default function ControlPanel({
             buttonBaseClasses,
             'h-12 w-12',
             currentUser.isMicOn
-              ? 'bg-[#D0D6ED] hover:bg-[#D0D6ED]/80'
-              : 'bg-[#D86F4A] shadow-lg hover:bg-[#D86F4A]/80'
+              ? 'bg-white/60 hover:bg-white/80 text-gray-700'
+              : 'bg-red-500 hover:bg-red-600 text-white'
           )}
           title={currentUser.isMicOn ? '마이크 끄기' : '마이크 켜기'}
         >
           <svg
-            className={cn(
-              'h-5 w-5',
-              currentUser.isMicOn ? 'text-[#2D3243]' : 'text-white'
-            )}
+            className="h-5 w-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -86,16 +83,13 @@ export default function ControlPanel({
             buttonBaseClasses,
             'h-12 w-12',
             currentUser.isCameraOn
-              ? 'bg-[#D0D6ED] hover:bg-[#D0D6ED]/80'
-              : 'bg-[#D86F4A] shadow-lg hover:bg-[#D86F4A]/80'
+              ? 'bg-white/60 hover:bg-white/80 text-gray-700'
+              : 'bg-red-500 hover:bg-red-600 text-white'
           )}
           title={currentUser.isCameraOn ? '카메라 끄기' : '카메라 켜기'}
         >
           <svg
-            className={cn(
-              'h-5 w-5',
-              currentUser.isCameraOn ? 'text-[#2D3243]' : 'text-white'
-            )}
+            className="h-5 w-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -127,11 +121,12 @@ export default function ControlPanel({
             onClick={onLeaveRoom}
             className={cn(
               buttonBaseClasses,
-              'h-12 w-12 bg-[#D86F4A] shadow-lg hover:bg-[#D86F4A]/80'
+              'h-12 w-12 bg-red-500 hover:bg-red-600 text-white'
             )}
+            title="통화 종료"
           >
             <svg
-              className="h-5 w-5 text-white"
+              className="h-5 w-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

@@ -1,14 +1,13 @@
 'use client'
 
-import Image from 'next/image'
 import { useState } from 'react'
 
-import PromptSection from '@/components/page/groupcall/photo-select/PromptSection'
 import ControlPanel from '@/components/page/groupcall/ControlPanel'
 import Header from '@/components/page/groupcall/Header'
-import WebCam from '@/components/page/groupcall/photo-select/WebCam'
 import PhotoNavigator from '@/components/page/groupcall/photo-select/PhotoNavigator'
+import PromptSection from '@/components/page/groupcall/photo-select/PromptSection'
 import ToggleSwitch from '@/components/page/groupcall/photo-select/ToggleSwitch'
+import WebCam from '@/components/page/groupcall/photo-select/WebCam'
 import StartButton from '@/components/page/groupcall/StartButton'
 import { cn } from '@/lib/utils'
 
@@ -136,7 +135,7 @@ export default function BackgroundSelectPage({
 
   const displayParticipants =
     participants.length > 0 ? participants : mockParticipants
-  const currentPhoto = selectedPhotos[currentPhotoIndex]
+  //   const currentPhoto = selectedPhotos[currentPhotoIndex]
   const currentBackground = photoBackgrounds[currentPhotoIndex]
 
   // 사진 이동 핸들러
@@ -267,7 +266,7 @@ export default function BackgroundSelectPage({
                 {/* 이전 버튼 */}
                 <button
                   onClick={onBack}
-                  className="group relative flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-gray-400 to-gray-500 px-8 py-4 text-white shadow-lg transition-all duration-300 hover:scale-105 hover:from-gray-500 hover:to-gray-600 active:scale-95"
+                  className="group relative flex items-center gap-2 overflow-hidden rounded-xl bg-[#C4C8DA] px-8 py-4 text-white shadow-lg transition-all duration-300 hover:scale-105 hover:bg-[#2D3243] active:scale-95"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                   <svg

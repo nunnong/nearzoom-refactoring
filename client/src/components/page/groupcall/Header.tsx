@@ -32,7 +32,7 @@ export default function Header({
   }
 
   return (
-    <header className="flex-shrink-0 border-b border-[#2D3243]/80 bg-[#2D3243] px-8 py-4">
+    <header className="flex-shrink-0 border-b border-[#2D3243]/20 bg-[#2D3243] px-8 py-4 shadow-sm">
       <div className="flex w-full items-center justify-between">
         {/* 왼쪽: 로고 & 방 정보 */}
         <div className="flex items-center gap-6">
@@ -47,17 +47,17 @@ export default function Header({
             <div className="relative">
               <div>
               <h1 className="text-xl font-bold text-white">[Near-zoom]</h1>
-              <p className="text-sm text-[#C9D76D] mt-1 ml-1">{roomInfo.createdAt}</p>
+              <p className="text-sm text-white/70 mt-1 ml-1">{roomInfo.createdAt}</p>
             </div>
               
             </div>
           </div>
 
-          <div className="h-8 w-px bg-white/40"></div>
+          <div className="h-8 w-px bg-[#2D3243]/30"></div>
 
           {/* Room URL */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-white">
+            <div className="flex items-center gap-2 text-white/80">
               <svg
                 className="h-5 w-5"
                 fill="none"
@@ -76,14 +76,14 @@ export default function Header({
 
             <button
               onClick={handleCopyUrl}
-              className="group flex items-center gap-2 rounded-full border border-[#C9D76D]/30 bg-[#C9D76D]/20 px-4 py-2 transition-all hover:scale-105 hover:bg-[#C9D76D]/30"
+              className="group flex items-center gap-2 rounded-full bg-white/80 border border-[#2D3243]/20 px-4 py-2 transition-all hover:scale-105 hover:bg-white hover:shadow-md"
             >
-              <span className="font-mono text-sm text-[#C9D76D]">
+              <span className="font-mono text-sm text-[#2D3243]">
                 {roomInfo.url}
               </span>
               <div className="flex items-center gap-1">
                 <svg
-                  className="h-4 w-4 text-[#C9D76D] group-hover:text-white"
+                  className="h-4 w-4 text-[#2D3243]/70 group-hover:text-[#2D3243]"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -95,7 +95,7 @@ export default function Header({
                     d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
                   />
                 </svg>
-                <span className="text-xs text-[#C9D76D]">복사</span>
+                <span className="text-xs text-red">복사</span>
               </div>
             </button>
           </div>
@@ -105,10 +105,10 @@ export default function Header({
         <div className="flex items-center gap-4">
           <button
             onClick={onLeaveRoom}
-            className="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:scale-110 hover:bg-white/10"
+            className="flex h-10 w-10 items-center justify-center rounded-full transition-all hover:scale-110 hover:bg-white/10"
           >
             <svg
-              className="h-5 w-5 text-white"
+              className="h-5 w-5 text-white hover:text-white/80"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
