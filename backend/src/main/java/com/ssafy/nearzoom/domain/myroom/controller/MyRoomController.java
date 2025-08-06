@@ -7,6 +7,11 @@ import com.ssafy.nearzoom.domain.myroom.dto.PhotoDeleteRequest;
 import com.ssafy.nearzoom.domain.myroom.dto.PhotoEditSaveRequest;
 import com.ssafy.nearzoom.domain.myroom.service.MyRoomService;
 import com.ssafy.nearzoom.global.response.ApiResponse;
+import com.ssafy.nearzoom.global.swagger.response.ApiResponseConstants.DeleteApiResponses;
+import com.ssafy.nearzoom.global.swagger.response.ApiResponseConstants.GetApiResponses;
+import com.ssafy.nearzoom.global.swagger.response.ApiResponseConstants.PostApiResponses;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -21,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/myroom")
 @RequiredArgsConstructor
+@Tag(name = "MyRoom API", description = "마이룸 사진 관리 API")
 public class MyRoomController {
 
     private final MyRoomService myRoomService;
@@ -31,6 +37,11 @@ public class MyRoomController {
      * 제한)
      */
     @GetMapping("/photos")
+    @Operation(
+        summary = "사진 목록 조회",
+        description = "마이룸 사진을 다양한 조건(좋아요, 날짜, 친구 등)으로 조회"
+    )
+    @GetApiResponses
     public MyPhotoListResponse getMyPhotos(
         Authentication authentication,
         @ModelAttribute MyPhotoListCondition condition
@@ -41,6 +52,11 @@ public class MyRoomController {
     }
 
     @PostMapping("/photos/heart")
+    @Operation(
+        summary = "사진 좋아요 토글",
+        description = "특정 사진에 좋아요 설정 및 해제"
+    )
+    @PostApiResponses
     public ResponseEntity<ApiResponse<String>> updateHeart(
         @RequestBody HeartUpdateRequest request,
         Authentication authentication
@@ -50,6 +66,11 @@ public class MyRoomController {
     }
 
     @DeleteMapping("/photos")
+    @Operation(
+        summary = "사진 삭제",
+        description = "특정 사진을 마이룸에서 삭제"
+    )
+    @DeleteApiResponses
     public ResponseEntity<ApiResponse<String>> deletePhoto(
         @RequestBody PhotoDeleteRequest request,
         Authentication authentication
@@ -59,6 +80,11 @@ public class MyRoomController {
     }
 
     @PostMapping("/photos/save-edited")
+    @Operation(
+        summary = "수정본 저장",
+        description = "편집본 저장, 원본은 수정 불가 상태로 전환"
+    )
+    @PostApiResponses
     public ResponseEntity<ApiResponse<String>> saveEditedPhoto(
         @RequestBody PhotoEditSaveRequest request,
         Authentication authentication
