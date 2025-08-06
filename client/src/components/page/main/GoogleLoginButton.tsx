@@ -1,8 +1,7 @@
-'use client'
+"use client"
 
-import React, { type JSX } from 'react'
+import { cn } from "@/lib/utils"
 
-import { cn } from '@/lib/utils'
 
 interface GoogleLoginButtonProps {
   onClick: () => void
@@ -10,22 +9,18 @@ interface GoogleLoginButtonProps {
   disabled?: boolean
 }
 
-const GoogleLoginButton = ({
-  onClick,
-  className,
-  disabled = false,
-}: GoogleLoginButtonProps): JSX.Element => {
+const GoogleLoginButton = ({ onClick, className, disabled = false }: GoogleLoginButtonProps): JSX.Element => {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'flex w-full items-center justify-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors',
-        'bg-white text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50',
-        'border border-gray-300 hover:border-gray-400',
-        'focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none',
-        className
+        "flex w-full items-center justify-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors",
+        "bg-white text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50",
+        "border border-gray-300 hover:border-gray-400",
+        "focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none",
+        className,
       )}
     >
       {/* 구글 로고 SVG */}

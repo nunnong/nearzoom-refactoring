@@ -10,15 +10,13 @@ import {
   deleteImageFromLocal,
   initializeTestImages,
 } from '@/utils/localStorage'
-import { saveReferenceImage } from '@/utils/localStorage'
+import { UserInfo } from '@/utils/auth'
 
-import HomeButton from './HomeButton'
 import ImageArchive from './ImageArchive'
-import LogoutButton from './LogoutButton'
 import SearchBox from './SearchBox'
 import SideList from './SideList'
-import UploadSelfieModal from './UploadSelfieModal'
-
+import HomeButton from './HomeButton'
+import LogoutButton from './LogoutButton'
 
 interface ImageItem {
   id: string
@@ -36,15 +34,9 @@ interface Filter {
   display: string
 }
 
-interface UserProfile {
-  profileImage?: string
-  email?: string
-  name?: string
-}
-
 interface DashboardProps {
   images?: ImageItem[]
-  userProfile?: UserProfile
+  userProfile?: UserInfo | null
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
@@ -125,14 +117,10 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
   }
 
   const handleUploadSelfie = (): void => {
-    setActiveModal('upload')
-  }
-
-  const handleSelfieUpload = (imageData: string): void => {
-    // 참고 이미지로 저장
-    saveReferenceImage(imageData)
-    console.log('Selfie uploaded and saved as reference image')
-    setActiveModal(null)
+    // 모달 대신 upload-selfie 페이지로 리다이렉트
+    const currentPath = window.location.pathname
+    const returnUrl = encodeURIComponent(currentPath)
+    router.push(`/upload-selfie?returnUrl=${returnUrl}`)
   }
 
 
@@ -173,9 +161,41 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
   }
 
   const handleShareKakao = (imageId: string): void => {
-    console.log('Share to KakaoTalk:', imageId)
-    // TODO: 카카오톡 공유 API 연동
+  const targetImage = imageList.find(img => img.id === imageId)
+  if (!targetImage) {
+    console.error('Image not found:', imageId)
+    return
   }
+
+  if (typeof window !== 'undefined' && (window as any).Kakao && (window as any).Kakao.Share) {
+    if (!(window as any).Kakao.isInitialized()) {
+      console.error('Kakao SDK not initialized')
+      alert('카카오톡 공유 기능을 사용할 수 없습니다.')
+      return
+    }
+
+    try {
+      (window as any).Kakao.Share.sendDefault({
+        objectType: 'feed',
+        content: {
+          title: targetImage.alt || '내가 그린 그림',
+          description: '이어줌에서 함께 그린 특별한 추억이에요!',
+          imageUrl: targetImage.src,
+          link: {
+            webUrl: window.location.href,
+            mobileWebUrl: window.location.href,
+          },
+        },
+      })
+    } catch (error) {
+      console.error('카카오톡 공유 실패:', error)
+      alert('카카오톡 공유에 실패했습니다. 다시 시도해주세요.')
+    }
+  } else {
+    console.error('Kakao SDK not loaded')
+    alert('카카오톡 공유 기능을 사용할 수 없습니다.')
+  }
+}
 
   const handleDelete = (imageId: string): void => {
     console.log('Deleting image:', imageId)
@@ -268,11 +288,6 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
         </main>
       </div>
 
-      <UploadSelfieModal
-        isOpen={activeModal === 'upload'}
-        onClose={closeModal}
-        onUpload={handleSelfieUpload}
-      />
 
 
       {activeModal === 'account' && (

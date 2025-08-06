@@ -59,6 +59,22 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
+      <head>
+        <script 
+          src="https://t1.kakaocdn.net/kakao_js_sdk/2.1.0/kakao.min.js"
+          integrity="sha384-dpu02ieKC6NUeKFoGMOKz6102CLEWi9+5RQjWSV0ikYSFFd8M3Wp2reIcquJOemx"
+          crossOrigin="anonymous"
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined' && window.Kakao) {
+                Kakao.init('c089c8172def97eb00c07217cae17495');
+              }
+            `
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${notoSansKR.variable} ${jua.variable} ${blackHanSans.variable} ${gamjaFlower.variable} ${gaegu.variable} antialiased`}
       >
