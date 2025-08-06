@@ -1,7 +1,6 @@
 package com.ssafy.nearzoom.domain.user.controller;
 
 import com.ssafy.nearzoom.domain.user.dto.UserInfoResponse;
-import com.ssafy.nearzoom.domain.user.entity.Social;
 import com.ssafy.nearzoom.domain.user.service.UserService;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import com.ssafy.nearzoom.global.response.ApiResponse;
@@ -9,7 +8,6 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import jakarta.validation.Valid;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -58,11 +56,11 @@ public class UserController {
 
         return ApiResponse.ok("로그아웃 성공", null);
     }
-
-
+    
     @GetMapping("/userInfo")
-    public ResponseEntity<ApiResponse<UserInfoResponse>> getUserInfo(String email, Social social) {
-        UserInfoResponse info = userService.getUserInfo(email, social);
+    public ResponseEntity<ApiResponse<UserInfoResponse>> getUserInfo(
+        Authentication authentication) {
+        UserInfoResponse info = userService.getUserInfo(authentication);
         return ApiResponse.ok(info);
     }
 
@@ -108,7 +106,8 @@ public class UserController {
         } catch (ApiException e) {
             return ApiResponse.failedOf(e);
         } catch (Exception e) {
-            return ApiResponse.failedOf(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 URL 저장 중 오류가 발생했습니다: " + e.getMessage());
+            return ApiResponse.failedOf(HttpStatus.INTERNAL_SERVER_ERROR,
+                "이미지 URL 저장 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
 }

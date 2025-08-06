@@ -30,7 +30,12 @@ public class UserService {
         refreshTokenService.delete(email);
     }
 
-    public UserInfoResponse getUserInfo(String email, Social social) {
+    public UserInfoResponse getUserInfo(Authentication authentication) {
+
+        UserAuthInfoResponse userAuthInfo = AuthUtil.getUserAuthInfo(authentication);
+
+        String email = userAuthInfo.email();
+        Social social = userAuthInfo.social();
 
         User user = userRepository.getByEmailAndSocial(email, social);
 
