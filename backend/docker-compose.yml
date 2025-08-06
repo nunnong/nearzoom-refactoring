@@ -35,8 +35,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      # Spring Boot에서 환경변수로 읽을 값들
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${PROD_MYSQL_DB}?useSSL=false&useUnicode=true&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_URL: jdbc:mysql://${HOST}:${PROD_MYSQL_PORT}/${PROD_MYSQL_DB}?useSSL=false&useUnicode=true&allowPublicKeyRetrieval=true
       PROD_MYSQL_USERNAME: ${PROD_MYSQL_USERNAME}
       PROD_MYSQL_PASSWORD: ${PROD_MYSQL_PASSWORD}
       REDIS_HOST: ${REDIS_HOST}

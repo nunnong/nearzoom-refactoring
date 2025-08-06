@@ -3,11 +3,11 @@ pipeline {
 
     environment {
         // Jenkins Credential로 등록된 .env 파일 ID
-        ENV_FILE_ID = '3c0873cf-29d5-4225-b17e-8fbecc3744f0'
+        ENV_FILE_ID = '720df111-d8d6-4035-b618-1e03ae9ec433'
         // Git 관련 환경변수 예시 (필요에 따라 수정)
-        GIT_CREDENTIALS_ID = 'b7c497b0-7015-4231-9fd1-9a2e51bf12f0'
+        GIT_CREDENTIALS_ID = 'd719d5d7-c8aa-4e55-940d-c2963d52219e'
         GIT_REPO_URL = 'https://lab.ssafy.com/s13-webmobile1-sub1/S13P11A605.git'
-        GIT_BRANCH = 'Infra'
+        GIT_BRANCH = 'backend'
     }
 
     stages {
