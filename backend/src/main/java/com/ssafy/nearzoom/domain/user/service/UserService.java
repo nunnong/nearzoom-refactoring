@@ -57,4 +57,15 @@ public class UserService {
         user.markDeleted();
         refreshTokenService.delete(email);
     }
+
+    @Transactional
+    public void updatePrettyFace(Authentication authentication, String prettyFaceUrl) {
+        UserAuthInfoResponse userAuthInfo = AuthUtil.getUserAuthInfo(authentication);
+
+        String email = userAuthInfo.email();
+        Social social = userAuthInfo.social();
+
+        User user = userRepository.getByEmailAndSocial(email, social);
+        user.updatePrettyFace(prettyFaceUrl);
+    }
 }
