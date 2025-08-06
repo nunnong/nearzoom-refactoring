@@ -9,59 +9,35 @@ services:
     restart: always
     volumes:
       - ./redis-data:/data
-    networks:
-      - jenkins-net
 
   mysql:
     image: mysql:8.0
     container_name: nearzoom-mysql
-    ports:
-      - "3306:3306"
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${LOCAL_MYSQL_PASSWORD}
-      MYSQL_DATABASE: ${LOCAL_MYSQL_DB}
-      MYSQL_USER: ${LOCAL_MYSQL_USERNAME}
-      MYSQL_PASSWORD: ${LOCAL_MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${PROD_MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${PROD_MYSQL_DB}
+      MYSQL_USER: ${PROD_MYSQL_USERNAME}
+      MYSQL_PASSWORD: ${PROD_MYSQL_PASSWORD}
+    ports:
+      - "3306:3306"
     volumes:
       - ./mysql-data:/var/lib/mysql
-    networks:
-      - jenkins-net
-
-  jenkins:
-    container_name: jenkins
-    ports:
-      - "9090:8080"
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment:
-      - TZ=Asia/Seoul
-    volumes:
-      - /home/ubuntu/jenkins:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock
-    networks:
-      - jenkins-net
-    restart: unless-stopped
 
   spring:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: nearzoom-backend
-    ports:
-      - "8080:8080"
     depends_on:
       - mysql
       - redis
-    networks:
-      - jenkins-net
-
+    ports:
+      - "8080:8080"
     environment:
-      # Spring Boot에서 환경변수로 읽을 값들
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${LOCAL_MYSQL_DB}?useSSL=false&useUnicode=true&allowPublicKeyRetrieval=true
-      LOCAL_MYSQL_USERNAME: ${LOCAL_MYSQL_USERNAME}
-      LOCAL_MYSQL_PASSWORD: ${LOCAL_MYSQL_PASSWORD}
+      SPRING_DATASOURCE_URL: jdbc:mysql://${HOST}:${PROD_MYSQL_PORT}/${PROD_MYSQL_DB}?useSSL=false&useUnicode=true&allowPublicKeyRetrieval=true
+      PROD_MYSQL_USERNAME: ${PROD_MYSQL_USERNAME}
+      PROD_MYSQL_PASSWORD: ${PROD_MYSQL_PASSWORD}
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
@@ -76,7 +52,5 @@ services:
       SPRING_JWT_REFRESH_EXPIRATION: ${REFRESHTOKEN_EXPIRE}
       SPRING_JWT_REFRESH_TOKEN_TTL: ${JWT_REFRESH_TOKEN_TTL}
       APP_REDIRECT_URL: ${REDIRECT_URL}
+      IMAGE_SERVER_URL: ${IMAGE_SERVER_URL}
     restart: always
-networks:
-  jenkins-net:
-    driver: bridge
