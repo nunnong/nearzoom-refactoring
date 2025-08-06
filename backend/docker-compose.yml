@@ -54,3 +54,8 @@ services:
       APP_REDIRECT_URL: ${REDIRECT_URL}
       IMAGE_SERVER_URL: ${IMAGE_SERVER_URL}
     restart: always
+    
+networks:
+  default:
+    external: true
+    name: nearzoom_default
