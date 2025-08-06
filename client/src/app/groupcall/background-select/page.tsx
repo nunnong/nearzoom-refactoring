@@ -3,9 +3,12 @@
 import Image from 'next/image'
 import { useState } from 'react'
 
+import PromptSection from '@/components/page/groupcall/photo-select/PromptSection'
 import ControlPanel from '@/components/page/groupcall/ControlPanel'
 import Header from '@/components/page/groupcall/Header'
 import WebCam from '@/components/page/groupcall/photo-select/WebCam'
+import PhotoNavigator from '@/components/page/groupcall/photo-select/PhotoNavigator'
+import ToggleSwitch from '@/components/page/groupcall/photo-select/ToggleSwitch'
 import StartButton from '@/components/page/groupcall/StartButton'
 import { cn } from '@/lib/utils'
 
@@ -206,117 +209,23 @@ export default function BackgroundSelectPage({
               </p>
             </div>
 
-            {/* 배경 타입 선택 */}
-            <div className="text-center">
-              <div className="relative mx-auto flex w-64 flex-wrap rounded-lg bg-gray-200 p-0.5 text-sm shadow-sm">
-                {[
-                  { value: 'color', label: '단색' },
-                  { value: 'prompt', label: 'AI 프롬프팅' },
-                ].map(option => (
-                  <label
-                    key={option.value}
-                    className="flex-1 cursor-pointer text-center"
-                  >
-                    <input
-                      type="radio"
-                      name="backgroundType"
-                      checked={backgroundType === option.value}
-                      onChange={() =>
-                        setBackgroundType(option.value as BackgroundType)
-                      }
-                      className="hidden"
-                    />
-                    <span
-                      className={`relative flex items-center justify-center rounded-md py-2 transition-all duration-150 ease-in-out ${
-                        backgroundType === option.value
-                          ? 'bg-white font-semibold text-slate-700 shadow-md'
-                          : 'text-slate-600 hover:bg-white/50'
-                      }`}
-                    >
-                      {option.label}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
+            <ToggleSwitch
+              options={[
+                { value: 'color', label: '단색' },
+                { value: 'prompt', label: 'AI 프롬프팅' },
+              ]}
+              value={backgroundType}
+              onChange={value => setBackgroundType(value as BackgroundType)}
+              name="backgroundType"
+            />
 
-            {/* 현재 사진 표시 */}
-            <div className="space-y-6">
-              <div className="text-center">
-                <span className="text-lg font-bold text-gray-700">
-                  {currentPhotoIndex + 1} / {selectedPhotos.length}
-                </span>
-              </div>
-              <div className="flex items-center justify-center space-x-8">
-                {/* 이전 버튼 */}
-                <button
-                  onClick={handlePreviousPhoto}
-                  disabled={currentPhotoIndex === 0}
-                  className={`flex h-12 w-12 items-center justify-center rounded-full transition-all duration-200 ${
-                    currentPhotoIndex === 0
-                      ? 'cursor-not-allowed bg-gray-200 text-gray-400'
-                      : 'bg-[#2D3243] text-white hover:bg-[#C9D76D] hover:text-[#2D3243] active:scale-95 shadow-lg'
-                  }`}
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-
-                {/* 현재 사진 */}
-                <div className="relative">
-                  <div className="relative overflow-hidden rounded-lg shadow-lg">
-                    {/* 배경 미리보기 */}
-                    <div
-                      className="absolute inset-0"
-                      style={{
-                        backgroundColor:
-                          currentBackground.backgroundType === 'color'
-                            ? currentBackground.backgroundValue
-                            : '#f3f4f6',
-                      }}
-                    />
-
-                    {/* 프롬프트 배경인 경우 텍스트 표시 */}
-                    {currentBackground.backgroundType === 'prompt' &&
-                      currentBackground.backgroundValue && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-400 to-pink-400 p-4 text-sm text-white">
-                          <span className="line-clamp-4 text-center">
-                            {currentBackground.backgroundValue}
-                          </span>
-                        </div>
-                      )}
-
-                    {/* 사진 */}
-                    <Image
-                      src={currentPhoto}
-                      alt={`사진 ${currentPhotoIndex + 1}`}
-                      width={288}
-                      height={288}
-                      className="relative z-10 object-cover mix-blend-multiply rounded-lg"
-                      quality={95}
-                      priority
-                      unoptimized
-                    />
-                  </div>
-                </div>
-
-                {/* 다음 버튼 */}
-                <button
-                  onClick={handleNextPhoto}
-                  disabled={currentPhotoIndex === selectedPhotos.length - 1}
-                  className={`flex h-12 w-12 items-center justify-center rounded-full transition-all duration-200 ${
-                    currentPhotoIndex === selectedPhotos.length - 1
-                      ? 'cursor-not-allowed bg-gray-200 text-gray-400'
-                      : 'bg-[#2D3243] text-white hover:bg-[#C9D76D] hover:text-[#2D3243] active:scale-95 shadow-lg'
-                  }`}
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            </div>
+            <PhotoNavigator
+              photos={selectedPhotos}
+              currentIndex={currentPhotoIndex}
+              onPrevious={handlePreviousPhoto}
+              onNext={handleNextPhoto}
+              photoBackground={currentBackground}
+            />
 
             {/* 배경 설정 옵션 */}
             {backgroundType === 'color' ? (
@@ -325,7 +234,7 @@ export default function BackgroundSelectPage({
                   색상 선택
                 </h3>
                 <div className="flex justify-center">
-                  <div className="grid grid-cols-5 gap-3 justify-items-center">
+                  <div className="grid grid-cols-5 justify-items-center gap-3">
                     {backgroundColors.map(color => (
                       <button
                         key={color}
@@ -343,40 +252,43 @@ export default function BackgroundSelectPage({
               </div>
             ) : (
               <div className="space-y-4">
-                <h3 className="text-center text-lg font-semibold text-gray-700">
-                  프롬프트 입력
-                </h3>
                 <div className="flex justify-center">
-                  <textarea
-                    value={promptText}
-                    onChange={e => setPromptText(e.target.value)}
-                    placeholder="원하는 배경을 설명해주세요..."
-                    className="h-24 w-full max-w-md rounded-lg border border-gray-300 p-3 text-gray-700 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  <PromptSection
+                    promptText={promptText}
+                    setPromptText={setPromptText}
                   />
                 </div>
               </div>
             )}
 
-            {/* 완료 버튼 */}
+            {/* 하단 버튼 */}
             <div className="flex justify-center pt-6">
               <div className="flex items-center gap-4">
                 {/* 이전 버튼 */}
                 <button
                   onClick={onBack}
-                  className="group relative flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-gray-400 to-gray-500 px-8 py-4 text-white transition-all duration-300 hover:from-gray-500 hover:to-gray-600 hover:scale-105 active:scale-95 shadow-lg"
+                  className="group relative flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-gray-400 to-gray-500 px-8 py-4 text-white shadow-lg transition-all duration-300 hover:scale-105 hover:from-gray-500 hover:to-gray-600 active:scale-95"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                  <svg className="h-4 w-4 transition-transform group-hover:-translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  <svg
+                    className="h-4 w-4 transition-transform group-hover:-translate-x-1"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 19l-7-7 7-7"
+                    />
                   </svg>
-                  <span className="font-bold text-lg">이전</span>
+                  <span className="text-lg font-bold">이전</span>
                 </button>
 
                 {/* 선택 완료 버튼*/}
                 <div className="w-48">
-                  <StartButton onClick={handleComplete}>
-                    선택 완료
-                  </StartButton>
+                  <StartButton onClick={handleComplete}>선택 완료</StartButton>
                 </div>
               </div>
             </div>

@@ -5,7 +5,7 @@ import { useState } from 'react'
 import ControlPanel from '@/components/page/groupcall/ControlPanel'
 import Header from '@/components/page/groupcall/Header'
 import FrameColorSelector from '@/components/page/groupcall/photo-select/FrameColorSelector'
-import PhotoCutSelector from '@/components/page/groupcall/photo-select/PhotoCutSelector'
+import ToggleSwitch from '@/components/page/groupcall/photo-select/ToggleSwitch'
 import PhotoPicker from '@/components/page/groupcall/photo-select/PhotoPicker'
 import WebCam from '@/components/page/groupcall/photo-select/WebCam'
 import StartButton from '@/components/page/groupcall/StartButton'
@@ -149,8 +149,15 @@ export default function PhotoSelectPage({
 
           <div className="mx-auto max-w-2xl space-y-6">
             {/* 컷 수 선택 */}
-            <PhotoCutSelector cutCount={cutCount} onChange={setCutCount} />
-
+            <ToggleSwitch
+              options={[
+                { value: 1, label: '1컷' },
+                { value: 2, label: '2컷' },
+                { value: 4, label: '4컷' },
+              ]}
+              value={cutCount}
+              onChange={value => setCutCount(value as number)}
+            />
             {/* 사진 선택 */}
             <PhotoPicker
               photos={capturedPhotos}
