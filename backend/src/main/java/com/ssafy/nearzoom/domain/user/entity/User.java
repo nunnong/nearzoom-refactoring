@@ -39,6 +39,10 @@ public class User extends BaseEntity {
     @Comment("소셜 로그인 제공자")
     private Social socialType;
 
+    @Column(columnDefinition = "TEXT")
+    @Comment("예쁜 얼굴 이미지 URL")
+    private String prettyFace;
+
     private User(String userName, String userEmail, String profileImage, Social socialType) {
         this.userName = userName;
         this.userEmail = userEmail;
@@ -54,5 +58,9 @@ public class User extends BaseEntity {
     public void update(OAuth2Response oAuth2Response) {
         this.userName = oAuth2Response.getName();
         this.profileImage = oAuth2Response.getProfileImage();
+    }
+
+    public void updatePrettyFace(String prettyFaceUrl) {
+        this.prettyFace = prettyFaceUrl;
     }
 }
