@@ -128,78 +128,10 @@ export const createShootingSlice = (set: any, get: any, roomName: string) => ({
       isCapturing: true
     })
   },
-  
-  completeCapture: async (imageData: string) => {
-    const { capturedImages, isRoomLeader, timerInterval, currentCutIndex, cutCount } = get()
-    
-    console.log(`✅ Capture completed! Processing image...`)
-    
-    // 타이머 정리 (혹시 남아있다면)
-    if (timerInterval) {
-      clearInterval(timerInterval)
-      set({ timerInterval: null })
-    }
-    
-    // 방장인 경우에만 이미지 처리 (Mock API 응답 사용)
-    if (isRoomLeader) {
-      try {
-        console.log(`📡 Processing image... (Cut ${currentCutIndex + 1}/${cutCount})`)
-        
-        // TODO: 실제 API 호출 (현재는 Mock 처리)
-        /*
-        const response = await fetch('/api/photos/upload', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            imageData,
-            roomName,
-            cutIndex: currentCutIndex
-          })
-        })
-        */
-        
-        // Mock API 응답 (실제 API 구현 전까지 사용)
-        const mockResult = {
-          success: true,
-          imageUrl: `mock-photo-${roomName}-cut${currentCutIndex + 1}.jpg`
-        }
-        
-        console.log(`💾 Image processed successfully! URL: ${mockResult.imageUrl}`)
-        
-        // 로컬 상태에 URL 저장
-        const newImages = [...capturedImages, mockResult.imageUrl]
-        set({ capturedImages: newImages })
-        
-      } catch (error) {
-        console.error('❌ Image processing error:', error)
-        // 에러 시 임시로 base64 저장 (fallback)
-        const newImages = [...capturedImages, imageData]
-        set({ capturedImages: newImages })
-      }
-      
-      // 캡쳐 상태 해제
-      const { updateShootingState } = require('./index')
-      updateShootingState(roomName, { 
-        isCapturing: false,
-        isShooting: false,
-        shootingTimer: 0
-      })
-      
-    } else {
-      // 비방장은 API 호출 없이 캡쳐 상태만 해제
-      const { updateShootingState } = require('./index')
-      updateShootingState(roomName, { 
-        isCapturing: false,
-        isShooting: false,
-        shootingTimer: 0
-      })
-      
-      console.log('📷 Capture completed (Non-host - no API call)')
-    }
 
-    // 모든 사용자가 컷 증가 또는 상태 전환 처리 (Yjs 동기화)
+  handleCutProgress: () => {
+    const { currentCutIndex, cutCount, roomName } = get()
+    
     console.log(`📊 Cut progress check: ${currentCutIndex + 1}/${cutCount}`)
     
     if (currentCutIndex < cutCount - 1) {
@@ -217,6 +149,104 @@ export const createShootingSlice = (set: any, get: any, roomName: string) => ({
         const { PhotoBoothState } = require('./stateSlice')
         updatePhotoBoothState(roomName, PhotoBoothState.SELECTING)
       }, 1500) // 1.5초 후 SELECTING으로
+    }
+  },
+  
+  completeCapture: async (imageData: string) => {
+    const { capturedImages, isRoomLeader, timerInterval, currentCutIndex, cutCount, roomName, handleCutProgress } = get()
+    
+    console.log(`✅ Capture completed! Cut ${currentCutIndex + 1}/${cutCount}`)
+    
+    // 타이머 정리 (혹시 남아있다면)
+    if (timerInterval) {
+      clearInterval(timerInterval)
+      set({ timerInterval: null })
+    }
+    
+    // 방장인 경우에만 이미지 처리 및 상태 진행 제어
+    if (isRoomLeader) {
+      try {
+        console.log(`📡 Processing image... (Cut ${currentCutIndex + 1}/${cutCount})`)
+        
+        // TODO: 실제 API 호출 (현재는 Mock 처리)
+        /*
+        const response = await fetch('/api/photos/upload', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            imageData,
+            roomName,
+            cutIndex: currentCutIndex
+          })
+        })
+        
+        const result = await response.json()
+        */
+        
+        // Mock API 응답 (실제 API 구현 전까지 사용)
+        const mockResult = {
+          success: true,
+          imageUrl: `mock-photo-${roomName}-cut${currentCutIndex + 1}.jpg`
+        }
+        
+        if (mockResult.success) {
+          console.log(`💾 Image processed successfully! URL: ${mockResult.imageUrl}`)
+          
+          // 성공 시: 로컬 상태에 URL 저장
+          const newImages = [...capturedImages, mockResult.imageUrl]
+          set({ capturedImages: newImages })
+          
+          // 캡쳐 상태 해제
+          const { updateShootingState } = require('./index')
+          updateShootingState(roomName, { 
+            isCapturing: false,
+            isShooting: false,
+            shootingTimer: 0
+          })
+          
+          // 성공 시에만 컷 진행 처리
+          handleCutProgress()
+          
+        } else {
+          console.error('❌ API returned failure:', mockResult)
+          // API 실패 시: 재시도를 위해 현재 상태 유지
+          alert('사진 업로드에 실패했습니다. 다시 시도해주세요.')
+          
+          // 실패 시에도 일단 캡쳐 상태는 해제 (재촬영 가능하게)
+          const { updateShootingState } = require('./index')
+          updateShootingState(roomName, { 
+            isCapturing: false,
+            isShooting: false,
+            shootingTimer: 0
+          })
+        }
+        
+      } catch (error) {
+        console.error('❌ Image processing network error:', error)
+        // 네트워크 에러 등: 현재 상태 유지하여 재시도 가능하게
+        alert('네트워크 오류가 발생했습니다. 다시 시도해주세요.')
+        
+        // 에러 시에도 일단 캡쳐 상태는 해제
+        const { updateShootingState } = require('./index')
+        updateShootingState(roomName, { 
+          isCapturing: false,
+          isShooting: false,
+          shootingTimer: 0
+        })
+      }
+      
+    } else {
+      // 비방장은 API 호출 없이 캡쳐 상태만 해제 (컷 진행에 관여하지 않음)
+      const { updateShootingState } = require('./index')
+      updateShootingState(roomName, { 
+        isCapturing: false,
+        isShooting: false,
+        shootingTimer: 0
+      })
+      
+      console.log('📷 Capture completed (Non-host - no API call, no cut progression)')
     }
   },
   
