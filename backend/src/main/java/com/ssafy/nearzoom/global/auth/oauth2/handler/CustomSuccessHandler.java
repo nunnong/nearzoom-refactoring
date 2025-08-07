@@ -33,10 +33,8 @@ public class CustomSuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         CustomOAuth2User customUserDetail = (CustomOAuth2User) authentication.getPrincipal();
         String email = customUserDetail.getEmail();
-        String name= customUserDetail.getName();
         Social social = customUserDetail.getSocial();
 
-        String accessToken = jwtUtil.createAccessToken(name, email, social);
         String refreshToken = jwtUtil.createRefreshToken(email, social);
 
         refreshTokenService.save(email, refreshToken);
@@ -44,12 +42,6 @@ public class CustomSuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         Cookie cookie = CookieUtil.createRefreshTokenCookie(refreshToken);
         response.addCookie(cookie);
 
-        // ✅ 로그 추가 위치
-        System.out.println("✅ [REDIRECT CHECK] redirectUrl: " + redirectUrl);
-        System.out.println("✅ [REDIRECT CHECK] final redirectWithToken: " + redirectUrl + "?token=" + accessToken);
-
-        String redirectWithToken = redirectUrl + "?token=" + accessToken; // token 파라미터 추가
-
-        response.sendRedirect(redirectWithToken); // token 포함된 URL로 리다이렉트
+        response.sendRedirect(redirectUrl);
     }
 }

@@ -35,6 +35,7 @@ public class ReissueController {
 
         Cookie refreshCookie = CookieUtil.createRefreshTokenCookie(tokens.refreshToken());
         response.addCookie(refreshCookie);
+        
         return ApiResponse.of(HttpStatus.OK, "accesToken이 전달되었습니다.", responseDto);
     }
 }
