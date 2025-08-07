@@ -3,7 +3,9 @@
 export interface ShootingSliceState {
   isShooting: boolean           // 촬영 중 여부 (카운트다운 및 캡쳐)
   shootingTimer: number         // 촬영 타이머 (초)
+  isFlashing: boolean           // 플래시 효과 진행 중 여부
   isCapturing: boolean          // 캡쳐 진행 중 여부
+  isSaving: boolean            // 저장 중 여부
   capturedImages: string[]      // 캡쳐된 이미지들 (base64)
   currentShootingCut: number    // 현재 촬영 중인 컷
   timerInterval: NodeJS.Timeout | null  // 타이머 인터벌 ID
@@ -24,7 +26,9 @@ export type ShootingSlice = ShootingSliceState & ShootingSliceActions
 export const defaultShootingSliceState: ShootingSliceState = {
   isShooting: false,
   shootingTimer: 0,
+  isFlashing: false,
   isCapturing: false,
+  isSaving: false,
   capturedImages: [],
   currentShootingCut: 0,
   timerInterval: null,
@@ -70,22 +74,26 @@ export const createShootingSlice = (set: any, get: any, roomName: string) => ({
           shootingTimer: newTimer
         })
       } else {
-        // 타이머가 0에 도달 - 촬영 시작
-        console.log('📸 Timer reached 0 - starting capture!')
+        // 타이머가 0에 도달 - 플래시 효과 시작
+        console.log('📸 Timer reached 0 - starting flash effect!')
         clearInterval(interval)
         set({ timerInterval: null })
         
-        // 캡쳐 상태로 전환
+        // 플래시 효과 시작
         updateShootingState(roomName, {
           isShooting: false,
           shootingTimer: 0,
-          isCapturing: true
+          isFlashing: true
         })
         
-        // 약간의 딜레이 후 캡쳐 완료 처리 (PhotoCanvas에서 자동 캡쳐됨)
+        // 플래시 효과 후 실제 캡쳐 시작
         setTimeout(() => {
-          // PhotoCanvas의 useEffect가 isCapturing을 감지하여 자동 캡쳐됨
-        }, 100)
+          console.log('✨ Flash complete - starting capture!')
+          updateShootingState(roomName, {
+            isFlashing: false,
+            isCapturing: true
+          })
+        }, 300) // 300ms 플래시 효과
       }
     }, 1000)
     
@@ -108,7 +116,9 @@ export const createShootingSlice = (set: any, get: any, roomName: string) => ({
     updateShootingState(roomName, {
       isShooting: false,
       shootingTimer: 0,
-      isCapturing: false
+      isFlashing: false,
+      isCapturing: false,
+      isSaving: false
     })
   },
   
@@ -163,6 +173,13 @@ export const createShootingSlice = (set: any, get: any, roomName: string) => ({
       set({ timerInterval: null })
     }
     
+    // 저장 중 상태 시작
+    const { updateShootingState } = require('./index')
+    updateShootingState(roomName, { 
+      isCapturing: false,
+      isSaving: true
+    })
+    
     // 방장인 경우에만 이미지 처리 및 상태 진행 제어
     if (isRoomLeader) {
       try {
@@ -198,10 +215,10 @@ export const createShootingSlice = (set: any, get: any, roomName: string) => ({
           const newImages = [...capturedImages, mockResult.imageUrl]
           set({ capturedImages: newImages })
           
-          // 캡쳐 상태 해제
-          const { updateShootingState } = require('./index')
+          // 저장 완료 - 모든 상태 해제
           updateShootingState(roomName, { 
             isCapturing: false,
+            isSaving: false,
             isShooting: false,
             shootingTimer: 0
           })
@@ -214,10 +231,10 @@ export const createShootingSlice = (set: any, get: any, roomName: string) => ({
           // API 실패 시: 재시도를 위해 현재 상태 유지
           alert('사진 업로드에 실패했습니다. 다시 시도해주세요.')
           
-          // 실패 시에도 일단 캡쳐 상태는 해제 (재촬영 가능하게)
-          const { updateShootingState } = require('./index')
+          // 실패 시에도 일단 모든 상태 해제 (재촬영 가능하게)
           updateShootingState(roomName, { 
             isCapturing: false,
+            isSaving: false,
             isShooting: false,
             shootingTimer: 0
           })
@@ -228,20 +245,20 @@ export const createShootingSlice = (set: any, get: any, roomName: string) => ({
         // 네트워크 에러 등: 현재 상태 유지하여 재시도 가능하게
         alert('네트워크 오류가 발생했습니다. 다시 시도해주세요.')
         
-        // 에러 시에도 일단 캡쳐 상태는 해제
-        const { updateShootingState } = require('./index')
+        // 에러 시에도 일단 모든 상태 해제
         updateShootingState(roomName, { 
           isCapturing: false,
+          isSaving: false,
           isShooting: false,
           shootingTimer: 0
         })
       }
       
     } else {
-      // 비방장은 API 호출 없이 캡쳐 상태만 해제 (컷 진행에 관여하지 않음)
-      const { updateShootingState } = require('./index')
+      // 비방장은 API 호출 없이 모든 상태 해제 (컷 진행에 관여하지 않음)
       updateShootingState(roomName, { 
         isCapturing: false,
+        isSaving: false,
         isShooting: false,
         shootingTimer: 0
       })

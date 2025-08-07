@@ -13,6 +13,7 @@ import {
 import { Track, VideoTrack } from 'livekit-client'
 import { useVirtualBackgroundReady } from '../../providers/PhotoBoothProvider'
 import Konva from 'konva'
+import { downloadImage } from '../../utils/imageDownload'
 
 interface PhotoCanvasProps {
   className?: string
@@ -29,7 +30,9 @@ export default function PhotoCanvas({
   
   // PhotoBooth store에서 상태들 가져오기
   const frameColor = usePhotoBoothStore(state => state.frameColor)
+  const isFlashing = usePhotoBoothStore(state => state.isFlashing)
   const isCapturing = usePhotoBoothStore(state => state.isCapturing)
+  const isSaving = usePhotoBoothStore(state => state.isSaving)
   const currentCutIndex = usePhotoBoothStore(state => state.currentCutIndex)
   const cutCount = usePhotoBoothStore(state => state.cutCount)
   const roomName = usePhotoBoothStore(state => state.roomName)
@@ -81,8 +84,8 @@ export default function PhotoCanvas({
 
         updatedParticipants[id] = {
           id,
-          x: 100 + (participantCount % 3) * 350,
-          y: 100 + Math.floor(participantCount / 3) * 280,
+          x: Math.random() * 200,
+          y: Math.random() * 200,
           width: 320,
           height: 240,
           rotation: 0,
@@ -132,12 +135,19 @@ export default function PhotoCanvas({
         })
 
         console.log('✅ Canvas captured successfully')
+        
+        // 자동 다운로드 (컷 정보 포함한 파일명)
+        const cutInfo = `cut${currentCutIndex + 1}-of-${cutCount}`
+        const filename = `photobooth-${cutInfo}.png`
+        downloadImage(dataURL, filename)
+        
+        // 기존 onCapture 콜백도 호출
         onCapture(dataURL)
       } catch (error) {
         console.error('❌ Failed to capture canvas:', error)
       }
     }
-  }, [onCapture])
+  }, [onCapture, currentCutIndex, cutCount])
 
   // isCapturing 상태 변화 감지하여 자동 캡쳐
   useEffect(() => {
@@ -498,8 +508,8 @@ export default function PhotoCanvas({
             const videoElement = videoElements[participantId]
             const processedCanvas = processedCanvases[participantId]
             const currentTransform = participants[participantId] || {
-              x: 50 + index * 200,
-              y: 50 + index * 100,
+              x: Math.random() * 200,
+              y: Math.random() * 200,
               width: 320,
               height: 240,
               rotation: 0,
@@ -678,8 +688,8 @@ export default function PhotoCanvas({
           />
         </Layer>
 
-        {/* 캡쳐 효과 레이어 */}
-        {isCapturing && (
+        {/* 플래시 효과 레이어 */}
+        {isFlashing && (
           <Layer>
             <Rect
               x={0}
@@ -687,18 +697,32 @@ export default function PhotoCanvas({
               width={CANVAS_CONFIG.width}
               height={CANVAS_CONFIG.height}
               fill="white"
-              opacity={0.8}
+              opacity={1}
+              listening={false}
+            />
+          </Layer>
+        )}
+
+        {/* 저장 중 효과 레이어 */}
+        {isSaving && (
+          <Layer>
+            <Rect
+              x={0}
+              y={0}
+              width={CANVAS_CONFIG.width}
+              height={CANVAS_CONFIG.height}
+              fill="rgba(0,0,0,0.7)"
               listening={false}
             />
             <Text
               x={CANVAS_CONFIG.width / 2}
               y={CANVAS_CONFIG.height / 2}
-              text="📸 촬영 중..."
-              fontSize={24}
+              text="💾 저장 중..."
+              fontSize={20}
               fontFamily="Arial"
-              fill="#2D3243"
+              fill="white"
               align="center"
-              offsetX={60}
+              offsetX={50}
               listening={false}
             />
           </Layer>

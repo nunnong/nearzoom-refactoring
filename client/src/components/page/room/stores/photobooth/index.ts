@@ -154,7 +154,9 @@ export const initializePhotoBoothState = (
     const data = {
       isShooting: shootingMap.get('isShooting'),
       shootingTimer: shootingMap.get('shootingTimer'),
+      isFlashing: shootingMap.get('isFlashing'),
       isCapturing: shootingMap.get('isCapturing'),
+      isSaving: shootingMap.get('isSaving'),
       capturedImages: shootingMap.get('capturedImages') || [],
       currentShootingCut: shootingMap.get('currentShootingCut'),
     }
@@ -243,7 +245,9 @@ export const updateFrameColor = (roomName: string, color: string) => {
 export const updateShootingState = (roomName: string, state: Partial<{
   isShooting: boolean
   shootingTimer: number
+  isFlashing: boolean
   isCapturing: boolean
+  isSaving: boolean
   currentShootingCut: number
 }>) => {
   const shootingMap = getShootingMap(roomName)
@@ -258,9 +262,19 @@ export const updateShootingState = (roomName: string, state: Partial<{
     console.log('🔄 shootingTimer set to:', state.shootingTimer)
   }
   
+  if (state.isFlashing !== undefined) {
+    shootingMap.set('isFlashing', state.isFlashing)
+    console.log('🔄 isFlashing set to:', state.isFlashing)
+  }
+  
   if (state.isCapturing !== undefined) {
     shootingMap.set('isCapturing', state.isCapturing)
     console.log('🔄 isCapturing set to:', state.isCapturing)
+  }
+  
+  if (state.isSaving !== undefined) {
+    shootingMap.set('isSaving', state.isSaving)
+    console.log('🔄 isSaving set to:', state.isSaving)
   }
   
   if (state.currentShootingCut !== undefined) {
