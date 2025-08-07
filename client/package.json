@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --turbo",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -15,6 +15,7 @@
     "@heroicons/react": "^2.2.0",
     "@livekit/components-react": "^2.9.14",
     "@livekit/components-styles": "^1.1.6",
+    "@livekit/track-processors": "^0.5.8",
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.12",
     "gsap": "^3.12.2",

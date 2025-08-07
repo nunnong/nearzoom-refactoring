@@ -1,16 +1,16 @@
 'use client'
 
-import { useRef, useState, useEffect, useCallback, useMemo } from 'react'
-import { Stage, Layer, Rect, Transformer, Text, Image } from 'react-konva'
-import { CANVAS_CONFIG } from '../../types/photoCanvas'
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
+import { Stage, Layer, Rect, Text, Image, Transformer } from 'react-konva'
 import { usePhotoBoothStore } from '../../providers/PhotoBoothProvider'
-import { updatePhotoCanvasState } from '../../stores/photobooth'
-import { 
+import {
   useParticipants,
   useTracks,
   useLocalParticipant,
 } from '@livekit/components-react'
 import { Track, VideoTrack } from 'livekit-client'
+import { CANVAS_CONFIG } from '../../types/photoCanvas'
+import { updatePhotoCanvasState } from '../../stores/photobooth'
 import { useVirtualBackgroundReady } from '../../providers/PhotoBoothProvider'
 import Konva from 'konva'
 
@@ -23,20 +23,27 @@ export default function PhotoCanvas({
   className = '',
   onCapture,
 }: PhotoCanvasProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [mounted, setMounted] = useState(false)
+  const stageRef = useRef<Konva.Stage>(null)
   const transformerRef = useRef<any>(null)
+  const [mounted, setMounted] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   
+  // selectedParticipant는 Yjs에서만 가져옴 (Single Source of Truth)
+  const selectedParticipant = usePhotoBoothStore(
+    state => state.selectedParticipant
+  )
+
   // PhotoBooth store에서 상태들 가져오기
   const frameColor = usePhotoBoothStore(state => state.frameColor)
   const isCapturing = usePhotoBoothStore(state => state.isCapturing)
   const currentCutIndex = usePhotoBoothStore(state => state.currentCutIndex)
   const cutCount = usePhotoBoothStore(state => state.cutCount)
   const roomName = usePhotoBoothStore(state => state.roomName)
-  const selectedParticipant = usePhotoBoothStore(state => state.selectedParticipant)
+
+  // PhotoCanvas 상태 (Yjs에서 동기화된 상태)
   const participants = usePhotoBoothStore(state => state.participants)
-  
-  // LiveKit 훅들
+
+  // LiveKit 참가자들과 카메라 트랙들
   const allParticipants = useParticipants()
   const { localParticipant } = useLocalParticipant()
   const cameraTrackRefs = useTracks([Track.Source.Camera])
@@ -49,16 +56,19 @@ export default function PhotoCanvas({
   const [processedCanvases, setProcessedCanvases] = useState<Record<string, HTMLCanvasElement>>({})
   
   // 비디오 업데이트용 refs
-  const stageRef = useRef<Konva.Stage>(null)
-  const videoUpdateIntervalRef = useRef<NodeJS.Timeout>()
-  
+  const videoUpdateIntervalRef = useRef<NodeJS.Timeout | undefined>()
+
   console.log('📹 Camera tracks found:', cameraTrackRefs.length)
   console.log('👥 Participants found:', allParticipants.length)
 
-  // 클라이언트 사이드 마운트 체크
+  // 디버그 로그
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    console.log('🎯 PhotoCanvas mounted, tracks info:', {
+      cameraTrackCount: cameraTrackRefs.length,
+      participantCount: allParticipants.length,
+      localParticipant: localParticipant?.identity,
+    })
+  }, [cameraTrackRefs.length, allParticipants.length, localParticipant])
 
   // 참가자 추가/제거 관리 (Yjs를 통해 동기화)
   useEffect(() => {
@@ -148,6 +158,11 @@ export default function PhotoCanvas({
       }, 100)
     }
   }, [isCapturing, captureImage])
+
+  // 클라이언트 사이드 마운트 체크
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // LiveKit 비디오 트랙 설정 (VirtualBackground 상태 변경 감지)
   useEffect(() => {
@@ -308,7 +323,7 @@ export default function PhotoCanvas({
     }
   }, [videoElements, processedCanvases, virtualBackgroundReady, processVideoFrame])
 
-  // Transformer 연결
+  // Transformer 연결 (DummyPhotoCanvas 패턴)
   useEffect(() => {
     if (selectedId && transformerRef.current) {
       const stage = transformerRef.current.getStage()
@@ -372,7 +387,16 @@ export default function PhotoCanvas({
         }
       }
     })
-  }, [participants])
+    
+    // Transformer도 업데이트 (선택된 요소가 변경된 경우)
+    if (selectedParticipant && transformerRef.current) {
+      const selectedNode = stage.findOne(`#video-${selectedParticipant}`)
+      if (selectedNode && transformerRef.current.nodes()[0] !== selectedNode) {
+        transformerRef.current.nodes([selectedNode])
+        transformerRef.current.getLayer()?.batchDraw()
+      }
+    }
+  }, [participants, selectedParticipant])
 
   // Z-Index 관리: lastInteractionTime 순서로 정렬 (최근 것이 위에)
   const sortedCameraTracksByZIndex = useMemo(() => {
@@ -383,11 +407,23 @@ export default function PhotoCanvas({
     })
   }, [cameraTrackRefs, participants])
 
-  // 선택 핸들러 (Yjs로 업데이트)
+  // Stage 클릭 핸들러 (DummyPhotoCanvas 패턴)
+  const handleStageClick = useCallback((e: any) => {
+    const clickedOnEmpty = e.target === e.target.getStage()
+    if (clickedOnEmpty) {
+      setSelectedId(null)
+      if (roomName) {
+        updatePhotoCanvasState(roomName, { selectedParticipant: null })
+      }
+      console.log('📍 Empty stage clicked - deselecting via Yjs')
+    }
+  }, [roomName])
+
+  // 선택 핸들러 (DummyPhotoCanvas 로직 적용)
   const handleSelect = useCallback(
     (id: string) => {
       if (roomName) {
-        // video- prefix 제거하여 순수한 participantId 추출
+        // video- prefix 제거하여 순수한 participantId 추출  
         const participantId = id.startsWith('video-') ? id.replace('video-', '') : id
         
         // 선택 시 해당 참가자의 lastInteractionTime 업데이트
@@ -417,16 +453,6 @@ export default function PhotoCanvas({
     [roomName, participants]
   )
 
-  const handleStageClick = useCallback((e: any) => {
-    const clickedOnEmpty = e.target === e.target.getStage()
-    if (clickedOnEmpty) {
-      setSelectedId(null)
-      if (roomName) {
-        updatePhotoCanvasState(roomName, { selectedParticipant: null })
-      }
-      console.log('📍 Empty stage clicked - deselecting via Yjs')
-    }
-  }, [roomName])
 
   // SSR 중이거나 마운트되지 않았으면 로딩 표시
   if (!mounted) {
@@ -447,9 +473,9 @@ export default function PhotoCanvas({
 
   return (
     <div className={`relative ${className}`}>
-      <Stage 
+      <Stage
         ref={stageRef}
-        width={CANVAS_CONFIG.width} 
+        width={CANVAS_CONFIG.width}
         height={CANVAS_CONFIG.height}
         className="overflow-hidden rounded-xl border-2 border-gray-300 shadow-lg"
         onClick={handleStageClick}
@@ -474,7 +500,6 @@ export default function PhotoCanvas({
               width={1}
               height={CANVAS_CONFIG.height}
               fill="rgba(0,0,0,0.1)"
-              listening={false}
             />
           ))}
           {[1, 2, 3].map(i => (
@@ -485,7 +510,6 @@ export default function PhotoCanvas({
               width={CANVAS_CONFIG.width}
               height={1}
               fill="rgba(0,0,0,0.1)"
-              listening={false}
             />
           ))}
         </Layer>
@@ -525,6 +549,7 @@ export default function PhotoCanvas({
             
             // VirtualBackground가 활성화되면 처리된 Canvas 사용, 아니면 원본 비디오 사용
             const displayImage = virtualBackgroundReady && processedCanvas ? processedCanvas : videoElement
+            const bgStatus = virtualBackgroundReady ? (processedCanvas ? 'ChromaKey' : 'VB-NoCanvas') : 'Original'
             
             return (
               <>
@@ -653,7 +678,6 @@ export default function PhotoCanvas({
             strokeWidth={12}
             cornerRadius={20}
             fill="transparent"
-            listening={false}
           />
 
           {/* 컷 정보 */}
@@ -664,7 +688,6 @@ export default function PhotoCanvas({
             height={40}
             fill="rgba(0,0,0,0.7)"
             cornerRadius={8}
-            listening={false}
           />
           <Text
             x={CANVAS_CONFIG.width - 90}
@@ -674,7 +697,6 @@ export default function PhotoCanvas({
             fontFamily="Arial"
             fill="white"
             align="center"
-            listening={false}
           />
         </Layer>
 
@@ -688,7 +710,6 @@ export default function PhotoCanvas({
               height={CANVAS_CONFIG.height}
               fill="white"
               opacity={0.8}
-              listening={false}
             />
             <Text
               x={CANVAS_CONFIG.width / 2}
@@ -699,11 +720,11 @@ export default function PhotoCanvas({
               fill="#2D3243"
               align="center"
               offsetX={60}
-              listening={false}
             />
           </Layer>
         )}
       </Stage>
+
     </div>
   )
 }

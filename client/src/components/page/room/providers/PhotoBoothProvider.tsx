@@ -16,6 +16,7 @@ import {
   createCutSlice,
   createSelectSlice,
   createShootingSlice,
+  createPhotoCanvasSlice,
   type PhotoBoothSlice,
 } from '../stores/photobooth'
 import { createRoomLeaderSlice } from '../stores/roomLeaderSlice'
@@ -25,11 +26,20 @@ import {
   useRoomInfo,
   useRoomContext,
 } from '@livekit/components-react'
+import { VirtualBackground, supportsBackgroundProcessors } from '@livekit/track-processors'
+import { Track } from 'livekit-client'
 
 // PhotoBooth only store type
 export type PhotoBoothStore = PhotoBoothSlice
 
 export type PhotoBoothStoreApi = ReturnType<typeof createPhotoBoothStore>
+
+// VirtualBackground Context
+export const VirtualBackgroundContext = createContext<{
+  virtualBackgroundReady: boolean
+}>({ 
+  virtualBackgroundReady: false 
+})
 
 export const PhotoBoothStoreContext = createContext<
   PhotoBoothStoreApi | undefined
@@ -49,6 +59,7 @@ const createPhotoBoothStore = (roomName: string) => {
     ...createCutSlice(set, get, roomName),
     ...createSelectSlice(set, get, roomName),
     ...createShootingSlice(set, get, roomName),
+    ...createPhotoCanvasSlice(set),
     ...createRoomLeaderSlice(set),
   }))
 }
@@ -67,6 +78,9 @@ export const PhotoBoothProvider = ({
     console.log(`Creating PhotoBooth store for room: ${roomName}`)
     return createPhotoBoothStore(roomName)
   })
+
+  // VirtualBackground 준비 상태 (로컬 상태)
+  const [virtualBackgroundReady, setVirtualBackgroundReady] = useState(false)
 
   // LiveKit 기반 방장 상태 계산
   const isRoomLeader = useMemo(() => {
@@ -236,6 +250,23 @@ export const PhotoBoothProvider = ({
       if (data.currentShootingCut !== undefined) {
         store.setState({ currentShootingCut: data.currentShootingCut })
       }
+      // PhotoCanvas slice 상태 업데이트 - Yjs가 Single Source of Truth
+      if (data.participants !== undefined) {
+        // syncFromYjs를 사용하여 Yjs 데이터를 그대로 반영
+        const { syncFromYjs } = store.getState()
+        if (syncFromYjs) {
+          syncFromYjs(data.participants, data.selectedParticipant || null)
+        } else {
+          // fallback: 직접 상태 업데이트
+          store.setState({ 
+            participants: data.participants,
+            selectedParticipant: data.selectedParticipant || null
+          })
+        }
+      } else if (data.selectedParticipant !== undefined) {
+        // 선택 상태만 업데이트
+        store.setState({ selectedParticipant: data.selectedParticipant })
+      }
     }
     
     // Yjs 상태 동기화 시작
@@ -257,11 +288,108 @@ export const PhotoBoothProvider = ({
     }
   }, [roomName, store, isRoomLeader])
 
+  // VirtualBackground 관리 (PhotoBooth 진입 시 즉시 적용)
+  useEffect(() => {
+    if (!localParticipant) return
+
+    let processor: any = null
+    let currentVideoTrack: any = null
+
+    const setupVirtualBackground = async () => {
+      try {
+        // 브라우저 지원 확인
+        if (!supportsBackgroundProcessors()) {
+          console.warn('❌ Background processors not supported in this browser')
+          return
+        }
+
+        console.log('🔧 Setting up VirtualBackground...')
+
+        // 기존 published video track 확인
+        const videoTrackPubs = Array.from(localParticipant.videoTrackPublications.values())
+        let videoTrack = videoTrackPubs[0]?.track
+        
+        // 트랙이 없으면 카메라 활성화만 시도 (새 트랙 생성하지 않음)
+        if (!videoTrack) {
+          console.log('📹 No existing video track, enabling camera...')
+          try {
+            // LiveKit의 표준 방식으로 카메라 활성화
+            await localParticipant.setCameraEnabled(true)
+            
+            // 카메라 활성화 후 트랙 다시 확인
+            const newVideoTrackPubs = Array.from(localParticipant.videoTrackPublications.values())
+            videoTrack = newVideoTrackPubs[0]?.track
+            
+            if (videoTrack) {
+              console.log('✅ Camera enabled, video track found')
+            } else {
+              console.warn('⚠️ Camera enabled but no video track found')
+              return
+            }
+          } catch (cameraError) {
+            console.error('❌ Failed to enable camera:', cameraError)
+            return
+          }
+        }
+        
+        if (!videoTrack || videoTrack.kind !== Track.Kind.Video) {
+          console.log('⚠️ No valid video track found for VirtualBackground')
+          return
+        }
+
+        currentVideoTrack = videoTrack
+
+        // 크로마키 배경 이미지 사용
+        console.log('🎨 Creating VirtualBackground with chromakey-bg.png...')
+        processor = VirtualBackground('/chromakey-bg.png')
+        
+        console.log('📝 Applying chromakey background to existing video track...')
+        await videoTrack.setProcessor(processor)
+        console.log('✅ VirtualBackground applied successfully to existing track!')
+        
+        // VirtualBackground 적용 완료 상태 업데이트
+        setVirtualBackgroundReady(true)
+        console.log('🎨 VirtualBackground ready state set to true')
+        
+      } catch (error) {
+        console.error('❌ Error setting up VirtualBackground:', error)
+      }
+    }
+
+    // PhotoBooth 진입 시 즉시 VirtualBackground 적용
+    console.log('🎯 PhotoBooth mounted, applying VirtualBackground immediately')
+    setupVirtualBackground()
+
+    return () => {
+      // PhotoBooth 언마운트 시에만 정리
+      console.log('🧹 Cleaning up VirtualBackground...')
+      if (processor && currentVideoTrack) {
+        try {
+          currentVideoTrack.setProcessor(undefined)
+          processor.destroy()
+          console.log('✅ VirtualBackground cleaned up')
+        } catch (error) {
+          console.warn('⚠️ Error cleaning up VirtualBackground processor:', error)
+        }
+      }
+    }
+  }, [localParticipant, store])
+
   return (
-    <PhotoBoothStoreContext.Provider value={store}>
-      {children}
-    </PhotoBoothStoreContext.Provider>
+    <VirtualBackgroundContext.Provider value={{ virtualBackgroundReady }}>
+      <PhotoBoothStoreContext.Provider value={store}>
+        {children}
+      </PhotoBoothStoreContext.Provider>
+    </VirtualBackgroundContext.Provider>
   )
+}
+
+export const useVirtualBackgroundReady = () => {
+  const context = useContext(VirtualBackgroundContext)
+  if (!context) {
+    throw new Error('useVirtualBackgroundReady must be used within PhotoBoothProvider')
+  }
+  return context.virtualBackgroundReady
 }
 
 export const usePhotoBoothStore = <T,>(

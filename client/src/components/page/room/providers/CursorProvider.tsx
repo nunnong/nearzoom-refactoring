@@ -76,7 +76,7 @@ export const CursorProvider = ({
     if (username && room?.localParticipant) {
       userIdRef.current = room.localParticipant.identity || username
       userColorRef.current = generateUserColor(userIdRef.current)
-      console.log('🎯 User ID initialized:', userIdRef.current)
+      // console.log('🎯 User ID initialized:', userIdRef.current)
     }
   }, [username, room?.localParticipant])
 
@@ -84,7 +84,7 @@ export const CursorProvider = ({
   useEffect(() => {
     if (!room) return
     
-    console.log('🎯 Setting up LiveKit cursor data listener')
+    // console.log('🎯 Setting up LiveKit cursor data listener')
     
     const handleDataReceived = (
       payload: Uint8Array, 
@@ -98,11 +98,11 @@ export const CursorProvider = ({
         const dataString = decoder.decode(payload)
         const cursorData: CursorDataPacket = JSON.parse(dataString)
         
-        console.log('📨 Received cursor data:', {
-          from: participant?.identity,
-          type: cursorData.type,
-          position: cursorData.x !== undefined ? `${cursorData.x},${cursorData.y}` : 'hidden'
-        })
+        // console.log('📨 Received cursor data:', {
+        //   from: participant?.identity,
+        //   type: cursorData.type,
+        //   position: cursorData.x !== undefined ? `${cursorData.x},${cursorData.y}` : 'hidden'
+        // })
         
         // 자신의 데이터는 무시
         if (cursorData.userId === userIdRef.current) return
@@ -169,14 +169,23 @@ export const CursorProvider = ({
       
       const data = encoder.encode(JSON.stringify(cursorPacket))
       
-      room.localParticipant?.publishData(data, {
+      // Room이 연결되어 있고 localParticipant가 있는지 확인
+      if (!room?.localParticipant || room.state !== 'connected') {
+        // Room이 준비되지 않았으면 조용히 스킵
+        return
+      }
+      
+      room.localParticipant.publishData(data, {
         reliable: false,
         topic: 'cursor'
       }).catch(error => {
-        console.error('Failed to publish cursor data:', error)
+        // PC manager closed 오류는 무시 (정상적인 연결 해제 과정)
+        if (!error.message?.includes('PC manager is closed')) {
+          console.error('Failed to publish cursor data:', error)
+        }
       })
       
-      console.log('📡 Published cursor update:', { x, y, topic: 'cursor' })
+      // console.log('📡 Published cursor update:', { x, y, topic: 'cursor' })
     }, 32) // ~60fps
   }, [room, username, encoder])
 
@@ -196,14 +205,23 @@ export const CursorProvider = ({
     
     const data = encoder.encode(JSON.stringify(cursorPacket))
     
-    room.localParticipant?.publishData(data, {
+    // Room이 연결되어 있고 localParticipant가 있는지 확인
+    if (!room?.localParticipant || room.state !== 'connected') {
+      // Room이 준비되지 않았으면 조용히 스킵
+      return
+    }
+    
+    room.localParticipant.publishData(data, {
       reliable: false,
       topic: 'cursor'
     }).catch(error => {
-      console.error('Failed to publish cursor hide:', error)
+      // PC manager closed 오류는 무시 (정상적인 연결 해제 과정)
+      if (!error.message?.includes('PC manager is closed')) {
+        console.error('Failed to publish cursor hide:', error)
+      }
     })
     
-    console.log('🫥 Published cursor hide')
+    // console.log('🫥 Published cursor hide')
   }, [room, username, encoder])
 
   // 마우스 이벤트 핸들러

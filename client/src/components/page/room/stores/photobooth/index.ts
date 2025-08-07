@@ -7,6 +7,7 @@ export type { StateSlice } from './stateSlice'
 export type { CutSlice } from './cutSlice'
 export type { SelectSlice } from './selectSlice'
 export type { ShootingSlice } from './shootingSlice'
+export type { PhotoCanvasSlice } from './photoCanvasSlice'
 
 // Legacy types removed - now using selectSlice
 
@@ -15,6 +16,7 @@ export { createStateSlice } from './stateSlice'
 export { createCutSlice } from './cutSlice'
 export { createSelectSlice } from './selectSlice'
 export { createShootingSlice } from './shootingSlice'
+export { createPhotoCanvasSlice } from './photoCanvasSlice'
 
 // Legacy creators removed - now using selectSlice
 
@@ -24,6 +26,7 @@ export type PhotoBoothSlice =
   import('./cutSlice').CutSlice & 
   import('./selectSlice').SelectSlice &
   import('./shootingSlice').ShootingSlice &
+  import('./photoCanvasSlice').PhotoCanvasSlice &
   import('../roomLeaderSlice').RoomLeaderSlice
 
 // Room별 WebSocket Provider와 Doc을 관리하는 Map
@@ -102,6 +105,12 @@ export const getShootingMap = (roomName: string) => {
   return room.ydoc.getMap('shootingState')
 }
 
+export const getPhotoCanvasMap = (roomName: string) => {
+  const room = getOrCreateRoom(roomName)
+  return room.ydoc.getMap('photoCanvasState')
+}
+
+
 // 하위 호환성을 위한 legacy 함수
 export const getPhotoBoothMap = (roomName: string) => {
   return getStateMap(roomName)
@@ -115,6 +124,7 @@ export const initializePhotoBoothState = (
   const photoBoothMap = getPhotoBoothMap(roomName)
   const shootingMap = getShootingMap(roomName)
   const selectMap = getSelectMap(roomName)
+  const photoCanvasMap = getPhotoCanvasMap(roomName)
   
   console.log('🎯 Initializing PhotoBooth state for room:', roomName)
   
@@ -152,20 +162,34 @@ export const initializePhotoBoothState = (
     onUpdate(data)
   }
   
+  // PhotoCanvas 상태 변경사항 감지 리스너
+  const photoCanvasUpdateHandler = () => {
+    const data = {
+      participants: photoCanvasMap.get('participants') || {},
+      selectedParticipant: photoCanvasMap.get('selectedParticipant'),
+    }
+    console.log('🔄 PhotoCanvas state updated:', data)
+    onUpdate(data)
+  }
+  
+  
   // 리스너 등록
   photoBoothMap.observe(photoBoothUpdateHandler)
   selectMap.observe(selectUpdateHandler)
   shootingMap.observe(shootingUpdateHandler)
+  photoCanvasMap.observe(photoCanvasUpdateHandler)
   
   // 초기 상태 전송
   photoBoothUpdateHandler()
   selectUpdateHandler()
   shootingUpdateHandler()
+  photoCanvasUpdateHandler()
   
   return () => {
     photoBoothMap.unobserve(photoBoothUpdateHandler)
     selectMap.unobserve(selectUpdateHandler)
     shootingMap.unobserve(shootingUpdateHandler)
+    photoCanvasMap.unobserve(photoCanvasUpdateHandler)
   }
 }
 
@@ -256,6 +280,25 @@ export const updateCapturedImages = (roomName: string, images: string[]) => {
   shootingMap.set('capturedImages', images)
   console.log('🔄 Captured images updated, count:', images.length)
 }
+
+// PhotoCanvas slice 업데이트
+export const updatePhotoCanvasState = (roomName: string, state: Partial<{
+  participants: Record<string, any>
+  selectedParticipant: string | null
+}>) => {
+  const photoCanvasMap = getPhotoCanvasMap(roomName)
+  
+  if (state.participants !== undefined) {
+    photoCanvasMap.set('participants', state.participants)
+    console.log('🔄 PhotoCanvas participants updated')
+  }
+  
+  if (state.selectedParticipant !== undefined) {
+    photoCanvasMap.set('selectedParticipant', state.selectedParticipant)
+    console.log('🔄 Selected participant:', state.selectedParticipant)
+  }
+}
+
 
 // Room 연결 해제
 export const disconnectRoom = (roomName: string) => {

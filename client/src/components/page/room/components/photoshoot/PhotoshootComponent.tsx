@@ -22,6 +22,7 @@ const PhotoCanvas = dynamic(() => import('./PhotoCanvas'), {
   )
 })
 
+
 interface PhotoshootComponentProps {
   onComplete?: () => void
   className?: string
@@ -99,11 +100,13 @@ export default function PhotoshootComponent({
         {/* PhotoCanvas 영역 */}
         <div className="flex flex-1 items-center justify-center pb-3">
           <div className="relative w-full max-w-4xl">
+            {/* 개선된 PhotoCanvas 사용 (DummyPhotoCanvas 로직 적용) */}
             <PhotoCanvas
-              width={800}
-              height={480}
               onCapture={handleCaptureComplete}
             />
+            
+            {/* 테스트용 DummyPhotoCanvas (주석처리) */}
+            {/* <DummyPhotoCanvas /> */}
 
             {/* 타이머 오버레이 */}
             <Timer

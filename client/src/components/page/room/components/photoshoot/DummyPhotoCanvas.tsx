@@ -12,17 +12,8 @@ import {
 } from '@livekit/components-react'
 import { Track, VideoTrack } from 'livekit-client'
 import { useVirtualBackgroundReady } from '../../providers/PhotoBoothProvider'
-import Konva from 'konva'
 
-interface PhotoCanvasProps {
-  className?: string
-  onCapture?: (imageData: string) => void
-}
-
-export default function PhotoCanvas({
-  className = '',
-  onCapture,
-}: PhotoCanvasProps) {
+export default function DummyPhotoCanvas() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const transformerRef = useRef<any>(null)
@@ -49,105 +40,26 @@ export default function PhotoCanvas({
   const [processedCanvases, setProcessedCanvases] = useState<Record<string, HTMLCanvasElement>>({})
   
   // 비디오 업데이트용 refs
-  const stageRef = useRef<Konva.Stage>(null)
+  const stageRef = useRef<any>(null)
   const videoUpdateIntervalRef = useRef<NodeJS.Timeout>()
   
-  console.log('📹 Camera tracks found:', cameraTrackRefs.length)
-  console.log('👥 Participants found:', allParticipants.length)
+  console.log('📊 DummyPhotoCanvas state:', {
+    frameColor,
+    isCapturing,
+    currentCutIndex,
+    cutCount,
+    roomName,
+    selectedParticipant,
+    participantCount: Object.keys(participants).length,
+    livekitParticipants: allParticipants.length,
+    cameraTracks: cameraTrackRefs.length,
+    virtualBackgroundReady
+  })
 
   // 클라이언트 사이드 마운트 체크
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  // 참가자 추가/제거 관리 (Yjs를 통해 동기화)
-  useEffect(() => {
-    if (!roomName) return
-
-    const currentParticipantIds = cameraTrackRefs.map(
-      t => t.participant.identity
-    )
-    const existingIds = Object.keys(participants)
-
-    // 새로운 참가자 추가
-    const newIds = currentParticipantIds.filter(id => !existingIds.includes(id))
-
-    if (newIds.length > 0) {
-      const updatedParticipants = { ...participants }
-
-      newIds.forEach((id, index) => {
-        const participantCount = existingIds.length + index
-        console.log(`➕ Adding participant to canvas via Yjs: ${id}`)
-
-        updatedParticipants[id] = {
-          id,
-          x: 100 + (participantCount % 3) * 350,
-          y: 100 + Math.floor(participantCount / 3) * 280,
-          width: 320,
-          height: 240,
-          rotation: 0,
-          scaleX: 1,
-          scaleY: 1,
-          lastInteractionTime: Date.now(),
-        }
-      })
-
-      // Yjs로 업데이트
-      updatePhotoCanvasState(roomName, { participants: updatedParticipants })
-    }
-
-    // 제거된 참가자 처리
-    const removedIds = existingIds.filter(
-      id => !currentParticipantIds.includes(id)
-    )
-
-    if (removedIds.length > 0) {
-      const updatedParticipants = { ...participants }
-      removedIds.forEach(id => {
-        console.log(`➖ Removing participant from canvas via Yjs: ${id}`)
-        delete updatedParticipants[id]
-      })
-
-      // Yjs로 업데이트
-      updatePhotoCanvasState(roomName, {
-        participants: updatedParticipants,
-        selectedParticipant: removedIds.includes(selectedParticipant || '')
-          ? null
-          : selectedParticipant,
-      })
-    }
-  }, [cameraTrackRefs, participants, roomName, selectedParticipant])
-
-  // 캡쳐 함수
-  const captureImage = useCallback(() => {
-    if (stageRef.current && onCapture) {
-      console.log('📸 Capturing canvas image...')
-
-      try {
-        // Konva Stage를 이미지로 변환
-        const dataURL = stageRef.current.toDataURL({
-          mimeType: 'image/png',
-          quality: 1,
-          pixelRatio: 2,
-        })
-
-        console.log('✅ Canvas captured successfully')
-        onCapture(dataURL)
-      } catch (error) {
-        console.error('❌ Failed to capture canvas:', error)
-      }
-    }
-  }, [onCapture])
-
-  // isCapturing 상태 변화 감지하여 자동 캡쳐
-  useEffect(() => {
-    if (isCapturing) {
-      // 약간의 딜레이 후 캡쳐 (렌더링 완료 대기)
-      setTimeout(() => {
-        captureImage()
-      }, 100)
-    }
-  }, [isCapturing, captureImage])
 
   // LiveKit 비디오 트랙 설정 (VirtualBackground 상태 변경 감지)
   useEffect(() => {
@@ -234,7 +146,7 @@ export default function PhotoCanvas({
         video.remove()
       })
     }
-  }, [cameraTrackRefs, virtualBackgroundReady])
+  }, [cameraTrackRefs, virtualBackgroundReady]) // virtualBackgroundReady 의존성 추가
 
   // 크로마키 처리 함수 (VirtualBackground가 활성화된 경우에만)
   const processVideoFrame = useCallback((participantId: string) => {
@@ -245,6 +157,7 @@ export default function PhotoCanvas({
     
     // 비디오가 준비되지 않았으면 처리하지 않음
     if (videoElement.readyState < 2) {
+      console.log(`⚠️ Video not ready for ${participantId}, readyState: ${videoElement.readyState}`)
       return
     }
     
@@ -324,7 +237,7 @@ export default function PhotoCanvas({
     }
   }, [selectedId])
 
-  // Yjs 상태 변경을 DOM 노드에 반영
+  // Yjs 상태 변경을 DOM 노드에 반영 (LiveKit 비디오만)
   useEffect(() => {
     if (!stageRef.current) return
 
@@ -365,7 +278,7 @@ export default function PhotoCanvas({
         }
         
         if (needsUpdate) {
-          console.log(`🔄 Syncing DOM node for ${participantId}:`, {
+          console.log(`🔄 [DummyCanvas] Syncing DOM node for ${participantId}:`, {
             from: { x: currentX, y: currentY, rotation: currentRotation, width: currentWidth, height: currentHeight },
             to: { x: transform.x, y: transform.y, rotation: transform.rotation, width: transform.width, height: transform.height }
           })
@@ -383,41 +296,38 @@ export default function PhotoCanvas({
     })
   }, [cameraTrackRefs, participants])
 
-  // 선택 핸들러 (Yjs로 업데이트)
+  // 선택 핸들러 (Yjs로 업데이트 - PhotoCanvas 로직 모방)
   const handleSelect = useCallback(
     (id: string) => {
       if (roomName) {
-        // video- prefix 제거하여 순수한 participantId 추출
-        const participantId = id.startsWith('video-') ? id.replace('video-', '') : id
-        
-        // 선택 시 해당 참가자의 lastInteractionTime 업데이트
+        // Mock participant 데이터 업데이트
         const updatedParticipants = {
           ...participants,
-          [participantId]: {
-            ...participants[participantId],
-            id: participantId,
-            x: participants[participantId]?.x || 100,
-            y: participants[participantId]?.y || 100,
-            width: participants[participantId]?.width || 320,
-            height: participants[participantId]?.height || 240,
-            rotation: participants[participantId]?.rotation || 0,
+          [id]: {
+            ...participants[id],
+            id,
+            x: participants[id]?.x || 100,
+            y: participants[id]?.y || 100,
+            width: participants[id]?.width || 200,
+            height: participants[id]?.height || 150,
+            rotation: participants[id]?.rotation || 0,
             scaleX: 1,
             scaleY: 1,
             lastInteractionTime: Date.now(),
           },
         }
         updatePhotoCanvasState(roomName, {
-          selectedParticipant: participantId,
+          selectedParticipant: id,
           participants: updatedParticipants,
         })
-        console.log('🎯 Selected via Yjs:', participantId)
+        console.log('🎯 Selected via Yjs:', id)
       }
       setSelectedId(id)
     },
     [roomName, participants]
   )
 
-  const handleStageClick = useCallback((e: any) => {
+  const handleStageClick = (e: any) => {
     const clickedOnEmpty = e.target === e.target.getStage()
     if (clickedOnEmpty) {
       setSelectedId(null)
@@ -426,19 +336,19 @@ export default function PhotoCanvas({
       }
       console.log('📍 Empty stage clicked - deselecting via Yjs')
     }
-  }, [roomName])
+  }
 
   // SSR 중이거나 마운트되지 않았으면 로딩 표시
   if (!mounted) {
     return (
-      <div className={`relative ${className}`}>
+      <div className="relative">
         <div
           className="flex items-center justify-center rounded-xl bg-gray-200"
           style={{ width: CANVAS_CONFIG.width, height: CANVAS_CONFIG.height }}
         >
           <div className="text-center">
             <div className="mx-auto mb-2 h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
-            <p className="text-sm text-gray-600">Canvas Loading...</p>
+            <p className="text-sm text-gray-600">DummyCanvas Loading...</p>
           </div>
         </div>
       </div>
@@ -446,26 +356,27 @@ export default function PhotoCanvas({
   }
 
   return (
-    <div className={`relative ${className}`}>
+    <div className="relative">
       <Stage 
         ref={stageRef}
         width={CANVAS_CONFIG.width} 
         height={CANVAS_CONFIG.height}
-        className="overflow-hidden rounded-xl border-2 border-gray-300 shadow-lg"
+        className="border-2 border-gray-300 rounded-xl"
         onClick={handleStageClick}
       >
         {/* 배경 레이어 */}
         <Layer>
+          {/* 배경 */}
           <Rect
             x={0}
             y={0}
             width={CANVAS_CONFIG.width}
             height={CANVAS_CONFIG.height}
-            fill={CANVAS_CONFIG.backgroundColor}
+            fill="#f0f0f0"
             listening={false}
           />
 
-          {/* 그리드 가이드라인 */}
+          {/* 그리드 가이드라인 (PhotoCanvas에서 가져옴) */}
           {[1, 2, 3].map(i => (
             <Rect
               key={`v-line-${i}`}
@@ -490,7 +401,7 @@ export default function PhotoCanvas({
           ))}
         </Layer>
 
-        {/* 참가자 비디오 레이어 */}
+        {/* 테스트 박스 레이어 */}
         <Layer>
           {/* LiveKit 참가자 비디오들 (VirtualBackground 지원) - Z-Index 정렬됨 */}
           {sortedCameraTracksByZIndex.map((trackRef, index) => {
@@ -525,6 +436,7 @@ export default function PhotoCanvas({
             
             // VirtualBackground가 활성화되면 처리된 Canvas 사용, 아니면 원본 비디오 사용
             const displayImage = virtualBackgroundReady && processedCanvas ? processedCanvas : videoElement
+            const bgStatus = virtualBackgroundReady ? (processedCanvas ? 'ChromaKey' : 'VB-NoCanvas') : 'Original'
             
             return (
               <>
@@ -542,7 +454,7 @@ export default function PhotoCanvas({
                   strokeWidth={selectedId === `video-${participantId}` ? 3 : 0}
                   onClick={(e) => {
                     e.cancelBubble = true
-                    console.log(`📹 Video clicked: ${participantId} - bringing to front`)
+                    console.log(`📹 Video clicked: ${participantId} (${bgStatus}) - bringing to front`)
                     handleSelect(`video-${participantId}`)
                   }}
                   onDragEnd={(e) => {
@@ -602,9 +514,36 @@ export default function PhotoCanvas({
                     }
                   }}
                 />
+                
+                {/* 개발용 상태 표시 */}
+                {process.env.NODE_ENV === 'development' && (
+                  <>
+                    <Text
+                      x={currentTransform.x + 5}
+                      y={currentTransform.y + 5}
+                      text={bgStatus}
+                      fontSize={10}
+                      fill="lime"
+                      stroke="black"
+                      strokeWidth={1}
+                      listening={false}
+                    />
+                    <Text
+                      x={currentTransform.x + 5}
+                      y={currentTransform.y + 20}
+                      text={`Z:${index + 1}`}
+                      fontSize={10}
+                      fill="orange"
+                      stroke="black"
+                      strokeWidth={1}
+                      listening={false}
+                    />
+                  </>
+                )}
               </>
             )
           })}
+
 
           {/* Transformer */}
           {selectedId && (
@@ -626,30 +565,16 @@ export default function PhotoCanvas({
               }}
             />
           )}
-
-          {/* 참가자가 없을 때 */}
-          {cameraTrackRefs.length === 0 && (
-            <Text
-              x={CANVAS_CONFIG.width / 2}
-              y={CANVAS_CONFIG.height / 2}
-              text="Waiting for camera tracks..."
-              fontSize={24}
-              fontFamily="Arial"
-              fill="#666"
-              align="center"
-              offsetX={140}
-            />
-          )}
         </Layer>
 
-        {/* 프레임 레이어 */}
+        {/* 프레임 레이어 (PhotoCanvas에서 가져옴) */}
         <Layer>
           <Rect
             x={10}
             y={10}
             width={CANVAS_CONFIG.width - 20}
             height={CANVAS_CONFIG.height - 20}
-            stroke={frameColor || '#FFFFFF'}
+            stroke={frameColor}
             strokeWidth={12}
             cornerRadius={20}
             fill="transparent"
@@ -704,6 +629,78 @@ export default function PhotoCanvas({
           </Layer>
         )}
       </Stage>
+
+      {/* 상태 표시 */}
+      <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 text-sm rounded">
+        Selected: {selectedId || 'None'}
+      </div>
+
+      {/* 테스트 버튼들 */}
+      <div className="mt-4 flex gap-2">
+        <button
+          onClick={() => {
+            // PhotoBooth store의 shooting 상태 토글 (테스트용)
+            const shootingSlice = usePhotoBoothStore.getState()
+            if (roomName) {
+              // Mock shooting toggle
+              console.log('📸 Toggling capture state via store')
+            }
+          }}
+          className={`px-4 py-2 rounded font-semibold ${
+            isCapturing 
+              ? 'bg-red-600 text-white' 
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          {isCapturing ? '📸 촬영 중지' : '📸 촬영 효과 테스트'}
+        </button>
+        
+        <button
+          onClick={() => {
+            console.log('🎯 Current PhotoBooth State:', {
+              frameColor,
+              roomName,
+              selectedParticipant,
+              participantCount: Object.keys(participants).length
+            })
+          }}
+          className="px-4 py-2 rounded font-semibold bg-gray-600 text-white hover:bg-gray-700"
+        >
+          📊 상태 로그
+        </button>
+        
+        <button
+          onClick={() => {
+            if (stageRef.current) {
+              stageRef.current.batchDraw()
+              console.log('🎨 Manual batchDraw called')
+            }
+          }}
+          className="px-4 py-2 rounded font-semibold bg-purple-600 text-white hover:bg-purple-700"
+        >
+          🎨 수동 업데이트
+        </button>
+      </div>
+
+      {/* 설명 */}
+      <div className="mt-4 p-4 bg-gray-100 rounded">
+        <h3 className="font-bold mb-2">테스트 기능:</h3>
+        <ul className="text-sm space-y-1">
+          <li>📹 **LiveKit 비디오**: 클릭 + 드래그 + 회전/크기조절 + **Yjs 실시간 동기화**</li>
+          <li>📍 빈 공간 클릭: 선택 해제</li>
+          <li>📸 촬영 효과: 흰색 오버레이 + 텍스트</li>
+          <li>🖼️ 프레임: 흰색 테두리 + 컷 정보</li>
+          <li>🎨 수동 업데이트: batchDraw() 수동 호출</li>
+          <li>🔄 **Transform 동기화**: 위치, 크기, 회전이 모든 클라이언트에 실시간 반영</li>
+        </ul>
+        <div className="mt-2 text-xs text-gray-600">
+          LiveKit 참가자: {allParticipants.length} | 카메라 트랙: {cameraTrackRefs.length} | 비디오 엘리먼트: {Object.keys(videoElements).length}
+          <br />
+          VirtualBackground: {virtualBackgroundReady ? 'ON' : 'OFF'} | 처리된 Canvas: {Object.keys(processedCanvases).length}
+          <br />
+          Z-Index 순서: {sortedCameraTracksByZIndex.map(t => t.participant.identity.slice(-4)).join(' → ')} (최근 상호작용 순)
+        </div>
+      </div>
     </div>
   )
 }
