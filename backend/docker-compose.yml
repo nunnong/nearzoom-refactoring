@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7.2
+    container_name: nearzoom-redis
+    ports:
+      - "6379:6379"
+    restart: always
+    volumes:
+      - ./redis-data:/data
+
+  mysql:
+    image: mysql:8.0
+    container_name: nearzoom-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${PROD_MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${PROD_MYSQL_DB}
+      MYSQL_USER: ${PROD_MYSQL_USERNAME}
+      MYSQL_PASSWORD: ${PROD_MYSQL_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql-data:/var/lib/mysql
+
+  spring:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nearzoom-backend
+    depends_on:
+      - mysql
+      - redis
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://${HOST}:${PROD_MYSQL_PORT}/${PROD_MYSQL_DB}?useSSL=false&useUnicode=true&allowPublicKeyRetrieval=true
+      PROD_MYSQL_USERNAME: ${PROD_MYSQL_USERNAME}
+      PROD_MYSQL_PASSWORD: ${PROD_MYSQL_PASSWORD}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      OAUTH_GOOGLE_CLIENT_ID: ${OAUTH_GOOGLE_CLIENT_ID}
+      OAUTH_GOOGLE_CLIENT_SECRET: ${OAUTH_GOOGLE_CLIENT_SECRET}
+      OAUTH_GOOGLE_REDIRECT_URI: ${OAUTH_GOOGLE_REDIRECT_URI}
+      OAUTH_KAKAO_CLIENT_ID: ${OAUTH_KAKAO_CLIENT_ID}
+      OAUTH_KAKAO_CLIENT_SECRET: ${OAUTH_KAKAO_CLIENT_SECRET}
+      OAUTH_KAKAO_REDIRECT_URI: ${OAUTH_KAKAO_REDIRECT_URI}
+      SPRING_JWT_SECRET: ${JWT_SECRET}
+      SPRING_JWT_ACCESS_EXPIRATION: ${ACCESSTOKEN_EXPIRE}
+      SPRING_JWT_REFRESH_EXPIRATION: ${REFRESHTOKEN_EXPIRE}
+      SPRING_JWT_REFRESH_TOKEN_TTL: ${JWT_REFRESH_TOKEN_TTL}
+      APP_REDIRECT_URL: ${REDIRECT_URL}
+      IMAGE_SERVER_URL: ${IMAGE_SERVER_URL}
+    restart: always
+    
+networks:
+  default:
+    external: true
+    name: nearzoom_default

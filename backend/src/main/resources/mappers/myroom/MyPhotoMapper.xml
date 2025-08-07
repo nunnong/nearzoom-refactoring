@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ssafy.nearzoom.domain.myroom.repository.MyPhotoMapper">
+
+  <select id="findPhotosByCondition"
+    resultType="com.ssafy.nearzoom.domain.myroom.dto.MyPhotoResponse">
+    SELECT
+    p.photo_id AS photoId,
+    p.img_url AS imageUrl,
+    p.created_at AS createdAt,
+    a.heart AS heart,
+    a.editable AS editable,
+    p.user_list AS partnerEmails
+    FROM photo p
+    JOIN archive a ON p.photo_id = a.photo_id
+    WHERE a.user_id = #{userId}
+    AND a.deleted_at IS NULL
+
+    <if test="cond.startDate != null">
+      AND DATE(a.created_at) &gt;= #{cond.startDate}
+    </if>
+    <if test="cond.endDate != null">
+      AND DATE(a.created_at) &lt;= #{cond.endDate}
+    </if>
+    <if test="cond.heart != null">
+      <choose>
+        <when test="cond.heart">
+          AND a.heart = 1
+        </when>
+        <otherwise>
+          AND a.heart = 0
+        </otherwise>
+      </choose>
+    </if>
+
+    <if test="cond.partnerEmails != null and cond.partnerEmails.size() > 0">
+      <foreach item="email" collection="cond.partnerEmails" open="AND (" separator=" OR " close=")">
+        p.user_list LIKE CONCAT('%', #{email}, '%')
+      </foreach>
+    </if>
+
+    <if test="cond.cursor != null">
+      AND p.photo_id &lt; #{cond.cursor}
+    </if>
+
+    ORDER BY p.photo_id DESC
+    LIMIT #{cond.limit}
+  </select>
+
+  <update id="updateHeart">
+    UPDATE archive
+    SET heart =
+    <choose>
+      <when test="heart == true">1</when>
+      <otherwise>0</otherwise>
+    </choose>
+    WHERE user_id = #{userId}
+    AND photo_id = #{photoId}
+  </update>
+
+  <update id="softDeletePhoto">
+    UPDATE archive
+    SET deleted_at = NOW()
+    WHERE user_id = #{userId}
+      AND photo_id = #{photoId}
+  </update>
+
+  <update id="markAsEdited">
+    UPDATE archive
+    SET editable = false,
+        updated_at = NOW()
+    WHERE user_id = #{userId}
+      AND photo_id = #{photoId}
+      AND editable = true
+  </update>
+
+
+</mapper>
