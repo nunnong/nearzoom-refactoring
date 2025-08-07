@@ -1,12 +1,13 @@
 'use client'
-import { Tab } from '@headlessui/react'
-import { HashtagIcon, PencilIcon} from '@heroicons/react/24/outline'
+
+import { HashtagIcon, PencilIcon } from '@heroicons/react/24/outline'
 import { useState, useEffect, useRef } from 'react'
 
 interface PromptSectionProps {
   promptText: string
   setPromptText: (value: string) => void
 }
+
 interface FloatingWord {
   id: number
   text: string
@@ -81,7 +82,6 @@ function StepwiseKeywordPrompt({
     setPromptText('')
   }
 
-  // 카테고리별 1개 랜덤 선택
   const pickRandomKeywords = () => {
     const newPicked: { [category in KeywordCategory]?: string } = {}
     categories.forEach(cat => {
@@ -89,7 +89,7 @@ function StepwiseKeywordPrompt({
       newPicked[cat] = list[Math.floor(Math.random() * list.length)]
     })
     setSelected(newPicked)
-    setActiveStep(categories.length - 1) // 마지막스텝으로 이동
+    setActiveStep(categories.length - 1)
   }
 
   const handleGenerate = () => setPromptText(generatePrompt(selected))
@@ -99,110 +99,93 @@ function StepwiseKeywordPrompt({
   const goNext = () =>
     setActiveStep(s => (s < categories.length - 1 ? s + 1 : s))
 
-  // 진행점
   const ProgressDot = () => (
-    <div className="mt-2 mb-4 flex justify-center gap-2">
+    <div className="mt-2 mb-4 flex justify-center gap-4">
       {categories.map((cat, idx) => (
-        <span
-          key={cat}
-          className={classNames(
-            'inline-block h-2.5 w-2.5 rounded-full transition-colors',
-            idx < activeStep
-              ? 'bg-indigo-400'
-              : idx === activeStep
-                ? 'bg-purple-500'
-                : 'bg-gray-200'
-          )}
-        />
-      ))}
-    </div>
-  )
-  const Preview = () => (
-    <div className="mb-2 flex flex-wrap items-center justify-center gap-2">
-      {categories.map(cat =>
-        selected[cat] ? (
+        <div key={cat} className="flex flex-col items-center space-y-1">
           <span
-            key={cat}
-            className="rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-semibold text-indigo-600 shadow"
-          >
-            <span>{cat.replace(/[^\w가-힣]/g, '')}: </span>
-            {selected[cat]}
+            className={classNames(
+              'inline-block h-3 w-3 rounded-full transition-colors',
+              idx < activeStep
+                ? 'bg-indigo-500'
+                : idx === activeStep
+                ? 'bg-purple-600'
+                : 'bg-gray-300'
+            )}
+          />
+          <span className="text-xs text-gray-600 select-none">
+            {cat.replace(/[^\w가-힣]/g, '')}
           </span>
-        ) : null
-      )}
+        </div>
+      ))}
     </div>
   )
 
   return (
     <div className="w-full">
-      {/* 상단 설명/버튼 */}
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-rg flex items-center gap-2 font-semibold text-indigo-800">
-          <HashtagIcon className="h-5 w-5" />
-          단계별 키워드 조합
-        </span>
-        <ProgressDot />
-        <div className="flex gap-2">
-          <button
-            onClick={resetAll}
-            className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600 transition-all hover:scale-105 hover:bg-gray-200"
-          >
-            초기화
-          </button>
-          <button
-            onClick={pickRandomKeywords}
-            className="rounded-lg bg-purple-100 px-3 py-2 text-xs font-medium text-purple-600 transition-all hover:scale-105 hover:bg-purple-200"
-          >
-            랜덤 생성
-          </button>
-        </div>
-      </div>
-      
-      {/* 설명
-      <div className="mb-2 rounded-lg border-gray-200 bg-gray-50 px-3 py-2 text-left text-xs text-gray-600 shadow-sm">
-        💡 <span className="font-medium">선택 순서 :</span> 🎨분위기 → 🏞️장소 →
-        🌅시간대 → 📸스타일
-      </div> */}
-      
-      <Preview />
-
-      {/* 키워드 선택 */}
-      <div className="mb-2 text-center">
-        <h2 className="mb-1 text-base font-bold text-indigo-900 select-none">
-          {currentCategory} 키워드를 선택하세요
-        </h2>
-        <div className="mt-2 grid grid-cols-2 justify-items-center gap-2 sm:grid-cols-3 lg:grid-cols-5">
-          {keywordCategories[currentCategory].keywords.map(keyword => (
-            <button
-              key={keyword}
-              onClick={() => selectKeyword(keyword)}
-              className={classNames(
-                'w-full rounded-lg border px-3 py-2 text-xs font-medium shadow-sm transition',
-                selected[currentCategory] === keyword
-                  ? 'scale-105 border-indigo-400 bg-gradient-to-r from-indigo-200 to-purple-100 text-indigo-800 shadow-md'
-                  : 'border-gray-200 bg-white text-gray-700 hover:border-indigo-300 hover:bg-indigo-50'
-              )}
+      {/* 선택된 키워드 미리보기 */}
+      <div className="mb-4 flex flex-wrap justify-center gap-2 px-2">
+        {categories.map(cat =>
+          selected[cat] ? (
+            <span
+              key={cat}
+              className="rounded-full border border-indigo-300 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 shadow-sm select-none"
             >
-              {keyword}
-            </button>
-          ))}
-        </div>
+              <span>{cat.replace(/[^\w가-힣]/g, '')}: </span>
+              {selected[cat]}
+            </span>
+          ) : null
+        )}
       </div>
 
-      {/* 네비게이션 버튼 */}
-      <div className="mt-4 flex justify-between gap-2">
+      {/* 키워드 선택 안내 */}
+      <h3 className="mb-3 px-2 text-center text-sm font-bold text-indigo-900 select-none">
+        {currentCategory} 키워드를 선택하세요
+      </h3>
+
+      {/* 키워드 선택 버튼 그리드 */}
+      <div className="grid grid-cols-2 gap-3 px-2 sm:grid-cols-3 lg:grid-cols-5">
+        {keywordCategories[currentCategory].keywords.map(keyword => (
+          <button
+            key={keyword}
+            onClick={() => selectKeyword(keyword)}
+            type="button"
+            className={classNames(
+              'w-full rounded-lg border px-3 py-2 text-center text-xs font-medium shadow-sm transition-transform duration-150 ease-in-out',
+              selected[currentCategory] === keyword
+                ? 'scale-105 border-indigo-400 bg-gradient-to-r from-indigo-200 to-purple-100 text-indigo-800 shadow-md'
+                : 'border-gray-200 bg-white text-gray-700 hover:border-indigo-400 hover:bg-indigo-50'
+            )}
+          >
+            {keyword}
+          </button>
+        ))}
+      </div>
+
+      {/* 네비게이션 버튼 및 프로그레스 */}
+      <div className="mt-6 flex items-center justify-between px-2">
         <button
           onClick={goPrev}
           disabled={activeStep === 0}
-          className="rounded-lg border border-gray-200 bg-gray-100 px-4 py-2 text-xs font-medium text-gray-600 disabled:opacity-50"
+          type="button"
+          className="rounded-lg border border-gray-300 bg-gray-100 px-4 py-2 text-xs font-medium text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          aria-label="이전 단계"
         >
           이전
         </button>
+
+        <ProgressDot />
+
         {activeStep < categories.length - 1 ? (
           <button
             onClick={goNext}
             disabled={!selected[currentCategory]}
-            className="rounded-lg bg-indigo-500 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-600 disabled:opacity-50"
+            type="button"
+            className={classNames(
+              'rounded-lg bg-[#D0D6ED]/90 px-5 py-2 text-xs font-bold text-[#2D3243] shadow-md transition hover:bg-[#D0D6ED] disabled:opacity-40 disabled:cursor-not-allowed',
+              !selected[currentCategory] && 'pointer-events-none'
+            )}
+            aria-label="다음 단계"
           >
             다음
           </button>
@@ -210,22 +193,37 @@ function StepwiseKeywordPrompt({
           <button
             onClick={handleGenerate}
             disabled={categories.some(cat => !selected[cat])}
-            className="rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-2 text-xs font-bold text-white shadow-lg transition hover:scale-105 disabled:opacity-50"
+            type="button"
+            className={classNames(
+              'rounded-lg bg-gradient-to-r from-purple-400 to-purple-600 px-5 py-2 text-xs font-bold text-white shadow-lg transition hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed',
+              categories.some(cat => !selected[cat]) && 'pointer-events-none'
+            )}
+            aria-label="키워드 조합 완료"
           >
-            프롬프트 조합 완료
+            선택 완료
           </button>
         )}
       </div>
 
-      {/* 미리보기 */}
-      {categories.every(cat => selected[cat]) && (
-        <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-4">
-          <div className="mb-1 text-xs font-bold text-indigo-800">미리보기</div>
-          <div className="font-semibold text-indigo-900">
-            {generatePrompt(selected)}
-          </div>
-        </div>
-      )}
+      {/* 초기화/랜덤 생성 버튼들을 하단으로 이동 */}
+      <div className="mt-6 flex items-center justify-center gap-3 px-2 pt-4 border-t border-gray-100">
+        <button
+          onClick={resetAll}
+          className="rounded-lg bg-gray-100 px-4 py-2 text-xs font-medium text-gray-600 transition-all hover:scale-105 hover:bg-gray-200"
+          aria-label="초기화"
+          type="button"
+        >
+          초기화
+        </button>
+        <button
+          onClick={pickRandomKeywords}
+          className="rounded-lg bg-purple-100 px-4 py-2 text-xs font-medium text-purple-600 transition-all hover:scale-105 hover:bg-purple-200"
+          aria-label="랜덤 생성"
+          type="button"
+        >
+          랜덤 생성
+        </button>
+      </div>
     </div>
   )
 }
@@ -234,38 +232,36 @@ export default function PromptSection({
   promptText,
   setPromptText,
 }: PromptSectionProps) {
-  const [activeMode, setActiveMode] = useState<'keyword' | 'advanced'>(
-    'keyword'
-  )
+  const [activeMode, setActiveMode] = useState<'keyword' | 'advanced'>('keyword')
   const [hoveredKeyword] = useState<string | null>(null)
   const [floatingWords, setFloatingWords] = useState<FloatingWord[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // 플로팅 워드 (이펙트)
   useEffect(() => {
     const interval = setInterval(() => {
       if (hoveredKeyword && containerRef.current) {
         const newWord: FloatingWord = {
           id: Date.now(),
           text: hoveredKeyword,
-          x: Math.random() * 220,
-          y: Math.random() * 140,
+          x: Math.random() * (containerRef.current.clientWidth - 50),
+          y: Math.random() * (containerRef.current.clientHeight - 30),
           opacity: 0.8,
           scale: 1,
         }
         setFloatingWords(prev => [...prev.slice(-2), newWord])
       }
-    }, 3300)
+    }, 3500)
     return () => clearInterval(interval)
   }, [hoveredKeyword])
+
   useEffect(() => {
     const timeout = setTimeout(() => {
       setFloatingWords(prev =>
         prev
           .map(word => ({
             ...word,
-            opacity: word.opacity - 0.06,
-            scale: word.scale + 0.06,
+            opacity: word.opacity - 0.07,
+            scale: word.scale + 0.07,
           }))
           .filter(word => word.opacity > 0.05)
       )
@@ -279,13 +275,16 @@ export default function PromptSection({
     )
   }
 
+  const resetAll = () => setPromptText('')
+
   return (
     <div
       ref={containerRef}
-      className="relative mx-auto w-full max-w-xl space-y-6 overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-xl"
+      className="relative mx-auto w-full max-w-xl space-y-6 overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-lg"
+      aria-label="AI 배경 프롬프트 생성기"
     >
       {/* 플로팅 워드 */}
-      <div className="pointer-events-none absolute inset-0 z-0">
+      <div className="pointer-events-none absolute inset-0 z-0 select-none">
         {floatingWords.map(word => (
           <div
             key={word.id}
@@ -302,102 +301,82 @@ export default function PromptSection({
         ))}
       </div>
 
-      {/* 헤더 */}
-      <div className="relative z-10 space-y-2 text-center">
-        <h2 className="text-lg font-extrabold tracking-tight text-gray-900">
-          AI 프롬프터
-        </h2>
-        <p className="text-sm text-gray-500">
-          키워드 조합 또는 직접 입력으로 배경을 생성해보세요
-        </p>
+      {/* 모드 토글 */}
+      <div className="relative z-10 flex justify-center gap-2 rounded-lg bg-gray-100 p-1 shadow-inner">
+        <button
+          onClick={() => setActiveMode('keyword')}
+          type="button"
+          className={classNames(
+            'flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition',
+            activeMode === 'keyword'
+              ? 'bg-white text-indigo-700 shadow'
+              : 'text-gray-600 hover:text-gray-800'
+          )}
+          aria-pressed={activeMode === 'keyword'}
+          aria-label="키워드 모드"
+        >
+          <HashtagIcon className="h-4 w-4" />
+          키워드
+        </button>
+        <button
+          onClick={() => setActiveMode('advanced')}
+          type="button"
+          className={classNames(
+            'flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition',
+            activeMode === 'advanced'
+              ? 'bg-white text-indigo-700 shadow'
+              : 'text-gray-600 hover:text-gray-800'
+          )}
+          aria-pressed={activeMode === 'advanced'}
+          aria-label="직접 작성 모드"
+        >
+          <PencilIcon className="h-4 w-4" />
+          직접 작성
+        </button>
       </div>
 
-      {/* 탭 */}
+      {/* 컨텐츠 */}
       <div className="relative z-10">
-        <Tab.Group
-          selectedIndex={activeMode === 'keyword' ? 0 : 1}
-          onChange={idx => setActiveMode(idx === 0 ? 'keyword' : 'advanced')}
-        >
-          <Tab.List className="flex gap-2 rounded-xl bg-gray-50 p-2 shadow-inner">
-            <Tab
-              className={({ selected }) =>
-                classNames(
-                  'flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-all focus:outline-none',
-                  selected
-                    ? 'scale-105 transform bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg'
-                    : 'text-indigo-700 hover:bg-white hover:text-indigo-600 hover:shadow-md'
-                )
-              }
-            >
-              <HashtagIcon className="h-5 w-5" />
-              키워드 조합
-            </Tab>
-            <Tab
-              className={({ selected }) =>
-                classNames(
-                  'flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-all focus:outline-none',
-                  selected
-                    ? 'scale-105 transform bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg'
-                    : 'text-indigo-700 hover:bg-white hover:text-indigo-600 hover:shadow-md'
-                )
-              }
-            >
-              <PencilIcon className="h-5 w-5" />
-              직접 작성
-            </Tab>
-          </Tab.List>
-
-          <Tab.Panels className="mt-6">
-            {/* 키워드 조합(단계별/액션버튼 동일) */}
-            <Tab.Panel>
-              <StepwiseKeywordPrompt setPromptText={setPromptText} />
-            </Tab.Panel>
-
-            {/* 직접 작성 */}
-            <Tab.Panel>
-              <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <span className="text-rg flex items-center gap-2 font-semibold text-indigo-800">
-                    <PencilIcon className="h-5 w-5" />
-                    프롬프트 작성
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setPromptText('')}
-                      className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600 transition-all hover:scale-105 hover:bg-gray-200"
-                    >
-                      초기화
-                    </button>
-                    <button
-                      onClick={generateRandomPrompt}
-                      className="rounded-lg bg-purple-100 px-3 py-2 text-xs font-medium text-purple-600 transition-all hover:scale-105 hover:bg-purple-200"
-                    >
-                      랜덤 생성
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <div className="mb-2 rounded-lg border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600 shadow-sm">
-                    💡 <span className="font-medium">작성 순서 팁 :</span>{' '}
-                    🎨분위기 → 🏞️장소 → 🌅시간대 → 📸스타일
-                  </div>
-                  <textarea
-                    rows={5}
-                    className="block w-full rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm leading-relaxed text-gray-800 shadow-sm transition-all focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100"
-                    placeholder="예시: 유쾌한 놀이공원에서 황금노을, 필름 카메라 스타일"
-                    value={promptText}
-                    onChange={e => setPromptText(e.target.value)}
-                  />
-                </div>
-              </div>
-            </Tab.Panel>
-          </Tab.Panels>
-        </Tab.Group>
+        {activeMode === 'keyword' ? (
+          <StepwiseKeywordPrompt setPromptText={setPromptText} />
+        ) : (
+          <div className="space-y-4 px-1">
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={resetAll}
+                type="button"
+                className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600 transition-all hover:scale-105 hover:bg-gray-200"
+                aria-label="프롬프트 초기화"
+              >
+                초기화
+              </button>
+              <button
+                onClick={generateRandomPrompt}
+                type="button"
+                className="rounded-lg bg-purple-100 px-3 py-2 text-xs font-medium text-purple-600 transition-all hover:scale-105 hover:bg-purple-200"
+                aria-label="프롬프트 랜덤 생성"
+              >
+                랜덤 생성
+              </button>
+            </div>
+            <p className="mb-2 text-xs text-gray-500">
+              🎨 분위기 → 🏞️ 장소 → 🌅 시간대 → 📸 스타일 순으로 작성하세요.
+            </p>
+            <textarea
+              rows={5}
+              className="block w-full resize-y rounded-xl border border-gray-300 bg-gray-50 p-4 text-sm leading-relaxed text-gray-800 shadow-sm transition-all focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100"
+              placeholder="예시: 유쾌한 놀이공원에서 황금노을, 필름 카메라 스타일"
+              value={promptText}
+              onChange={e => setPromptText(e.target.value)}
+              aria-label="프롬프트 직접 작성 입력란"
+            />
+          </div>
+        )}
       </div>
 
       {/* 프롬프트 미리보기 */}
       {promptText && (
-        <div className="relative rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-cyan-50 p-4 shadow-lg">
+        <div className="relative z-10 rounded-xl border border-emerald-300 bg-gradient-to-br from-emerald-50 to-cyan-50 p-4 shadow-lg">
           <div className="flex items-start gap-3">
             <div className="flex-1 space-y-3">
               <div className="flex items-center justify-between">
@@ -405,33 +384,10 @@ export default function PromptSection({
                   🎬 프롬프트 미리보기
                 </span>
               </div>
-              <div className="rounded-lg border border-emerald-200 bg-white/90 p-3 shadow-sm">
-                <p className="text-sm leading-relaxed font-medium text-emerald-900">
+              <div className="rounded-lg border border-emerald-200 bg-white/90 p-3 shadow-sm break-words whitespace-pre-wrap">
+                <p className="text-sm leading-relaxed font-medium text-emerald-900 select-text">
                   {promptText}
                 </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {promptText
-                  .split(/[,\s]+/)
-                  .filter(word => word.length > 2)
-                  .slice(0, 6)
-                  .map((word, idx) => (
-                    <span
-                      key={idx}
-                      className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700"
-                    >
-                      {word.replace(/[^\w가-힣]/g, '')}
-                    </span>
-                  ))}
-                {promptText.split(/[,\s]+/).filter(word => word.length > 2)
-                  .length > 6 && (
-                  <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-600">
-                    +
-                    {promptText.split(/[,\s]+/).filter(word => word.length > 2)
-                      .length - 6}{' '}
-                    더보기
-                  </span>
-                )}
               </div>
             </div>
           </div>

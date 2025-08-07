@@ -18,6 +18,8 @@ interface ParticipantListProps {
   showStartButton?: boolean
   onStartCall?: () => void
   startButtonText?: string
+  roomUrl?: string // 새로 추가
+  onCopyRoomUrl?: () => void // 새로 추가
 }
 
 export default function ParticipantList({
@@ -25,18 +27,76 @@ export default function ParticipantList({
   showStartButton = true,
   onStartCall = () => {},
   startButtonText = 'START',
+  roomUrl = '', // 새로 추가
+  onCopyRoomUrl = () => {}, // 새로 추가
 }: ParticipantListProps) {
+  const handleCopyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(`https://${roomUrl}`)
+      alert('URL이 복사되었습니다!')
+      onCopyRoomUrl()
+    } catch (err) {
+      console.error('복사 실패:', err)
+      alert('복사에 실패했습니다.')
+    }
+  }
+
   return (
-    <div className="flex-1 rounded-3xl border border-white/30 bg-white/60 p-6 shadow-lg backdrop-blur-sm">
-      <div className="mb-6 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-800">참가자들</h3>
+    <div className="flex-1 rounded-2xl border border-white/30 bg-white/90 p-4 shadow-lg backdrop-blur-sm">
+      {/* 친구 초대 섹션 - 알약 스타일 */}
+      <div className="mb-3">
+        <button
+          onClick={handleCopyUrl}
+          className="group mx-auto flex items-center gap-3 rounded-2xl border border-gray-200/60 bg-white/90 px-7 py-2 shadow-sm backdrop-blur-sm transition-all hover:bg-white hover:shadow-md"
+        >
+          <div className="flex items-center gap-2">
+            <svg
+              className="h-4 w-4 text-gray-400 group-hover:text-gray-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"
+              />
+            </svg>
+            <span className="text-sm text-[#2D3243] group-hover:text-gray-800">
+            친구를 초대해주세요!
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-1 rounded-full bg-[#2D3243] px-3 py-1.5 text-white transition-all group-hover:bg-[#1a1f2e]">
+            <svg
+              className="h-3.5 w-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+              />
+            </svg>
+            <span className="text-xs font-semibold">복사</span>
+          </div>
+        </button>
+      </div>
+
+      {/* 참가자 목록 */}
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-rg font-extrabold tracking-tight text-gray-900">Participants ({participants.length})</h3>
         <div className="flex items-center gap-2">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-[#C9D76D]" />
-          <span className="text-sm text-gray-600">{participants.length}명</span>
+          {/* <div className="h-2 w-2 animate-pulse rounded-full bg-[#C9D76D]" /> */}
+          {/* <span className="text-sm text-gray-600">{participants.length}명</span> */}
         </div>
       </div>
 
-      <div className="mb-6 space-y-3">
+      <div className="mb-4 space-y-3">
         {participants.map(participant => (
           <div
             key={participant.id}

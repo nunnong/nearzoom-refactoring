@@ -30,7 +30,7 @@ export default function ControlPanel({
     'flex items-center justify-center rounded-2xl transition-all duration-200 hover:scale-110 shadow-md'
 
   return (
-    <div className="rounded-3xl bg-white/60 backdrop-blur-sm border border-white/30 shadow-lg p-4">
+    <div className="rounded-2xl bg-white/90 backdrop-blur-sm border border-white/30 shadow-lg p-4">
       <div className="flex justify-center gap-3">
         {/* 마이크 버튼 */}
         <button

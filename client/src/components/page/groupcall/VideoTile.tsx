@@ -48,7 +48,7 @@ export default function VideoTile({
         // 카메라 꺼진 상태
         <div className="flex h-full w-full items-center justify-center bg-gray-100">
           <div className="text-center">
-            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gray-600 text-xl font-semibold text-white shadow-md">
+            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gray-600 text-lg font-semibold text-white shadow-md">
               {(participant.name || participant.email)[0].toUpperCase()}
             </div>
             <svg
@@ -73,7 +73,7 @@ export default function VideoTile({
       <div className="absolute right-0 bottom-0 left-0 border-t border-gray-200/60 bg-white/95 p-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <span className="font-medium text-gray-800">
+            <span className="font-medium text-rg text-gray-800">
               {participant.name || participant.email}
             </span>
             {participant.isHost && (

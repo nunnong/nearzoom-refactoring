@@ -2,6 +2,8 @@
 
 import { useRef, useEffect } from 'react'
 
+import Timer from '@/components/page/groupcall/photoshoot/Timer'
+
 interface ParticipantWebcam {
   id: string
   name: string
@@ -13,11 +15,15 @@ interface ScreenShareAreaProps {
   screenStream?: MediaStream
   participantWebcams: ParticipantWebcam[]
   className?: string
+  isTimerActive?: boolean
+  timerSeconds?: number
 }
 
 export default function ScreenShareArea({
   screenStream,
   className = '',
+  isTimerActive = false,
+  timerSeconds = 0,
 }: ScreenShareAreaProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -29,7 +35,7 @@ export default function ScreenShareArea({
   }, [screenStream])
 
   return (
-    <div className={`relative w-full h-[480px] bg-black rounded-xl overflow-hidden shadow-lg ${className}`}>
+    <div className={`relative w-full max-w-lg aspect-square mx-auto bg-black rounded-xl overflow-hidden shadow-lg ${className}`}>
       {/* 공유화면 */}
       {screenStream ? (
         <video
@@ -55,9 +61,18 @@ export default function ScreenShareArea({
         </div>
       )}
 
+      {/* 타이머 오버레이 - 우측 상단 */}
+      {isTimerActive && (
+        <div className="absolute top-4 right-4 z-30">
+          <Timer
+            isActive={isTimerActive}
+            seconds={timerSeconds}
+          />
+        </div>
+      )}
 
       {/* 촬영 준비 상태 표시 */}
-      {screenStream && (
+      {screenStream && !isTimerActive && (
         <div className="absolute top-4 right-4">
           <div className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2">
             <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
@@ -68,23 +83,3 @@ export default function ScreenShareArea({
     </div>
   )
 }
-
-// 웹캠 비디오 컴포넌트 (별도 분리)
-// function VideoComponent({ stream}: { stream: MediaStream; userName: string }) {
-//   const videoRef = useRef<HTMLVideoElement>(null)
-
-//   useEffect(() => {
-//     if (videoRef.current && stream) {
-//       videoRef.current.srcObject = stream
-//     }
-//   }, [stream])
-
-//   return (
-//     <video
-//       ref={videoRef}
-//       autoPlay
-//       playsInline
-//       muted
-//       className="w-28 h-36 object-cover rounded-lg border-2 border-white shadow-md bg-white/30 backdrop-blur-sm"
-//     />
-//   )

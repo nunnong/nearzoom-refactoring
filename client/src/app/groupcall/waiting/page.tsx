@@ -127,7 +127,7 @@ export default function WaitingPage({
       />
 
       {/* 메인 컨텐츠 영역 */}
-      <div className="flex flex-1 gap-6 bg-gray-100 px-8 py-6">
+      <div className="flex flex-1 gap-6 bg-[#2d3243] px-8 py-6">
         {/* 왼쪽: 비디오 영역 */}
         <div className="flex flex-1 flex-col">
           <div className="grid flex-1 grid-cols-2 gap-6">

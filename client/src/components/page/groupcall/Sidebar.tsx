@@ -49,7 +49,7 @@ export default function Sidebar({
   className,
 }: SidebarProps) {
   return (
-    <div className={cn('flex flex-col gap-6 w-80', className)}>
+    <div className={cn('flex flex-col gap-4 w-80', className)}>
       {/* 참가자 목록 */}
       <ParticipantList
         participants={participants}

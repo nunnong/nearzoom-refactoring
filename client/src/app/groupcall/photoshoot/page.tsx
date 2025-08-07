@@ -8,7 +8,6 @@ import ParticipantList from '@/components/page/groupcall/ParticipantList'
 import CompletionModal from '@/components/page/groupcall/photoshoot/CompletionModal'
 import ProgressBar from '@/components/page/groupcall/photoshoot/ProgressBar'
 import ScreenShareArea from '@/components/page/groupcall/photoshoot/ScreenShareArea'
-import Timer from '@/components/page/groupcall/photoshoot/Timer'
 import { cn } from '@/lib/utils'
 
 // 타입 정의
@@ -107,6 +106,7 @@ export default function GroupShotRoom({
       })
     }, 1000)
   }
+  
   // 더미 참가자 데이터 (participants가 비어있을 때 사용)
   const mockParticipants: Participant[] = [
     {
@@ -182,10 +182,10 @@ export default function GroupShotRoom({
       />
 
       {/* 메인 컨텐츠 */}
-      <div className="flex flex-1 gap-6 px-8 py-6">
+      <div className="flex flex-1 gap-6 px-8 py-6 bg-[#2d3243]">
         {/* 왼쪽: 메인 영역 (흰색 상자) */}
         <div className="flex flex-1">
-          <div className="relative flex flex-1 flex-col rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="relative flex flex-1 flex-col rounded-2xl border border-gray-100 bg-white/90 p-6 shadow-sm">
             {/* 진행바 */}
             <div className="flex justify-center py-3">
               <ProgressBar
@@ -201,12 +201,8 @@ export default function GroupShotRoom({
                 <ScreenShareArea
                   screenStream={screenStream}
                   participantWebcams={participantWebcams}
-                />
-
-                {/* 타이머 오버레이 */}
-                <Timer
-                  isActive={testShooting || isShooting}
-                  seconds={testShooting ? testTimer : timer}
+                  isTimerActive={testShooting || isShooting}
+                  timerSeconds={testShooting ? testTimer : timer}
                 />
 
                 {/* 테스트 버튼 */}
@@ -229,13 +225,15 @@ export default function GroupShotRoom({
         </div>
 
         {/* 오른쪽: 사이드바 */}
-        <div className="flex w-80 flex-col gap-6">
+        <div className="flex w-80 flex-col gap-4">
           {/* 참가자 목록 */}
           <ParticipantList
             participants={displayParticipants}
             showStartButton={currentUser.isHost}
             onStartCall={onStartCut}
             startButtonText="촬영 시작" // 커스텀 텍스트
+            roomUrl={roomInfo.url}
+            onCopyRoomUrl={onCopyRoomUrl}
           />
 
           {/* 컨트롤 버튼들 */}

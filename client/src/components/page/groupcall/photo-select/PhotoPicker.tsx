@@ -37,9 +37,9 @@ export default function PhotoPicker({
 
   return (
     <div>
-      <h3 className="mb-3 text-center text-lg font-semibold text-gray-800">
+      {/* <h3 className="mb-3 text-center text-lg font-semibold text-gray-800">
         사진 선택 ({selected.length}/{cutCount})
-      </h3>
+      </h3> */}
       <div className="grid grid-cols-2 gap-4">
         {photos.map((photo, idx) => {
           const order = getPhotoOrder(photo)
@@ -58,14 +58,16 @@ export default function PhotoPicker({
                     : 'border-white hover:border-[#C4C8DA] hover:shadow-md'
                 } `}
               >
-                <Image
-                  src={photo}
-                  alt={`촬영된 사진 ${idx + 1}`}
-                  className="h-64 w-full object-cover"
-                  width={400}
-                  height={256}
-                  draggable={false}
-                />
+                {/* 🔥 수정: 1:1 정사각형 비율로 고정된 컨테이너 */}
+                <div className="aspect-square relative">
+                  <Image
+                    src={photo}
+                    alt={`촬영된 사진 ${idx + 1}`}
+                    fill
+                    className="object-cover"
+                    draggable={false}
+                  />
+                </div>
 
                 {/* 선택 순서 표시 */}
                 {isSelected && order && (

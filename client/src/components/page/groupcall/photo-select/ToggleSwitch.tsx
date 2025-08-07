@@ -24,7 +24,7 @@ export default function ToggleSwitch({
 }: ToggleSwitchProps) {
   return (
     <div className={`text-center ${className}`}>
-      <div className="relative mx-auto flex w-64 flex-wrap rounded-lg bg-gray-200 p-0.5 text-sm shadow-sm">
+      <div className="relative mx-auto flex w-64 flex-wrap rounded-lg bg-[#D0D6ED]/50 p-0.5 text-sm shadow-sm">
         {options.map(option => (
           <label
             key={option.value}

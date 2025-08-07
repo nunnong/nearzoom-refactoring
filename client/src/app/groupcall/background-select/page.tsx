@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 import ControlPanel from '@/components/page/groupcall/ControlPanel'
 import Header from '@/components/page/groupcall/Header'
 import PhotoNavigator from '@/components/page/groupcall/photo-select/PhotoNavigator'
+import Preview from '@/components/page/groupcall/photo-select/Preview'
 import PromptSection from '@/components/page/groupcall/photo-select/PromptSection'
 import ToggleSwitch from '@/components/page/groupcall/photo-select/ToggleSwitch'
 import WebCam from '@/components/page/groupcall/photo-select/WebCam'
@@ -26,7 +27,6 @@ interface BackgroundSelectPageProps {
   participants?: any[]
   currentUser?: any
   roomInfo?: any
-  selectedPhotos: string[] // 이전 단계에서 선택한 사진들
   onComplete?: (backgrounds: PhotoBackground[]) => void
   onBack?: () => void
   onLeaveRoom?: () => void
@@ -52,18 +52,15 @@ export default function BackgroundSelectPage({
     title: 'SSAFY 13기 A605팀 4컷 촬영',
     createdAt: 'July 24th, 2024 14:39 PM',
   },
-  selectedPhotos = [
-    'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&h=400&fit=crop',
-  ],
   onComplete = () => {},
-  onBack = () => {},
   onLeaveRoom = () => {},
   onCopyRoomUrl = () => {},
   onMicToggle = () => {},
   onCameraToggle = () => {},
   className,
 }: BackgroundSelectPageProps) {
+  // localStorage에서 데이터 가져오기
+  const [photoData, setPhotoData] = useState<any>(null)
   // 상태 관리
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
   const [backgroundType, setBackgroundType] = useState<BackgroundType>('color')
@@ -72,12 +69,34 @@ export default function BackgroundSelectPage({
 
   // 각 사진의 배경 설정 상태
   const [photoBackgrounds, setPhotoBackgrounds] = useState<PhotoBackground[]>(
-    selectedPhotos.map((_, index) => ({
-      photoIndex: index,
-      backgroundType: 'color',
-      backgroundValue: '#C8B5FF',
-    }))
+    []
   )
+
+  useEffect(() => {
+    const data = localStorage.getItem('photoSelectData')
+    if (data) {
+      const parsedData = JSON.parse(data)
+      setPhotoData(parsedData)
+
+      // photoBackgrounds 초기화 - parsedData 사용
+      setPhotoBackgrounds(
+        Array.from(
+          { length: parsedData.selectedPhotos.length },
+          (_, index) => ({
+            photoIndex: index,
+            backgroundType: 'color' as BackgroundType,
+            backgroundValue: '#C8B5FF',
+          })
+        )
+      )
+    }
+  }, [])
+
+  // 로딩 중이면 로딩 화면 표시
+  if (!photoData) return <div>Loading...</div>
+
+  // localStorage에서 가져온 데이터
+  const { selectedPhotos, frameColor } = photoData
 
   // 더미 데이터
   const mockParticipants = [
@@ -135,25 +154,6 @@ export default function BackgroundSelectPage({
 
   const displayParticipants =
     participants.length > 0 ? participants : mockParticipants
-  //   const currentPhoto = selectedPhotos[currentPhotoIndex]
-  const currentBackground = photoBackgrounds[currentPhotoIndex]
-
-  // 사진 이동 핸들러
-  const handlePreviousPhoto = () => {
-    if (currentPhotoIndex > 0) {
-      saveCurrentSettings()
-      setCurrentPhotoIndex(currentPhotoIndex - 1)
-      loadPhotoSettings(currentPhotoIndex - 1)
-    }
-  }
-
-  const handleNextPhoto = () => {
-    if (currentPhotoIndex < selectedPhotos.length - 1) {
-      saveCurrentSettings()
-      setCurrentPhotoIndex(currentPhotoIndex + 1)
-      loadPhotoSettings(currentPhotoIndex + 1)
-    }
-  }
 
   // 현재 설정 저장
   const saveCurrentSettings = () => {
@@ -181,6 +181,16 @@ export default function BackgroundSelectPage({
     }
   }
 
+  // 다음 사진으로 이동 (선택 완료 후)
+  const handleNextPhoto = () => {
+    saveCurrentSettings()
+    if (currentPhotoIndex < selectedPhotos.length - 1) {
+      const nextIndex = currentPhotoIndex + 1
+      setCurrentPhotoIndex(nextIndex)
+      loadPhotoSettings(nextIndex)
+    }
+  }
+
   // 완료 핸들러
   const handleComplete = () => {
     saveCurrentSettings() // 마지막 설정도 저장
@@ -197,97 +207,109 @@ export default function BackgroundSelectPage({
       />
 
       {/* 메인 컨텐츠 */}
-      <div className="flex flex-1 gap-4 bg-gray-100 px-8 py-6">
-        {/* 왼쪽: 배경 설정 영역 */}
-        <div className="flex-1 rounded-lg bg-white p-6 shadow-sm">
-          <div className="mx-auto max-w-2xl space-y-6">
+      <div className="flex flex-1 gap-4 bg-[#2d3243] px-8 py-6">
+        <div className="mb-4 flex-1 rounded-2xl bg-white/90 p-6 shadow-sm">
+          <div className="mx-auto mt-7 mb-10 max-w-6xl space-y-8">
             {/* 제목 */}
-            <div className="mb-4 text-center">
-              <p className="text-sm font-bold text-gray-600">
+            <div className="text-center">
+              {/* <p className="text-sm font-bold text-gray-600">
                 사진별 원하는 배경 옵션을 선택하세요
-              </p>
+              </p> */}
             </div>
 
-            <ToggleSwitch
-              options={[
-                { value: 'color', label: '단색' },
-                { value: 'prompt', label: 'AI 프롬프팅' },
-              ]}
-              value={backgroundType}
-              onChange={value => setBackgroundType(value as BackgroundType)}
-              name="backgroundType"
-            />
-
-            <PhotoNavigator
-              photos={selectedPhotos}
-              currentIndex={currentPhotoIndex}
-              onPrevious={handlePreviousPhoto}
-              onNext={handleNextPhoto}
-              photoBackground={currentBackground}
-            />
-
-            {/* 배경 설정 옵션 */}
-            {backgroundType === 'color' ? (
-              <div className="space-y-4">
-                <h3 className="text-center text-lg font-semibold text-gray-700">
-                  색상 선택
-                </h3>
-                <div className="flex justify-center">
-                  <div className="grid grid-cols-5 justify-items-center gap-3">
-                    {backgroundColors.map(color => (
-                      <button
-                        key={color}
-                        onClick={() => setSelectedColor(color)}
-                        className={`h-10 w-10 rounded-full border-2 transition-all hover:scale-110 ${
-                          selectedColor === color
-                            ? 'border-[#2D3243] shadow-lg'
-                            : 'border-gray-300 hover:border-gray-400'
-                        }`}
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </div>
-                </div>
+            {/* 배경 설정과 옵션 선택 - 좌우 배치 */}
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-5 lg:gap-12">
+              {/* 왼쪽: 사진 네비게이터 */}
+              <div className="space-y-4 lg:col-span-2">
+                {/* PhotoNavigator */}
+                <PhotoNavigator
+                  photos={selectedPhotos}
+                  currentIndex={currentPhotoIndex}
+                />
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex justify-center">
-                  <PromptSection
-                    promptText={promptText}
-                    setPromptText={setPromptText}
+
+              {/* 오른쪽: 배경 옵션 + 미리보기 + 완료 버튼 */}
+              <div className="space-y-4 lg:col-span-3">
+                {/* 배경 옵션 제목 */}
+                <h2 className="text-center text-lg font-extrabold tracking-tight text-gray-900">
+                  Select Background
+                </h2>
+
+                {/* 배경 타입 선택 토글 */}
+                <div className="flex justify-center mb-6">
+                  <ToggleSwitch
+                    options={[
+                      { value: 'color', label: '단색' },
+                      { value: 'prompt', label: 'AI 프롬프팅' },
+                    ]}
+                    value={backgroundType}
+                    onChange={value =>
+                      setBackgroundType(value as BackgroundType)
+                    }
+                    name="backgroundType"
                   />
                 </div>
-              </div>
-            )}
 
-            {/* 하단 버튼 */}
-            <div className="flex justify-center pt-6">
-              <div className="flex items-center gap-4">
-                {/* 이전 버튼 */}
-                <button
-                  onClick={onBack}
-                  className="group relative flex items-center gap-2 overflow-hidden rounded-xl bg-[#C4C8DA] px-8 py-4 text-white shadow-lg transition-all duration-300 hover:scale-105 hover:bg-[#2D3243] active:scale-95"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                  <svg
-                    className="h-4 w-4 transition-transform group-hover:-translate-x-1"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 19l-7-7 7-7"
-                    />
-                  </svg>
-                  <span className="text-lg font-bold">이전</span>
-                </button>
+                {/* 배경 설정 옵션 */}
+                <div>
+                  {backgroundType === 'color' ? (
+                    <div className="space-y-4">
+                      <div className="flex justify-center mb-4">
+                        <div className="grid grid-cols-5 justify-items-center gap-6 mb-4 mt-3">
+                          {backgroundColors.map(color => (
+                            <button
+                              key={color}
+                              onClick={() => setSelectedColor(color)}
+                              className={`h-8 w-8 rounded-lg border-2 transition-all hover:scale-110 ${
+                                selectedColor === color
+                                  ? 'border-[#2D3243] shadow-lg'
+                                  : 'border-gray-300 hover:border-gray-400'
+                              }`}
+                              style={{ backgroundColor: color }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      {/* 미리보기 영역 */}
+                      <div className="rounded-lg border-gray-300 p-1 text-center">
+                        <div className="mb-4 text-sm text-gray-500">
+                          preview
+                        </div>
+                        <Preview
+                          cutCount={selectedPhotos.length}
+                          selectedPhotos={selectedPhotos}
+                          frameColor={frameColor}
+                          backgroundColor={
+                            backgroundType === 'color'
+                              ? selectedColor
+                              : undefined
+                          }
+                          currentPhotoIndex={currentPhotoIndex}
+                          showPhotos={false}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-center">
+                      <PromptSection
+                        promptText={promptText}
+                        setPromptText={setPromptText}
+                      />
+                    </div>
+                  )}
+                </div>
 
-                {/* 선택 완료 버튼*/}
-                <div className="w-48">
-                  <StartButton onClick={handleComplete}>선택 완료</StartButton>
+                {/* 완료 버튼 */}
+                <div className="flex flex-col items-center justify-center pt-2">
+                  {currentPhotoIndex < selectedPhotos.length - 1 ? (
+                    <StartButton onClick={handleNextPhoto} className="w-54">
+                      다음 사진으로
+                    </StartButton>
+                  ) : (
+                    <StartButton onClick={handleComplete} className="w-54">
+                      선택 완료
+                    </StartButton>
+                  )}
                 </div>
               </div>
             </div>
@@ -295,7 +317,7 @@ export default function BackgroundSelectPage({
         </div>
 
         {/* 오른쪽: 사이드바 (참가자 웹캠) */}
-        <div className="flex w-80 flex-col gap-6">
+        <div className="flex w-80 flex-col gap-4">
           <WebCam
             participants={displayParticipants}
             currentUser={currentUser}
