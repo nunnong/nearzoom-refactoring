@@ -90,3 +90,10 @@ springdoc:
   packages-to-scan: com.ssafy.nearzoom
   default-consumes-media-type: application/json
   default-produces-media-type: application/json
+
+# LiveKit 설정 (추가)
+livekit:
+  api:
+    key: ${LIVEKIT_API_KEY}
+    secret: ${LIVEKIT_API_SECRET}
+  url: ${LIVEKIT_URL}
