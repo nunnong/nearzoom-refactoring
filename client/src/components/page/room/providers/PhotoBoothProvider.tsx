@@ -13,9 +13,8 @@ import { create } from 'zustand'
 
 import {
   createStateSlice,
-  createFrameSlice,
   createCutSlice,
-  createPhotoSlice,
+  createSelectSlice,
   createShootingSlice,
   type PhotoBoothSlice,
 } from '../stores/photobooth'
@@ -47,9 +46,8 @@ const createPhotoBoothStore = (roomName: string) => {
   // 모든 slice들을 통합한 store 생성
   return create<PhotoBoothStore>()((set, get) => ({
     ...createStateSlice(set, get, roomName),
-    ...createFrameSlice(set, roomName),
     ...createCutSlice(set, get, roomName),
-    ...createPhotoSlice(set, get, roomName),
+    ...createSelectSlice(set, get, roomName),
     ...createShootingSlice(set, get, roomName),
     ...createRoomLeaderSlice(set),
   }))

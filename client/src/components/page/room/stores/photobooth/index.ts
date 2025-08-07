@@ -4,24 +4,25 @@ import * as Y from 'yjs'
 // Slice types import
 export { PhotoBoothState } from './stateSlice'
 export type { StateSlice } from './stateSlice'
-export type { FrameSlice } from './frameSlice'
 export type { CutSlice } from './cutSlice'
-export type { PhotoSlice } from './photoSlice'
+export type { SelectSlice } from './selectSlice'
 export type { ShootingSlice } from './shootingSlice'
+
+// Legacy types removed - now using selectSlice
 
 // Slice creators export
 export { createStateSlice } from './stateSlice'
-export { createFrameSlice } from './frameSlice'
 export { createCutSlice } from './cutSlice'
-export { createPhotoSlice } from './photoSlice'
+export { createSelectSlice } from './selectSlice'
 export { createShootingSlice } from './shootingSlice'
+
+// Legacy creators removed - now using selectSlice
 
 // Combined PhotoBooth slice type
 export type PhotoBoothSlice = 
   import('./stateSlice').StateSlice & 
-  import('./frameSlice').FrameSlice & 
   import('./cutSlice').CutSlice & 
-  import('./photoSlice').PhotoSlice &
+  import('./selectSlice').SelectSlice &
   import('./shootingSlice').ShootingSlice &
   import('../roomLeaderSlice').RoomLeaderSlice
 
@@ -75,14 +76,20 @@ export const getStateMap = (roomName: string) => {
   return room.ydoc.getMap('photoBoothState')
 }
 
-export const getFrameMap = (roomName: string) => {
-  const room = getOrCreateRoom(roomName)
-  return room.ydoc.getMap('frameState')
-}
-
 export const getCutMap = (roomName: string) => {
   const room = getOrCreateRoom(roomName)
   return room.ydoc.getMap('cutState')
+}
+
+export const getSelectMap = (roomName: string) => {
+  const room = getOrCreateRoom(roomName)
+  return room.ydoc.getMap('selectState')
+}
+
+// Legacy maps for backward compatibility
+export const getFrameMap = (roomName: string) => {
+  const room = getOrCreateRoom(roomName)
+  return room.ydoc.getMap('frameState')
 }
 
 export const getPhotoMap = (roomName: string) => {
@@ -107,6 +114,7 @@ export const initializePhotoBoothState = (
 ) => {
   const photoBoothMap = getPhotoBoothMap(roomName)
   const shootingMap = getShootingMap(roomName)
+  const selectMap = getSelectMap(roomName)
   
   console.log('🎯 Initializing PhotoBooth state for room:', roomName)
   
@@ -114,12 +122,20 @@ export const initializePhotoBoothState = (
   const photoBoothUpdateHandler = () => {
     const data = {
       photoBoothState: photoBoothMap.get('photoBoothState'),
-      frameColor: photoBoothMap.get('frameColor'),
       cutCount: photoBoothMap.get('cutCount'),
       currentCutIndex: photoBoothMap.get('currentCutIndex'),
-      selectedPhotos: photoBoothMap.get('selectedPhotos') || [],
     }
     console.log('🔄 PhotoBooth state updated:', data)
+    onUpdate(data)
+  }
+  
+  // Select 상태 변경사항 감지 리스너 (새로 추가)
+  const selectUpdateHandler = () => {
+    const data = {
+      selectedPhotos: selectMap.get('selectedPhotos') || [],
+      frameColor: selectMap.get('frameColor') || '#FFFFFF',
+    }
+    console.log('🔄 Select state updated:', data)
     onUpdate(data)
   }
   
@@ -138,14 +154,17 @@ export const initializePhotoBoothState = (
   
   // 리스너 등록
   photoBoothMap.observe(photoBoothUpdateHandler)
+  selectMap.observe(selectUpdateHandler)
   shootingMap.observe(shootingUpdateHandler)
   
   // 초기 상태 전송
   photoBoothUpdateHandler()
+  selectUpdateHandler()
   shootingUpdateHandler()
   
   return () => {
     photoBoothMap.unobserve(photoBoothUpdateHandler)
+    selectMap.unobserve(selectUpdateHandler)
     shootingMap.unobserve(shootingUpdateHandler)
   }
 }
@@ -159,12 +178,7 @@ export const updatePhotoBoothState = (roomName: string, state: string) => {
   console.log('🔄 PhotoBooth state set to:', state)
 }
 
-// Frame slice 업데이트 (photoBoothMap으로 통합)
-export const updateFrameColor = (roomName: string, color: string) => {
-  const photoBoothMap = getPhotoBoothMap(roomName)
-  photoBoothMap.set('frameColor', color)
-  console.log('🔄 Frame color set to:', color)
-}
+// Frame slice 업데이트는 이제 selectSlice로 통합됨
 
 // Cut slice 업데이트 (photoBoothMap으로 통합)
 export const updateCutCount = (roomName: string, count: number) => {
@@ -179,11 +193,26 @@ export const updateCurrentCutIndex = (roomName: string, index: number) => {
   console.log('🔄 Current cut index set to:', index)
 }
 
-// Photo slice 업데이트 (photoBoothMap으로 통합)
+// Select slice 업데이트 (새로운 통합 함수)
+export const updateSelectState = (roomName: string, updates: Partial<{
+  selectedPhotos: string[]
+  frameColor: string
+}>) => {
+  const selectMap = getSelectMap(roomName)
+  
+  Object.entries(updates).forEach(([key, value]) => {
+    selectMap.set(key, value)
+    console.log(`🔄 Select state updated - ${key}:`, value)
+  })
+}
+
+// Legacy functions for backward compatibility
 export const updateSelectedPhotos = (roomName: string, photos: string[]) => {
-  const photoBoothMap = getPhotoBoothMap(roomName)
-  photoBoothMap.set('selectedPhotos', photos)
-  console.log('🔄 Selected photos updated:', photos)
+  updateSelectState(roomName, { selectedPhotos: photos })
+}
+
+export const updateFrameColor = (roomName: string, color: string) => {
+  updateSelectState(roomName, { frameColor: color })
 }
 
 // Shooting slice 업데이트

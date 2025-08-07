@@ -8,6 +8,7 @@ import { usePhotoBoothStore } from '../providers/PhotoBoothProvider'
 import { PhotoBoothState } from '../stores/photoboothStore'
 import { useRoomInfo } from '@livekit/components-react'
 import { useEffect } from 'react'
+import PhotoSelectComponent from './photo-select/PhotoSelectComponent'
 
 interface PhotoBoothProps {}
 
@@ -27,6 +28,8 @@ export default function PhotoBooth({}: PhotoBoothProps = {}) {
         return <WaitingComponent />
       case PhotoBoothState.SHOOTING:
         return <PhotoshootComponent />
+      case PhotoBoothState.SELECTING:
+        return <PhotoSelectComponent />
       default:
         return <WaitingComponent />
     }
