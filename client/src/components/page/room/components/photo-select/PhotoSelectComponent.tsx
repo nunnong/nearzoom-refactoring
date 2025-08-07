@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { useParticipants, useLocalParticipant } from '@livekit/components-react'
 import ControlPanel from '@/components/page/groupcall/ControlPanel'
 import FrameColorSelector from '@/components/page/groupcall/photo-select/FrameColorSelector'
@@ -8,33 +7,42 @@ import PhotoCutSelector from '@/components/page/groupcall/photo-select/PhotoCutS
 import PhotoPicker from '@/components/page/groupcall/photo-select/PhotoPicker'
 import WebCam from '@/components/page/groupcall/photo-select/WebCam'
 import { cn } from '@/lib/utils'
+import { usePhotoBoothStore } from '../../providers/PhotoBoothProvider'
+import { PhotoBoothState } from '../../stores/photoboothStore'
 
 interface PhotoSelectComponentProps {
-  onComplete?: (selections: {
-    cutCount: number
-    selectedPhotos: string[]
-    frameColor: string
-  }) => void
   className?: string
 }
 
 export default function PhotoSelectComponent({
-  onComplete = () => {},
   className,
 }: PhotoSelectComponentProps) {
   const participants = useParticipants()
   const localParticipant = useLocalParticipant()
-  const [cutCount, setCutCount] = useState<number>(4)
-  const [selectedPhotos, setSelectedPhotos] = useState<string[]>([])
-  const [frameColor, setFrameColor] = useState<string>('#FFFFFF')
 
+  // Yjs store에서 상태 가져오기
+  const cutCount = usePhotoBoothStore(state => state.cutCount)
+  const selectedPhotos = usePhotoBoothStore(state => state.selectedPhotos)
+  const frameColor = usePhotoBoothStore(state => state.frameColor)
+  const capturedImages = usePhotoBoothStore(state => state.capturedImages)
 
-  const capturedPhotos = [
-    'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop',
-  ]
+  // Yjs store 액션들
+  const setCutCount = usePhotoBoothStore(state => state.setCutCount)
+  const setSelectedPhotos = usePhotoBoothStore(state => state.setSelectedPhotos)
+  const setFrameColor = usePhotoBoothStore(state => state.setFrameColor)
+  const setPhotoBoothState = usePhotoBoothStore(state => state.setPhotoBoothState)
+
+  // 실제 촬영된 사진들 사용 (하드코딩된 사진 대신)
+  const capturedPhotos =
+    capturedImages.length > 0
+      ? capturedImages
+      : [
+          // 개발/테스트용 fallback 이미지들
+          'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&h=400&fit=crop',
+          'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&h=400&fit=crop',
+          'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&h=400&fit=crop',
+          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop',
+        ]
 
   const frameColors = [
     '#FFFFFF',
@@ -45,14 +53,19 @@ export default function PhotoSelectComponent({
     '#2D3243',
   ]
 
-
   const handleComplete = () => {
     if (selectedPhotos.length === cutCount) {
-      onComplete({
+      console.log('🎉 Photo selection completed:', {
         cutCount,
         selectedPhotos,
         frameColor,
       })
+
+      // 선택 완료 후 WAITING 상태로 돌아가거나 새로운 완료 상태로 전환
+      setPhotoBoothState(PhotoBoothState.WAITING)
+
+      // 선택된 사진들과 설정들이 이미 Yjs에 저장되어 있음
+      // 다른 참가자들도 실시간으로 확인 가능
     }
   }
 
@@ -105,7 +118,7 @@ export default function PhotoSelectComponent({
       </div>
 
       {/* 오른쪽: 사이드바 (참가자 웹캠) */}
-      <div className="flex w-80 flex-col gap-6">
+      {/* <div className="flex w-80 flex-col gap-6">
         <WebCam
           participants={participants}
           localParticipant={localParticipant}
@@ -114,7 +127,7 @@ export default function PhotoSelectComponent({
           localParticipant={localParticipant}
           showLeaveButton={true}
         />
-      </div>
+      </div> */}
     </div>
   )
 }
