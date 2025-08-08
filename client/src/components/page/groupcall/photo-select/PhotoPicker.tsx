@@ -37,9 +37,9 @@ export default function PhotoPicker({
 
   return (
     <div>
-      <h3 className="mb-3 text-center text-lg font-semibold text-[#2D3243]">
+      {/* <h3 className="mb-3 text-center text-lg font-semibold text-gray-800">
         사진 선택 ({selected.length}/{cutCount})
-      </h3>
+      </h3> */}
       <div className="grid grid-cols-2 gap-4">
         {photos.map((photo, idx) => {
           const order = getPhotoOrder(photo)
@@ -52,24 +52,26 @@ export default function PhotoPicker({
               onClick={() => toggleSelect(photo)}
             >
               <div
-                className={`relative overflow-hidden rounded-lg border-4 transition-all duration-200 ${
+                className={`relative overflow-hidden rounded-xl border-4 transition-all duration-200 ${
                   isSelected
-                    ? 'scale-[1.02] transform border-[#C9D76D] shadow-lg'
-                    : 'border-gray-200 hover:border-[#C9D76D] hover:shadow-md'
+                    ? 'scale-[1.02] transform border-[#C4C8DA] shadow-lg'
+                    : 'border-white hover:border-[#C4C8DA] hover:shadow-md'
                 } `}
               >
-                <Image
-                  src={photo}
-                  alt={`촬영된 사진 ${idx + 1}`}
-                  className="h-64 w-full object-cover"
-                  width={400}
-                  height={256}
-                  draggable={false}
-                />
+                {/* 🔥 수정: 1:1 정사각형 비율로 고정된 컨테이너 */}
+                <div className="aspect-square relative">
+                  <Image
+                    src={photo}
+                    alt={`촬영된 사진 ${idx + 1}`}
+                    fill
+                    className="object-cover"
+                    draggable={false}
+                  />
+                </div>
 
                 {/* 선택 순서 표시 */}
                 {isSelected && order && (
-                  <div className="absolute top-2 left-2 flex h-8 w-8 items-center justify-center rounded-full bg-[#C9D76D] text-sm font-bold text-[#2D3243] shadow-lg">
+                  <div className="absolute top-2 left-2 flex h-8 w-8 items-center justify-center rounded-full bg-[#2d3243] text-sm font-bold text-white shadow-lg">
                     {order}
                   </div>
                 )}
