@@ -10,7 +10,7 @@ import {
   deleteImageFromLocal,
   initializeTestImages,
 } from '@/utils/localStorage'
-import { UserInfo } from '@/utils/auth'
+import { User } from '@/types/auth'
 
 import ImageArchive from './ImageArchive'
 import SearchBox from './SearchBox'
@@ -36,7 +36,7 @@ interface Filter {
 
 interface DashboardProps {
   images?: ImageItem[]
-  userProfile?: UserInfo | null
+  userProfile?: User | null
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
@@ -354,14 +354,6 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
                       <div className="flex justify-between">
                         <dt className="text-sm font-medium text-gray-500">이메일</dt>
                         <dd className="text-sm text-gray-900">{userProfile?.email || 'user@kakao.com'}</dd>
-                      </div>
-                      <div className="flex justify-between">
-                        <dt className="text-sm font-medium text-gray-500">가입일</dt>
-                        <dd className="text-sm text-gray-900">2024.01.15</dd>
-                      </div>
-                      <div className="flex justify-between">
-                        <dt className="text-sm font-medium text-gray-500">마지막 로그인</dt>
-                        <dd className="text-sm text-gray-900">2024.08.02</dd>
                       </div>
                     </dl>
                   </div>

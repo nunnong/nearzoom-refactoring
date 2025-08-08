@@ -5,7 +5,7 @@ import { TEST_IMAGES } from '@/constants'
 import { useAuth } from '@/hooks/useAuth'
 
 export default function MyRoom() {
-  const { currentUser } = useAuth()
+  const { user } = useAuth()
   
-  return <Dashboard images={TEST_IMAGES} userProfile={currentUser} />
+  return <Dashboard images={TEST_IMAGES} userProfile={user} />
 }

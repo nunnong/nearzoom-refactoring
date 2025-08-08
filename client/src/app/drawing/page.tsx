@@ -791,6 +791,8 @@ const DrawingPage: React.FC = () => {
                   onTextSelect={handleTextSelect}
                   onTextDelete={deleteText}
                   onTextUpdate={updateText}
+                  onIncreaseFontSize={(textId) => {}}
+                  onDecreaseFontSize={(textId) => {}}
                 />
               </div>
             ) : (
