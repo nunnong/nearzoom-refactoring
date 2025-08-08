@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -34,7 +35,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest request,
         HttpServletResponse response, Authentication authentication) {
 
-        userService.logout(authentication);
+        userService.logOut(authentication);
 
         HttpSession session = request.getSession(false);
         if (session != null) {
@@ -56,7 +57,7 @@ public class UserController {
 
         return ApiResponse.ok("로그아웃 성공", null);
     }
-    
+
     @GetMapping("/userInfo")
     public ResponseEntity<ApiResponse<UserInfoResponse>> getUserInfo(
         Authentication authentication) {
@@ -64,11 +65,22 @@ public class UserController {
         return ApiResponse.ok(info);
     }
 
-    @DeleteMapping("/signout")
+    @GetMapping("/email-user-info")
+    public ResponseEntity<ApiResponse<List<UserInfoResponse>>> getFeedUserInfo(
+        String email) {
+        List<UserInfoResponse> info = userService.getFeedUserInfo(email);
+
+        if (info.isEmpty()) {
+            return ApiResponse.ok("해당 이메일의 사용자가 없습니다.", null);
+        }
+        return ApiResponse.ok("사용자가 존재합니다.", info);
+    }
+
+    @DeleteMapping("/sign-out")
     public ResponseEntity<ApiResponse<Void>> withdraw(HttpServletRequest request,
         HttpServletResponse response, Authentication authentication) {
 
-        userService.signout(authentication);
+        userService.signOut(authentication);
 
         HttpSession session = request.getSession(false);
         if (session != null) {
