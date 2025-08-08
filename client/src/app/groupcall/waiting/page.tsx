@@ -1,11 +1,11 @@
 'use client'
 
+import { useState, useCallback, useMemo } from 'react'
+
 import Header from '@/components/page/groupcall/Header'
 import Sidebar from '@/components/page/groupcall/Sidebar'
 import VideoTile from '@/components/page/groupcall/VideoTile'
-import { cn } from '@/lib/utils'
 
-//타입 정의
 interface Participant {
   id: string
   email: string
@@ -33,125 +33,134 @@ interface RoomInfo {
   createdAt: string
 }
 
-interface WaitingPageProps {
-  participants?: Participant[]
-  currentUser?: CurrentUser
-  roomInfo?: RoomInfo
-  onMicToggle?: () => void
-  onCameraToggle?: () => void
-  onStartCall?: () => void
-  onLeaveRoom?: () => void
-  onCopyRoomUrl?: () => void
-  className?: string
-}
+export default function WaitingPage() {
+  // 예시 데이터 - 실제로는 props나 상태관리를 통해 받아올 데이터
+  const [roomInfo] = useState<RoomInfo>({
+    id: 'room-123',
+    url: 'meet.example.com/room-123',
+    createdAt: 'July 24th, 2024 14:39 PM',
+  })
 
-export default function WaitingPage({
-  // Props 기본값 설정
-  participants = [],
-  currentUser = {
-    id: 'me',
+  const [currentUser, setCurrentUser] = useState<CurrentUser>({
+    id: 'user-1',
     email: 'ssafy123.5@gmail.com',
     name: '김싸피',
     isMicOn: true,
     isCameraOn: true,
-  },
-  roomInfo = {
-    id: 'a605',
-    url: 'ssafynearzoom.store/a605',
-    title: 'SSAFY 13기 A605팀 회의',
-    createdAt: 'July 24th, 2024 14:39 PM',
-  },
-  onMicToggle = () => {},
-  onCameraToggle = () => {},
-  onStartCall = () => {},
-  onLeaveRoom = () => {},
-  onCopyRoomUrl = () => {},
-  className,
-}: WaitingPageProps) {
-  //더미데이터
-  const mockParticipants: Participant[] = [
+  })
+
+  const [participants] = useState<Participant[]>([
     {
-      id: '1',
-      name: '김싸피',
+      id: 'user-1',
       email: 'ssafy123.5@gmail.com',
+      name: '김싸피',
       isHost: true,
       isMicOn: true,
       isCameraOn: true,
       isConnected: true,
     },
     {
-      id: '2',
-      name: '박싸피',
+      id: 'user-2',
       email: 'park.4@gmail.com',
+      name: '박싸피',
       isHost: false,
       isMicOn: false,
       isCameraOn: true,
       isConnected: true,
     },
     {
-      id: '3',
-      name: '이싸피',
+      id: 'user-3',
       email: 'lee.3@kakao.com',
+      name: '이싸피',
       isHost: false,
       isMicOn: true,
       isCameraOn: false,
       isConnected: true,
     },
     {
-      id: '4',
-      name: '최싸피',
+      id: 'user-4',
       email: 'choi.2@kakao.com',
+      name: '최싸피',
       isHost: false,
       isMicOn: true,
       isCameraOn: true,
       isConnected: true,
     },
-  ]
+  ])
 
-  // Props가 비어있으면 더미 데이터 사용
-  const displayParticipants =
-    participants.length > 0 ? participants : mockParticipants
+  // 반응형 그리드 컬럼 수 계산
+  const gridCols = useMemo(() => {
+    const count = participants.length
+    if (count === 1) return 'grid-cols-1'
+    if (count === 2) return 'grid-cols-1 sm:grid-cols-2'
+    if (count <= 4) return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-2'
+    return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+  }, [participants.length])
+
+  // 핸들러 함수들 - useCallback으로 최적화
+  const handleLeaveRoom = useCallback(() => {
+    console.log('방 나가기')
+    // 실제 구현: 방 나가는 로직
+  }, [])
+
+  const handleCopyRoomUrl = useCallback(() => {
+    console.log('URL 복사됨')
+    // 실제 구현: URL 복사 완료 처리
+  }, [])
+
+  const handleMicToggle = useCallback(() => {
+    setCurrentUser(prev => ({
+      ...prev,
+      isMicOn: !prev.isMicOn,
+    }))
+  }, [])
+
+  const handleCameraToggle = useCallback(() => {
+    setCurrentUser(prev => ({
+      ...prev,
+      isCameraOn: !prev.isCameraOn,
+    }))
+  }, [])
+
+  const handleStartCall = useCallback(() => {
+    console.log('통화 시작')
+  }, [])
 
   return (
-    <div
-      className={cn(
-        'flex min-h-screen flex-col bg-[#C9D76D] text-[#2D3243]',
-        className
-      )}
-    >
-      {/* Header */}
-      <Header 
-        roomInfo={roomInfo}
-        onLeaveRoom={onLeaveRoom}
-        onCopyRoomUrl={onCopyRoomUrl}
-      />
+    <div className="flex min-h-screen flex-col bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      {/* 헤더 */}
+      <Header roomInfo={roomInfo} onLeaveRoom={handleLeaveRoom} />
 
-      {/* 메인 컨텐츠 영역 */}
-      <div className="flex flex-1 gap-6 bg-gray-100 px-8 py-6">
-        {/* 왼쪽: 비디오 영역 */}
-        <div className="flex flex-1 flex-col">
-          <div className="grid flex-1 grid-cols-2 gap-6">
-            {displayParticipants.map((participant) => (
-              <VideoTile 
+      <main className="flex flex-1 flex-col gap-4 bg-[#2d3243] p-4 md:flex-row md:gap-6 md:p-6 lg:p-8">
+        {/* 비디오 영역 */}
+        <section className="min-w-0 flex-1">
+          <div className={`grid gap-3 sm:gap-4 lg:gap-6 ${gridCols}`}>
+            {participants.map(participant => (
+              <VideoTile
                 key={participant.id}
                 participant={participant}
+                className="min-h-[180px] sm:min-h-[200px] lg:min-h-[240px]"
               />
             ))}
           </div>
-        </div>
+        </section>
 
-        {/* 오른쪽: 사이드바 */}
-        <Sidebar
-          participants={displayParticipants}
-          currentUser={currentUser}
-          showStartButton={true}
-          showLeaveButton={true}
-          onMicToggle={onMicToggle}
-          onCameraToggle={onCameraToggle}
-          onStartCall={onStartCall}
-          onLeaveRoom={onLeaveRoom}
-        />
-      </div>
+        {/* 사이드바 */}
+        <aside className="w-full shrink-0 md:w-[300px]">
+          <Sidebar
+            participants={participants}
+            currentUser={currentUser}
+            roomUrl={roomInfo.url}
+            showStartButton={true}
+            showLeaveButton={true}
+            onMicToggle={handleMicToggle}
+            onCameraToggle={handleCameraToggle}
+            onStartCall={handleStartCall}
+            onLeaveRoom={handleLeaveRoom}
+            onCopyRoomUrl={handleCopyRoomUrl}
+          />
+        </aside>
+      </main>
     </div>
   )
 }

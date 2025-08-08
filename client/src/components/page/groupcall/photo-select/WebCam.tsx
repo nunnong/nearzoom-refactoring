@@ -25,10 +25,11 @@ export default function Webcam({ participants, currentUser, className }: WebcamP
   const allParticipants = [currentUser, ...participants.filter(p => p.id !== currentUser.id)].slice(0, 4)
 
   return (
-    <div className={cn('bg-white rounded-xl p-4 shadow-sm', className)}>
-      <h3 className="text-lg font-semibold text-[#2D3243] mb-4">
-        참가자 ({allParticipants.length})
+    <div className={cn('bg-white/90 rounded-2xl p-4 py-4 shadow-sm', className)}>
+      <h3 className="text-rg font-extrabold tracking-tight text-gray-900 mb-2">
+        Participants ({allParticipants.length})
       </h3>
+      
       
       {/* 세로로 1개씩 웹캠 표시 */}
       <div className="space-y-3">
