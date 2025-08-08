@@ -18,17 +18,18 @@ interface ParticipantListProps {
   showStartButton?: boolean
   onStartCall?: () => void
   startButtonText?: string
-  roomUrl?: string // 새로 추가
-  onCopyRoomUrl?: () => void // 새로 추가
+  roomUrl?: string 
+  onCopyRoomUrl?: () => void 
 }
 
 export default function ParticipantList({
   participants,
   showStartButton = true,
   onStartCall = () => {},
+
   startButtonText = 'START',
-  roomUrl = '', // 새로 추가
-  onCopyRoomUrl = () => {}, // 새로 추가
+  roomUrl = '', 
+  onCopyRoomUrl = () => {}, 
 }: ParticipantListProps) {
   const handleCopyUrl = async () => {
     try {
@@ -64,10 +65,10 @@ export default function ParticipantList({
               />
             </svg>
             <span className="text-sm text-[#2D3243] group-hover:text-gray-800">
-            친구를 초대해주세요!
+              친구를 초대해주세요!
             </span>
           </div>
-          
+
           <div className="flex items-center gap-1 rounded-full bg-[#2D3243] px-3 py-1.5 text-white transition-all group-hover:bg-[#1a1f2e]">
             <svg
               className="h-3.5 w-3"
@@ -89,7 +90,9 @@ export default function ParticipantList({
 
       {/* 참가자 목록 */}
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-rg font-extrabold tracking-tight text-gray-900">Participants ({participants.length})</h3>
+        <h3 className="text-rg font-extrabold tracking-tight text-gray-900">
+          Participants ({participants.length})
+        </h3>
         <div className="flex items-center gap-2">
           {/* <div className="h-2 w-2 animate-pulse rounded-full bg-[#C9D76D]" /> */}
           {/* <span className="text-sm text-gray-600">{participants.length}명</span> */}

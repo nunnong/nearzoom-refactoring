@@ -12,12 +12,9 @@ interface RoomInfo {
 interface HeaderProps {
   roomInfo: RoomInfo
   onLeaveRoom?: () => void
-  onCopyRoomUrl?: () => void
 }
 
-export default function Header({
-  onLeaveRoom = () => {},
-}: HeaderProps) {
+export default function Header({ onLeaveRoom = () => {} }: HeaderProps) {
   return (
     <header className="flex-shrink-0 border-b-2 border-[#2D3243] bg-[#f6f4f0] px-8 py-3">
       <div className="flex w-full items-center justify-between">
@@ -25,19 +22,19 @@ export default function Header({
         <div className="w-1/6"></div>
 
         {/* 중앙: NEARZOOM 로고 이미지 */}
-        <div className="flex-1 flex justify-center">
+        <div className="flex flex-1 justify-center">
           <Image
             src="/nearzoomlogologo.png"
             alt="NEARZOOM"
             width={400}
             height={300}
-            className="object-contain h-12"
+            className="h-12 object-contain"
             priority
           />
         </div>
 
         {/* 오른쪽: 설정 버튼만 */}
-        <div className="w-1/6 flex justify-end items-center">
+        <div className="flex w-1/6 items-center justify-end">
           <button
             onClick={onLeaveRoom}
             className="flex h-8 w-8 items-center justify-center rounded-sm transition-all hover:bg-[#2D3243]/10"

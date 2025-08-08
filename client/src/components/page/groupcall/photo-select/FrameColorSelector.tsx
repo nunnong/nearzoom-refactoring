@@ -13,7 +13,7 @@ export default function FrameColorSelector({
 }: FrameColorSelectorProps) {
   return (
     <div className="text-center">
-      <div className="grid grid-cols-3 grid-rows-2 gap-x-4 gap-y-3 mb-4 mt-3 justify-items-center">
+      <div className="grid grid-cols-3 gap-6 mb-8 mt-6 w-fit mx-auto">
         {palette.map(color => (
           <button
             key={color}

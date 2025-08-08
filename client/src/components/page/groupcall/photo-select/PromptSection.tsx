@@ -1,6 +1,6 @@
 'use client'
 
-import { HashtagIcon, PencilIcon } from '@heroicons/react/24/outline'
+import { HashtagIcon, PencilIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline'
 import { useState, useEffect, useRef } from 'react'
 
 interface PromptSectionProps {
@@ -61,8 +61,27 @@ function StepwiseKeywordPrompt({
   const [selected, setSelected] = useState<{
     [category in KeywordCategory]?: string
   }>({})
+  const [currentKeywordIndex, setCurrentKeywordIndex] = useState(0)
 
   const currentCategory = categories[activeStep]
+  const currentKeywords = keywordCategories[currentCategory].keywords
+
+  // 캐러셀에서 보여질 키워드들 (현재 인덱스 기준으로 5개)
+  const getVisibleKeywords = () => {
+    const total = currentKeywords.length
+    const visible = []
+    
+    for (let i = 0; i < 5; i++) {
+      const index = (currentKeywordIndex + i - 2 + total) % total // 가운데를 중심으로 앞뒤 2개씩
+      visible.push({
+        keyword: currentKeywords[index],
+        index: index,
+        position: i // 0: far-left, 1: left, 2: center, 3: right, 4: far-right
+      })
+    }
+    
+    return visible
+  }
 
   const generatePrompt = (sel: Record<string, string>) => {
     let prompt = ''
@@ -79,6 +98,7 @@ function StepwiseKeywordPrompt({
   const resetAll = () => {
     setSelected({})
     setActiveStep(0)
+    setCurrentKeywordIndex(0)
     setPromptText('')
   }
 
@@ -93,11 +113,37 @@ function StepwiseKeywordPrompt({
   }
 
   const handleGenerate = () => setPromptText(generatePrompt(selected))
-  const selectKeyword = (keyword: string) =>
+  
+  const selectKeyword = (keyword: string) => {
     setSelected(prev => ({ ...prev, [currentCategory]: keyword }))
-  const goPrev = () => setActiveStep(s => (s > 0 ? s - 1 : 0))
-  const goNext = () =>
-    setActiveStep(s => (s < categories.length - 1 ? s + 1 : s))
+  }
+
+  const goPrev = () => {
+    if (activeStep > 0) {
+      setActiveStep(s => s - 1)
+      setCurrentKeywordIndex(0) // 새 카테고리로 이동 시 인덱스 초기화
+    }
+  }
+  
+  const goNext = () => {
+    if (activeStep < categories.length - 1) {
+      setActiveStep(s => s + 1)
+      setCurrentKeywordIndex(0) // 새 카테고리로 이동 시 인덱스 초기화
+    }
+  }
+
+  // 캐러셀 네비게이션
+  const goToPrevKeyword = () => {
+    setCurrentKeywordIndex(prev => 
+      prev === 0 ? currentKeywords.length - 1 : prev - 1
+    )
+  }
+
+  const goToNextKeyword = () => {
+    setCurrentKeywordIndex(prev => 
+      (prev + 1) % currentKeywords.length
+    )
+  }
 
   const ProgressDot = () => (
     <div className="mt-2 mb-4 flex justify-center gap-4">
@@ -121,6 +167,8 @@ function StepwiseKeywordPrompt({
     </div>
   )
 
+  const visibleKeywords = getVisibleKeywords()
+
   return (
     <div className="w-full">
       {/* 선택된 키워드 미리보기 */}
@@ -139,27 +187,57 @@ function StepwiseKeywordPrompt({
       </div>
 
       {/* 키워드 선택 안내 */}
-      <h3 className="mb-3 px-2 text-center text-sm font-bold text-indigo-900 select-none">
+      <h3 className="mb-4 px-2 text-center text-sm font-bold text-indigo-900 select-none">
         {currentCategory} 키워드를 선택하세요
       </h3>
 
-      {/* 키워드 선택 버튼 그리드 */}
-      <div className="grid grid-cols-2 gap-3 px-2 sm:grid-cols-3 lg:grid-cols-5">
-        {keywordCategories[currentCategory].keywords.map(keyword => (
-          <button
-            key={keyword}
-            onClick={() => selectKeyword(keyword)}
-            type="button"
-            className={classNames(
-              'w-full rounded-lg border px-3 py-2 text-center text-xs font-medium shadow-sm transition-transform duration-150 ease-in-out',
-              selected[currentCategory] === keyword
-                ? 'scale-105 border-indigo-400 bg-gradient-to-r from-indigo-200 to-purple-100 text-indigo-800 shadow-md'
-                : 'border-gray-200 bg-white text-gray-700 hover:border-indigo-400 hover:bg-indigo-50'
-            )}
-          >
-            {keyword}
-          </button>
-        ))}
+      {/* 캐러셀 형태 키워드 선택 */}
+      <div className="relative px-2 mb-4">
+        {/* 왼쪽 화살표 */}
+        <button
+          onClick={goToPrevKeyword}
+          className="absolute left-0 top-1/2 z-10 transform -translate-y-1/2 -translate-x-2 bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-all hover:scale-110"
+          aria-label="이전 키워드"
+        >
+          <ChevronLeftIcon className="h-4 w-4 text-gray-600" />
+        </button>
+
+        {/* 키워드 카드들 */}
+        <div className="flex justify-center items-center gap-2 px-8">
+          {visibleKeywords.map(({ keyword, index, position }) => (
+            <button
+              key={`${keyword}-${index}`}
+              onClick={() => selectKeyword(keyword)}
+              type="button"
+              className={classNames(
+                'transition-all duration-300 ease-in-out rounded-xl border text-center font-medium shadow-sm',
+                // 중앙 카드 (position === 2)는 크게, 나머지는 작게
+                position === 2 
+                  ? 'scale-110 text-sm px-3 py-3 min-w-[100px] opacity-100' 
+                  : position === 1 || position === 3
+                  ? 'scale-90 text-xs px-3 py-3 min-w-[90px] opacity-80'
+                  : 'scale-70 text-xs px-2 py-2 min-w-[80px] opacity-70',
+                // 선택된 키워드 스타일
+                selected[currentCategory] === keyword
+                  ? 'border-indigo-400 bg-gradient-to-r from-indigo-200 to-purple-100 text-indigo-800 shadow-lg'
+                  : 'border-gray-200 bg-white text-gray-700 hover:border-indigo-400 hover:bg-indigo-50',
+                // 중앙이 아닌 카드는 호버 시에만 약간 확대
+                position !== 2 && 'hover:scale-95'
+              )}
+            >
+              {keyword}
+            </button>
+          ))}
+        </div>
+
+        {/* 오른쪽 화살표 */}
+        <button
+          onClick={goToNextKeyword}
+          className="absolute right-0 top-1/2 z-10 transform -translate-y-1/2 translate-x-2 bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-all hover:scale-110"
+          aria-label="다음 키워드"
+        >
+          <ChevronRightIcon className="h-4 w-4 text-gray-600" />
+        </button>
       </div>
 
       {/* 네비게이션 버튼 및 프로그레스 */}
@@ -200,7 +278,7 @@ function StepwiseKeywordPrompt({
             )}
             aria-label="키워드 조합 완료"
           >
-            선택 완료
+            완성
           </button>
         )}
       </div>
@@ -280,7 +358,7 @@ export default function PromptSection({
   return (
     <div
       ref={containerRef}
-      className="relative mx-auto w-full max-w-xl space-y-6 overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-lg"
+      className="relative mx-auto w-full max-w-2xl space-y-6 overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-lg"
       aria-label="AI 배경 프롬프트 생성기"
     >
       {/* 플로팅 워드 */}
@@ -307,7 +385,7 @@ export default function PromptSection({
           onClick={() => setActiveMode('keyword')}
           type="button"
           className={classNames(
-            'flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition',
+            'flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition',
             activeMode === 'keyword'
               ? 'bg-white text-indigo-700 shadow'
               : 'text-gray-600 hover:text-gray-800'
@@ -322,7 +400,7 @@ export default function PromptSection({
           onClick={() => setActiveMode('advanced')}
           type="button"
           className={classNames(
-            'flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition',
+            'flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition',
             activeMode === 'advanced'
               ? 'bg-white text-indigo-700 shadow'
               : 'text-gray-600 hover:text-gray-800'
@@ -359,7 +437,7 @@ export default function PromptSection({
                 랜덤 생성
               </button>
             </div>
-            <p className="mb-2 text-xs text-gray-500">
+            <p className="mb-2 text-sm text-gray-500">
               🎨 분위기 → 🏞️ 장소 → 🌅 시간대 → 📸 스타일 순으로 작성하세요.
             </p>
             <textarea

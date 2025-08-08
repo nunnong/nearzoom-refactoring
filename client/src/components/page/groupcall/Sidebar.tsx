@@ -28,33 +28,39 @@ interface CurrentUser {
 interface SidebarProps {
   participants: Participant[]
   currentUser: CurrentUser
+  roomUrl?: string
   showStartButton?: boolean
   showLeaveButton?: boolean
   onMicToggle?: () => void
   onCameraToggle?: () => void
   onStartCall?: () => void
   onLeaveRoom?: () => void
+  onCopyRoomUrl?: () => void
   className?: string
 }
 
 export default function Sidebar({
   participants,
   currentUser,
+  roomUrl,
   showStartButton = true,
   showLeaveButton = true,
   onMicToggle = () => {},
   onCameraToggle = () => {},
   onStartCall = () => {},
   onLeaveRoom = () => {},
+  onCopyRoomUrl = () => {},
   className,
 }: SidebarProps) {
   return (
-    <div className={cn('flex flex-col gap-4 w-80', className)}>
+    <div className={cn('flex w-full flex-col gap-4 md:w-80', className)}>
       {/* 참가자 목록 */}
       <ParticipantList
         participants={participants}
+        roomUrl={roomUrl}
         showStartButton={showStartButton}
         onStartCall={onStartCall}
+        onCopyRoomUrl={onCopyRoomUrl}
       />
 
       {/* 컨트롤 버튼들 */}
