@@ -3,7 +3,6 @@
 import {
   ArrowLeftIcon,
   PaintBrushIcon,
-  SwatchIcon,
   TrashIcon,
   CheckIcon,
   ArrowUturnLeftIcon,
@@ -39,7 +38,6 @@ const ExitConfirmModal = dynamic(
   { ssr: false }
 )
 
-interface DrawingPageProps {}
 
 interface LineData {
   points: number[]
@@ -68,7 +66,7 @@ interface TextData {
   rotation?: number
 }
 
-const DrawingPage: React.FC<DrawingPageProps> = () => {
+const DrawingPage: React.FC = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const stageRef = useRef<any>(null)
@@ -112,7 +110,6 @@ const DrawingPage: React.FC<DrawingPageProps> = () => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasChanges) {
         e.preventDefault()
-        e.returnValue = '편집 중인 내용이 있습니다. 정말로 나가시겠습니까?'
         return '편집 중인 내용이 있습니다. 정말로 나가시겠습니까?'
       }
     }
@@ -193,18 +190,19 @@ const DrawingPage: React.FC<DrawingPageProps> = () => {
   const brushSizes = [2, 5, 10, 15, 20]
 
   const fontOptions = [
-    { name: '깔끔', family: 'var(--font-noto-sans-kr), sans-serif', displayName: 'Noto Sans KR' },
-    { name: '귀여움', family: 'var(--font-jua), cursive', displayName: 'Jua' },
-    { name: '힙함', family: 'var(--font-black-han-sans), sans-serif', displayName: 'Black Han Sans' },
-    { name: '손글씨', family: 'var(--font-gamja-flower), cursive', displayName: 'Gamja Flower' },
-    { name: '삐뚤빼뚤', family: 'var(--font-gaegu), cursive', displayName: 'Gaegu' },
+    { name: '깔끔', family: 'Noto Sans KR, sans-serif', displayName: 'Noto Sans KR' },
+    { name: '귀여움', family: 'Jua, cursive', displayName: 'Jua' },
+    { name: '힙함', family: 'Black Han Sans, sans-serif', displayName: 'Black Han Sans' },
+    { name: '손글씨', family: 'Gamja Flower, cursive', displayName: 'Gamja Flower' },
+    { name: '삐뚤빼뚤', family: 'Gaegu, cursive', displayName: 'Gaegu' },
     { name: '기본', family: 'Arial, sans-serif', displayName: 'Arial' },
   ]
 
   // 이미지 해상도 기반 폰트 크기 계산
-  const calculateFontSize = (ratio: number) => {
+  const calculateFontSize = (fontSize: number) => {
     // 이미지의 대각선 길이를 기준으로 계산
     const diagonal = Math.sqrt(originalImageSize.width ** 2 + originalImageSize.height ** 2)
+    const ratio = fontSize / 1000 // fontSize를 비율로 변환
     return Math.round(diagonal * ratio)
   }
 
@@ -212,8 +210,7 @@ const DrawingPage: React.FC<DrawingPageProps> = () => {
   const increaseFontSize = (textId: string) => {
     const currentText = texts.find(t => t.id === textId)
     if (currentText) {
-      const maxSize = calculateFontSize(0.15) // 최대 크기를 더 크게 설정
-      const newSize = Math.min(currentText.fontSize + calculateFontSize(0.01), maxSize)
+      const newSize = Math.min(currentText.fontSize + 4, 96)
       updateText(textId, { fontSize: newSize })
     }
   }
@@ -221,8 +218,7 @@ const DrawingPage: React.FC<DrawingPageProps> = () => {
   const decreaseFontSize = (textId: string) => {
     const currentText = texts.find(t => t.id === textId)
     if (currentText) {
-      const minSize = calculateFontSize(0.01) // 최소 크기
-      const newSize = Math.max(currentText.fontSize - calculateFontSize(0.01), minSize)
+      const newSize = Math.max(currentText.fontSize - 4, 12)
       updateText(textId, { fontSize: newSize })
     }
   }
@@ -444,6 +440,7 @@ const DrawingPage: React.FC<DrawingPageProps> = () => {
   const addText = (text: string, fontFamily: string, fontSize: number, color: string) => {
     if (!textClickPosition || !text.trim()) return
     
+    
     const newText: TextData = {
       id: Date.now().toString(),
       x: textClickPosition.x,
@@ -457,6 +454,10 @@ const DrawingPage: React.FC<DrawingPageProps> = () => {
     saveToHistory()
     setHasChanges(true)
     setTexts([...texts, newText])
+    
+    // 새로 생성된 텍스트 자동 선택하지 않기
+    setSelectedTextId(null)
+    
     closeTextModal()
   }
 
@@ -875,6 +876,7 @@ const DrawingPage: React.FC<DrawingPageProps> = () => {
                 </div>
               )
             })()}
+            
           </div>
         </div>
       </div>
@@ -896,9 +898,9 @@ const DrawingPage: React.FC<DrawingPageProps> = () => {
           onTextAdd={addText}
           fontOptions={fontOptions}
           colors={colors}
-          defaultFontSize={calculateFontSize(0.05)}
-          minFontSize={calculateFontSize(0.02)}
-          maxFontSize={calculateFontSize(0.15)}
+          defaultFontSize={24}
+          minFontSize={12}
+          maxFontSize={96}
         />
       )}
 

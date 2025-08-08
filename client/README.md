@@ -24,17 +24,19 @@ curl -fsSL https://get.pnpm.io/install.sh | sh -
 ## 🏃‍♂️ 시작하기
 
 1. **의존성 설치**
+
    ```bash
    pnpm install
    ```
 
 2. **개발 서버 실행**
+
    ```bash
    pnpm dev
    ```
 
 3. **브라우저에서 확인**
-   
+
    [http://localhost:3000](http://localhost:3000)에서 애플리케이션을 확인할 수 있습니다.
 
 ## 📁 프로젝트 구조
