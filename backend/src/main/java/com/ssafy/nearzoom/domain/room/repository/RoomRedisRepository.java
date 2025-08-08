@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import livekit.LivekitModels.Room;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -87,5 +88,63 @@ public class RoomRedisRepository {
 
     log.info("Participant added to room. RoomKey: {}, DisplayName: {}, Total: {}",
         roomKey, displayName, participantList.size());
+  }
+
+  public void updateParticipantStatus(Long roomId, String identity, String status) {
+    String participantKey = RedisKeyConstants.PARTICIPANT_KEY_PREFIX + roomId + ":" + identity;
+
+    if (!redisTemplate.hasKey(participantKey)) {
+      log.warn("Participant key not found: {}", participantKey);
+      return;
+    }
+
+    redisTemplate.opsForHash().put(participantKey, "status", status);
+    redisTemplate.opsForHash().put(participantKey, "updatedAt", LocalDateTime.now().toString());
+
+    log.info("Participant status updated. RoomId: {}, Identity: {}, Status: {}",
+        roomId, identity, status);
+  }
+
+  public void removeParticipant(String displayName, String roomKey) {
+    String participantsString = (String) redisTemplate.opsForHash().get(roomKey, "participants");
+
+    if (participantsString == null || participantsString.trim().isEmpty()) {
+      log.warn("No participants found in room: {}", roomKey);
+      return;
+    }
+
+    List<String> participantList = new ArrayList<>(Arrays.asList(participantsString.split(",")));
+
+    // 첫 번째로 발견되는 해당 이름을 제거
+    if (participantList.remove(displayName)) {
+      String updatedParticipants = participantList.isEmpty() ? "" : String.join(",", participantList);
+
+      redisTemplate.opsForHash().put(roomKey, "participants", updatedParticipants);
+      redisTemplate.opsForHash().put(roomKey, "participantCount", String.valueOf(participantList.size()));
+
+      log.info("Participant removed from room. RoomKey: {}, DisplayName: {}, Remaining: {}",
+          roomKey, displayName, participantList.size());
+    } else {
+      log.warn("Participant not found in room participants list. RoomKey: {}, DisplayName: {}",
+          roomKey, displayName);
+    }
+  }
+
+  //방 종료 시 모든 참가자 상태를 'removed'로 변경
+  public void closeAllParticipants(Long roomId) {
+    String participantPattern = RedisKeyConstants.PARTICIPANT_KEY_PREFIX + roomId + ":*";
+    Set<String> participantKeys = redisTemplate.keys(participantPattern);
+
+    if (!participantKeys.isEmpty()) {
+      for (String participantKey : participantKeys) {
+        redisTemplate.opsForHash().put(participantKey, "status", "removed");
+        redisTemplate.opsForHash().put(participantKey, "removedAt", LocalDateTime.now().toString());
+        // 참가자 정보도 TTL 1시간으로 단축
+        redisTemplate.expire(participantKey, Duration.ofHours(1));
+      }
+
+      log.info("All participants marked as removed for room: {}, Count: {}",
+          roomId, participantKeys.size());
+    }
   }
 }
