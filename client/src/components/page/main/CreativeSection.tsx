@@ -7,7 +7,13 @@ interface CreativeSectionProps {
   onLogin: () => void
   onLogout: () => void
   onMyPage: () => void
+  onMyFeed: () => void
   onAfterLoginClick: () => void
+  user?: {
+    name?: string
+    email?: string
+    profileImage?: string
+  } | null
 }
 
 export default function CreativeSection({
@@ -15,7 +21,9 @@ export default function CreativeSection({
   onLogin,
   onLogout,
   onMyPage,
-  onAfterLoginClick
+  onMyFeed,
+  onAfterLoginClick,
+  user
 }: CreativeSectionProps) {
   return (
     <div className="bg-stone-100 p-4 md:p-8">
@@ -24,6 +32,8 @@ export default function CreativeSection({
         onLogin={onLogin}
         onLogout={onLogout}
         onMyPage={onMyPage}
+        onMyFeed={onMyFeed}
+        user={user}
       />
       
       <HeroSection 

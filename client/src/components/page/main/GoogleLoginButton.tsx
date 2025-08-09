@@ -9,7 +9,7 @@ interface GoogleLoginButtonProps {
   disabled?: boolean
 }
 
-const GoogleLoginButton = ({ onClick, className, disabled = false }: GoogleLoginButtonProps): JSX.Element => {
+const GoogleLoginButton = ({ onClick, className, disabled = false }: GoogleLoginButtonProps): React.JSX.Element => {
   return (
     <button
       type="button"

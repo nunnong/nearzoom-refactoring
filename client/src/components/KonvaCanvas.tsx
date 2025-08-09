@@ -55,6 +55,8 @@ interface KonvaCanvasProps {
   onTextSelect: (textId: string | null) => void
   onTextDelete: (textId: string) => void
   onTextUpdate: (textId: string, updates: Partial<TextData>) => void
+  onIncreaseFontSize: (textId: string) => void
+  onDecreaseFontSize: (textId: string) => void
 }
 
 const KonvaCanvas: React.FC<KonvaCanvasProps> = ({
@@ -74,6 +76,8 @@ const KonvaCanvas: React.FC<KonvaCanvasProps> = ({
   onTextSelect,
   onTextDelete,
   onTextUpdate,
+  onIncreaseFontSize,
+  onDecreaseFontSize,
 }) => {
   const [selectedSticker, setSelectedSticker] = useState<string | null>(null)
   const [selectedText, setSelectedText] = useState<string | null>(null)

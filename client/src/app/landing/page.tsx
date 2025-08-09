@@ -54,16 +54,6 @@ export default function LandingPage() {
       ease: "power2.out",
       onComplete: () => {
         rotateAnim.kill();
-        // 3초 후 페이드아웃과 메인으로 이동
-        setTimeout(() => {
-            gsap.to(containerRef.current, {
-            opacity: 0,
-            duration: 0.5,
-            onComplete: () => {
-                router.push("/");
-            }
-            });
-        }, 3000);
         }
     });
 
@@ -83,7 +73,7 @@ export default function LandingPage() {
     tl.to(
     [letters[4], letters[5]], 
     {
-    x: (i: number) => [-70, 80][i], 
+    x: (i: number) => [-90, 100][i], 
     y: 40,
     duration: 0.8,
     ease: "power2.out",
@@ -95,7 +85,7 @@ export default function LandingPage() {
     tl.to(
     [letters[0], letters[1], letters[2], letters[3]], 
     {
-    x: (i: number) => [-90, -30, 30, 90][i], 
+    x: (i: number) => [-120, -40, 40, 120][i], 
     y: -40,
     duration: 1,
     scale: 1.2,
