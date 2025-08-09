@@ -6,12 +6,10 @@ import { useAuth } from '@/hooks/useAuth'
 interface LoginModalProps {
   isOpen: boolean
   onClose: () => void
-  onKakaoLogin?: () => void
-  onGoogleLogin?: () => void
   isLoading?: boolean
 }
 
-const LoginModal = ({ isOpen, onClose, onKakaoLogin, onGoogleLogin, isLoading = false }: LoginModalProps): JSX.Element => {
+const LoginModal = ({ isOpen, onClose, isLoading = false }: LoginModalProps): JSX.Element => {
   const { startSocialLogin } = useAuth()
 
   if (!isOpen) return <></>
