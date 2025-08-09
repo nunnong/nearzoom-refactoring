@@ -40,39 +40,35 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
+  console.log('Dashboard - received userProfile:', userProfile)
+  console.log('Dashboard - userProfile name:', userProfile?.name)
+  console.log('Dashboard - userProfile data:', userProfile?.data)
+  
+  // ApiResponse 형태의 데이터인 경우 실제 데이터 추출
+  const actualUser = userProfile?.data ? {
+    name: userProfile.data.userName,
+    email: userProfile.data.userEmail,
+    profileImage: userProfile.data.userProfileImage,
+    socialType: 'GOOGLE' // 현재 구글 로그인
+  } : userProfile
+  
+  console.log('Dashboard - actualUser:', actualUser)
+  
   const router = useRouter()
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false)
   const [activeModal, setActiveModal] = useState<string | null>(null)
   const [imageList, setImageList] = useState<ImageItem[]>([])
   const [filteredImages, setFilteredImages] = useState<ImageItem[]>([])
+  const [isMyFeedHovered, setIsMyFeedHovered] = useState<boolean>(false)
 
-  // localStorage에서 이미지 데이터 로드
+  // props로 받은 사용자별 이미지 데이터 사용
   useEffect(() => {
-    // 첫 로드 시 테스트 데이터 초기화
-    initializeTestImages(images)
-
-    // localStorage에서 데이터 로드
-    const savedImages = getImagesFromLocal()
-    console.log('📸 Loaded images from localStorage:', savedImages)
-    setImageList(savedImages)
-    setFilteredImages(savedImages)
+    console.log('📸 사용자별 이미지 데이터 로드:', images)
+    setImageList(images)
+    setFilteredImages(images)
   }, [images])
 
-  // 페이지 로드 시 localStorage 데이터 새로고침
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const savedImages = getImagesFromLocal()
-      setImageList(savedImages)
-      setFilteredImages(savedImages)
-    }
-
-    // 다른 탭에서 localStorage 변경 시 동기화
-    window.addEventListener('storage', handleStorageChange)
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange)
-    }
-  }, [])
+  // localStorage 동기화 제거 (서버 데이터 사용)
 
   // 현재 활성화된 필터들을 추적
   const [activeFilters, setActiveFilters] = useState<Filter[]>([])
@@ -233,7 +229,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
     <div className="min-h-screen bg-gray-50">
       <SideList
         isOpen={isSidebarOpen}
-        userProfile={userProfile}
+        userProfile={actualUser}
         onUploadSelfie={handleUploadSelfie}
         onAccount={handleAccount}
         onClose={() => setIsSidebarOpen(false)}
@@ -268,6 +264,57 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
             </div>
             <div className="flex items-center space-x-3">
               <HomeButton />
+              
+              {/* MY FEED with dropdown toggle */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsMyFeedHovered(!isMyFeedHovered)}
+                  className="inline-flex h-[44px] px-6 py-2.5 items-center gap-2 rounded-md bg-gray-700 text-base font-semibold text-white shadow-inner shadow-white/10 hover:bg-gray-600 focus:outline-none transition-colors"
+                >
+                  MY FEED
+                </button>
+                
+                {/* Dropdown Menu */}
+                {isMyFeedHovered && (
+                  <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                    <div className="flex items-center justify-around p-3">
+                      <button
+                        onClick={() => {
+                          /* Home.png 관련 새로운 기능 */
+                          setIsMyFeedHovered(false) // 클릭 후 토글 닫기
+                        }}
+                        className="p-2 hover:bg-gray-100 rounded transition-colors"
+                        title="Feature 1"
+                      >
+                        <img src="/Home.png" alt="Feature 1" className="w-8 h-8 object-contain" />
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          /* Search.png 관련 새로운 기능 */
+                          setIsMyFeedHovered(false) // 클릭 후 토글 닫기
+                        }}
+                        className="p-2 hover:bg-gray-100 rounded transition-colors"
+                        title="Feature 2"
+                      >
+                        <img src="/Search.png" alt="Feature 2" className="w-8 h-8 object-contain" />
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          /* User.png 관련 새로운 기능 */
+                          setIsMyFeedHovered(false) // 클릭 후 토글 닫기
+                        }}
+                        className="p-2 hover:bg-gray-100 rounded transition-colors"
+                        title="Feature 3"
+                      >
+                        <img src="/User.png" alt="Feature 3" className="w-8 h-8 object-contain" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
               <LogoutButton />
             </div>
           </div>
@@ -314,9 +361,9 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
                 {/* Profile Section */}
                 <div className="flex items-center space-x-4">
                   <div className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center">
-                    {userProfile?.profileImage ? (
+                    {actualUser?.profileImage ? (
                       <img
-                        src={userProfile.profileImage}
+                        src={actualUser.profileImage}
                         alt="Profile"
                         className="h-full w-full rounded-full object-cover"
                       />
@@ -328,10 +375,10 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
                   </div>
                   <div>
                     <h4 className="text-lg font-medium text-gray-900">
-                      {userProfile?.name || '사용자'}
+                      {actualUser?.name || '사용자'}
                     </h4>
                     <p className="text-sm text-gray-500">
-                      {userProfile?.email || 'user@example.com'}
+                      {actualUser?.email || 'user@example.com'}
                     </p>
                   </div>
                 </div>
@@ -344,16 +391,33 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
                         <dt className="text-sm font-medium text-gray-500">소셜 로그인</dt>
                         <dd className="text-sm text-gray-900 flex items-center">
                           <div className="flex items-center space-x-1">
-                            <div className="w-4 h-4 bg-yellow-400 rounded-sm flex items-center justify-center">
-                              <span className="text-xs font-bold text-black">K</span>
-                            </div>
-                            <span>카카오</span>
+                            {actualUser?.socialType === 'KAKAO' ? (
+                              <>
+                                <div className="w-4 h-4 bg-yellow-400 rounded-sm flex items-center justify-center">
+                                  <span className="text-xs font-bold text-black">K</span>
+                                </div>
+                                <span>카카오</span>
+                              </>
+                            ) : actualUser?.socialType === 'GOOGLE' ? (
+                              <>
+                                <div className="w-4 h-4 bg-white border border-gray-300 rounded-sm flex items-center justify-center">
+                                  <span className="text-xs font-bold text-blue-600">G</span>
+                                </div>
+                                <span>구글</span>
+                              </>
+                            ) : (
+                              <span className="text-gray-500">알 수 없음</span>
+                            )}
                           </div>
                         </dd>
                       </div>
                       <div className="flex justify-between">
                         <dt className="text-sm font-medium text-gray-500">이메일</dt>
-                        <dd className="text-sm text-gray-900">{userProfile?.email || 'user@kakao.com'}</dd>
+                        <dd className="text-sm text-gray-900">{actualUser?.email || '이메일 정보 없음'}</dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt className="text-sm font-medium text-gray-500">사용자명</dt>
+                        <dd className="text-sm text-gray-900">{actualUser?.name || '사용자명 없음'}</dd>
                       </div>
                     </dl>
                   </div>

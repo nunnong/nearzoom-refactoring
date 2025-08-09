@@ -7,6 +7,7 @@ interface CreativeSectionProps {
   onLogin: () => void
   onLogout: () => void
   onMyPage: () => void
+  onMyFeed: () => void
   onAfterLoginClick: () => void
 }
 
@@ -15,6 +16,7 @@ export default function CreativeSection({
   onLogin,
   onLogout,
   onMyPage,
+  onMyFeed,
   onAfterLoginClick
 }: CreativeSectionProps) {
   return (
@@ -24,6 +26,7 @@ export default function CreativeSection({
         onLogin={onLogin}
         onLogout={onLogout}
         onMyPage={onMyPage}
+        onMyFeed={onMyFeed}
       />
       
       <HeroSection 

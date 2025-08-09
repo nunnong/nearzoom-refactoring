@@ -5,9 +5,10 @@ interface HeaderProps {
   onLogin: () => void
   onLogout: () => void
   onMyPage: () => void
+  onMyFeed: () => void
 }
 
-export default function Header({ isLoggedIn, onLogin, onLogout, onMyPage }: HeaderProps) {
+export default function Header({ isLoggedIn, onLogin, onLogout, onMyPage, onMyFeed }: HeaderProps) {
   return (
     <div className="flex items-center justify-between mb-8 md:mb-16">
       <div className="flex items-center gap-3">
@@ -21,6 +22,7 @@ export default function Header({ isLoggedIn, onLogin, onLogout, onMyPage }: Head
         onLogin={onLogin} 
         onLogout={onLogout} 
         onMyPage={onMyPage} 
+        onMyFeed={onMyFeed}
       />
     </div>
   )

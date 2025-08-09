@@ -27,13 +27,16 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
   // 액션들
   setTokens: ({ accessToken }) => {
+    console.log('setTokens 호출됨, 토큰:', accessToken)
     set({
       accessToken,
       isAuthenticated: !!accessToken,
     })
+    console.log('상태 업데이트 완료, isAuthenticated:', !!accessToken)
 
     if (typeof window !== 'undefined') {
       saveAccessToken(accessToken)
+      console.log('localStorage에 토큰 저장 완료')
     }
   },
 
@@ -59,23 +62,29 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
   // 앱 시작 시 토큰 복원 및 검증
   initializeAuth: async () => {
+    console.log('initializeAuth 시작')
     if (typeof window === 'undefined') return
 
     const savedToken = getAccessToken()
+    console.log('저장된 토큰:', savedToken)
     if (!savedToken) {
+      console.log('저장된 토큰이 없음')
       set({ isLoading: false })
       return
     }
 
     set({ accessToken: savedToken, isLoading: true })
+    console.log('토큰 설정됨, 사용자 정보 검증 시작')
 
     try {
       // 토큰이 유효한지 사용자 정보로 검증
       const userResponse = await api.get(API_ENDPOINTS.USER_INFO)
+      console.log('사용자 정보 응답:', userResponse.data)
       set({
         user: userResponse.data,
         isAuthenticated: true,
       })
+      console.log('로그인 상태로 설정됨')
     } catch (error) {
       console.error('토큰 검증 실패:', error)
       get().clearTokens()
@@ -94,7 +103,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     } finally {
       get().clearTokens()
       if (typeof window !== 'undefined') {
-        window.location.href = '/login'
+        window.location.href = '/'
       }
     }
   },

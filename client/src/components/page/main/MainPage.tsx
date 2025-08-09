@@ -5,6 +5,7 @@ import CreativeSection from "./CreativeSection"
 import AboutUsSection from "./AboutUsSection"
 import Footer from "./Footer"
 import LoginModal from "./LoginModal"
+import { useEffect } from "react"
 
 export default function CreativePage() {
   const {
@@ -14,11 +15,21 @@ export default function CreativePage() {
     handleLogin,
     handleLogout,
     handleMyPage,
+    handleMyFeed,
     handleKakaoLoginClick,
     handleGoogleLoginClick,
     handleAfterLoginClick,
-    isLoading
+    isLoading,
+    initializeAuth
   } = useAuth()
+
+  useEffect(() => {
+    initializeAuth()
+  }, [])
+
+  useEffect(() => {
+    console.log('MainPage - isLoggedIn:', isLoggedIn)
+  }, [isLoggedIn])
 
   return (
     <div className="min-h-screen w-[90%] mx-auto">
@@ -27,6 +38,7 @@ export default function CreativePage() {
         onLogin={handleLogin}
         onLogout={handleLogout}
         onMyPage={handleMyPage}
+        onMyFeed={handleMyFeed}
         onAfterLoginClick={handleAfterLoginClick}
       />
 

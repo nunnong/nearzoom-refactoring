@@ -19,6 +19,7 @@ export const API_ENDPOINTS = {
   PHOTOS: '/myroom/photos',
   LIKE: '/myroom/photos/like',
   SAVE_EDITED: '/myroom/photos/save-edited',
+  
 
   // Room
   CREATE_ROOM: '/room/create',

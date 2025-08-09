@@ -14,8 +14,15 @@ export default function CallbackPage() {
   
   const [state, setState] = useState<PageState>('loading')
   const [errorMessage, setErrorMessage] = useState<string>('')
+  const [processed, setProcessed] = useState(false)
 
   useEffect(() => {
+    if (processed) {
+      console.log('이미 처리됨, 중복 실행 방지')
+      return
+    }
+    
+    setProcessed(true)
     const processLoginCallback = async () => {
       try {
         setState('loading')
@@ -26,26 +33,45 @@ export default function CallbackPage() {
           throw new Error(`OAuth2 인증 실패: ${error}`)
         }
 
-        // URL에서 JWT Access Token 추출 (백엔드에서 리다이렉트 시 전달)
-        const token = searchParams.get('token')
+        console.log('OAuth 로그인 성공, refresh token으로 access token 요청 시작')
+        console.log('현재 쿠키:', document.cookie)
         
-        if (!token) {
-          throw new Error('인증 토큰이 전달되지 않았습니다.')
+        // refresh token으로 access token 요청
+        const tokenResponse = await fetch('http://localhost:8080/auth/refresh', {
+          method: 'POST',
+          credentials: 'include', // 쿠키 포함
+        })
+
+        if (!tokenResponse.ok) {
+          throw new Error('Access token 요청 실패')
+        }
+
+        const tokenData = await tokenResponse.json()
+        console.log('Access token 응답:', tokenData)
+        
+        // ApiResponse 구조에서 데이터 추출
+        const accessToken = tokenData.data?.accessToken
+        if (!accessToken) {
+          console.error('토큰 응답 구조:', tokenData)
+          throw new Error('Access token이 응답에 없습니다')
         }
 
         // Zustand 스토어에 토큰 저장 (localStorage도 자동으로 저장됨)
-        handleLoginSuccess(token)
+        handleLoginSuccess(accessToken)
 
         // 사용자 정보 가져오기 (토큰 검증 포함)
+        console.log('콜백에서 fetchUserInfo 호출 시작')
         await fetchUserInfo()
+        console.log('콜백에서 fetchUserInfo 완료')
 
         // 성공 상태로 변경
         setState('success')
         
-        // 잠깐 성공 메시지 보여준 후 메인 페이지로 이동
+        // 성공 후 3초 대기 (디버깅용)
+        console.log('콜백 처리 완료, 3초 후 메인 페이지로 이동')
         setTimeout(() => {
           router.replace('/')
-        }, 1500)
+        }, 3000)
         
       } catch (error: any) {
         console.error('OAuth2 로그인 콜백 처리 중 오류:', error)
@@ -76,7 +102,7 @@ export default function CallbackPage() {
     }
 
     processLoginCallback()
-  }, [searchParams, handleLoginSuccess, fetchUserInfo, router])
+  }, [])
 
   // 로딩 상태
   if (state === 'loading') {
