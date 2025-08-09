@@ -11,7 +11,7 @@ interface UseSelfieCheckOptions {
 }
 
 export const useSelfieCheck = (options: UseSelfieCheckOptions = {}) => {
-  const { redirectTo = '/upload-selfie', requireSelfie = true } = options
+  const { redirectTo, requireSelfie = true } = options
   const [hasSelfie, setHasSelfie] = useState<boolean | null>(null)
   const [isChecking, setIsChecking] = useState(true)
   const router = useRouter()
@@ -32,7 +32,7 @@ export const useSelfieCheck = (options: UseSelfieCheckOptions = {}) => {
         const selfieExists = checkUserSelfie()
         setHasSelfie(selfieExists)
 
-        if (requireSelfie && !selfieExists) {
+        if (requireSelfie && !selfieExists && redirectTo) {
           // 현재 페이지를 returnUrl로 설정하여 업로드 후 돌아올 수 있도록 함
           const currentPath = window.location.pathname
           const returnUrl = encodeURIComponent(currentPath)

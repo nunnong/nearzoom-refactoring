@@ -33,7 +33,7 @@ export default function CreativePage() {
   }, [isLoggedIn])
 
   return (
-    <div className="min-h-screen w-[90%] mx-auto">
+    <div className="min-h-screen w-full mx-auto transform scale-[0.8] origin-top">
       <CreativeSection
         isLoggedIn={isLoggedIn}
         onLogin={handleLogin}
