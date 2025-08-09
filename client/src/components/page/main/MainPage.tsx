@@ -20,7 +20,8 @@ export default function CreativePage() {
     handleGoogleLoginClick,
     handleAfterLoginClick,
     isLoading,
-    initializeAuth
+    initializeAuth,
+    user
   } = useAuth()
 
   useEffect(() => {
@@ -40,6 +41,7 @@ export default function CreativePage() {
         onMyPage={handleMyPage}
         onMyFeed={handleMyFeed}
         onAfterLoginClick={handleAfterLoginClick}
+        user={user}
       />
 
       <AboutUsSection />

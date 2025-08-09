@@ -80,8 +80,22 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       // 토큰이 유효한지 사용자 정보로 검증
       const userResponse = await api.get(API_ENDPOINTS.USER_INFO)
       console.log('사용자 정보 응답:', userResponse.data)
+      
+      // 백엔드 응답을 프론트엔드 User 타입에 맞게 변환
+      const rawData = userResponse.data.data || userResponse.data
+      const userData = {
+        id: rawData.id || 0,
+        name: rawData.userName || rawData.name || '',
+        email: rawData.userEmail || rawData.email || '',
+        profileImage: rawData.userProfileImage || rawData.profileImage,
+        socialType: rawData.socialType || 'GOOGLE',
+        createdAt: rawData.createdAt || new Date().toISOString(),
+        updatedAt: rawData.updatedAt || new Date().toISOString(),
+      }
+      
+      console.log('변환된 사용자 데이터:', userData)
       set({
-        user: userResponse.data,
+        user: userData,
         isAuthenticated: true,
       })
       console.log('로그인 상태로 설정됨')

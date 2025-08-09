@@ -17,6 +17,8 @@ import SearchBox from './SearchBox'
 import SideList from './SideList'
 import HomeButton from './HomeButton'
 import LogoutButton from './LogoutButton'
+import UploadSelfieModal from './UploadSelfieModal'
+import { useAuth } from '@/hooks/useAuth'
 
 interface ImageItem {
   id: string
@@ -54,12 +56,16 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
   
   console.log('Dashboard - actualUser:', actualUser)
   
+  const { handleLogout, isLoading } = useAuth()
+  
   const router = useRouter()
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true) // 기본값을 true로 변경
   const [activeModal, setActiveModal] = useState<string | null>(null)
   const [imageList, setImageList] = useState<ImageItem[]>([])
   const [filteredImages, setFilteredImages] = useState<ImageItem[]>([])
-  const [isMyFeedHovered, setIsMyFeedHovered] = useState<boolean>(false)
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false)
+  const [isMyFeedOpen, setIsMyFeedOpen] = useState<boolean>(false)
+  const [isUploadSelfieModalOpen, setIsUploadSelfieModalOpen] = useState<boolean>(false)
 
   // props로 받은 사용자별 이미지 데이터 사용
   useEffect(() => {
@@ -113,10 +119,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
   }
 
   const handleUploadSelfie = (): void => {
-    // 모달 대신 upload-selfie 페이지로 리다이렉트
-    const currentPath = window.location.pathname
-    const returnUrl = encodeURIComponent(currentPath)
-    router.push(`/upload-selfie?returnUrl=${returnUrl}`)
+    setIsUploadSelfieModalOpen(true)
   }
 
 
@@ -264,58 +267,98 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
             </div>
             <div className="flex items-center space-x-3">
               <HomeButton />
-              
-              {/* MY FEED with dropdown toggle */}
+
+              {/* Hamburger Menu Button */}
               <div className="relative">
                 <button
-                  onClick={() => setIsMyFeedHovered(!isMyFeedHovered)}
-                  className="inline-flex h-[44px] px-6 py-2.5 items-center gap-2 rounded-md bg-gray-700 text-base font-semibold text-white shadow-inner shadow-white/10 hover:bg-gray-600 focus:outline-none transition-colors"
+                  onClick={() => setIsMenuOpen(!isMenuOpen)}
+                  className="p-2 rounded-md hover:bg-gray-100 transition-colors focus:outline-none"
                 >
-                  MY FEED
+                  <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
                 </button>
                 
                 {/* Dropdown Menu */}
-                {isMyFeedHovered && (
-                  <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                    <div className="flex items-center justify-around p-3">
-                      <button
-                        onClick={() => {
-                          /* Home.png 관련 새로운 기능 */
-                          setIsMyFeedHovered(false) // 클릭 후 토글 닫기
-                        }}
-                        className="p-2 hover:bg-gray-100 rounded transition-colors"
-                        title="Feature 1"
-                      >
-                        <img src="/Home.png" alt="Feature 1" className="w-8 h-8 object-contain" />
-                      </button>
+                {isMenuOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                    <div className="py-2">
+                      {/* MY FEED with nested dropdown */}
+                      <div className="relative">
+                        <button
+                          onClick={() => setIsMyFeedOpen(!isMyFeedOpen)}
+                          className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center justify-between gap-2 text-gray-800"
+                        >
+                          <div className="flex items-center gap-2">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7H3a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2z" />
+                            </svg>
+                            MY FEED
+                          </div>
+                          <svg className={`w-4 h-4 transition-transform ${isMyFeedOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        
+                        {/* MY FEED Icons Submenu */}
+                        {isMyFeedOpen && (
+                          <div className="ml-4 border-l-2 border-gray-100">
+                            <button
+                              onClick={() => {
+                                /* Home.png 관련 새로운 기능 */
+                                setIsMyFeedOpen(false)
+                                setIsMenuOpen(false)
+                              }}
+                              className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2 text-gray-800"
+                            >
+                              <img src="/Home.png" alt="Feature 1" className="w-5 h-5 object-contain" />
+                              Home
+                            </button>
+                            <button
+                              onClick={() => {
+                                /* Search.png 관련 새로운 기능 */
+                                setIsMyFeedOpen(false)
+                                setIsMenuOpen(false)
+                              }}
+                              className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2 text-gray-800"
+                            >
+                              <img src="/Search.png" alt="Feature 2" className="w-5 h-5 object-contain" />
+                              Search
+                            </button>
+                            <button
+                              onClick={() => {
+                                /* User.png 관련 새로운 기능 */
+                                setIsMyFeedOpen(false)
+                                setIsMenuOpen(false)
+                              }}
+                              className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2 text-gray-800"
+                            >
+                              <img src="/User.png" alt="Feature 3" className="w-5 h-5 object-contain" />
+                              Profile
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <hr className="my-2 border-gray-200" />
                       
                       <button
                         onClick={() => {
-                          /* Search.png 관련 새로운 기능 */
-                          setIsMyFeedHovered(false) // 클릭 후 토글 닫기
+                          handleLogout()
+                          setIsMenuOpen(false)
                         }}
-                        className="p-2 hover:bg-gray-100 rounded transition-colors"
-                        title="Feature 2"
+                        disabled={isLoading}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2 text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <img src="/Search.png" alt="Feature 2" className="w-8 h-8 object-contain" />
-                      </button>
-                      
-                      <button
-                        onClick={() => {
-                          /* User.png 관련 새로운 기능 */
-                          setIsMyFeedHovered(false) // 클릭 후 토글 닫기
-                        }}
-                        className="p-2 hover:bg-gray-100 rounded transition-colors"
-                        title="Feature 3"
-                      >
-                        <img src="/User.png" alt="Feature 3" className="w-8 h-8 object-contain" />
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        {isLoading ? '로그아웃 중...' : 'LOGOUT'}
                       </button>
                     </div>
                   </div>
                 )}
               </div>
-              
-              <LogoutButton />
             </div>
           </div>
         </header>
@@ -450,6 +493,13 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
           </div>
         </div>
       )}
+
+      {/* Upload Selfie Modal */}
+      <UploadSelfieModal
+        isOpen={isUploadSelfieModalOpen}
+        onClose={() => setIsUploadSelfieModalOpen(false)}
+        userProfile={actualUser}
+      />
     </div>
   )
 }
