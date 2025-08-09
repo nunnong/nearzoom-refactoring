@@ -21,33 +21,33 @@ public class FollowController {
 
     private final FollowService followService;
 
-    @PostMapping("/{followee-id}")
+    @PostMapping("/{followeeId}")
     public ResponseEntity<ApiResponse<Void>> follow(Authentication authentication,
         @PathVariable Long followeeId) {
         followService.follow(authentication, followeeId);
         return ApiResponse.ok();
     }
 
-    @DeleteMapping("/{followee-id}")
+    @DeleteMapping("/{followeeId}")
     public ResponseEntity<ApiResponse<Void>> unfollow(Authentication authentication,
         @PathVariable Long followeeId) {
         followService.unfollow(authentication, followeeId);
         return ApiResponse.ok();
     }
 
-    @GetMapping("/following/{user-id}")
+    @GetMapping("/following/{userId}")
     public ResponseEntity<ApiResponse<List<UserInfoResponse>>> getFollowing(
         @PathVariable Long userId) {
         return ApiResponse.ok(followService.getFollowing(userId));
     }
 
-    @GetMapping("/followers/{user-id}")
+    @GetMapping("/followers/{userId}")
     public ResponseEntity<ApiResponse<List<UserInfoResponse>>> getFollowers(
         @PathVariable Long userId) {
         return ApiResponse.ok(followService.getFollowers(userId));
     }
 
-    @GetMapping("/check/{followee-id}")
+    @GetMapping("/check/{followeeId}")
     public ResponseEntity<ApiResponse<Boolean>> isFollowing(Authentication authentication,
         @PathVariable Long followeeId) {
         return ApiResponse.ok(followService.isFollowing(authentication, followeeId));

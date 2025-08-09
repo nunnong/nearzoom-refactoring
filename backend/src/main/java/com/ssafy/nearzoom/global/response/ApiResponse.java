@@ -45,4 +45,14 @@ public record ApiResponse<T>(
     public static <T> ResponseEntity<ApiResponse<T>> create() {
         return ApiResponse.of(HttpStatus.CREATED);
     }
+
+    public static <T> ResponseEntity<ApiResponse<T>> create(T data) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(new ApiResponse<>(false, null, data));
+    }
+
+    public static <T> ResponseEntity<ApiResponse<T>> create(String message, T data) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(new ApiResponse<>(false, message, data));
+    }
 }
