@@ -33,7 +33,7 @@ public class SecurityConfig {
             CorsConfiguration config = new CorsConfiguration();
 
             config.setAllowedOrigins(List.of("https://nearzoom.store"));
-            config.setAllowedMethods(List.of("GET", "POST", "DELETE", "PATCH"));
+            config.setAllowedMethods(List.of("GET", "POST", "DELETE", "PATCH", "PUT", "OPTIONS"));
             config.setAllowedHeaders(List.of("*"));
             config.setAllowCredentials(true);
             config.setExposedHeaders(List.of("Set-Cookie", "Authorization"));
