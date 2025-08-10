@@ -9,16 +9,17 @@ interface ImageItem {
 
 const STORAGE_KEY = 'nearzoom_images'
 const REFERENCE_STORAGE_KEY = 'nearzoom_reference_image'
+const ACCESS_TOKEN_KEY = 'nearzoom_access_token'
 
 export const saveImageToLocal = (image: ImageItem): void => {
   try {
     const existingImages = getImagesFromLocal()
     console.log('💾 Saving new image to localStorage:', image.id)
     console.log('📋 Existing images count:', existingImages.length)
-    
+
     const updatedImages = [...existingImages, image]
     console.log('📋 Updated images count:', updatedImages.length)
-    
+
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedImages))
     console.log('✅ Successfully saved image to localStorage')
   } catch (error) {
@@ -36,22 +37,34 @@ export const getImagesFromLocal = (): ImageItem[] => {
   }
 }
 
-export const updateImageInLocal = (imageId: string, updates: Partial<ImageItem>): void => {
+export const updateImageInLocal = (
+  imageId: string,
+  updates: Partial<ImageItem>
+): void => {
   try {
     const existingImages = getImagesFromLocal()
-    console.log('🔄 Updating image in localStorage:', imageId, 'Updates:', updates)
-    console.log('📋 Existing images before update:', existingImages.length, 'images')
-    
+    console.log(
+      '🔄 Updating image in localStorage:',
+      imageId,
+      'Updates:',
+      updates
+    )
+    console.log(
+      '📋 Existing images before update:',
+      existingImages.length,
+      'images'
+    )
+
     const targetImage = existingImages.find(img => img.id === imageId)
     console.log('🎯 Target image found:', targetImage)
-    
-    const updatedImages = existingImages.map(img => 
+
+    const updatedImages = existingImages.map(img =>
       img.id === imageId ? { ...img, ...updates } : img
     )
-    
+
     const updatedTarget = updatedImages.find(img => img.id === imageId)
     console.log('✨ Updated image:', updatedTarget)
-    
+
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedImages))
     console.log('✅ Successfully updated image in localStorage')
   } catch (error) {
@@ -72,10 +85,16 @@ export const deleteImageFromLocal = (imageId: string): void => {
 export const initializeTestImages = (defaultImages: ImageItem[]): void => {
   try {
     const existingImages = getImagesFromLocal()
-    console.log('🔧 Initializing test images. Existing images:', existingImages.length)
-    
+    console.log(
+      '🔧 Initializing test images. Existing images:',
+      existingImages.length
+    )
+
     if (existingImages.length === 0) {
-      console.log('📥 No existing images found. Loading default images:', defaultImages.length)
+      console.log(
+        '📥 No existing images found. Loading default images:',
+        defaultImages.length
+      )
       localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultImages))
     } else {
       console.log('✅ Images already exist in localStorage')
@@ -94,17 +113,16 @@ export const clearAllImages = (): void => {
   }
 }
 
-// 참고 이미지 관리 기능들 (단일 이미지)
 export const saveReferenceImage = (imageData: string): void => {
   try {
     console.log('💾 Saving reference image (single)')
-    
+
     const referenceImage = {
       id: `ref_${Date.now()}`,
       src: imageData,
-      uploadedAt: new Date().toISOString()
+      uploadedAt: new Date().toISOString(),
     }
-    
+
     localStorage.setItem(REFERENCE_STORAGE_KEY, JSON.stringify(referenceImage))
     console.log('✅ Successfully saved reference image')
   } catch (error) {
@@ -112,7 +130,11 @@ export const saveReferenceImage = (imageData: string): void => {
   }
 }
 
-export const getReferenceImage = (): {id: string, src: string, uploadedAt: string} | null => {
+export const getReferenceImage = (): {
+  id: string
+  src: string
+  uploadedAt: string
+} | null => {
   try {
     const imageData = localStorage.getItem(REFERENCE_STORAGE_KEY)
     return imageData ? JSON.parse(imageData) : null
@@ -136,12 +158,46 @@ export const clearReferenceImage = (): void => {
     localStorage.removeItem(REFERENCE_STORAGE_KEY)
     console.log('🗑️ Cleared reference image from localStorage')
   } catch (error) {
-    console.error('❌ Failed to clear reference image from localStorage:', error)
+    console.error(
+      '❌ Failed to clear reference image from localStorage:',
+      error
+    )
   }
 }
 
-// 하위 호환성을 위한 기존 함수들 (deprecated)
-export const getReferenceImages = (): Array<{id: string, src: string, uploadedAt: string}> => {
+export const getReferenceImages = (): Array<{
+  id: string
+  src: string
+  uploadedAt: string
+}> => {
   const singleImage = getReferenceImage()
   return singleImage ? [singleImage] : []
+}
+
+// 인증 토큰 관련 함수들
+export const saveAccessToken = (token: string): void => {
+  try {
+    localStorage.setItem(ACCESS_TOKEN_KEY, token)
+    console.log('✅ Access token saved to localStorage')
+  } catch (error) {
+    console.error('❌ Failed to save access token:', error)
+  }
+}
+
+export const getAccessToken = (): string | null => {
+  try {
+    return localStorage.getItem(ACCESS_TOKEN_KEY)
+  } catch (error) {
+    console.error('❌ Failed to get access token from localStorage:', error)
+    return null
+  }
+}
+
+export const removeAccessToken = (): void => {
+  try {
+    localStorage.removeItem(ACCESS_TOKEN_KEY)
+    console.log('🗑️ Access token removed from localStorage')
+  } catch (error) {
+    console.error('❌ Failed to remove access token:', error)
+  }
 }
