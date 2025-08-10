@@ -11,9 +11,11 @@ export default function Header({ isLoggedIn, onLogin, onLogout, onMyPage }: Head
   return (
     <div className="flex items-center justify-between mb-8 md:mb-16">
       <div className="flex items-center gap-3">
-        <div className="w-6 h-6 md:w-8 md:h-8 bg-black rounded-full relative overflow-hidden">
-          <div className="absolute left-0 top-0 w-1/2 h-full bg-black"></div>
-        </div>
+        <img 
+          src="/link-icon.png" 
+          alt="로고" 
+          className="w-12 h-12 md:w-12 md:h-12 rounded-full object-cover rotate-12"
+        />
       </div>
 
       <IsLogin 

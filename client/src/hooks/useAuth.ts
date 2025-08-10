@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+
+import { roomAPI } from '@/lib/api/room'
 import {
   isLoggedIn,
   clearUserAuth,
@@ -14,6 +16,7 @@ export const useAuth = () => {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<UserInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false)
   const router = useRouter()
 
   // 컴포넌트 마운트 시 로그인 상태 확인
@@ -128,11 +131,42 @@ export const useAuth = () => {
     }
   }
 
-  const handleAfterLoginClick = () => {
-    if (isUserLoggedIn) {
-      router.push('/groupcall/waiting')
-    } else {
+  const handleAfterLoginClick = async () => {
+    // 🔧 수정: isUserLoggedIn 사용 (일관성)
+    if (!isUserLoggedIn) {
       setIsLoginModalOpen(true)
+      return
+    }
+
+    if (isCreatingRoom) return // 중복 클릭 방지
+
+    setIsCreatingRoom(true)
+
+    try {
+      console.log('방 생성 시작...')
+      
+      // 즉시 방 생성 API 호출
+      const roomData = await roomAPI.createRoom()
+      
+      console.log('방 생성 성공:', roomData)
+      
+      // sessionStorage에 roomData 저장
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('roomData', JSON.stringify(roomData))
+      }
+      
+      // 생성된 방으로 즉시 이동 (방장으로 접속)
+      const roomUrl = `/room/${roomData.roomId}?isHost=true&skipJoin=true`
+      
+      // 🔧 수정: router.push 사용 (Next.js 권장 방식)
+      router.push(roomUrl)
+      
+    } catch (error) {
+      console.error('방 생성 실패:', error)
+      alert('방 생성에 실패했습니다. 다시 시도해주세요.')
+    } finally {
+      // 🔧 수정: finally에서 로딩 상태 해제
+      setIsCreatingRoom(false)
     }
   }
 
@@ -141,6 +175,7 @@ export const useAuth = () => {
     isLoginModalOpen,
     currentUser,
     isLoading,
+    isCreatingRoom,
     setIsLoginModalOpen,
     handleLogin,
     handleLogout,

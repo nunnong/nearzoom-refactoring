@@ -8,6 +8,7 @@ interface CreativeSectionProps {
   onLogout: () => void
   onMyPage: () => void
   onAfterLoginClick: () => void
+  isCreatingRoom?: boolean // 방 생성 중 여부
 }
 
 export default function CreativeSection({

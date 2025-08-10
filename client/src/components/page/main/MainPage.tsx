@@ -17,8 +17,11 @@ export default function CreativePage() {
     handleKakaoLoginClick,
     handleGoogleLoginClick,
     handleAfterLoginClick,
-    isLoading
+    isLoading,
+    isCreatingRoom,
   } = useAuth()
+
+
 
   return (
     <div className="min-h-screen w-[90%] mx-auto">
@@ -28,6 +31,7 @@ export default function CreativePage() {
         onLogout={handleLogout}
         onMyPage={handleMyPage}
         onAfterLoginClick={handleAfterLoginClick}
+        isCreatingRoom={isCreatingRoom}
       />
 
       <AboutUsSection />
