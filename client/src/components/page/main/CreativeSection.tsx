@@ -1,13 +1,20 @@
+import GallerySection from "./GallerySection"
 import Header from "./Header"
 import HeroSection from "./HeroSection"
-import GallerySection from "./GallerySection"
+
 
 interface CreativeSectionProps {
   isLoggedIn: boolean
   onLogin: () => void
   onLogout: () => void
   onMyPage: () => void
+  onMyFeed: () => void
   onAfterLoginClick: () => void
+  user?: {
+    name?: string
+    email?: string
+    profileImage?: string
+  } | null
   isCreatingRoom?: boolean // 방 생성 중 여부
 }
 
@@ -16,7 +23,9 @@ export default function CreativeSection({
   onLogin,
   onLogout,
   onMyPage,
-  onAfterLoginClick
+  onMyFeed,
+  onAfterLoginClick,
+  user
 }: CreativeSectionProps) {
   return (
     <div className="bg-stone-100 p-4 md:p-8">
@@ -25,6 +34,8 @@ export default function CreativeSection({
         onLogin={onLogin}
         onLogout={onLogout}
         onMyPage={onMyPage}
+        onMyFeed={onMyFeed}
+        user={user}
       />
       
       <HeroSection 

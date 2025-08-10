@@ -1,6 +1,6 @@
 'use client'
 
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth } from '@/hooks/auth'
 
 export default function LogoutButton() {
   const { handleLogout, isLoading } = useAuth()

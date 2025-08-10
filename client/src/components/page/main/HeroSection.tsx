@@ -27,13 +27,15 @@ export default function HeroSection({ isLoggedIn, onAfterLoginClick, isCreatingR
               isCreatingRoom ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
-            <div className="absolute inset-0 bg-gradient-to-r rounded-lg blur-md opacity-30 animate-pulse group-hover:opacity-50 transition-opacity"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg blur-md opacity-40 animate-pulse group-hover:opacity-60 transition-opacity"></div>
+            <div className="absolute inset-0 bg-white rounded-lg blur-sm opacity-20 animate-ping"></div>
+            <div className="absolute -inset-1 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-lg opacity-30 blur-lg animate-pulse group-hover:animate-bounce"></div>
             <Image
               src="/afterLogin.svg"
               alt="After Login"
               width={200}
               height={100}
-              className="max-w-full h-auto relative z-10 drop-shadow-lg"
+              className="max-w-full h-auto relative z-10 drop-shadow-2xl animate-pulse group-hover:animate-none"
             />
           </div>
         ) : (

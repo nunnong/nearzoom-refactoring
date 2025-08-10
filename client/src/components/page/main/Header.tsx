@@ -1,20 +1,29 @@
 import IsLogin from "./IsLogin"
+import Image from "next/image"
 
 interface HeaderProps {
   isLoggedIn: boolean
   onLogin: () => void
   onLogout: () => void
   onMyPage: () => void
+  onMyFeed: () => void
+  user?: {
+    name?: string
+    email?: string
+    profileImage?: string
+  } | null
 }
 
-export default function Header({ isLoggedIn, onLogin, onLogout, onMyPage }: HeaderProps) {
+export default function Header({ isLoggedIn, onLogin, onLogout, onMyPage, onMyFeed, user }: HeaderProps) {
   return (
     <div className="flex items-center justify-between mb-8 md:mb-16">
       <div className="flex items-center gap-3">
-        <img 
-          src="/link-icon.png" 
-          alt="로고" 
-          className="w-12 h-12 md:w-12 md:h-12 rounded-full object-cover rotate-12"
+        <Image
+          src="/link-icon.png"
+          alt="Link Icon"
+          width={40}
+          height={40}
+          className="w-8 h-8 md:w-10 md:h-10"
         />
       </div>
 
@@ -23,6 +32,8 @@ export default function Header({ isLoggedIn, onLogin, onLogout, onMyPage }: Head
         onLogin={onLogin} 
         onLogout={onLogout} 
         onMyPage={onMyPage} 
+        onMyFeed={onMyFeed}
+        user={user}
       />
     </div>
   )

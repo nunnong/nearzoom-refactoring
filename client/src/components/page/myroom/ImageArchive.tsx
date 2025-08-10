@@ -29,6 +29,7 @@ interface ImageArchiveProps {
   onShareKakao?: (imageId: string) => void
   onDelete?: (imageId: string) => void
   onEdit?: (imageId: string) => void
+  onWriteFeed?: (imageId: string) => void // Feed쪽으로 보내기
 }
 
 const ImageArchive: React.FC<ImageArchiveProps> = ({
@@ -37,6 +38,7 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
   onShareKakao,
   onDelete,
   onEdit,
+  onWriteFeed,
 }) => {
   const [deleteModalOpen, setDeleteModalOpen] = useState<boolean>(false)
   const [imageToDelete, setImageToDelete] = useState<ImageItem | null>(null)
@@ -44,6 +46,8 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
   const [imageToShare, setImageToShare] = useState<ImageItem | null>(null)
   const [editModalOpen, setEditModalOpen] = useState<boolean>(false)
   const [imageToEdit, setImageToEdit] = useState<ImageItem | null>(null)
+
+  
 
   const handleDeleteClick = (image: ImageItem): void => {
     setImageToDelete(image)
@@ -102,6 +106,35 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
     640: 1,
   }
 
+  // 이미지가 없을 때 표시할 메시지
+  if (images.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="mb-6">
+          <svg
+            className="mx-auto h-24 w-24 text-gray-300"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"
+            />
+          </svg>
+        </div>
+        <h3 className="mb-2 text-xl font-semibold text-gray-600">
+          아직 생성한 이미지가 없습니다
+        </h3>
+        <p className="text-gray-500">
+          메인 페이지에서 AI와 함께 창작한 작품들이 여기에 저장됩니다.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <>
       <Masonry
@@ -147,6 +180,15 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
                 aria-label="Share image"
               >
                 <ShareIcon className="h-4 w-4 text-white" />
+              </button>
+
+              {/* Share.png Button - Left Center */}
+              <button
+                onClick={() => {/* Share.png 관련 새로운 기능 */}}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-white/30"
+                aria-label="Share with Share.png"
+              >
+                <img src="/Share.png" alt="Share" className="h-5 w-5 object-contain" />
               </button>
 
               {/* Delete Button - Center */}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { checkUserSelfie } from '@/utils/selfieCheck'
-import { isLoggedIn } from '@/utils/auth'
+import { useAuthStore } from '@/stores/authStore'
 
 interface UseSelfieCheckOptions {
   redirectTo?: string
@@ -11,16 +11,17 @@ interface UseSelfieCheckOptions {
 }
 
 export const useSelfieCheck = (options: UseSelfieCheckOptions = {}) => {
-  const { redirectTo = '/upload-selfie', requireSelfie = true } = options
+  const { redirectTo, requireSelfie = true } = options
   const [hasSelfie, setHasSelfie] = useState<boolean | null>(null)
   const [isChecking, setIsChecking] = useState(true)
   const router = useRouter()
+  const { isAuthenticated } = useAuthStore()
 
   useEffect(() => {
     const checkSelfie = async () => {
       try {
         // 먼저 로그인 상태 확인
-        const userLoggedIn = isLoggedIn()
+        const userLoggedIn = isAuthenticated
         if (!userLoggedIn) {
           // 로그인하지 않은 경우 체크하지 않고 넘어감
           setHasSelfie(true) // 로그인하지 않은 경우 셀피 체크를 우회
@@ -31,7 +32,7 @@ export const useSelfieCheck = (options: UseSelfieCheckOptions = {}) => {
         const selfieExists = checkUserSelfie()
         setHasSelfie(selfieExists)
 
-        if (requireSelfie && !selfieExists) {
+        if (requireSelfie && !selfieExists && redirectTo) {
           // 현재 페이지를 returnUrl로 설정하여 업로드 후 돌아올 수 있도록 함
           const currentPath = window.location.pathname
           const returnUrl = encodeURIComponent(currentPath)
