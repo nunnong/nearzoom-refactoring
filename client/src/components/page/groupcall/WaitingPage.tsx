@@ -1,7 +1,8 @@
-
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
+import { Room } from 'livekit-client'
+import { LiveKitRoom } from '@livekit/components-react'
 
 import Header from '@/components/page/groupcall/Header'
 import Sidebar from '@/components/page/groupcall/Sidebar'
@@ -36,27 +37,55 @@ interface RoomInfo {
 }
 
 interface WaitingPageProps {
-  roomData?: JoinRoomData | CreateRoomData // API에서 받은 실제 데이터
-  isHost?: boolean // 방장 여부
-  onStartCall?: () => void // 방 생성 함수 (방장만 사용)
+  roomData?: JoinRoomData | CreateRoomData
+  isHost?: boolean
+  onStartCall?: () => void
 }
 
-export default function WaitingPage({ 
-  roomData, 
-  isHost = true, // 기본값: 방장 (기존 동작 유지)
-  onStartCall 
+export default function WaitingPage({
+  roomData,
+  isHost = true,
+  onStartCall,
 }: WaitingPageProps) {
-  
-  // roomData가 있으면 실제 데이터로, 없으면 기존 Mock 데이터 사용
+  const [room] = useState(() => new Room())
+  const [isConnected, setIsConnected] = useState(false)
+
+  // LiveKit connect
+  useEffect(() => {
+    if (roomData?.serverUrl && roomData?.participantToken) {
+      const connectToRoom = async () => {
+        try {
+          console.log('LiveKit 연결 시도...', {
+            serverUrl: roomData.serverUrl,
+            roomId: roomData.roomId,
+          })
+          await room.connect(roomData.serverUrl, roomData.participantToken)
+          console.log('LiveKit 연결 성공!')
+          setIsConnected(true)
+        } catch (error) {
+          console.error('LiveKit 연결 실패:', error)
+        }
+      }
+      connectToRoom()
+    }
+
+    return () => {
+      room.disconnect()
+    }
+  }, [roomData, room])
+
   const [roomInfo] = useState<RoomInfo>(() => {
     if (roomData) {
       return {
         id: roomData.roomId.toString(),
-        url: `${typeof window !== 'undefined' ? window.location.origin : 'https://www.nearzoom.store'}/room/${roomData.roomId}`,
-        createdAt: roomData.createdAt || (roomData as JoinRoomData).createdAt || '',
+        url: `${typeof window !== 'undefined'
+          ? window.location.origin
+          : 'https://www.nearzoom.store'
+        }/room/${roomData.roomId}`,
+        createdAt:
+          roomData.createdAt || (roomData as JoinRoomData).createdAt || '',
       }
     }
-    // 기존 Mock 데이터 (WebRTC 팀원 작업용)
     return {
       id: 'room-123',
       url: 'meet.example.com/room-123',
@@ -64,19 +93,16 @@ export default function WaitingPage({
     }
   })
 
-  // 현재 사용자 정보 (나중에 로그인 정보와 연동)
   const [currentUser, setCurrentUser] = useState<CurrentUser>(() => {
     if (roomData) {
-      // 실제 API 데이터에서 추출
       return {
         id: 'current-user',
-        email: 'current@user.com', // TODO: 실제 로그인 사용자 정보로 변경
+        email: 'current@user.com',
         name: roomData.participantName,
         isMicOn: true,
         isCameraOn: true,
       }
     }
-    // 기존 Mock 데이터
     return {
       id: 'user-1',
       email: 'ssafy123.5@gmail.com',
@@ -86,10 +112,8 @@ export default function WaitingPage({
     }
   })
 
-  // 참가자 목록 (현재는 Mock, 나중에 LiveKit에서 실제 데이터 가져와야 함)
   const [participants] = useState<Participant[]>(() => {
     if (roomData) {
-      // 실제 API 데이터 기반 참가자 (현재 사용자만)
       return [
         {
           id: 'current-user',
@@ -99,11 +123,9 @@ export default function WaitingPage({
           isMicOn: true,
           isCameraOn: true,
           isConnected: true,
-        }
+        },
       ]
     }
-    
-    // 기존 Mock 데이터 (WebRTC 팀원 개발용)
     return [
       {
         id: 'user-1',
@@ -144,7 +166,6 @@ export default function WaitingPage({
     ]
   })
 
-  // 반응형 그리드 컬럼 수 계산
   const gridCols = useMemo(() => {
     const count = participants.length
     if (count === 1) return 'grid-cols-1'
@@ -153,7 +174,6 @@ export default function WaitingPage({
     return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
   }, [participants.length])
 
-  // 핸들러 함수들
   const handleLeaveRoom = useCallback(() => {
     console.log('방 나가기')
     if (typeof window !== 'undefined') {
@@ -183,15 +203,11 @@ export default function WaitingPage({
     }))
   }, [])
 
-  // 방장이 Start 버튼을 눌렀을 때 (방 생성)
   const handleStartCall = useCallback(() => {
     console.log('통화 시작')
-    
     if (isHost && onStartCall) {
-      // 부모 컴포넌트에서 전달받은 방 생성 함수 호출
       onStartCall()
     } else {
-      // 참가자는 방장이 시작할 때까지 대기
       console.log('방장이 시작할 때까지 대기 중...')
     }
   }, [isHost, onStartCall])
@@ -204,15 +220,102 @@ export default function WaitingPage({
       <main className="flex flex-1 flex-col gap-4 bg-[#2d3243] p-4 md:flex-row md:gap-6 md:p-6 lg:p-8">
         {/* 비디오 영역 */}
         <section className="min-w-0 flex-1">
-          <div className={`grid gap-3 sm:gap-4 lg:gap-6 ${gridCols}`}>
-            {participants.map(participant => (
-              <VideoTile
-                key={participant.id}
-                participant={participant}
-                className="min-h-[180px] sm:min-h-[200px] lg:min-h-[240px]"
-              />
-            ))}
-          </div>
+          {roomData?.serverUrl && roomData?.participantToken ? (
+            // LiveKit 연결 모드
+            <div className="relative">
+              {!isConnected && (
+                <div className="absolute top-4 left-4 z-10 bg-yellow-500 text-white px-3 py-1 rounded-lg text-sm">
+                  LiveKit 연결 중...
+                </div>
+              )}
+              {isConnected && (
+                <div className="absolute top-4 left-4 z-10 bg-green-500 text-white px-3 py-1 rounded-lg text-sm">
+                  ✅ 연결됨
+                </div>
+              )}
+
+              <LiveKitRoom
+                video={currentUser.isCameraOn}
+                audio={currentUser.isMicOn}
+                token={roomData.participantToken}
+                serverUrl={roomData.serverUrl}
+                room={room}
+                data-lk-theme="default"
+                style={{ height: '100%' }}
+                onConnected={() => setIsConnected(true)}
+                onDisconnected={() => setIsConnected(false)}
+              >
+                <div className={`grid gap-3 sm:gap-4 lg:gap-6 ${gridCols}`}>
+                  {/* 본인 웹캠 */}
+                  <div className="min-h-[180px] sm:min-h-[200px] lg:min-h-[240px] relative bg-gray-900 rounded-lg overflow-hidden">
+                    <video
+                      ref={(videoEl) => {
+                        if (videoEl && currentUser.isCameraOn) {
+                          navigator.mediaDevices
+                            .getUserMedia({ video: true, audio: false })
+                            .then(stream => {
+                              videoEl.srcObject = stream
+                            })
+                            .catch(err => console.error('웹캠 접근 실패:', err))
+                        }
+                      }}
+                      autoPlay
+                      muted
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-sm">
+                      {currentUser.name || 'You'} {isHost && '(Host)'}
+                    </div>
+                  </div>
+
+                  {/* 다른 참가자 */}
+                  {participants.slice(1).map(p => (
+                    <VideoTile
+                      key={p.id}
+                      participant={p}
+                      className="min-h-[180px] sm:min-h-[200px] lg:min-h-[240px]"
+                    />
+                  ))}
+                </div>
+              </LiveKitRoom>
+            </div>
+          ) : (
+            // Mock 데이터 모드
+            <div className={`grid gap-3 sm:gap-4 lg:gap-6 ${gridCols}`}>
+              {participants.map((participant, index) => (
+                <div
+                  key={participant.id}
+                  className="min-h-[180px] sm:min-h-[200px] lg:min-h-[240px] relative bg-gray-900 rounded-lg overflow-hidden"
+                >
+                  {index === 0 && currentUser.isCameraOn ? (
+                    <video
+                      ref={(videoEl) => {
+                        if (videoEl) {
+                          navigator.mediaDevices
+                            .getUserMedia({ video: true, audio: false })
+                            .then(stream => {
+                              videoEl.srcObject = stream
+                            })
+                            .catch(err => console.error('웹캠 접근 실패:', err))
+                        }
+                      }}
+                      autoPlay
+                      muted
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <VideoTile
+                      participant={participant}
+                      className="w-full h-full"
+                    />
+                  )}
+                  <div className="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-sm">
+                    {participant.name} {participant.isHost && '(Host)'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* 사이드바 */}
@@ -221,7 +324,7 @@ export default function WaitingPage({
             participants={participants}
             currentUser={currentUser}
             roomUrl={roomInfo.url}
-            showStartButton={isHost} // 방장만 Start 버튼 표시
+            showStartButton={isHost}
             showLeaveButton={true}
             onMicToggle={handleMicToggle}
             onCameraToggle={handleCameraToggle}

@@ -1,4 +1,3 @@
-// app/groupcall/waiting/page.tsx
 'use client'
 
 import { useCallback } from 'react'

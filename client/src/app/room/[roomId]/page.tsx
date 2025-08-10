@@ -46,30 +46,28 @@ export default function RoomJoinPage() {
 
   // 방장 데이터 로드 함수
   const loadHostData = () => {
-    try {
-      // sessionStorage에서 roomData 가져오기
-      const storedRoomData = sessionStorage.getItem('roomData')
+  try {
+    const storedRoomData = sessionStorage.getItem('roomData')
 
-      if (storedRoomData) {
-        const parsedData = JSON.parse(storedRoomData)
-        console.log('방장 데이터 로드 성공:', parsedData)
-        setRoomData(parsedData)
-        setPageState('success')
+    if (storedRoomData) {
+      const parsedData = JSON.parse(storedRoomData)
+      console.log('방장 데이터 로드 성공:', parsedData)
+      setRoomData(parsedData)
+      setPageState('success')
 
-        // 사용 후 삭제 (보안 + 새로고침 시 재사용 방지)
-        sessionStorage.removeItem('roomData')
-      } else {
-        // sessionStorage에 데이터가 없으면 에러 처리
-        console.log('방장 데이터 없음')
-        setErrorMessage('방 정보를 찾을 수 없습니다. 다시 시도해주세요.')
-        setPageState('error')
-      }
-    } catch (error) {
-      console.error('방장 데이터 로드 실패:', error)
-      setErrorMessage('방 정보 로드 중 오류가 발생했습니다.')
+      // 🔥 수정: 즉시 삭제하지 말고 성공 시에만 삭제
+      // sessionStorage.removeItem('roomData') // 이 줄 제거
+    } else {
+      console.log('방장 데이터 없음')
+      setErrorMessage('방 정보를 찾을 수 없습니다. 다시 시도해주세요.')
       setPageState('error')
     }
+  } catch (error) {
+    console.error('방장 데이터 로드 실패:', error)
+    setErrorMessage('방 정보 로드 중 오류가 발생했습니다.')
+    setPageState('error')
   }
+}
 
   useEffect(() => {
     if (roomId && typeof roomId === 'string') {
