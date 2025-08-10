@@ -17,6 +17,6 @@ export const userService = {
 
   // 회원 탈퇴
   deleteUser: async (): Promise<void> => {
-    await api.delete(API_ENDPOINTS.USER_INFO)
+    await api.delete(API_ENDPOINTS.SIGNOUT)
   },
 }

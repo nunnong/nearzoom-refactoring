@@ -13,7 +13,7 @@ import SideList from './SideList'
 import HomeButton from './HomeButton'
 import LogoutButton from './LogoutButton'
 import UploadSelfieModal from './UploadSelfieModal'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth } from '@/hooks/auth'
 
 interface ImageItem {
   id: string
@@ -51,7 +51,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
   
   console.log('Dashboard - actualUser:', actualUser)
   
-  const { handleLogout, isLoading } = useAuth()
+  const { handleLogout, handleDeleteAccount, isLoading } = useAuth()
   
   const router = useRouter()
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true) // 기본값을 true로 변경
@@ -469,10 +469,14 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
             <div className="border-t border-gray-200 px-6 py-4">
               <div className="flex items-center justify-between">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (confirm('정말로 회원탈퇴를 하시겠습니까?\n탈퇴 시 모든 데이터가 삭제됩니다.')) {
-                      console.log('회원탈퇴 처리')
-                      // TODO: 회원탈퇴 로직 구현
+                      try {
+                        await handleDeleteAccount()
+                        alert('회원탈퇴가 완료되었습니다.')
+                      } catch (error) {
+                        alert('회원탈퇴 중 오류가 발생했습니다.')
+                      }
                     }
                   }}
                   className="text-sm text-red-600 hover:text-red-800 underline"
