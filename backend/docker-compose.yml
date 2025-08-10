@@ -53,8 +53,11 @@ services:
       SPRING_JWT_REFRESH_TOKEN_TTL: ${JWT_REFRESH_TOKEN_TTL}
       APP_REDIRECT_URL: ${REDIRECT_URL}
       IMAGE_SERVER_URL: ${IMAGE_SERVER_URL}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      LIVEKIT_URL: ${LIVEKIT_URL}
     restart: always
-    
+
 networks:
   default:
     external: true
