@@ -67,11 +67,34 @@ export default function CallbackPage() {
         // 성공 상태로 변경
         setState('success')
         
-        // 성공 후 3초 대기 (디버깅용)
-        console.log('콜백 처리 완료, 3초 후 메인 페이지로 이동')
-        setTimeout(() => {
-          router.replace('/')
-        }, 3000)
+        // 사용자 정보를 가져온 후 참조 사진이 있는지 확인
+        const userInfo = await fetch('http://localhost:8080/api/user/me', {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        })
+        
+        if (userInfo.ok) {
+          const userData = await userInfo.json()
+          const hasReferencePhoto = userData.data?.faceImageUrl || userData.data?.profileImage
+          
+          console.log('사용자 정보:', userData.data)
+          console.log('참조 사진 존재 여부:', hasReferencePhoto)
+          
+          // 참조 사진이 없으면 업로드 페이지로, 있으면 메인 페이지로
+          setTimeout(() => {
+            if (!hasReferencePhoto) {
+              router.replace('/upload-photo')
+            } else {
+              router.replace('/')
+            }
+          }, 2000)
+        } else {
+          // 사용자 정보를 가져오지 못한 경우 메인 페이지로
+          setTimeout(() => {
+            router.replace('/')
+          }, 3000)
+        }
         
       } catch (error: any) {
         console.error('OAuth2 로그인 콜백 처리 중 오류:', error)

@@ -7,7 +7,6 @@ import { userTransformer } from '@/lib/auth'
 import type { SocialType } from '@/types/auth'
 
 export const useAuth = () => {
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const router = useRouter()
 
   const {
@@ -54,7 +53,7 @@ export const useAuth = () => {
   }
 
   const handleLogin = () => {
-    setIsLoginModalOpen(true)
+    router.push('/login')
   }
 
   const handleKakaoLoginClick = () => {
@@ -73,7 +72,7 @@ export const useAuth = () => {
     if (isAuthenticated) {
       router.push('/myroom')
     } else {
-      setIsLoginModalOpen(true)
+      router.push('/login')
     }
   }
 
@@ -81,7 +80,7 @@ export const useAuth = () => {
     if (isAuthenticated) {
       router.push('/myfeed')
     } else {
-      setIsLoginModalOpen(true)
+      router.push('/login')
     }
   }
 
@@ -89,7 +88,18 @@ export const useAuth = () => {
     if (isAuthenticated) {
       router.push('/groupcall/waiting')
     } else {
-      setIsLoginModalOpen(true)
+      router.push('/login')
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    try {
+      await userService.deleteUser()
+      logout()
+      router.replace('/')
+    } catch (error) {
+      console.error('회원탈퇴 실패:', error)
+      throw error
     }
   }
 
@@ -100,10 +110,8 @@ export const useAuth = () => {
     isLoading,
     isAuthenticated,
     isLoggedIn: isAuthenticated,
-    isLoginModalOpen,
 
     // 액션
-    setIsLoginModalOpen,
     startSocialLogin,
     handleLoginSuccess,
     fetchUserInfo,
@@ -114,6 +122,7 @@ export const useAuth = () => {
     handleKakaoLoginClick,
     handleGoogleLoginClick,
     handleAfterLoginClick,
+    handleDeleteAccount,
     logout,
     initializeAuth,
   }

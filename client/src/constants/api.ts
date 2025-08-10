@@ -31,4 +31,5 @@ export const API_ENDPOINTS = {
   // Users
   USER_INFO: '/user/userInfo',
   LOGOUT: '/user/logout',
+  SIGNOUT: '/signout',
 }

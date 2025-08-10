@@ -13,7 +13,7 @@ import SideList from './SideList'
 import HomeButton from './HomeButton'
 import LogoutButton from './LogoutButton'
 import UploadSelfieModal from './UploadSelfieModal'
-import { useAuth } from '@/hooks/auth'
+import { useAuth } from '@/hooks/useAuth'
 
 interface ImageItem {
   id: string
@@ -308,7 +308,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
                               }}
                               className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2 text-gray-800"
                             >
-                              <img src="/Home.png" alt="피드 홈" className="w-5 h-5 object-contain" />
+                              <img src="/Home.png" alt="Home Feed" className="w-5 h-5 object-contain" />
                               Home
                             </button>
                             <button
@@ -319,7 +319,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
                               }}
                               className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2 text-gray-800"
                             >
-                              <img src="/Search.png" alt="모든 피드" className="w-5 h-5 object-contain" />
+                              <img src="/Search.png" alt="All feeds" className="w-5 h-5 object-contain" />
                               Search
                             </button>
                             <button

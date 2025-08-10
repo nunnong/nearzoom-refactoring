@@ -4,22 +4,16 @@ import { useAuth } from "@/hooks/auth"
 import CreativeSection from "./CreativeSection"
 import AboutUsSection from "./AboutUsSection"
 import Footer from "./Footer"
-import LoginModal from "./LoginModal"
 import { useEffect } from "react"
 
 export default function CreativePage() {
   const {
     isLoggedIn,
-    isLoginModalOpen,
-    setIsLoginModalOpen,
     handleLogin,
     handleLogout,
     handleMyPage,
     handleMyFeed,
-    handleKakaoLoginClick,
-    handleGoogleLoginClick,
     handleAfterLoginClick,
-    isLoading,
     initializeAuth,
     user
   } = useAuth()
@@ -47,14 +41,6 @@ export default function CreativePage() {
       <AboutUsSection />
 
       <Footer />
-
-      <LoginModal
-        isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
-        onKakaoLogin={handleKakaoLoginClick}
-        onGoogleLogin={handleGoogleLoginClick}
-        isLoading={isLoading}
-      />
     </div>
   )
 }
