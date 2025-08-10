@@ -4,12 +4,7 @@ import { useRouter } from 'next/navigation'
 import React, { useEffect } from 'react'
 import { useState } from 'react'
 
-import {
-  getImagesFromLocal,
-  updateImageInLocal,
-  deleteImageFromLocal,
-  initializeTestImages,
-} from '@/utils/localStorage'
+import api from '@/lib/axios'
 import { User } from '@/types/auth'
 
 import ImageArchive from './ImageArchive'
@@ -18,7 +13,7 @@ import SideList from './SideList'
 import HomeButton from './HomeButton'
 import LogoutButton from './LogoutButton'
 import UploadSelfieModal from './UploadSelfieModal'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth } from '@/hooks/auth'
 
 interface ImageItem {
   id: string
@@ -73,8 +68,6 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
     setImageList(images)
     setFilteredImages(images)
   }, [images])
-
-  // localStorage 동기화 제거 (서버 데이터 사용)
 
   // 현재 활성화된 필터들을 추적
   const [activeFilters, setActiveFilters] = useState<Filter[]>([])
@@ -135,7 +128,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
     setIsSidebarOpen(!isSidebarOpen)
   }
 
-  const handleLike = (imageId: string): void => {
+  const handleLike = async (imageId: string): Promise<void> => {
     const targetImage = imageList.find(img => img.id === imageId)
     const newIsLiked = !targetImage?.isLiked
 
@@ -148,15 +141,22 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
       newIsLiked
     )
 
-    // localStorage 업데이트
-    updateImageInLocal(imageId, { isLiked: newIsLiked })
+    try {
+      // API 호출
+      await api.post('/photos/heart', {
+        photoId: imageId,
+        isLiked: newIsLiked
+      })
 
-    // 로컬 상태 업데이트
-    setImageList(prevImages =>
-      prevImages.map(img =>
-        img.id === imageId ? { ...img, isLiked: newIsLiked } : img
+      // 로컬 상태 업데이트
+      setImageList(prevImages =>
+        prevImages.map(img =>
+          img.id === imageId ? { ...img, isLiked: newIsLiked } : img
+        )
       )
-    )
+    } catch (error) {
+      console.error('하트 상태 업데이트 실패:', error)
+    }
   }
 
   const handleShareKakao = (imageId: string): void => {
@@ -198,9 +198,6 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
 
   const handleDelete = (imageId: string): void => {
     console.log('Deleting image:', imageId)
-
-    // localStorage에서 삭제
-    deleteImageFromLocal(imageId)
 
     // 로컬 상태 업데이트
     setImageList(prevImages => prevImages.filter(img => img.id !== imageId))
@@ -311,7 +308,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
                               }}
                               className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2 text-gray-800"
                             >
-                              <img src="/Home.png" alt="Feature 1" className="w-5 h-5 object-contain" />
+                              <img src="/Home.png" alt="피드 홈" className="w-5 h-5 object-contain" />
                               Home
                             </button>
                             <button
@@ -322,7 +319,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
                               }}
                               className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2 text-gray-800"
                             >
-                              <img src="/Search.png" alt="Feature 2" className="w-5 h-5 object-contain" />
+                              <img src="/Search.png" alt="모든 피드" className="w-5 h-5 object-contain" />
                               Search
                             </button>
                             <button
@@ -333,7 +330,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
                               }}
                               className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2 text-gray-800"
                             >
-                              <img src="/User.png" alt="Feature 3" className="w-5 h-5 object-contain" />
+                              <img src="/User.png" alt="My feed" className="w-5 h-5 object-contain" />
                               Profile
                             </button>
                           </div>

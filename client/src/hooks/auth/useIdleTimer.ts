@@ -1,22 +1,20 @@
 import { useEffect, useRef, useCallback } from 'react'
+import { AUTH_CONFIG, sessionManager } from '@/lib/auth'
+import { useAuthStore } from '@/stores/authStore'
 
 interface UseIdleTimerOptions {
-  timeout: number // 밀리초 단위
-  onIdle: () => void
+  timeout?: number
   events?: string[]
   enabled?: boolean
 }
 
 export const useIdleTimer = ({ 
-  timeout, 
-  onIdle, 
-  events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'],
-  enabled = true 
-}: UseIdleTimerOptions) => {
+  timeout = AUTH_CONFIG.IDLE_TIMEOUT,
+  events = AUTH_CONFIG.IDLE_EVENTS,
+  enabled = true
+}: UseIdleTimerOptions = {}) => {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const onIdleRef = useRef(onIdle)
-
-  onIdleRef.current = onIdle
+  const { logoutDueToInactivity } = useAuthStore()
 
   const resetTimer = useCallback(() => {
     if (timeoutRef.current) {
@@ -25,10 +23,15 @@ export const useIdleTimer = ({
 
     if (enabled) {
       timeoutRef.current = setTimeout(() => {
-        onIdleRef.current()
+        logoutDueToInactivity()
       }, timeout)
     }
-  }, [timeout, enabled])
+  }, [timeout, enabled, logoutDueToInactivity])
+
+  const handleActivity = useCallback(() => {
+    resetTimer()
+    sessionManager.updateActivity()
+  }, [resetTimer])
 
   useEffect(() => {
     if (!enabled) {
@@ -38,14 +41,8 @@ export const useIdleTimer = ({
       return
     }
 
-    const handleActivity = () => {
-      resetTimer()
-    }
-
-    // 초기 타이머 설정
     resetTimer()
 
-    // 이벤트 리스너 등록
     events.forEach(event => {
       document.addEventListener(event, handleActivity, true)
     })
@@ -59,7 +56,7 @@ export const useIdleTimer = ({
         document.removeEventListener(event, handleActivity, true)
       })
     }
-  }, [events, resetTimer, enabled])
+  }, [events, handleActivity, resetTimer, enabled])
 
   return { resetTimer }
 }

@@ -1,27 +1,37 @@
 "use client"
 
 import type { JSX } from "react"
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth } from '@/hooks/auth'
 
 interface LoginModalProps {
   isOpen: boolean
   onClose: () => void
+  onKakaoLogin?: () => void
+  onGoogleLogin?: () => void
   isLoading?: boolean
 }
 
-const LoginModal = ({ isOpen, onClose, isLoading = false }: LoginModalProps): JSX.Element => {
+const LoginModal = ({ isOpen, onClose, onKakaoLogin, onGoogleLogin, isLoading = false }: LoginModalProps): JSX.Element => {
   const { startSocialLogin } = useAuth()
 
   if (!isOpen) return <></>
 
   const handleKakaoLogin = () => {
-    startSocialLogin('KAKAO')
-    onClose() // 모달 닫고 리다이렉트
+    if (onKakaoLogin) {
+      onKakaoLogin()
+    } else {
+      startSocialLogin('KAKAO')
+      onClose() // 모달 닫고 리다이렉트
+    }
   }
 
   const handleGoogleLogin = () => {
-    startSocialLogin('GOOGLE')
-    onClose() // 모달 닫고 리다이렉트
+    if (onGoogleLogin) {
+      onGoogleLogin()
+    } else {
+      startSocialLogin('GOOGLE')
+      onClose() // 모달 닫고 리다이렉트
+    }
   }
 
   return (
@@ -30,7 +40,7 @@ const LoginModal = ({ isOpen, onClose, isLoading = false }: LoginModalProps): JS
       <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" aria-hidden="true" onClick={onClose} />
 
       {/* 모달 컨테이너 */}
-      <div className="fixed inset-0 z-10 flex items-center justify-center p-4">
+      <div className="fixed top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
         <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-md relative">
           {/* X 버튼 */}
           <button

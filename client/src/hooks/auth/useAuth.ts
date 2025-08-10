@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
 import { authService } from '@/services/authService'
+import { userService } from '@/services/userService'
+import { userTransformer } from '@/lib/auth'
 import type { SocialType } from '@/types/auth'
 
 export const useAuth = () => {
@@ -21,38 +23,25 @@ export const useAuth = () => {
     logout,
   } = useAuthStore()
 
-  // 소셜 로그인 시작
   const startSocialLogin = (provider: SocialType) => {
     const loginUrl = authService.getSocialLoginUrl(provider)
     window.location.href = loginUrl
   }
 
-  // 로그인 성공 후 토큰 처리
   const handleLoginSuccess = (accessToken: string) => {
     console.log('handleLoginSuccess 호출됨, 토큰:', accessToken)
     setTokens({ accessToken })
     console.log('setTokens 완료')
   }
-  // 사용자 정보 가져오기
+
   const fetchUserInfo = async () => {
     try {
       setLoading(true)
-      const response = await authService.validateToken()
+      const response = await userService.getUserInfo()
       console.log('Raw user info response:', response)
       
-      // ApiResponse 구조에서 실제 데이터 추출
       const rawData = response.data || response
-      
-      // 백엔드 응답을 프론트엔드 User 타입에 맞게 변환
-      const userData = {
-        id: rawData.id || 0,
-        name: rawData.userName || rawData.name || '',
-        email: rawData.userEmail || rawData.email || '',
-        profileImage: rawData.userProfileImage || rawData.profileImage,
-        socialType: rawData.socialType || 'GOOGLE', // 구글 로그인이므로 GOOGLE로 설정
-        createdAt: rawData.createdAt || new Date().toISOString(),
-        updatedAt: rawData.updatedAt || new Date().toISOString(),
-      }
+      const userData = userTransformer.fromBackend(rawData)
       
       console.log('Converted user data:', userData)
       setUser(userData)
@@ -64,27 +53,22 @@ export const useAuth = () => {
     }
   }
 
-  // (메인화면에서) 로그인 클릭 핸들러
   const handleLogin = () => {
     setIsLoginModalOpen(true)
   }
 
-  // 카카오 로그인 클릭 핸들러
   const handleKakaoLoginClick = () => {
     startSocialLogin('KAKAO')
   }
 
-  // 구글 로그인 클릭 핸들러
   const handleGoogleLoginClick = () => {
     startSocialLogin('GOOGLE')
   }
 
-  // 로그아웃 핸들러
   const handleLogout = () => {
     logout()
   }
 
-  // 마이룸 이동 핸들러
   const handleMyPage = () => {
     if (isAuthenticated) {
       router.push('/myroom')
@@ -93,7 +77,6 @@ export const useAuth = () => {
     }
   }
 
-  // 마이피드 이동 핸들러
   const handleMyFeed = () => {
     if (isAuthenticated) {
       router.push('/myfeed')
@@ -101,7 +84,7 @@ export const useAuth = () => {
       setIsLoginModalOpen(true)
     }
   }
-  // 로그인 후 액션 핸들러
+
   const handleAfterLoginClick = () => {
     if (isAuthenticated) {
       router.push('/groupcall/waiting')

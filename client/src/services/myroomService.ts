@@ -1,5 +1,5 @@
-import api from '@/lib/axios'
 import { API_ENDPOINTS } from '@/constants/api'
+import { api } from '@/lib/api'
 
 export const myroomService = {
   // 사진 목록 가져오기

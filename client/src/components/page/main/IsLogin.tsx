@@ -92,13 +92,12 @@ export default function AuthButtons({ isLoggedIn, onLogin, onLogout, onMyPage, o
                       <div className="ml-4 border-l-2 border-gray-100">
                         <button
                           onClick={() => {
-                            /* Home.png 관련 새로운 기능 */
                             setIsMyFeedOpen(false)
                             setIsMenuOpen(false)
                           }}
-                          className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2"
+                          className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2 text-gray-800"
                         >
-                          <img src="/Home.png" alt="Feature 1" className="w-5 h-5 object-contain" />
+                          <img src="/Home.png" alt="Home feeds"className="w-5 h-5 object-contain" />
                           Home
                         </button>
                         <button
@@ -107,9 +106,9 @@ export default function AuthButtons({ isLoggedIn, onLogin, onLogout, onMyPage, o
                             setIsMyFeedOpen(false)
                             setIsMenuOpen(false)
                           }}
-                          className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2"
+                          className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2 text-gray-800"
                         >
-                          <img src="/Search.png" alt="Feature 2" className="w-5 h-5 object-contain" />
+                          <img src="/Search.png" alt="All feeds" className="w-5 h-5 object-contain" />
                           Search
                         </button>
                         <button
@@ -118,9 +117,9 @@ export default function AuthButtons({ isLoggedIn, onLogin, onLogout, onMyPage, o
                             setIsMyFeedOpen(false)
                             setIsMenuOpen(false)
                           }}
-                          className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2"
+                          className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2 text-gray-800"
                         >
-                          <img src="/User.png" alt="Feature 3" className="w-5 h-5 object-contain" />
+                          <img src="/User.png" alt="My feed" className="w-5 h-5 object-contain" />
                           Profile
                         </button>
                       </div>

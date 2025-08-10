@@ -128,7 +128,7 @@ export default function UploadSelfieModal({ isOpen, onClose, userProfile }: Uplo
             <span className="text-blue-500 font-medium text-lg">이</span>
             <span className="text-red-500 font-medium text-lg">어</span>
             <span className="text-yellow-500 font-medium text-lg">줌</span>
-            <span className="text-gray-700 ml-1">계정</span>
+            <span className="text-gray-700 ml-1"></span>
           </div>
           
           <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">

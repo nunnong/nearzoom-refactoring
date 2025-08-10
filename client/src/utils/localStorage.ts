@@ -10,6 +10,7 @@ interface ImageItem {
 const STORAGE_KEY = 'nearzoom_images'
 const REFERENCE_STORAGE_KEY = 'nearzoom_reference_image'
 const ACCESS_TOKEN_KEY = 'nearzoom_access_token'
+const SESSION_TIMESTAMP_KEY = 'nearzoom_session_timestamp'
 
 export const saveImageToLocal = (image: ImageItem): void => {
   try {
@@ -200,4 +201,56 @@ export const removeAccessToken = (): void => {
   } catch (error) {
     console.error('❌ Failed to remove access token:', error)
   }
+}
+
+// 마지막 활동 타임스탬프 관련 함수들  
+export const saveLastActivityTimestamp = (): void => {
+  try {
+    const timestamp = Date.now()
+    localStorage.setItem(SESSION_TIMESTAMP_KEY, timestamp.toString())
+    console.log('✅ Last activity timestamp saved:', new Date(timestamp).toLocaleString())
+  } catch (error) {
+    console.error('❌ Failed to save last activity timestamp:', error)
+  }
+}
+
+// 호환성을 위해 기존 함수명 유지
+export const saveSessionTimestamp = saveLastActivityTimestamp
+
+export const getSessionTimestamp = (): number | null => {
+  try {
+    const timestamp = localStorage.getItem(SESSION_TIMESTAMP_KEY)
+    return timestamp ? parseInt(timestamp) : null
+  } catch (error) {
+    console.error('❌ Failed to get session timestamp:', error)
+    return null
+  }
+}
+
+export const removeSessionTimestamp = (): void => {
+  try {
+    localStorage.removeItem(SESSION_TIMESTAMP_KEY)
+    console.log('🗑️ Session timestamp removed from localStorage')
+  } catch (error) {
+    console.error('❌ Failed to remove session timestamp:', error)
+  }
+}
+
+export const isSessionExpired = (): boolean => {
+  const timestamp = getSessionTimestamp()
+  if (!timestamp) return true
+  
+  const now = Date.now()
+  const twoHours = 2 * 60 * 60 * 1000 // 2시간을 밀리초로
+  const isExpired = (now - timestamp) > twoHours
+  
+  if (isExpired) {
+    console.log('🕐 Session expired:', {
+      sessionStart: new Date(timestamp).toLocaleString(),
+      now: new Date(now).toLocaleString(),
+      elapsed: Math.floor((now - timestamp) / 1000 / 60) + ' minutes'
+    })
+  }
+  
+  return isExpired
 }

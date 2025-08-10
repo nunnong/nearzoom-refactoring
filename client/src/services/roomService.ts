@@ -1,5 +1,5 @@
-import api from '@/lib/axios'
 import { API_ENDPOINTS } from '@/constants/api'
+import { api } from '@/lib/api'
 
 interface CreateRoomData {
   title: string

@@ -37,3 +37,20 @@ export interface ApiError {
   code?: string
   status?: number
 }
+
+// 세션 관련 타입
+export interface SessionData {
+  timestamp: number
+  isExpired: boolean
+}
+
+// 인증 구성 타입
+export interface AuthConfig {
+  SESSION_TIMEOUT: number
+  IDLE_TIMEOUT: number
+  STORAGE_KEYS: {
+    ACCESS_TOKEN: string
+    SESSION_TIMESTAMP: string
+  }
+  IDLE_EVENTS: readonly string[]
+}

@@ -1,12 +1,9 @@
 import { create } from 'zustand'
+
 import type { AuthState, User } from '@/types/auth'
-import api from '@/lib/axios'
 import { API_ENDPOINTS } from '@/constants/api'
-import {
-  saveAccessToken,
-  getAccessToken,
-  removeAccessToken,
-} from '@/utils/localStorage'
+import { api } from '@/lib/api'
+import { tokenStorage, sessionManager, userTransformer } from '@/lib/auth'
 
 interface AuthActions {
   setTokens: ({ accessToken }: { accessToken: string }) => void
@@ -25,7 +22,6 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   isLoading: false,
   isAuthenticated: false,
 
-  // 액션들
   setTokens: ({ accessToken }) => {
     console.log('setTokens 호출됨, 토큰:', accessToken)
     set({
@@ -35,8 +31,9 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     console.log('상태 업데이트 완료, isAuthenticated:', !!accessToken)
 
     if (typeof window !== 'undefined') {
-      saveAccessToken(accessToken)
-      console.log('localStorage에 토큰 저장 완료')
+      tokenStorage.save(accessToken)
+      sessionManager.saveTimestamp()
+      console.log('localStorage에 토큰 및 세션 타임스탬프 저장 완료')
     }
   },
 
@@ -56,7 +53,8 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     })
 
     if (typeof window !== 'undefined') {
-      removeAccessToken()
+      tokenStorage.remove()
+      sessionManager.removeTimestamp()
     }
   },
 
@@ -65,7 +63,14 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     console.log('initializeAuth 시작')
     if (typeof window === 'undefined') return
 
-    const savedToken = getAccessToken()
+    // 먼저 세션이 만료되었는지 확인
+    if (sessionManager.isExpired()) {
+      console.log('세션이 만료됨, 자동 로그아웃')
+      get().logoutDueToInactivity()
+      return
+    }
+
+    const savedToken = tokenStorage.get()
     console.log('저장된 토큰:', savedToken)
     if (!savedToken) {
       console.log('저장된 토큰이 없음')
@@ -81,17 +86,8 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       const userResponse = await api.get(API_ENDPOINTS.USER_INFO)
       console.log('사용자 정보 응답:', userResponse.data)
       
-      // 백엔드 응답을 프론트엔드 User 타입에 맞게 변환
       const rawData = userResponse.data.data || userResponse.data
-      const userData = {
-        id: rawData.id || 0,
-        name: rawData.userName || rawData.name || '',
-        email: rawData.userEmail || rawData.email || '',
-        profileImage: rawData.userProfileImage || rawData.profileImage,
-        socialType: rawData.socialType || 'GOOGLE',
-        createdAt: rawData.createdAt || new Date().toISOString(),
-        updatedAt: rawData.updatedAt || new Date().toISOString(),
-      }
+      const userData = userTransformer.fromBackend(rawData)
       
       console.log('변환된 사용자 데이터:', userData)
       set({
@@ -107,7 +103,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     }
   },
 
-  // 로그아웃
+  // 일반적인 로그아웃
   logout: async () => {
     try {
       // 서버에 로그아웃 요청 (refresh token 무효화)
@@ -122,8 +118,22 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     }
   },
 
-  // 비활성화로 인한 로그아웃
-  logoutDueToInactivity: () => {
+  // 비활성화로 인한 자동 로그아웃
+  logoutDueToInactivity: async () => {
+    const state = get()
+    
+    // 이미 로그아웃 상태라면 중복 실행 방지
+    if (!state.isAuthenticated) {
+      return
+    }
+    
+    try {
+      // 서버에 로그아웃 요청하여 쿠키 삭제
+      await api.post(API_ENDPOINTS.LOGOUT)
+    } catch (error) {
+      console.error('로그아웃 API 호출 실패:', error)
+    }
+    
     get().clearTokens()
     if (typeof window !== 'undefined') {
       alert('2시간 동안 활동이 없어 자동으로 로그아웃되었습니다.')

@@ -1,9 +1,9 @@
 'use client'
 
 import Dashboard from '@/components/page/myroom/Dashboard'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth } from '@/hooks/auth'
 import { useEffect, useState } from 'react'
-import api from '@/lib/axios'
+import { api } from '@/lib/api'
 
 interface ImageItem {
   id: string

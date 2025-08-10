@@ -1,6 +1,6 @@
-import { API_BASE_URL, API_ENDPOINTS } from '@/constants/api'
-import api from '@/lib/axios'
 import type { SocialType, TokenResponse } from '@/types/auth'
+import { API_BASE_URL, API_ENDPOINTS } from '@/constants/api'
+import { api } from '@/lib/api'
 
 export const authService = {
   // 소셜 로그인 URL 생성

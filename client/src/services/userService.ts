@@ -1,6 +1,6 @@
-import api from '@/lib/axios'
-import { API_ENDPOINTS } from '@/constants/api'
 import type { User } from '@/types/auth'
+import { API_ENDPOINTS } from '@/constants/api'
+import { api } from '@/lib/api'
 
 export const userService = {
   // 사용자 정보 가져오기

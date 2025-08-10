@@ -1,6 +1,6 @@
 "use client"
 
-import { useAuth } from "@/hooks/useAuth"
+import { useAuth } from "@/hooks/auth"
 import CreativeSection from "./CreativeSection"
 import AboutUsSection from "./AboutUsSection"
 import Footer from "./Footer"
@@ -33,7 +33,7 @@ export default function CreativePage() {
   }, [isLoggedIn])
 
   return (
-    <div className="min-h-screen w-full mx-auto transform scale-[0.8] origin-top">
+    <div className="min-h-screen w-full mx-auto transform origin-top" style={{transform: 'scaleX(0.9)'}}>
       <CreativeSection
         isLoggedIn={isLoggedIn}
         onLogin={handleLogin}
