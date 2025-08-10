@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { authService } from '@/services/authService'
 import { userService } from '@/services/userService'
 import { userTransformer } from '@/lib/auth'
+import { useRoomStore } from '@/stores/roomStore'
 import { roomAPI } from '@/lib/api/room' // 🔥 추가: 방 API import
 import type { SocialType } from '@/types/auth'
 
@@ -98,7 +99,7 @@ const fetchUserInfo = async () => {
     }
   }
 
-  // 🔥 수정: 방 생성 로직 추가
+  //  방 생성 로직 
   const handleAfterLoginClick = async () => {
     if (!isAuthenticated) {
       setIsLoginModalOpen(true)
@@ -117,20 +118,18 @@ const fetchUserInfo = async () => {
       
       console.log('방 생성 성공:', roomData)
       
-      // sessionStorage에 roomData 저장
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('roomData', JSON.stringify(roomData))
-      }
+      const { setRoomData, setIsHost } = useRoomStore.getState()
+      setRoomData(roomData)
+      setIsHost(true)
       
-      // 생성된 방으로 즉시 이동 (방장으로 접속)
+      // 생성된 방으로 이동
       const roomUrl = `/room/${roomData.roomId}?isHost=true&skipJoin=true`
-      
       router.push(roomUrl)
       
     } catch (error) {
       console.error('방 생성 실패:', error)
       
-      // 🔥 인증 관련 에러 처리
+      // 인증 관련 에러 처리
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류'
       
       if (errorMessage.includes('인증') || errorMessage.includes('로그인') || errorMessage.includes('토큰')) {
@@ -153,7 +152,7 @@ const fetchUserInfo = async () => {
     isAuthenticated,
     isLoggedIn: isAuthenticated,
     isLoginModalOpen,
-    isCreatingRoom, // 🔥 추가: 방 생성 상태 반환
+    isCreatingRoom, 
 
     // 액션
     setIsLoginModalOpen,

@@ -3,6 +3,7 @@
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+import { useRoomStore } from '@/stores/roomStore'
 import WaitingPage from '@/components/page/groupcall/WaitingPage'
 import { roomAPI, JoinRoomData, getErrorMessage } from '@/lib/api/room'
 
@@ -15,7 +16,10 @@ export default function RoomJoinPage() {
   const searchParams = useSearchParams()
   const isHost = searchParams?.get('isHost') === 'true'
   const skipJoin = searchParams?.get('skipJoin') === 'true'
-
+  
+  // 🔥 Zustand store 사용
+  const { roomData: storedRoomData, clearRoomData } = useRoomStore()
+  
   const [pageState, setPageState] = useState<PageState>('loading')
   const [roomData, setRoomData] = useState<JoinRoomData | null>(null)
   const [errorMessage, setErrorMessage] = useState<string>('')
@@ -44,37 +48,31 @@ export default function RoomJoinPage() {
     }
   }
 
-  // 방장 데이터 로드 함수
+  // 🔥 수정: 방장 데이터 로드 함수 (Zustand 사용)
   const loadHostData = () => {
-  try {
-    const storedRoomData = sessionStorage.getItem('roomData')
-
-    if (storedRoomData) {
-      const parsedData = JSON.parse(storedRoomData)
-      console.log('방장 데이터 로드 성공:', parsedData)
-      setRoomData(parsedData)
-      setPageState('success')
-
-      // 🔥 수정: 즉시 삭제하지 말고 성공 시에만 삭제
-      // sessionStorage.removeItem('roomData') // 이 줄 제거
-    } else {
-      console.log('방장 데이터 없음')
-      setErrorMessage('방 정보를 찾을 수 없습니다. 다시 시도해주세요.')
+    try {
+      if (storedRoomData) {
+        console.log('Zustand에서 방장 데이터 로드 성공:', storedRoomData)
+        setRoomData(storedRoomData)
+        setPageState('success')
+      } else {
+        console.log('Zustand에 방장 데이터 없음')
+        setErrorMessage('방 정보를 찾을 수 없습니다. 다시 시도해주세요.')
+        setPageState('error')
+      }
+    } catch (error) {
+      console.error('방장 데이터 로드 실패:', error)
+      setErrorMessage('방 정보 로드 중 오류가 발생했습니다.')
       setPageState('error')
     }
-  } catch (error) {
-    console.error('방장 데이터 로드 실패:', error)
-    setErrorMessage('방 정보 로드 중 오류가 발생했습니다.')
-    setPageState('error')
   }
-}
 
   useEffect(() => {
     if (roomId && typeof roomId === 'string') {
       if (/^\d+$/.test(roomId)) {
         if (skipJoin && isHost) {
-          // 방장: API 호출 없이 sessionStorage에서 데이터 로드
-          console.log('방장으로 접속 - sessionStorage에서 데이터 로드')
+          // 방장: Zustand store에서 데이터 로드
+          console.log('방장으로 접속 - Zustand store에서 데이터 로드')
           loadHostData()
         } else {
           // 참가자: joinRoom API 호출
@@ -89,7 +87,7 @@ export default function RoomJoinPage() {
       setErrorMessage('방 ID가 없습니다.')
       setPageState('error')
     }
-  }, [roomId, skipJoin, isHost])
+  }, [roomId, skipJoin, isHost, storedRoomData]) // 🔥 의존성 배열에 storedRoomData 추가
 
   const handleRetry = () => {
     if (roomId && typeof roomId === 'string') {
@@ -97,7 +95,7 @@ export default function RoomJoinPage() {
       setErrorMessage('')
 
       if (skipJoin && isHost) {
-        // 방장: sessionStorage에서 데이터 로드
+        // 방장: Zustand store에서 데이터 로드
         loadHostData()
       } else {
         // 참가자: joinRoom API 호출
@@ -107,6 +105,8 @@ export default function RoomJoinPage() {
   }
 
   const handleGoHome = () => {
+    // 🔥 추가: 홈으로 갈 때 room 데이터 정리
+    clearRoomData()
     router.push('/')
   }
 
@@ -195,7 +195,7 @@ export default function RoomJoinPage() {
     return (
       <WaitingPage
         roomData={roomData}
-        isHost={isHost} // ← 수정된 부분: false → isHost
+        isHost={isHost}
       />
     )
   }
