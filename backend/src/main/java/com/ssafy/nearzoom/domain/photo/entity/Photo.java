@@ -6,11 +6,13 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
+@Table(name = "PHOTO")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Photo extends BaseEntity {
@@ -27,10 +29,10 @@ public class Photo extends BaseEntity {
     private String userList;
 
     @Column(name = "room_id", length = 100, nullable = false)
-    private String roomId;
+    private Long roomId;
 
     // 생성자
-    public Photo(String imgUrl, String roomId, String userList) {
+    public Photo(String imgUrl, Long roomId, String userList) {
         this.imgUrl = imgUrl;
         this.roomId = roomId;
         this.userList = userList;

@@ -38,4 +38,4 @@ out/
 .vscode/
 
 # Redis volume data
-Infra/redis-data/
+backend/redis-data/

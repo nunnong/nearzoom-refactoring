@@ -177,7 +177,7 @@ public class ImageProcessingService {
     String selectedImages = (String) roomData.get("selectedImages");
     String imageCount = (String) roomData.get("imageCount");
     String imageUrl = (String) roomData.get("image_url");
-    String roomUsers = (String) roomData.get("users");
+    String roomUsers = (String) roomData.get("participants");
     String backgroundType = (String) roomData.get("background_type");
 
     String backgroundColor = (String) roomData.get("background_color");

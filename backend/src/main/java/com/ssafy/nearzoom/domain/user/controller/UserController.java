@@ -8,10 +8,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +17,6 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -77,7 +73,7 @@ public class UserController {
         return ApiResponse.ok("사용자가 존재합니다.", info);
     }
 
-    @DeleteMapping("/sign-out")
+    @DeleteMapping("/signout")
     public ResponseEntity<ApiResponse<Void>> withdraw(HttpServletRequest request,
         HttpServletResponse response, Authentication authentication) {
 
@@ -105,17 +101,13 @@ public class UserController {
     }
 
     @PutMapping("/save-face-image")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> updatePrettyFace(
+    public ResponseEntity<ApiResponse<String>> updatePrettyFace(
         Authentication authentication,
-        @RequestBody String prettyFaceUrl) {
+        @RequestParam String prettyFaceUrl) {
         try {
             userService.updatePrettyFace(authentication, prettyFaceUrl);
 
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("prettyFaceUrl", prettyFaceUrl);
-            responseData.put("updatedAt", LocalDateTime.now().toString());
-
-            return ApiResponse.ok("예쁜 얼굴 이미지가 성공적으로 저장되었습니다.", responseData);
+            return ApiResponse.ok("예쁜 얼굴 이미지가 성공적으로 저장되었습니다.");
         } catch (ApiException e) {
             return ApiResponse.failedOf(e);
         } catch (Exception e) {

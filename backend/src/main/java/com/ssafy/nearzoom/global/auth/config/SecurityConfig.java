@@ -20,62 +20,62 @@ import org.springframework.web.cors.CorsConfiguration;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
-  private final CustomOAuth2UserService customOAuth2UserService;
-  private final CustomSuccessHandler customSuccessHandler;
-  private final JWTUtil jwtUtil;
 
-  @Bean
-  public SecurityFilterChain filterChain(HttpSecurity http)
-      throws Exception {
+    private final CustomOAuth2UserService customOAuth2UserService;
+    private final CustomSuccessHandler customSuccessHandler;
+    private final JWTUtil jwtUtil;
 
-    http.cors(cors -> cors.configurationSource(request -> {
-      CorsConfiguration config = new CorsConfiguration();
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http)
+        throws Exception {
 
-      config.setAllowedOrigins(List.of("http://localhost:3000"));
-      config.setAllowedMethods(List.of("GET", "PUT", "POST", "DELETE", "PATCH", "OPTIONS"));
-      config.setAllowedHeaders(List.of("*"));
-      config.setAllowCredentials(true);
-      config.setExposedHeaders(List.of("Set-Cookie", "Authorization"));
+        http.cors(cors -> cors.configurationSource(request -> {
+            CorsConfiguration config = new CorsConfiguration();
 
-      return config;
-    }));
+            config.setAllowedOrigins(List.of("https://nearzoom.store"));
+            config.setAllowedMethods(List.of("GET", "POST", "DELETE", "PATCH"));
+            config.setAllowedHeaders(List.of("*"));
+            config.setAllowCredentials(true);
+            config.setExposedHeaders(List.of("Set-Cookie", "Authorization"));
 
-    http.csrf(csrf -> csrf.disable());
-    http.formLogin(form -> form.disable());
-    http.httpBasic(httpBasic -> httpBasic.disable());
-    http.exceptionHandling(ex -> ex
-        .authenticationEntryPoint((request, response, authException) -> {
-          response.setContentType("application/json");
-          response.setCharacterEncoding("UTF-8");
-          response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-          response.getWriter().write("{\"error\":\"로그인 인증 실패!\"}");
-        })
-        .accessDeniedHandler((request, response, accessDeniedException) -> {
-          response.setContentType("application/json");
-          response.setCharacterEncoding("UTF-8");
-          response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-          response.getWriter().write("{\"error\":\"접근 권한이 없음!\"}");
-        })
-    );
+            return config;
+        }));
 
-    http.addFilterAfter(new JWTFilter(jwtUtil),
-        OAuth2LoginAuthenticationFilter.class);
+        http.csrf(csrf -> csrf.disable());
+        http.formLogin(form -> form.disable());
+        http.httpBasic(httpBasic -> httpBasic.disable());
+        http.exceptionHandling(ex -> ex
+            .authenticationEntryPoint((request, response, authException) -> {
+                response.setContentType("application/json");
+                response.setCharacterEncoding("UTF-8");
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("{\"error\":\"로그인 인증 실패!\"}");
+            })
+            .accessDeniedHandler((request, response, accessDeniedException) -> {
+                response.setContentType("application/json");
+                response.setCharacterEncoding("UTF-8");
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.getWriter().write("{\"error\":\"접근 권한이 없음!\"}");
+            })
+        );
 
-    http.oauth2Login(oauth2 -> oauth2
-        .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
-        .successHandler(customSuccessHandler)
-    );
+        http.addFilterAfter(new JWTFilter(jwtUtil),
+            OAuth2LoginAuthenticationFilter.class);
 
-    http.authorizeHttpRequests(
-        (auth) -> auth
-            .requestMatchers("/auth/refresh", "user/logout", "/api/s3-test/**",
-                "myroom/photos/**", "/favicon.ico")
-            .permitAll()
-            .anyRequest().authenticated());
+        http.oauth2Login(oauth2 -> oauth2
+            .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
+            .successHandler(customSuccessHandler)
+        );
 
-    http.sessionManagement(
-        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+        http.authorizeHttpRequests(
+            (auth) -> auth
+                .requestMatchers("/auth/refresh", "user/logout", "webhooks/**")
+                .permitAll()
+                .anyRequest().authenticated());
 
-    return http.build();
-  }
+        http.sessionManagement(
+            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+
+        return http.build();
+    }
 }
