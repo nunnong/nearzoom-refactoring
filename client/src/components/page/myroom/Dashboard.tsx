@@ -452,7 +452,10 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
       <UploadSelfieModal
         isOpen={isUploadSelfieModalOpen}
         onClose={() => setIsUploadSelfieModalOpen(false)}
-        userProfile={actualUser}
+        onImageUpdated={() => {
+          // 참조 이미지 업데이트 후 추가 작업이 필요하면 여기에 작성
+          console.log('참조 이미지가 업데이트되었습니다.')
+        }}
       />
     </div>
   )

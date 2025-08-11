@@ -16,6 +16,7 @@ export const API_ENDPOINTS = {
   REFRESH: '/auth/refresh',
 
   // MyRoom
+  MYROOM: '/myroom/photos',
   PHOTOS: '/photoprompt/result/{jobId}',
   LIKE: '/photos/heart',
   SAVE_EDITED: '/myroom/photos/save-edited',

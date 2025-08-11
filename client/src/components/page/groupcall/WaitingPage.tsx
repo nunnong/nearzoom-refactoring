@@ -7,7 +7,7 @@ import { LiveKitRoom } from '@livekit/components-react'
 import Header from '@/components/page/groupcall/Header'
 import Sidebar from '@/components/page/groupcall/Sidebar'
 import VideoTile from '@/components/page/groupcall/VideoTile'
-import { JoinRoomData, CreateRoomData, roomAPI } from '@/lib/api/room'  // 🔥 추가: roomAPI import
+import { JoinRoomData, CreateRoomData, roomAPI } from '@/lib/api/room'
 
 interface Participant {
   id: string
@@ -50,7 +50,6 @@ export default function WaitingPage({
   const [room] = useState(() => new Room())
   const [isConnected, setIsConnected] = useState(false)
   
-  // 🔥 추가: 실제 참가자 데이터 상태
   const [realParticipants, setRealParticipants] = useState<Participant[]>([])
   const [isLoadingParticipants, setIsLoadingParticipants] = useState(false)
 
@@ -78,7 +77,7 @@ export default function WaitingPage({
     }
   }, [roomData, room])
 
-  // 🔥 추가: 실제 방 정보 불러오기
+  // 🔥 수정: 안전한 방 정보 불러오기
   const loadRoomInfo = useCallback(async () => {
     if (!roomData?.roomId) return
     
@@ -86,48 +85,61 @@ export default function WaitingPage({
       setIsLoadingParticipants(true)
       console.log('🔄 방 정보 불러오기 중...', roomData.roomId)
       
-      // 🔥 수정: roomId를 숫자로 변환해서 전달
       const numericRoomId = typeof roomData.roomId === 'string' ? parseInt(roomData.roomId, 10) : roomData.roomId
       const roomInfo = await roomAPI.getRoomInfo(numericRoomId)
       console.log('✅ 방 정보 로드 성공:', roomInfo)
       
-      // 서버 응답을 클라이언트 형식으로 변환
-      const participants: Participant[] = roomInfo.participants.map(p => ({
-        id: p.id,
-        email: p.email,
-        name: p.name || p.email.split('@')[0], // 이름이 없으면 이메일에서 추출
-        isHost: p.isHost,
-        isMicOn: true, // 기본값 (LiveKit에서 실제 상태 가져올 수 있음)
-        isCameraOn: true, // 기본값
-        isConnected: true, // 방에 있으므로 연결된 것으로 간주
-      }))
+      // 🔥 수정: 안전한 데이터 변환
+      const participants: Participant[] = (roomInfo.participants || [])
+        .filter(p => p && typeof p === 'object') // null/undefined 객체 필터링
+        .map(p => {
+          // 🔥 안전한 이메일 처리
+          const safeEmail = p.email || 'unknown@unknown.com'
+          const safeName = p.name || (
+            safeEmail && typeof safeEmail === 'string' && safeEmail.includes('@')
+              ? safeEmail.split('@')[0]
+              : 'Unknown User'
+          )
+          
+          return {
+            id: p.id || `participant-${Date.now()}-${Math.random()}`,
+            email: safeEmail,
+            name: safeName,
+            isHost: Boolean(p.isHost),
+            isMicOn: true,
+            isCameraOn: true,
+            isConnected: true,
+          }
+        })
       
       setRealParticipants(participants)
       console.log('👥 참가자 목록 업데이트:', participants)
       
     } catch (error) {
       console.error('❌ 방 정보 로드 실패:', error)
+      // 🔥 에러 발생 시 빈 배열로 설정하여 UI 깨짐 방지
+      setRealParticipants([])
     } finally {
       setIsLoadingParticipants(false)
     }
   }, [roomData?.roomId])
 
-  // 🔥 추가: 컴포넌트 마운트 시 방 정보 로드
+  // 컴포넌트 마운트 시 방 정보 로드
   useEffect(() => {
     loadRoomInfo()
   }, [loadRoomInfo])
 
-  // 🔥 추가: 주기적으로 방 정보 갱신 (10초마다)
+  // 주기적으로 방 정보 갱신 (10초마다)
   useEffect(() => {
     const interval = setInterval(() => {
       console.log('🔄 주기적 방 정보 갱신')
       loadRoomInfo()
-    }, 10000) // 10초마다
+    }, 10000)
 
     return () => clearInterval(interval)
   }, [loadRoomInfo])
 
-  // 🔥 추가: 브라우저 포커스 시 갱신
+  // 브라우저 포커스 시 갱신
   useEffect(() => {
     const handleFocus = () => {
       console.log('🔄 브라우저 포커스 - 방 정보 갱신')
@@ -176,14 +188,14 @@ export default function WaitingPage({
     }
   })
 
-  // 🔥 수정: 실제 데이터 사용 (Mock 데이터 제거)
+  // 🔥 수정: 더 안전한 참가자 목록 처리
   const participants = useMemo(() => {
     if (realParticipants.length > 0) {
       return realParticipants
     }
     
-    // 🔥 fallback: 서버 데이터 로딩 중이거나 실패한 경우에만 현재 사용자 표시
-    if (roomData) {
+    // fallback: 서버 데이터 로딩 중이거나 실패한 경우에만 현재 사용자 표시
+    if (roomData?.participantName) {
       return [
         {
           id: 'current-user',
@@ -197,7 +209,18 @@ export default function WaitingPage({
       ]
     }
     
-    return []
+    // 🔥 최후의 fallback
+    return [
+      {
+        id: 'fallback-user',
+        email: 'fallback@user.com',
+        name: 'Loading...',
+        isHost: isHost,
+        isMicOn: true,
+        isCameraOn: true,
+        isConnected: true,
+      }
+    ]
   }, [realParticipants, roomData, isHost])
 
   const gridCols = useMemo(() => {
@@ -246,11 +269,10 @@ export default function WaitingPage({
     }
   }, [isHost, onStartCall])
 
-  // 🔥 추가: 수동 새로고침 버튼
-  const handleRefreshParticipants = useCallback(() => {
-    console.log('🔄 수동 참가자 목록 새로고침')
-    loadRoomInfo()
-  }, [loadRoomInfo])
+  // const handleRefreshParticipants = useCallback(() => {
+  //   console.log('🔄 수동 참가자 목록 새로고침')
+  //   loadRoomInfo()
+  // }, [loadRoomInfo])
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
@@ -260,7 +282,7 @@ export default function WaitingPage({
       <main className="flex flex-1 flex-col gap-4 bg-[#2d3243] p-4 md:flex-row md:gap-6 md:p-6 lg:p-8">
         {/* 비디오 영역 */}
         <section className="min-w-0 flex-1">
-          {/* 🔥 추가: 로딩 상태 표시 */}
+          {/* 로딩 상태 표시 */}
           {isLoadingParticipants && (
             <div className="absolute top-4 right-4 z-10 bg-blue-500 text-white px-3 py-1 rounded-lg text-sm">
               참가자 목록 업데이트 중...
@@ -379,17 +401,6 @@ export default function WaitingPage({
             onLeaveRoom={handleLeaveRoom}
             onCopyRoomUrl={handleCopyRoomUrl}
           />
-          
-          {/* 🔥 추가: 디버그용 새로고침 버튼
-          <div className="mt-4">
-            <button
-              onClick={handleRefreshParticipants}
-              disabled={isLoadingParticipants}
-              className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 text-sm"
-            >
-              {isLoadingParticipants ? '업데이트 중...' : '참가자 목록 새로고침'}
-            </button>
-          </div> */}
         </aside>
       </main>
     </div>

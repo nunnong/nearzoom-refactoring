@@ -11,11 +11,12 @@ export default function HeroSection({ isLoggedIn, onAfterLoginClick, isCreatingR
     <>
       <div className="mb-4 md:mb-8 text-center">
         <Image
-          src="/creative.png"
+          src="/nearzoomlogologo.png"
           alt="Creative"
           width={1400}
           height={179}
           className="mx-auto max-w-full h-auto"
+          objectFit="contain"
         />
       </div>
 
