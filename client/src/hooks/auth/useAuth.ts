@@ -5,12 +5,12 @@ import { authService } from '@/services/authService'
 import { userService } from '@/services/userService'
 import { userTransformer } from '@/lib/auth'
 import { useRoomStore } from '@/stores/roomStore'
-import { roomAPI } from '@/lib/api/room' // 🔥 추가: 방 API import
+import { roomAPI } from '@/lib/api/room' // 🔥 방 API import
 import type { SocialType } from '@/types/auth'
 
 export const useAuth = () => {
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
-  const [isCreatingRoom, setIsCreatingRoom] = useState(false) // 🔥 추가: 방 생성 상태
+  // 🔥 방 생성 상태만 추가 (로그인 모달은 제거)
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false)
   const router = useRouter()
 
   const {
@@ -32,43 +32,28 @@ export const useAuth = () => {
   }
 
   const handleLoginSuccess = (accessToken: string) => {
-    console.log('handleLoginSuccess 호출됨, 토큰:', accessToken)
     setTokens({ accessToken })
-    console.log('setTokens 완료')
   }
 
-  // hooks/useAuth.ts - fetchUserInfo 함수
-const fetchUserInfo = async () => {
-  try {
-    setLoading(true)
-    const response = await userService.getUserInfo()
-    console.log('Raw user info response:', response)
-    
-    // 백엔드 응답 구조 확인을 위한 로그
-    console.log('Response structure:', JSON.stringify(response, null, 2))
-    
-    // 응답 구조에 따라 조건부로 데이터 추출
-    let rawData
-    if (response.data) {
-      rawData = response.data
-    } else {
-      rawData = response
+  // 🔥 팀원의 간단한 fetchUserInfo 사용
+  const fetchUserInfo = async () => {
+    try {
+      setLoading(true)
+      const response = await userService.getUserInfo()
+      
+      const rawData = response
+      const userData = userTransformer.fromBackend(rawData)
+      setUser(userData)
+    } catch (error) {
+      console.error('사용자 정보 가져오기 실패:', error)
+      clearTokens()
+    } finally {
+      setLoading(false)
     }
-    
-    const userData = userTransformer.fromBackend(rawData)
-    
-    console.log('Converted user data:', userData)
-    setUser(userData)
-  } catch (error) {
-    console.error('사용자 정보 가져오기 실패:', error)
-    clearTokens()
-  } finally {
-    setLoading(false)
   }
-}
 
   const handleLogin = () => {
-    setIsLoginModalOpen(true)
+    router.push('/login')
   }
 
   const handleKakaoLoginClick = () => {
@@ -87,7 +72,7 @@ const fetchUserInfo = async () => {
     if (isAuthenticated) {
       router.push('/myroom')
     } else {
-      setIsLoginModalOpen(true)
+      router.push('/login')
     }
   }
 
@@ -95,14 +80,19 @@ const fetchUserInfo = async () => {
     if (isAuthenticated) {
       router.push('/myfeed')
     } else {
-      setIsLoginModalOpen(true)
+      router.push('/login')
     }
   }
 
-  //  방 생성 로직 
+  // 🔥 방 생성 로직 (로그인 페이지로 리다이렉트 방식으로 수정)
   const handleAfterLoginClick = async () => {
     if (!isAuthenticated) {
-      setIsLoginModalOpen(true)
+      // 🔥 현재 페이지를 저장하고 로그인 페이지로 이동
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('redirectAfterLogin', window.location.pathname)
+        localStorage.setItem('actionAfterLogin', 'createRoom') // 로그인 후 방 생성 액션
+      }
+      router.push('/login')
       return
     }
 
@@ -133,14 +123,55 @@ const fetchUserInfo = async () => {
       const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류'
       
       if (errorMessage.includes('인증') || errorMessage.includes('로그인') || errorMessage.includes('토큰')) {
-        // 인증 에러인 경우 로그인 모달 표시
+        // 인증 에러인 경우 로그인 페이지로 이동
         alert('로그인이 필요합니다.')
-        setIsLoginModalOpen(true)
+        router.push('/login')
       } else {
         alert('방 생성에 실패했습니다. 다시 시도해주세요.')
       }
     } finally {
       setIsCreatingRoom(false)
+    }
+  }
+
+  // 🔥 팀원의 회원탈퇴 기능 추가
+  const handleDeleteAccount = async () => {
+    try {
+      await userService.deleteUser()
+      
+      // 백엔드에서 세션/쿠키 정리가 완료된 후 클라이언트 토큰도 즉시 제거
+      clearTokens()
+      
+      // 카카오 로그아웃 (소셜 로그인 세션 제거)
+      if (typeof window !== 'undefined' && window.Kakao?.Auth) {
+        try {
+          await window.Kakao.Auth.logout()
+        } catch (kakaoError) {
+          console.warn('카카오 로그아웃 실패:', kakaoError)
+        }
+      }
+      
+      // 구글 로그아웃
+      if (typeof window !== 'undefined' && window.google?.accounts) {
+        try {
+          window.google.accounts.id.disableAutoSelect()
+        } catch (googleError) {
+          console.warn('구글 로그아웃 실패:', googleError)
+        }
+      }
+      
+      // router 대신 window.location으로 강제 새로고침하여 모든 상태 초기화
+      if (typeof window !== 'undefined') {
+        window.location.href = '/'
+      }
+    } catch (error: any) {
+      console.error('회원탈퇴 실패:', {
+        message: error?.message,
+        status: error?.status,
+        response: error?.response?.data,
+        error: error
+      })
+      throw error
     }
   }
 
@@ -151,11 +182,9 @@ const fetchUserInfo = async () => {
     isLoading,
     isAuthenticated,
     isLoggedIn: isAuthenticated,
-    isLoginModalOpen,
-    isCreatingRoom, 
+    isCreatingRoom, // 🔥 방 생성 상태만 유지
 
     // 액션
-    setIsLoginModalOpen,
     startSocialLogin,
     handleLoginSuccess,
     fetchUserInfo,
@@ -166,6 +195,7 @@ const fetchUserInfo = async () => {
     handleKakaoLoginClick,
     handleGoogleLoginClick,
     handleAfterLoginClick,
+    handleDeleteAccount, // 🔥 회원탈퇴 기능 추가
     logout,
     initializeAuth,
   }

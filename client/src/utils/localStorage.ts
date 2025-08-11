@@ -245,7 +245,7 @@ export const isSessionExpired = (): boolean => {
   const isExpired = (now - timestamp) > twoHours
   
   if (isExpired) {
-    console.log('🕐 Session expired:', {
+    console.log(' Session expired:', {
       sessionStart: new Date(timestamp).toLocaleString(),
       now: new Date(now).toLocaleString(),
       elapsed: Math.floor((now - timestamp) / 1000 / 60) + ' minutes'

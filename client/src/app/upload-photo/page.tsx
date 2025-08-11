@@ -1,33 +1,15 @@
 'use client'
 
 import React, { useState, useRef } from 'react'
-import { X, Globe, Edit, Trash2, Upload } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { X, Edit, Trash2 } from 'lucide-react'
 import api from '@/lib/axios'
 
-interface UploadSelfieModalProps {
-  isOpen: boolean
-  onClose: () => void
-  userProfile?: {
-    name?: string
-    email?: string
-    profileImage?: string
-  } | null
-}
-
-export default function UploadSelfieModal({ isOpen, onClose, userProfile }: UploadSelfieModalProps) {
+export default function UploadPhotoPage() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
-  const [currentReferenceImage, setCurrentReferenceImage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  // 모달이 열릴 때 서버에서 기존 참조 사진 로드
-  React.useEffect(() => {
-    if (isOpen) {
-      // userProfile에서 참조 사진 URL 가져오기 (프로필 사진과 구분)
-      const referenceImageUrl = userProfile?.faceImageUrl
-      setCurrentReferenceImage(referenceImageUrl || null)
-    }
-  }, [isOpen, userProfile])
+  const router = useRouter()
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -36,7 +18,6 @@ export default function UploadSelfieModal({ isOpen, onClose, userProfile }: Uplo
       reader.onload = (e) => {
         const result = e.target?.result as string
         setSelectedImage(result)
-        // 임시 미리보기용으로만 사용 (저장하지 않음)
       }
       reader.readAsDataURL(file)
     }
@@ -75,19 +56,13 @@ export default function UploadSelfieModal({ isOpen, onClose, userProfile }: Uplo
         }
       })
       
-      // 저장 완료 후 모달 닫기
-      onClose()
+      // 서버에 저장되었으므로 localStorage 저장 불필요
       
-      // 페이지 새로고침하여 업데이트된 프로필 이미지 반영
-      window.location.reload()
+      // 저장 완료 후 메인 페이지로 이동
+      router.replace('/')
       
     } catch (error: any) {
-      console.error('프로필 이미지 저장 실패:')
-      console.error('Error object:', error)
-      console.error('Error response:', error?.response)
-      console.error('Error data:', error?.response?.data)
-      console.error('Error status:', error?.response?.status)
-      console.error('Error message:', error?.message)
+      console.error('프로필 이미지 저장 실패:', error)
       
       let errorMessage = '프로필 이미지 저장에 실패했습니다.'
       if (error?.response?.data?.message) {
@@ -104,19 +79,19 @@ export default function UploadSelfieModal({ isOpen, onClose, userProfile }: Uplo
 
   const handleDelete = () => {
     setSelectedImage(null)
-    setCurrentReferenceImage(null)
-    // 실제 서버에서 삭제하는 API 호출이 필요하다면 여기에 추가
   }
 
-  if (!isOpen) return null
+  const handleSkip = () => {
+    router.replace('/')
+  }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="bg-white rounded-3xl shadow-2xl w-96 max-w-sm mx-4 overflow-hidden">
         {/* 헤더 */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <button
-            onClick={onClose}
+            onClick={() => router.back()}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
             <X size={20} className="text-gray-600" />
@@ -126,41 +101,34 @@ export default function UploadSelfieModal({ isOpen, onClose, userProfile }: Uplo
             <span className="text-blue-500 font-medium text-lg">이</span>
             <span className="text-red-500 font-medium text-lg">어</span>
             <span className="text-yellow-500 font-medium text-lg">줌</span>
-            <span className="text-gray-700 ml-1"></span>
           </div>
           
-          <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-            <div className="flex flex-col items-center">
-              <div className="w-1 h-1 bg-gray-600 rounded-full mb-1"></div>
-              <div className="w-1 h-1 bg-gray-600 rounded-full mb-1"></div>
-              <div className="w-1 h-1 bg-gray-600 rounded-full"></div>
-            </div>
-          </button>
+          <div className="w-8"></div>
         </div>
 
         {/* 컨텐츠 */}
         <div className="p-6">
-          <h2 className="text-xl font-medium text-gray-800 mb-3">참조 사진</h2>
+          <h2 className="text-xl font-medium text-gray-800 mb-3">참조 사진 등록</h2>
           
           <p className="text-gray-600 text-sm mb-6 leading-relaxed">
             가장 잘 나온 사진 하나를 업로드해주세요. AI가 이를 참조하여 더 예쁘고 자연스러운 사진을 만들어 드립니다.
           </p>
 
-          {/* 모두에게 표시 버튼 */}
-          <button className="flex items-center space-x-2 text-blue-600 border border-blue-200 rounded-full px-4 py-2 mb-6 hover:bg-blue-50 transition-colors">
+          {/* AI 사진 합성용 태그 */}
+          <div className="flex items-center space-x-2 text-blue-600 border border-blue-200 rounded-full px-4 py-2 mb-6 w-fit">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
             <span className="text-sm font-medium">AI 사진 합성용</span>
-          </button>
+          </div>
 
           {/* 프로필 이미지 */}
           <div className="flex justify-center mb-8">
             <div className="w-32 h-32 rounded-full overflow-hidden bg-gradient-to-br from-orange-200 via-green-200 to-blue-200 p-1">
               <div className="w-full h-full rounded-full overflow-hidden bg-white flex items-center justify-center">
-                {selectedImage || currentReferenceImage ? (
+                {selectedImage ? (
                   <img 
-                    src={selectedImage || currentReferenceImage || ''}
+                    src={selectedImage}
                     alt="참조 사진"
                     className="w-full h-full object-cover"
                   />
@@ -177,22 +145,24 @@ export default function UploadSelfieModal({ isOpen, onClose, userProfile }: Uplo
           </div>
 
           {/* 버튼들 */}
-          <div className="flex space-x-3">
+          <div className="flex space-x-3 mb-4">
             <button 
               onClick={handleUploadClick}
               className="flex-1 flex items-center justify-center space-x-2 bg-blue-50 text-blue-600 py-3 rounded-full hover:bg-blue-100 transition-colors"
             >
               <Edit size={16} />
-              <span className="font-medium">{currentReferenceImage ? '교체' : '업로드'}</span>
+              <span className="font-medium">{selectedImage ? '교체' : '업로드'}</span>
             </button>
             
-            <button 
-              onClick={handleDelete}
-              className="flex-1 flex items-center justify-center space-x-2 bg-gray-50 text-gray-700 py-3 rounded-full hover:bg-gray-100 transition-colors"
-            >
-              <Trash2 size={16} />
-              <span className="font-medium">삭제</span>
-            </button>
+            {selectedImage && (
+              <button 
+                onClick={handleDelete}
+                className="flex-1 flex items-center justify-center space-x-2 bg-gray-50 text-gray-700 py-3 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <Trash2 size={16} />
+                <span className="font-medium">삭제</span>
+              </button>
+            )}
           </div>
 
           {/* 저장 버튼 */}
@@ -200,11 +170,19 @@ export default function UploadSelfieModal({ isOpen, onClose, userProfile }: Uplo
             <button
               onClick={handleSave}
               disabled={isUploading}
-              className="w-full mt-4 bg-blue-600 text-white py-3 rounded-full hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full mb-3 bg-blue-600 text-white py-3 rounded-full hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isUploading ? '저장 중...' : '저장'}
+              {isUploading ? '저장 중...' : '저장하고 시작하기'}
             </button>
           )}
+
+          {/* 다음에 등록하기 버튼 */}
+          <button
+            onClick={handleSkip}
+            className="w-full text-gray-500 py-3 rounded-full hover:bg-gray-50 transition-colors font-medium"
+          >
+            다음에 등록하기
+          </button>
 
           {/* 숨겨진 파일 입력 */}
           <input

@@ -25,7 +25,7 @@ export default function AuthButtons({ isLoggedIn, onLogin, onLogout, onMyPage, o
   return (
     <div className="flex items-center gap-3">
       {isLoggedIn ? (
-        <>
+        <> 
           {/* User Profile Icon */}
           <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
             {user?.profileImage ? (
