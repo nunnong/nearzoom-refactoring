@@ -147,4 +147,26 @@ public class RoomRedisRepository {
           roomId, participantKeys.size());
     }
   }
+
+  //방장 권한 이양
+  public void transferHostAuthority(Long roomId, User currentHost, User newHost, String roomKey) {
+    // 1. 방장 정보 업데이트
+    redisTemplate.opsForHash().put(roomKey, "host", newHost.getUserEmail());
+    redisTemplate.opsForHash().put(roomKey, "hostTransferredAt", LocalDateTime.now().toString());
+    redisTemplate.opsForHash().put(roomKey, "previousHost", currentHost.getUserEmail());
+
+    // 2. 방장 이양 히스토리 저장 (선택사항)
+    String historyKey = "host_transfer:" + roomId + ":" + System.currentTimeMillis();
+    Map<String, String> transferHistory = new HashMap<>();
+    transferHistory.put("roomId", String.valueOf(roomId));
+    transferHistory.put("fromHost", currentHost.getUserEmail());
+    transferHistory.put("toHost", newHost.getUserEmail());
+    transferHistory.put("transferredAt", LocalDateTime.now().toString());
+
+    redisTemplate.opsForHash().putAll(historyKey, transferHistory);
+    redisTemplate.expire(historyKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
+
+    log.info("Host authority transferred in Redis. RoomId: {}, From: {} To: {}",
+        roomId, currentHost.getUserEmail(), newHost.getUserEmail());
+  }
 }
