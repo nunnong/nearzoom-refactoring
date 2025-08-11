@@ -5,6 +5,7 @@ import com.ssafy.nearzoom.domain.room.dto.LiveKitInfoResponse;
 import com.ssafy.nearzoom.domain.room.dto.RoomInfo;
 import com.ssafy.nearzoom.domain.room.dto.JoinRequest;
 import com.ssafy.nearzoom.domain.room.dto.RoomMetaSaveRequest;
+import com.ssafy.nearzoom.domain.room.dto.TransferHostRequest;
 import com.ssafy.nearzoom.domain.room.service.RoomService;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import com.ssafy.nearzoom.global.response.ApiResponse;
@@ -211,6 +212,65 @@ public class RoomController {
     } catch (Exception e) {
       log.error("Unexpected error during participants retrieval. RoomId: {}", roomId, e);
       return ApiResponse.failedOf(HttpStatus.INTERNAL_SERVER_ERROR, "참가자 목록 조회 중 오류가 발생했습니다: " + e.getMessage());
+    }
+  }
+
+  @PostMapping("/{roomId}/transfer-host")
+  @Operation(summary = "방장 권한 이양", description = "현재 방장이 다른 참가자에게 방장 권한을 넘깁니다.")
+  @PostApiResponses
+  public ResponseEntity<ApiResponse<Map<String, Object>>> transferHost(
+      HttpServletRequest request,
+      @PathVariable Long roomId,
+      @RequestBody TransferHostRequest transferRequest) {
+
+    try {
+      // roomId 일치 확인
+      if (!roomId.equals(transferRequest.roomId())) {
+        throw new ApiException(HttpStatus.BAD_REQUEST, "경로의 roomId와 요청 데이터의 roomId가 일치하지 않습니다.");
+      }
+
+      roomService.transferHost(request, transferRequest);
+
+      Map<String, Object> responseData = new HashMap<>();
+      responseData.put("roomId", roomId);
+      responseData.put("newHostEmail", transferRequest.newHostEmail());
+      responseData.put("transferredAt", LocalDateTime.now().toString());
+
+      log.info("Host transferred via API. RoomId: {}, NewHost: {}", roomId, transferRequest.newHostEmail());
+
+      return ResponseEntity.ok(new ApiResponse<>(false, "방장 권한이 성공적으로 이양되었습니다.", responseData));
+
+    } catch (ApiException e) {
+      log.warn("Host transfer failed. RoomId: {}, Error: {}", roomId, e.getMessage());
+      return ApiResponse.failedOf(e);
+    } catch (Exception e) {
+      log.error("Unexpected error during host transfer. RoomId: {}", roomId, e);
+      return ApiResponse.failedOf(HttpStatus.INTERNAL_SERVER_ERROR, "방장 권한 이양 중 오류가 발생했습니다: " + e.getMessage());
+    }
+  }
+
+  @GetMapping("/{roomId}/is-host")
+  @Operation(summary = "방장 권한 확인", description = "현재 사용자가 해당 방의 방장인지 확인합니다.")
+  @GetApiResponses
+  public ResponseEntity<ApiResponse<Map<String, Object>>> checkHostAuthority(
+      HttpServletRequest request,
+      @PathVariable Long roomId) {
+
+    try {
+      boolean isHost = roomService.isHost(request, roomId);
+
+      Map<String, Object> responseData = new HashMap<>();
+      responseData.put("roomId", roomId);
+      responseData.put("isHost", isHost);
+      responseData.put("checkedAt", LocalDateTime.now().toString());
+
+      return ResponseEntity.ok(new ApiResponse<>(false, "방장 권한 확인이 완료되었습니다.", responseData));
+
+    } catch (ApiException e) {
+      return ApiResponse.failedOf(e);
+    } catch (Exception e) {
+      log.error("Unexpected error during host check. RoomId: {}", roomId, e);
+      return ApiResponse.failedOf(HttpStatus.INTERNAL_SERVER_ERROR, "방장 권한 확인 중 오류가 발생했습니다: " + e.getMessage());
     }
   }
 
