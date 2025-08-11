@@ -102,23 +102,8 @@ export const roomAPI = {
             console.log('=== 방 생성 API 호출 시작 ===');
             
             // 인증 상태 먼저 확인
-            const authState = useAuthStore.getState();
-            console.log('방 생성 전 인증 상태 확인:');
-            console.log('- isAuthenticated:', authState.isAuthenticated);
-            console.log('- user:', authState.user);
-            console.log('- accessToken 존재:', !!authState.accessToken);
-            
-            if (!authState.isAuthenticated || !authState.accessToken) {
-                console.error('❌ 인증되지 않은 상태에서 방 생성 시도');
-                throw new Error('로그인이 필요합니다');
-            }
-            
             const headers = getAuthHeaders();
-            console.log('API 요청에 사용할 헤더:', headers);
-            
-            const requestBody = metadata || '{}';
-            console.log('요청 본문:', requestBody);
-            console.log('요청 URL:', `${API_BASE_URL}/room/create`);
+            console.log('요청 헤더:', headers);
             
             const response = await fetch(`${API_BASE_URL}/room/create`, {
                 method: "POST",
@@ -135,6 +120,8 @@ export const roomAPI = {
                 console.error('방 생성 실패 응답 내용:', errorText);
                 
                 if (response.status === 401) {
+                    const authState = useAuthStore.getState();
+                    authState.clearTokens(); // 토큰 정리
                     console.error('🔴 401 에러: 백엔드에서 토큰을 인식하지 못함');
                     console.error('전송된 헤더:', headers);
                     throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
