@@ -48,19 +48,15 @@ export default function UploadPhotoPage() {
       })
       
       const imageUrl = uploadResponse.data.data.url || uploadResponse.data.url
-      console.log('이미지 업로드 성공, URL:', imageUrl)
       
       // 2단계: 받은 URL을 프로필 이미지로 저장
-      const saveResponse = await api.put('/save-face-image', imageUrl, {
+      const saveResponse = await api.put('/user/save-face-image', imageUrl, {
         headers: {
           'Content-Type': 'text/plain'
         }
       })
       
-      console.log('프로필 이미지 URL 저장 성공:', saveResponse.data)
-      
-      // localStorage에 참조 사진 저장
-      localStorage.setItem('userSelfie', selectedImage)
+      // 서버에 저장되었으므로 localStorage 저장 불필요
       
       // 저장 완료 후 메인 페이지로 이동
       router.replace('/')

@@ -5,7 +5,7 @@ export const API_BASE_URL =
     ? 'https://nearzoom.store'
     : 'http://localhost:8080'
 
-// 프론트엔드 콜백 URL (백엔드가 리다이렉트할 주소)
+// 프론트엔드 콜백 URL
 export const FRONTEND_BASE_URL =
   process.env.NODE_ENV === 'production'
     ? 'https://nearzoom.store'
@@ -16,20 +16,38 @@ export const API_ENDPOINTS = {
   REFRESH: '/auth/refresh',
 
   // MyRoom
-  PHOTOS: '/myroom/photos',
-  LIKE: '/myroom/photos/like',
+  PHOTOS: '/photoprompt/result/{jobId}',
+  LIKE: '/photos/heart',
   SAVE_EDITED: '/myroom/photos/save-edited',
   
 
-  // Room
+  // Room (회의룸)
   CREATE_ROOM: '/room/create',
 
-  // PhotoPrompt -> 프론트에서 호출하나???
+  // PhotoPrompt
   PHOTO_SELECTION: '/photoprompt/selection',
   PHOTO_BACKGROUND: '/photoprompt/background',
 
-  // Users
+  // Follow System(피드 쪽)
+  FOLLOW: '/follows',
+  UNFOLLOW: '/follows',  
+  FOLLOWING_LIST: '/follows/following',
+  FOLLOWERS_LIST: '/follows/followers',
+  FOLLOW_CHECK: '/follows/check',
+
+  // Likes (피드 쪽)
+  LIKE_PHOTO: '/likes',
+  UNLIKE_PHOTO: '/likes',
+  LIKE_COUNT: '/likes',
+
+  // Feeds
+  FEEDS: '/feeds',
+  FEED_DETAIL: '/feeds',
+
+  // User Management
   USER_INFO: '/user/userInfo',
+  EMAIL_USER_INFO: '/user/email-user-info',
   LOGOUT: '/user/logout',
-  SIGNOUT: '/signout',
+  SIGNOUT: '/user/signout',
+  SAVE_FACE_IMAGE: '/user/save-face-image',
 }

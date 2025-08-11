@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/auth'
+import { API_BASE_URL } from '@/constants/api'
 
 type PageState = 'loading' | 'success' | 'error'
 
@@ -18,7 +19,6 @@ export default function CallbackPage() {
 
   useEffect(() => {
     if (processed) {
-      console.log('이미 처리됨, 중복 실행 방지')
       return
     }
     
@@ -33,11 +33,9 @@ export default function CallbackPage() {
           throw new Error(`OAuth2 인증 실패: ${error}`)
         }
 
-        console.log('OAuth 로그인 성공, refresh token으로 access token 요청 시작')
-        console.log('현재 쿠키:', document.cookie)
         
         // refresh token으로 access token 요청
-        const tokenResponse = await fetch('http://localhost:8080/auth/refresh', {
+        const tokenResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
           method: 'POST',
           credentials: 'include', // 쿠키 포함
         })
@@ -47,7 +45,6 @@ export default function CallbackPage() {
         }
 
         const tokenData = await tokenResponse.json()
-        console.log('Access token 응답:', tokenData)
         
         // ApiResponse 구조에서 데이터 추출
         const accessToken = tokenData.data?.accessToken
@@ -60,15 +57,13 @@ export default function CallbackPage() {
         handleLoginSuccess(accessToken)
 
         // 사용자 정보 가져오기 (토큰 검증 포함)
-        console.log('콜백에서 fetchUserInfo 호출 시작')
         await fetchUserInfo()
-        console.log('콜백에서 fetchUserInfo 완료')
 
         // 성공 상태로 변경
         setState('success')
         
         // 사용자 정보를 가져온 후 참조 사진이 있는지 확인
-        const userInfo = await fetch('http://localhost:8080/api/user/me', {
+        const userInfo = await fetch(`${API_BASE_URL}/user/userInfo`, {
           headers: {
             'Authorization': `Bearer ${accessToken}`
           }
@@ -76,10 +71,7 @@ export default function CallbackPage() {
         
         if (userInfo.ok) {
           const userData = await userInfo.json()
-          const hasReferencePhoto = userData.data?.faceImageUrl || userData.data?.profileImage
-          
-          console.log('사용자 정보:', userData.data)
-          console.log('참조 사진 존재 여부:', hasReferencePhoto)
+          const hasReferencePhoto = userData.data?.faceImageUrl
           
           // 참조 사진이 없으면 업로드 페이지로, 있으면 메인 페이지로
           setTimeout(() => {

@@ -28,21 +28,16 @@ export const useAuth = () => {
   }
 
   const handleLoginSuccess = (accessToken: string) => {
-    console.log('handleLoginSuccess 호출됨, 토큰:', accessToken)
     setTokens({ accessToken })
-    console.log('setTokens 완료')
   }
 
   const fetchUserInfo = async () => {
     try {
       setLoading(true)
       const response = await userService.getUserInfo()
-      console.log('Raw user info response:', response)
       
-      const rawData = response.data || response
+      const rawData = response
       const userData = userTransformer.fromBackend(rawData)
-      
-      console.log('Converted user data:', userData)
       setUser(userData)
     } catch (error) {
       console.error('사용자 정보 가져오기 실패:', error)
@@ -95,10 +90,39 @@ export const useAuth = () => {
   const handleDeleteAccount = async () => {
     try {
       await userService.deleteUser()
-      logout()
-      router.replace('/')
-    } catch (error) {
-      console.error('회원탈퇴 실패:', error)
+      
+      // 백엔드에서 세션/쿠키 정리가 완료된 후 클라이언트 토큰도 즉시 제거
+      clearTokens()
+      
+      // 카카오 로그아웃 (소셜 로그인 세션 제거)
+      if (typeof window !== 'undefined' && window.Kakao?.Auth) {
+        try {
+          await window.Kakao.Auth.logout()
+        } catch (kakaoError) {
+          console.warn('카카오 로그아웃 실패:', kakaoError)
+        }
+      }
+      
+      // 구글 로그아웃
+      if (typeof window !== 'undefined' && window.google?.accounts) {
+        try {
+          window.google.accounts.id.disableAutoSelect()
+        } catch (googleError) {
+          console.warn('구글 로그아웃 실패:', googleError)
+        }
+      }
+      
+      // router 대신 window.location으로 강제 새로고침하여 모든 상태 초기화
+      if (typeof window !== 'undefined') {
+        window.location.href = '/'
+      }
+    } catch (error: any) {
+      console.error('회원탈퇴 실패:', {
+        message: error?.message,
+        status: error?.status,
+        response: error?.response?.data,
+        error: error
+      })
       throw error
     }
   }

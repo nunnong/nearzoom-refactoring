@@ -6,6 +6,7 @@ import { useState } from 'react'
 
 import api from '@/lib/axios'
 import { User } from '@/types/auth'
+import { API_ENDPOINTS } from '@/constants/api'
 
 import ImageArchive from './ImageArchive'
 import SearchBox from './SearchBox'
@@ -37,19 +38,14 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
-  console.log('Dashboard - received userProfile:', userProfile)
-  console.log('Dashboard - userProfile name:', userProfile?.name)
-  console.log('Dashboard - userProfile data:', userProfile?.data)
-  
   // ApiResponse 형태의 데이터인 경우 실제 데이터 추출
   const actualUser = userProfile?.data ? {
     name: userProfile.data.userName,
     email: userProfile.data.userEmail,
     profileImage: userProfile.data.userProfileImage,
-    socialType: 'GOOGLE' // 현재 구글 로그인
+    faceImageUrl: userProfile.data.faceImageUrl, // 참조 사진 URL 추가
+    socialType: userProfile.data.socialType // 실제 소셜 타입 사용
   } : userProfile
-  
-  console.log('Dashboard - actualUser:', actualUser)
   
   const { handleLogout, handleDeleteAccount, isLoading } = useAuth()
   
@@ -64,7 +60,6 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
 
   // props로 받은 사용자별 이미지 데이터 사용
   useEffect(() => {
-    console.log('📸 사용자별 이미지 데이터 로드:', images)
     setImageList(images)
     setFilteredImages(images)
   }, [images])
@@ -112,6 +107,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
   }
 
   const handleUploadSelfie = (): void => {
+    // 마이룸에서는 항상 모달 열기 (참조 사진 유무와 관계없이)
     setIsUploadSelfieModalOpen(true)
   }
 
@@ -132,18 +128,9 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
     const targetImage = imageList.find(img => img.id === imageId)
     const newIsLiked = !targetImage?.isLiked
 
-    console.log(
-      '❤️ Toggling like for image:',
-      imageId,
-      'Current state:',
-      targetImage?.isLiked,
-      '→ New state:',
-      newIsLiked
-    )
-
     try {
       // API 호출
-      await api.post('/photos/heart', {
+      await api.post(API_ENDPOINTS.LIKE, {
         photoId: imageId,
         isLiked: newIsLiked
       })
@@ -197,20 +184,12 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
 }
 
   const handleDelete = (imageId: string): void => {
-    console.log('Deleting image:', imageId)
-
     // 로컬 상태 업데이트
     setImageList(prevImages => prevImages.filter(img => img.id !== imageId))
   }
 
   const handleEdit = (imageId: string): void => {
     const imageToEdit = imageList.find(img => img.id === imageId)
-    console.log(
-      'Edit requested for image:',
-      imageId,
-      'Image data:',
-      imageToEdit
-    )
 
     if (imageToEdit && !imageToEdit.isEdited) {
       // drawing 페이지로 라우팅 (이미지 ID와 src, returnUrl을 쿼리 파라미터로 전달)
@@ -220,8 +199,6 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
       router.push(
         `/drawing?id=${imageId}&src=${encodedSrc}&returnUrl=${encodedReturnUrl}`
       )
-    } else if (imageToEdit?.isEdited) {
-      console.log('Cannot edit: Image is already edited')
     }
   }
 
@@ -427,30 +404,6 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
                 <div className="space-y-4">
                   <div className="border-t border-gray-200 pt-4">
                     <dl className="space-y-3">
-                      <div className="flex justify-between">
-                        <dt className="text-sm font-medium text-gray-500">소셜 로그인</dt>
-                        <dd className="text-sm text-gray-900 flex items-center">
-                          <div className="flex items-center space-x-1">
-                            {actualUser?.socialType === 'KAKAO' ? (
-                              <>
-                                <div className="w-4 h-4 bg-yellow-400 rounded-sm flex items-center justify-center">
-                                  <span className="text-xs font-bold text-black">K</span>
-                                </div>
-                                <span>카카오</span>
-                              </>
-                            ) : actualUser?.socialType === 'GOOGLE' ? (
-                              <>
-                                <div className="w-4 h-4 bg-white border border-gray-300 rounded-sm flex items-center justify-center">
-                                  <span className="text-xs font-bold text-blue-600">G</span>
-                                </div>
-                                <span>구글</span>
-                              </>
-                            ) : (
-                              <span className="text-gray-500">알 수 없음</span>
-                            )}
-                          </div>
-                        </dd>
-                      </div>
                       <div className="flex justify-between">
                         <dt className="text-sm font-medium text-gray-500">이메일</dt>
                         <dd className="text-sm text-gray-900">{actualUser?.email || '이메일 정보 없음'}</dd>

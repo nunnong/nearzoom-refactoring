@@ -20,13 +20,14 @@ export default function UploadSelfieModal({ isOpen, onClose, userProfile }: Uplo
   const [currentReferenceImage, setCurrentReferenceImage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // 모달이 열릴 때 기존 참조 사진 로드
+  // 모달이 열릴 때 서버에서 기존 참조 사진 로드
   React.useEffect(() => {
     if (isOpen) {
-      const existingImage = localStorage.getItem('userSelfie')
-      setCurrentReferenceImage(existingImage)
+      // userProfile에서 참조 사진 URL 가져오기 (프로필 사진과 구분)
+      const referenceImageUrl = userProfile?.faceImageUrl
+      setCurrentReferenceImage(referenceImageUrl || null)
     }
-  }, [isOpen])
+  }, [isOpen, userProfile])
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -35,8 +36,7 @@ export default function UploadSelfieModal({ isOpen, onClose, userProfile }: Uplo
       reader.onload = (e) => {
         const result = e.target?.result as string
         setSelectedImage(result)
-        // localStorage에 셀피 업로드 상태 저장
-        localStorage.setItem('userSelfie', result)
+        // 임시 미리보기용으로만 사용 (저장하지 않음)
       }
       reader.readAsDataURL(file)
     }
@@ -67,16 +67,13 @@ export default function UploadSelfieModal({ isOpen, onClose, userProfile }: Uplo
       })
       
       const imageUrl = uploadResponse.data.data.url || uploadResponse.data.url
-      console.log('이미지 업로드 성공, URL:', imageUrl)
       
       // 2단계: 받은 URL을 프로필 이미지로 저장
-      const saveResponse = await api.put('/save-face-image', imageUrl, {
+      const saveResponse = await api.put('/user/save-face-image', imageUrl, {
         headers: {
           'Content-Type': 'text/plain'
         }
       })
-      
-      console.log('프로필 이미지 URL 저장 성공:', saveResponse.data)
       
       // 저장 완료 후 모달 닫기
       onClose()
@@ -107,7 +104,8 @@ export default function UploadSelfieModal({ isOpen, onClose, userProfile }: Uplo
 
   const handleDelete = () => {
     setSelectedImage(null)
-    localStorage.removeItem('userSelfie')
+    setCurrentReferenceImage(null)
+    // 실제 서버에서 삭제하는 API 호출이 필요하다면 여기에 추가
   }
 
   if (!isOpen) return null
