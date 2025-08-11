@@ -27,7 +27,7 @@ const ExitConfirmModal: React.FC<ExitConfirmModalProps> = ({
       {/* Modal */}
       <div className="relative z-10 w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
         <div className="flex items-center space-x-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
             <ExclamationTriangleIcon className="h-6 w-6 text-orange-600" />
           </div>
           <div className="flex-1">
@@ -49,7 +49,7 @@ const ExitConfirmModal: React.FC<ExitConfirmModalProps> = ({
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+            className="flex-1 rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
           >
             나가기
           </button>

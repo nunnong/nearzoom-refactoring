@@ -55,6 +55,8 @@ interface KonvaCanvasProps {
   onTextSelect: (textId: string | null) => void
   onTextDelete: (textId: string) => void
   onTextUpdate: (textId: string, updates: Partial<TextData>) => void
+  onIncreaseFontSize: (textId: string) => void
+  onDecreaseFontSize: (textId: string) => void
 }
 
 const KonvaCanvas: React.FC<KonvaCanvasProps> = ({
@@ -69,12 +71,13 @@ const KonvaCanvas: React.FC<KonvaCanvasProps> = ({
   onMouseDown,
   onMouseMove,
   onMouseUp,
-  onStickerDelete,
-  onStickerUpdate,
+  onStickerUpdate, 
   onStickerSelect,
   onTextSelect,
   onTextDelete,
   onTextUpdate,
+  onIncreaseFontSize,
+  onDecreaseFontSize,
 }) => {
   const [selectedSticker, setSelectedSticker] = useState<string | null>(null)
   const [selectedText, setSelectedText] = useState<string | null>(null)
@@ -203,28 +206,32 @@ const KonvaCanvas: React.FC<KonvaCanvasProps> = ({
     }
   }
 
-  const handleTextTransform = (e: any, textId: string) => {
-    const node = e.target
-    const scaleX = node.scaleX()
-    const scaleY = node.scaleY()
-    const rotation = node.rotation()
+ const handleTextTransform = (e: any, textId: string) => {
+  const node = e.target;
+  const scaleX = node.scaleX();
+  const scaleY = node.scaleY();
+  const rotation = node.rotation();
 
-    // 텍스트의 경우 fontSize를 조정
-    const textItem = texts.find(t => t.id === textId)
-    if (textItem) {
-      // 현재 폰트 크기에 스케일을 적용하여 새로운 폰트 크기 계산
-      const currentFontSize = textItem.fontSize
-      const scaleFactor = Math.max(scaleX, scaleY)
-      const newFontSize = Math.max(12, Math.round(currentFontSize * scaleFactor))
-      
-      onTextUpdate(textId, {
-        x: node.x(),
-        y: node.y(),
-        fontSize: newFontSize,
-        rotation: rotation,
-      })
-    }
+  const textItem = texts.find(t => t.id === textId);
+  if (textItem) {
+    const currentFontSize = textItem.fontSize;
+    const scaleFactor = Math.max(scaleX, scaleY);
+    const newFontSize = Math.max(12, Math.round(currentFontSize * scaleFactor));
+
+    // **fontSize를 state에 실제로 반영!**
+    onTextUpdate(textId, {
+      x: node.x(),
+      y: node.y(),
+      fontSize: newFontSize,
+      rotation: rotation,
+    });
+
+    // 스케일을 1로 초기화
+    node.scaleX(1);
+    node.scaleY(1);
   }
+};
+
   return (
     <Stage
       ref={stageRef}

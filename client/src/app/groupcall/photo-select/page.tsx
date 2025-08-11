@@ -1,20 +1,52 @@
 'use client'
 
-import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useState, useCallback, useMemo } from 'react'
 
 import ControlPanel from '@/components/page/groupcall/ControlPanel'
 import Header from '@/components/page/groupcall/Header'
 import FrameColorSelector from '@/components/page/groupcall/photo-select/FrameColorSelector'
-import PhotoCutSelector from '@/components/page/groupcall/photo-select/PhotoCutSelector'
 import PhotoPicker from '@/components/page/groupcall/photo-select/PhotoPicker'
-import WebCam from '@/components/page/groupcall/photo-select/WebCam'
+import Preview from '@/components/page/groupcall/photo-select/Preview'
+import ToggleSwitch from '@/components/page/groupcall/photo-select/ToggleSwitch'
+import Webcam from '@/components/page/groupcall/photo-select/WebCam'
+import WebcamBar from '@/components/page/groupcall/photo-select/WebcamBar'
+import StartButton from '@/components/page/groupcall/StartButton'
 import { cn } from '@/lib/utils'
 
-// 메인 페이지 컴포넌트
+// 타입 정의
+interface Participant {
+  id: string
+  email: string
+  name?: string
+  avatar?: string
+  isHost: boolean
+  isMicOn: boolean
+  isCameraOn: boolean
+  isConnected: boolean
+}
+
+interface CurrentUser {
+  id: string
+  email: string
+  name?: string
+  avatar?: string
+  isMicOn: boolean
+  isCameraOn: boolean
+  isHost: boolean
+}
+
+interface RoomInfo {
+  id: string
+  url: string
+  title?: string
+  createdAt: string
+}
+
 interface PhotoSelectPageProps {
-  participants?: any[]
-  currentUser?: any
-  roomInfo?: any
+  participants?: Participant[]
+  currentUser?: CurrentUser
+  roomInfo?: RoomInfo
   onComplete?: (selections: {
     cutCount: number
     selectedPhotos: string[]
@@ -45,7 +77,6 @@ export default function PhotoSelectPage({
   },
   onComplete = () => {},
   onLeaveRoom = () => {},
-  onCopyRoomUrl = () => {},
   onMicToggle = () => {},
   onCameraToggle = () => {},
   className,
@@ -54,18 +85,34 @@ export default function PhotoSelectPage({
   const [cutCount, setCutCount] = useState<number>(4)
   const [selectedPhotos, setSelectedPhotos] = useState<string[]>([])
   const [frameColor, setFrameColor] = useState<string>('#FFFFFF')
+  const [currentUserState, setCurrentUserState] = useState(currentUser)
+
+  const router = useRouter()
+
+  // useCallback으로 최적화된 핸들러들
+  const handleMicToggle = useCallback(() => {
+    setCurrentUserState(prev => ({
+      ...prev,
+      isMicOn: !prev.isMicOn
+    }))
+    onMicToggle()
+  }, [onMicToggle])
+
+  const handleCameraToggle = useCallback(() => {
+    setCurrentUserState(prev => ({
+      ...prev,
+      isCameraOn: !prev.isCameraOn
+    }))
+    onCameraToggle()
+  }, [onCameraToggle])
+
+  const handleLeaveRoom = useCallback(() => {
+    onLeaveRoom()
+  }, [onLeaveRoom])
+
 
   // 더미 데이터
-  const mockParticipants = [
-    {
-      id: '1',
-      name: '김싸피',
-      email: 'ssafy123.5@gmail.com',
-      isHost: true,
-      isMicOn: true,
-      isCameraOn: true,
-      isConnected: true,
-    },
+  const mockParticipants: Participant[] = useMemo(() => [
     {
       id: '2',
       name: '박싸피',
@@ -93,110 +140,185 @@ export default function PhotoSelectPage({
       isCameraOn: false,
       isConnected: true,
     },
-  ]
+  ], [])
 
-  // 더미 사진 데이터 (실제로는 촬영된 4컷 이미지)
-  const capturedPhotos = [
+  const capturedPhotos = useMemo(() => [
     'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&h=400&fit=crop',
     'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&h=400&fit=crop',
     'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&h=400&fit=crop',
     'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop',
-  ]
+  ], [])
 
-  const frameColors = [
+  const frameColors = useMemo(() => [
     '#FFFFFF',
     '#000000',
     '#929292',
     '#73c0ef',
     '#293e85',
     '#2D3243',
-  ]
+  ], [])
 
-  const displayParticipants =
-    participants.length > 0 ? participants : mockParticipants
+  const displayParticipants = useMemo(() => 
+    participants.length > 0 ? participants : mockParticipants,
+    [participants, mockParticipants]
+  )
 
-  const handleComplete = () => {
+  // 컷수 변경 핸들러
+  const handleCutCountChange = useCallback((value: string | number) => {
+    setCutCount(Number(value))
+    setSelectedPhotos([]) 
+  }, [])
+
+  // 완료 핸들러
+  const handleComplete = useCallback(() => {
     if (selectedPhotos.length === cutCount) {
-      onComplete({
+      const selections = {
         cutCount,
         selectedPhotos,
-        frameColor,
-      })
+        frameColor
+      }
+      
+      localStorage.setItem('photoSelectData', JSON.stringify(selections))
+      onComplete(selections)
+      router.push('/groupcall/background-select')
     }
-  }
+  }, [selectedPhotos, cutCount, frameColor, onComplete, router])
 
-  const isCompleteDisabled = selectedPhotos.length !== cutCount
+  // 완료 버튼 비활성화 상태
+  const isCompleteDisabled = useMemo(() => 
+    selectedPhotos.length !== cutCount,
+    [selectedPhotos.length, cutCount]
+  )
 
   return (
-    <div className={cn('flex min-h-screen flex-col bg-[#F5F6EF]', className)}>
+    <div className={cn('flex min-h-screen flex-col bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50', className)}>
       {/* Header */}
       <Header
         roomInfo={roomInfo}
-        onLeaveRoom={onLeaveRoom}
-        onCopyRoomUrl={onCopyRoomUrl}
+        onLeaveRoom={handleLeaveRoom}
       />
 
+      {/* Zoom 스타일 웹캠 바 - 모바일에서만 표시 */}
+      <div className="block md:hidden">
+        <WebcamBar
+          participants={displayParticipants}
+          currentUser={currentUserState}
+          position="bottom"
+        />
+      </div>
+
       {/* 메인 컨텐츠 */}
-      <div className="flex flex-1 gap-4 bg-gray-100 px-8 py-6">
-        {/* 왼쪽: 사진 선택 영역 */}
-        <div className="flex-1 rounded-lg bg-white p-6 shadow-sm">
-          <div className="mb-4 text-center">
-            <p className="text-sm font-bold text-gray-600">
-              원하는 컷 수를 선택하고 사진을 골라주세요
-            </p>
-          </div>
+      <main className={cn(
+        'flex flex-1 flex-col gap-4 bg-[#2d3243] p-4 md:flex-row md:gap-6 md:p-6 lg:p-8',
+      
+        'pb-24 md:pb-4'
+      )}>
+        {/* 메인 영역 */}
+        <section className="min-w-0 flex-1">
+          <div className="rounded-2xl border border-white/20 bg-white/95 backdrop-blur-sm p-3 shadow-lg sm:p-4 lg:p-6">
+            <div className="mx-auto max-w-6xl space-y-6 sm:space-y-8">
+              
+              {/* 사진 선택과 프레임 선택 */}
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-5 lg:gap-8 xl:gap-12 mt-4 mb-8">
+                
+                {/* 왼쪽: 사진 선택 */}
+                <div className="space-y-4 lg:col-span-3">
+                  <h2 className="text-lg font-extrabold tracking-tight text-gray-900 text-center sm:text-xl">
+                    Select Photos
+                  </h2>
+                  
+                  <div className="flex justify-center">
+                    <ToggleSwitch
+                      options={[
+                        { value: 1, label: '1컷' },
+                        { value: 2, label: '2컷' },
+                        { value: 4, label: '4컷' },
+                      ]}
+                      value={cutCount}
+                      onChange={handleCutCountChange} 
+                    />
+                  </div>
+                  
+                  <PhotoPicker
+                    photos={capturedPhotos}
+                    cutCount={cutCount}
+                    selected={selectedPhotos}
+                    onSelect={setSelectedPhotos}
+                  />
+                </div>
 
-          <div className="mx-auto max-w-2xl space-y-6">
-            {/* 컷 수 선택 */}
-            <PhotoCutSelector cutCount={cutCount} onChange={setCutCount} />
+                {/* 오른쪽: 프레임 색상 + 미리보기 + 완료 버튼 */}
+                <div className="space-y-4 lg:col-span-2 lg:space-y-6">
+                  
+                  <div className="space-y-3">
+                    <h2 className="text-lg font-extrabold tracking-tight text-gray-900 text-center sm:text-xl">
+                      Frame Color
+                    </h2>
+                    <FrameColorSelector
+                      frameColor={frameColor}
+                      onFrameColorChange={setFrameColor}
+                      palette={frameColors}
+                    />
+                  </div>
 
-            {/* 사진 선택 */}
-            <PhotoPicker
-              photos={capturedPhotos}
-              cutCount={cutCount}
-              selected={selectedPhotos}
-              onSelect={setSelectedPhotos}
-            />
+                  <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-3 text-center sm:p-4">
+                    <div className="mb-2 text-sm text-gray-500 sm:text-base">Preview</div>
+                    <div className="flex justify-center">
+                      <Preview
+                        cutCount={cutCount}
+                        selectedPhotos={selectedPhotos}
+                        frameColor={frameColor}
+                        className="max-w-full"
+                      />
+                    </div>
+                  </div>
 
-            {/* 프레임 색상 선택 */}
-            <FrameColorSelector
-              frameColor={frameColor}
-              onFrameColorChange={setFrameColor}
-              palette={frameColors}
-            />
+                  <div className="flex flex-col items-center justify-center space-y-3 pt-2">
+                    <StartButton
+                      onClick={handleComplete}
+                      disabled={isCompleteDisabled}
+                      className="w-full max-w-xs sm:w-54"
+                    >
+                      DONE
+                    </StartButton>
 
-            {/* 완료 버튼 */}
-            <div className="flex justify-center pt-4">
-              <button
-                onClick={handleComplete}
-                disabled={isCompleteDisabled}
-                className={`rounded-lg px-8 py-3 text-lg font-semibold transition-all ${
-                  isCompleteDisabled
-                    ? 'cursor-not-allowed bg-gray-300 text-gray-500'
-                    : 'bg-[#2D3243] text-white shadow-lg hover:bg-[#C9D76D] hover:text-[#2D3243] active:scale-95'
-                }`}
-              >
-                선택 완료
-              </button>
+                    {isCompleteDisabled && (
+                      <p className="text-center text-xs text-gray-500 sm:text-base">
+                        <span className="hidden sm:inline">
+                          {cutCount}장의 사진을 모두 선택해주세요
+                        </span>
+                        <span className="sm:hidden">
+                          {cutCount}장 선택 필요
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* 오른쪽: 사이드바 (참가자 웹캠) */}
-        <div className="flex w-80 flex-col gap-6">
-          <WebCam
-            participants={displayParticipants}
-            currentUser={currentUser}
-          />
-          <ControlPanel
-            currentUser={currentUser}
-            onMicToggle={onMicToggle}
-            onCameraToggle={onCameraToggle}
-            onLeaveRoom={onLeaveRoom}
-            showLeaveButton={true}
-          />
-        </div>
-      </div>
+        {/* 데스크톱 사이드바 */}
+        <aside className="hidden w-[300px] shrink-0 md:block lg:w-80">
+          <div className="flex flex-col gap-3 sm:gap-4">
+            {/* Webcam 컴포넌트 */}
+            <Webcam
+              participants={displayParticipants}
+              currentUser={currentUserState}
+            />
+            
+            {/* 컨트롤 패널 */}
+            <ControlPanel
+              currentUser={currentUserState}
+              onMicToggle={handleMicToggle}
+              onCameraToggle={handleCameraToggle}
+              onLeaveRoom={handleLeaveRoom}
+              showLeaveButton={true}
+            />
+          </div>
+        </aside>
+      </main>
     </div>
   )
 }

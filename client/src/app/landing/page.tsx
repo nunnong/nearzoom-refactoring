@@ -69,7 +69,7 @@ export default function LandingPage() {
     tl.to(
       [letters[0], letters[1], letters[2], letters[3]],
       {
-        x: (i: number) => [-200, -100, 100, 200][i],
+        x: (i: number) => [-350, -180, 180, 350][i],
         y: -40,
         duration: 0.8,
         ease: 'power2.out',
@@ -122,7 +122,7 @@ export default function LandingPage() {
       linkRotateAnim.kill()
       tl.kill()
     }
-  }, [])
+  }, [router])
 
   // 각 글자에 해당하는 PNG 파일 경로
   const letterImages = [
@@ -147,13 +147,14 @@ export default function LandingPage() {
             alt={letter.alt}
             width={48}
             height={48}
-            className="absolute select-none"
+            className="absolute h-[48px] w-[48px] select-none"
             style={{
               left: '50%',
               top: '50%',
               transformOrigin: 'center',
               transform: 'translate(-50%, -50%)',
             }}
+            draggable={false}
           />
         ))}
 
@@ -163,12 +164,13 @@ export default function LandingPage() {
           alt="link"
           width={70}
           height={70}
-          className="absolute select-none"
+          className="absolute h-[70px] w-[70px] select-none"
           style={{
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
           }}
+          draggable={false}
         />
       </div>
     </div>

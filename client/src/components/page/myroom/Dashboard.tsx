@@ -4,21 +4,17 @@ import { useRouter } from 'next/navigation'
 import React, { useEffect } from 'react'
 import { useState } from 'react'
 
-import {
-  getImagesFromLocal,
-  updateImageInLocal,
-  deleteImageFromLocal,
-  initializeTestImages,
-} from '@/utils/localStorage'
-import { saveReferenceImage } from '@/utils/localStorage'
+import api from '@/lib/axios'
+import { User } from '@/types/auth'
+import { API_ENDPOINTS } from '@/constants/api'
 
-import HomeButton from './HomeButton'
 import ImageArchive from './ImageArchive'
-import LogoutButton from './LogoutButton'
 import SearchBox from './SearchBox'
 import SideList from './SideList'
+import HomeButton from './HomeButton'
+import LogoutButton from './LogoutButton'
 import UploadSelfieModal from './UploadSelfieModal'
-
+import { useAuth } from '@/hooks/auth'
 
 interface ImageItem {
   id: string
@@ -36,51 +32,37 @@ interface Filter {
   display: string
 }
 
-interface UserProfile {
-  profileImage?: string
-  email?: string
-  name?: string
-}
-
 interface DashboardProps {
   images?: ImageItem[]
-  userProfile?: UserProfile
+  userProfile?: User | null
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
+  // ApiResponse 형태의 데이터인 경우 실제 데이터 추출
+  const actualUser = userProfile?.data ? {
+    name: userProfile.data.userName,
+    email: userProfile.data.userEmail,
+    profileImage: userProfile.data.userProfileImage,
+    faceImageUrl: userProfile.data.faceImageUrl, // 참조 사진 URL 추가
+    socialType: userProfile.data.socialType // 실제 소셜 타입 사용
+  } : userProfile
+  
+  const { handleLogout, handleDeleteAccount, isLoading } = useAuth()
+  
   const router = useRouter()
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true) // 기본값을 true로 변경
   const [activeModal, setActiveModal] = useState<string | null>(null)
   const [imageList, setImageList] = useState<ImageItem[]>([])
   const [filteredImages, setFilteredImages] = useState<ImageItem[]>([])
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false)
+  const [isMyFeedOpen, setIsMyFeedOpen] = useState<boolean>(false)
+  const [isUploadSelfieModalOpen, setIsUploadSelfieModalOpen] = useState<boolean>(false)
 
-  // localStorage에서 이미지 데이터 로드
+  // props로 받은 사용자별 이미지 데이터 사용
   useEffect(() => {
-    // 첫 로드 시 테스트 데이터 초기화
-    initializeTestImages(images)
-
-    // localStorage에서 데이터 로드
-    const savedImages = getImagesFromLocal()
-    console.log('📸 Loaded images from localStorage:', savedImages)
-    setImageList(savedImages)
-    setFilteredImages(savedImages)
+    setImageList(images)
+    setFilteredImages(images)
   }, [images])
-
-  // 페이지 로드 시 localStorage 데이터 새로고침
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const savedImages = getImagesFromLocal()
-      setImageList(savedImages)
-      setFilteredImages(savedImages)
-    }
-
-    // 다른 탭에서 localStorage 변경 시 동기화
-    window.addEventListener('storage', handleStorageChange)
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange)
-    }
-  }, [])
 
   // 현재 활성화된 필터들을 추적
   const [activeFilters, setActiveFilters] = useState<Filter[]>([])
@@ -125,14 +107,8 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
   }
 
   const handleUploadSelfie = (): void => {
-    setActiveModal('upload')
-  }
-
-  const handleSelfieUpload = (imageData: string): void => {
-    // 참고 이미지로 저장
-    saveReferenceImage(imageData)
-    console.log('Selfie uploaded and saved as reference image')
-    setActiveModal(null)
+    // 마이룸에서는 항상 모달 열기 (참조 사진 유무와 관계없이)
+    setIsUploadSelfieModalOpen(true)
   }
 
 
@@ -148,53 +124,72 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
     setIsSidebarOpen(!isSidebarOpen)
   }
 
-  const handleLike = (imageId: string): void => {
+  const handleLike = async (imageId: string): Promise<void> => {
     const targetImage = imageList.find(img => img.id === imageId)
     const newIsLiked = !targetImage?.isLiked
 
-    console.log(
-      '❤️ Toggling like for image:',
-      imageId,
-      'Current state:',
-      targetImage?.isLiked,
-      '→ New state:',
-      newIsLiked
-    )
+    try {
+      // API 호출
+      await api.post(API_ENDPOINTS.LIKE, {
+        photoId: imageId,
+        isLiked: newIsLiked
+      })
 
-    // localStorage 업데이트
-    updateImageInLocal(imageId, { isLiked: newIsLiked })
-
-    // 로컬 상태 업데이트
-    setImageList(prevImages =>
-      prevImages.map(img =>
-        img.id === imageId ? { ...img, isLiked: newIsLiked } : img
+      // 로컬 상태 업데이트
+      setImageList(prevImages =>
+        prevImages.map(img =>
+          img.id === imageId ? { ...img, isLiked: newIsLiked } : img
+        )
       )
-    )
+    } catch (error) {
+      console.error('하트 상태 업데이트 실패:', error)
+    }
   }
 
   const handleShareKakao = (imageId: string): void => {
-    console.log('Share to KakaoTalk:', imageId)
-    // TODO: 카카오톡 공유 API 연동
+  const targetImage = imageList.find(img => img.id === imageId)
+  if (!targetImage) {
+    console.error('Image not found:', imageId)
+    return
   }
 
+  if (typeof window !== 'undefined' && (window as any).Kakao && (window as any).Kakao.Share) {
+    if (!(window as any).Kakao.isInitialized()) {
+      console.error('Kakao SDK not initialized')
+      alert('카카오톡 공유 기능을 사용할 수 없습니다.')
+      return
+    }
+
+    try {
+      (window as any).Kakao.Share.sendDefault({
+        objectType: 'feed',
+        content: {
+          title: targetImage.alt || '내가 그린 그림',
+          description: '이어줌에서 함께 그린 특별한 추억이에요!',
+          imageUrl: targetImage.src,
+          link: {
+            webUrl: window.location.href,
+            mobileWebUrl: window.location.href,
+          },
+        },
+      })
+    } catch (error) {
+      console.error('카카오톡 공유 실패:', error)
+      alert('카카오톡 공유에 실패했습니다. 다시 시도해주세요.')
+    }
+  } else {
+    console.error('Kakao SDK not loaded')
+    alert('카카오톡 공유 기능을 사용할 수 없습니다.')
+  }
+}
+
   const handleDelete = (imageId: string): void => {
-    console.log('Deleting image:', imageId)
-
-    // localStorage에서 삭제
-    deleteImageFromLocal(imageId)
-
     // 로컬 상태 업데이트
     setImageList(prevImages => prevImages.filter(img => img.id !== imageId))
   }
 
   const handleEdit = (imageId: string): void => {
     const imageToEdit = imageList.find(img => img.id === imageId)
-    console.log(
-      'Edit requested for image:',
-      imageId,
-      'Image data:',
-      imageToEdit
-    )
 
     if (imageToEdit && !imageToEdit.isEdited) {
       // drawing 페이지로 라우팅 (이미지 ID와 src, returnUrl을 쿼리 파라미터로 전달)
@@ -204,8 +199,6 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
       router.push(
         `/drawing?id=${imageId}&src=${encodedSrc}&returnUrl=${encodedReturnUrl}`
       )
-    } else if (imageToEdit?.isEdited) {
-      console.log('Cannot edit: Image is already edited')
     }
   }
 
@@ -213,7 +206,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
     <div className="min-h-screen bg-gray-50">
       <SideList
         isOpen={isSidebarOpen}
-        userProfile={userProfile}
+        userProfile={actualUser}
         onUploadSelfie={handleUploadSelfie}
         onAccount={handleAccount}
         onClose={() => setIsSidebarOpen(false)}
@@ -248,7 +241,98 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
             </div>
             <div className="flex items-center space-x-3">
               <HomeButton />
-              <LogoutButton />
+
+              {/* Hamburger Menu Button */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsMenuOpen(!isMenuOpen)}
+                  className="p-2 rounded-md hover:bg-gray-100 transition-colors focus:outline-none"
+                >
+                  <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+                
+                {/* Dropdown Menu */}
+                {isMenuOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                    <div className="py-2">
+                      {/* MY FEED with nested dropdown */}
+                      <div className="relative">
+                        <button
+                          onClick={() => setIsMyFeedOpen(!isMyFeedOpen)}
+                          className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center justify-between gap-2 text-gray-800"
+                        >
+                          <div className="flex items-center gap-2">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7H3a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2z" />
+                            </svg>
+                            MY FEED
+                          </div>
+                          <svg className={`w-4 h-4 transition-transform ${isMyFeedOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        
+                        {/* MY FEED Icons Submenu */}
+                        {isMyFeedOpen && (
+                          <div className="ml-4 border-l-2 border-gray-100">
+                            <button
+                              onClick={() => {
+                                /* Home.png 관련 새로운 기능 */
+                                setIsMyFeedOpen(false)
+                                setIsMenuOpen(false)
+                              }}
+                              className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2 text-gray-800"
+                            >
+                              <img src="/Home.png" alt="Home Feed" className="w-5 h-5 object-contain" />
+                              Home
+                            </button>
+                            <button
+                              onClick={() => {
+                                /* Search.png 관련 새로운 기능 */
+                                setIsMyFeedOpen(false)
+                                setIsMenuOpen(false)
+                              }}
+                              className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2 text-gray-800"
+                            >
+                              <img src="/Search.png" alt="All feeds" className="w-5 h-5 object-contain" />
+                              Search
+                            </button>
+                            <button
+                              onClick={() => {
+                                /* User.png 관련 새로운 기능 */
+                                setIsMyFeedOpen(false)
+                                setIsMenuOpen(false)
+                              }}
+                              className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2 text-gray-800"
+                            >
+                              <img src="/User.png" alt="My feed" className="w-5 h-5 object-contain" />
+                              Profile
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <hr className="my-2 border-gray-200" />
+                      
+                      <button
+                        onClick={() => {
+                          handleLogout()
+                          setIsMenuOpen(false)
+                        }}
+                        disabled={isLoading}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-100 transition-colors flex items-center gap-2 text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        {isLoading ? '로그아웃 중...' : 'LOGOUT'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </header>
@@ -268,11 +352,6 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
         </main>
       </div>
 
-      <UploadSelfieModal
-        isOpen={activeModal === 'upload'}
-        onClose={closeModal}
-        onUpload={handleSelfieUpload}
-      />
 
 
       {activeModal === 'account' && (
@@ -299,9 +378,9 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
                 {/* Profile Section */}
                 <div className="flex items-center space-x-4">
                   <div className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center">
-                    {userProfile?.profileImage ? (
+                    {actualUser?.profileImage ? (
                       <img
-                        src={userProfile.profileImage}
+                        src={actualUser.profileImage}
                         alt="Profile"
                         className="h-full w-full rounded-full object-cover"
                       />
@@ -313,10 +392,10 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
                   </div>
                   <div>
                     <h4 className="text-lg font-medium text-gray-900">
-                      {userProfile?.name || '사용자'}
+                      {actualUser?.name || '사용자'}
                     </h4>
                     <p className="text-sm text-gray-500">
-                      {userProfile?.email || 'user@example.com'}
+                      {actualUser?.email || 'user@example.com'}
                     </p>
                   </div>
                 </div>
@@ -326,27 +405,12 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
                   <div className="border-t border-gray-200 pt-4">
                     <dl className="space-y-3">
                       <div className="flex justify-between">
-                        <dt className="text-sm font-medium text-gray-500">소셜 로그인</dt>
-                        <dd className="text-sm text-gray-900 flex items-center">
-                          <div className="flex items-center space-x-1">
-                            <div className="w-4 h-4 bg-yellow-400 rounded-sm flex items-center justify-center">
-                              <span className="text-xs font-bold text-black">K</span>
-                            </div>
-                            <span>카카오</span>
-                          </div>
-                        </dd>
-                      </div>
-                      <div className="flex justify-between">
                         <dt className="text-sm font-medium text-gray-500">이메일</dt>
-                        <dd className="text-sm text-gray-900">{userProfile?.email || 'user@kakao.com'}</dd>
+                        <dd className="text-sm text-gray-900">{actualUser?.email || '이메일 정보 없음'}</dd>
                       </div>
                       <div className="flex justify-between">
-                        <dt className="text-sm font-medium text-gray-500">가입일</dt>
-                        <dd className="text-sm text-gray-900">2024.01.15</dd>
-                      </div>
-                      <div className="flex justify-between">
-                        <dt className="text-sm font-medium text-gray-500">마지막 로그인</dt>
-                        <dd className="text-sm text-gray-900">2024.08.02</dd>
+                        <dt className="text-sm font-medium text-gray-500">사용자명</dt>
+                        <dd className="text-sm text-gray-900">{actualUser?.name || '사용자명 없음'}</dd>
                       </div>
                     </dl>
                   </div>
@@ -358,10 +422,14 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
             <div className="border-t border-gray-200 px-6 py-4">
               <div className="flex items-center justify-between">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (confirm('정말로 회원탈퇴를 하시겠습니까?\n탈퇴 시 모든 데이터가 삭제됩니다.')) {
-                      console.log('회원탈퇴 처리')
-                      // TODO: 회원탈퇴 로직 구현
+                      try {
+                        await handleDeleteAccount()
+                        alert('회원탈퇴가 완료되었습니다.')
+                      } catch (error) {
+                        alert('회원탈퇴 중 오류가 발생했습니다.')
+                      }
                     }
                   }}
                   className="text-sm text-red-600 hover:text-red-800 underline"
@@ -379,6 +447,13 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
           </div>
         </div>
       )}
+
+      {/* Upload Selfie Modal */}
+      <UploadSelfieModal
+        isOpen={isUploadSelfieModalOpen}
+        onClose={() => setIsUploadSelfieModalOpen(false)}
+        userProfile={actualUser}
+      />
     </div>
   )
 }

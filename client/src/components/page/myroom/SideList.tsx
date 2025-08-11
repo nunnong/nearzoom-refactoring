@@ -1,7 +1,7 @@
 'use client'
 
 import { CameraIcon, UserIcon } from '@heroicons/react/24/outline'
-import React from 'react'
+import { User } from '@/types/auth'
 
 interface MenuItem {
   id: string
@@ -10,16 +10,10 @@ interface MenuItem {
   onClick?: () => void
 }
 
-interface UserProfile {
-  profileImage?: string
-  email?: string
-  name?: string
-}
-
 interface SideListProps {
   className?: string
   isOpen?: boolean
-  userProfile?: UserProfile
+  userProfile?: User | null
   onUploadSelfie?: () => void
   onAccount?: () => void
   onClose?: () => void
@@ -97,7 +91,7 @@ const SideList: React.FC<SideListProps> = ({
             </button>
           </header>
 
-          {/* Profile Section */}
+          {/* 예쁜 사진 */}
           <div className="border-b border-slate-700/50 p-6">
             <div className="flex flex-col items-center space-y-3">
               {/* Profile Image */}
@@ -126,7 +120,7 @@ const SideList: React.FC<SideListProps> = ({
                 ></div>
               </div>
 
-              {/* User Info */}
+              {/*사용자 정보 */}
               <div className="text-center">
                 {userProfile?.name ? (
                   <p className="text-sm font-medium text-white">
@@ -173,7 +167,7 @@ const SideList: React.FC<SideListProps> = ({
           {/* Footer */}
           <footer className="border-t border-slate-700/50 p-4">
             <div className="text-center text-xs text-slate-500">
-              © 2024 NearZoom
+              © 2025 NearZoom
             </div>
           </footer>
         </div>

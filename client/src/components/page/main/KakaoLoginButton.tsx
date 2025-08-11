@@ -10,22 +10,18 @@ interface KakaoLoginButtonProps {
   disabled?: boolean
 }
 
-const KakaoLoginButton = ({
-  onClick,
-  className,
-  disabled = false,
-}: KakaoLoginButtonProps): JSX.Element => {
+const KakaoLoginButton = ({ onClick, className, disabled = false }: KakaoLoginButtonProps): JSX.Element => {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'flex w-full items-center justify-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors',
-        'bg-[#FEE500] text-[#191919] hover:bg-[#FFEB3B] disabled:cursor-not-allowed disabled:opacity-50',
-        'border border-[#FEE500] hover:border-[#FFEB3B]',
-        'focus:ring-2 focus:ring-[#FEE500] focus:ring-offset-2 focus:outline-none',
-        className
+        "flex w-full items-center justify-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors",
+        "bg-[#FEE500] text-[#191919] hover:bg-[#FFEB3B] disabled:cursor-not-allowed disabled:opacity-50",
+        "border border-[#FEE500] hover:border-[#FFEB3B]",
+        "focus:ring-2 focus:ring-[#FEE500] focus:ring-offset-2 focus:outline-none",
+        className,
       )}
     >
       {/* 카카오 로고 SVG */}

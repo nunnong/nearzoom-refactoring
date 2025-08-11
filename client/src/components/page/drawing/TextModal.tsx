@@ -20,9 +20,9 @@ const TextModal: React.FC<TextModalProps> = ({
   onTextAdd,
   fontOptions,
   colors,
-  defaultFontSize = 32,
-  minFontSize = 16,
-  maxFontSize = 120,
+  defaultFontSize = 12,
+  minFontSize = 12,
+  maxFontSize = 96,
 }) => {
   const [text, setText] = useState('')
   const [selectedFont, setSelectedFont] = useState(fontOptions[0])
@@ -105,7 +105,7 @@ const TextModal: React.FC<TextModalProps> = ({
                   className="p-6 border border-gray-200 rounded-lg bg-gray-50 min-h-[100px] flex items-center justify-center text-center break-words"
                   style={{
                     fontFamily: selectedFont.family,
-                    fontSize: `${Math.min(fontSize, 48)}px`, // 미리보기에서는 최대 48px로 제한
+                    fontSize: `${Math.min(fontSize, 48)}px`, 
                     color: selectedColor,
                     lineHeight: '1.4',
                     wordWrap: 'break-word',

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import type { Metadata } from 'next'
 import {
   Geist,
@@ -10,6 +11,12 @@ import {
 } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/components/page/room/providers/AuthProvider'
+=======
+import type { Metadata } from "next";
+import { Geist, Geist_Mono, Noto_Sans_KR, Jua, Gamja_Flower, Black_Han_Sans, Gaegu } from "next/font/google";
+import "./globals.css";
+import AuthProvider from "@/providers/AuthProvider";
+>>>>>>> 02a57a75b7a2575a96aa4dd54c9e9beb84982a82
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -68,11 +75,29 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
+      <head>
+        <script 
+          src="https://t1.kakaocdn.net/kakao_js_sdk/2.1.0/kakao.min.js"
+          integrity="sha384-dpu02ieKC6NUeKFoGMOKz6102CLEWi9+5RQjWSV0ikYSFFd8M3Wp2reIcquJOemx"
+          crossOrigin="anonymous"
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined' && window.Kakao) {
+                Kakao.init('c089c8172def97eb00c07217cae17495');
+              }
+            `
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${notoSansKR.variable} ${jua.variable} ${blackHanSans.variable} ${gamjaFlower.variable} ${gaegu.variable} antialiased`}
       >
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
-  )
+  );
 }
