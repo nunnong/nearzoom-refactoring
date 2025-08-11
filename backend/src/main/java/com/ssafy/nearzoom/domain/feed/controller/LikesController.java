@@ -19,28 +19,23 @@ public class LikesController {
 
     private final LikesService likesService;
 
-    @PostMapping("/{photoId}")
+    @PostMapping("/{feedId}")
     public ResponseEntity<ApiResponse<Void>> like(Authentication authentication,
-        @PathVariable Long photoId) {
-        likesService.like(authentication, photoId);
+        @PathVariable Long feedId) {
+        likesService.like(authentication, feedId);
         return ApiResponse.ok();
     }
 
-    @DeleteMapping("/{photoId}")
+    @DeleteMapping("/{feedId}")
     public ResponseEntity<ApiResponse<Void>> unlike(Authentication authentication,
-        @PathVariable Long photoId) {
-        likesService.unlike(authentication, photoId);
+        @PathVariable Long feedId) {
+        likesService.unlike(authentication, feedId);
         return ApiResponse.ok();
     }
 
-    @GetMapping("/{photoId}/count")
-    public ResponseEntity<ApiResponse<Long>> count(@PathVariable Long photoId) {
-        return ApiResponse.ok(likesService.getLikeCount(photoId));
-    }
-
-    @GetMapping("/{photoId}/me")
+    @GetMapping("/check/{feedId}")
     public ResponseEntity<ApiResponse<Boolean>> likedByMe(Authentication authentication,
-        @PathVariable Long photoId) {
-        return ApiResponse.ok(likesService.isLikedByMe(authentication, photoId));
+        @PathVariable Long feedId) {
+        return ApiResponse.ok(likesService.isLikedByMe(authentication, feedId));
     }
 }

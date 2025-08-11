@@ -31,6 +31,10 @@ public class User extends BaseEntity {
     @Comment("이메일")
     private String userEmail;
 
+    @Column(length = 20, nullable = false)
+    @Comment("계정명")
+    private String accountName;
+
     @Column(columnDefinition = "TEXT")
     @Comment("프로필 사진")
     private String profileImage;
@@ -43,16 +47,19 @@ public class User extends BaseEntity {
     @Comment("예쁜 얼굴 이미지 URL")
     private String prettyFace;
 
-    private User(String userName, String userEmail, String profileImage, Social socialType) {
+    private User(String userName, String userEmail, String accountName, String profileImage,
+        Social socialType) {
         this.userName = userName;
         this.userEmail = userEmail;
+        this.accountName = accountName;
         this.profileImage = profileImage;
         this.socialType = socialType;
     }
 
-    public static User of(String userName, String userEmail, String profileImage,
+    public static User of(String userName, String userEmail, String accountName,
+        String profileImage,
         Social socialType) {
-        return new User(userName, userEmail, profileImage, socialType);
+        return new User(userName, userEmail, accountName, profileImage, socialType);
     }
 
     public void update(OAuth2Response oAuth2Response) {
