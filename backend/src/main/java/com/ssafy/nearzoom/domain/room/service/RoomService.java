@@ -1,10 +1,12 @@
 package com.ssafy.nearzoom.domain.room.service;
 
 import com.ssafy.nearzoom.domain.room.constants.RedisKeyConstants;
+import com.ssafy.nearzoom.domain.room.dto.LeaveRequest;
 import com.ssafy.nearzoom.domain.room.dto.LiveKitInfoResponse;
 import com.ssafy.nearzoom.domain.room.dto.RoomInfo;
 import com.ssafy.nearzoom.domain.room.dto.JoinRequest;
 import com.ssafy.nearzoom.domain.room.dto.RoomMetaSaveRequest;
+import com.ssafy.nearzoom.domain.room.dto.TransferHostRequest;
 import com.ssafy.nearzoom.domain.room.repository.RoomRedisRepository;
 import com.ssafy.nearzoom.domain.user.entity.Social;
 import com.ssafy.nearzoom.domain.user.entity.User;
@@ -21,12 +23,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import livekit.LivekitModels;
@@ -90,7 +95,7 @@ public class RoomService {
   public LiveKitInfoResponse createRoom(HttpServletRequest request, String metadata)
       throws IOException {
     User user = validateUserFromCookie(request);
-    Long roomId = System.currentTimeMillis();
+    Long roomId = generateRoomId();
 
     try {
       if (roomServiceClient == null) {
@@ -216,9 +221,7 @@ public class RoomService {
     String roomKey = RedisKeyConstants.ROOM_KEY_PREFIX + roomId;
     Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
 
-    if (roomData.isEmpty()) {
-      throw new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 방입니다.");
-    }
+    isExistingRoom(roomData);
 
     String participantsString = (String) roomData.get("participants");
     List<String> participants = new ArrayList<>();
@@ -228,11 +231,228 @@ public class RoomService {
     }
 
     return new RoomInfo(
-        (Long) roomData.get("roomId"),
+        Long.parseLong((String) roomData.get("roomId")),
         (String) roomData.get("serverUrl"),
         participants,
         (String) roomData.get("createdAt")
     );
+  }
+
+  public void leaveRoom(HttpServletRequest request, LeaveRequest leaveRequest) {
+    User user = validateUserFromCookie(request);
+
+    String roomKey = RedisKeyConstants.ROOM_KEY_PREFIX + leaveRequest.roomId();
+    Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
+
+    isExistingRoom(roomData);
+
+    try {
+      // 1. 참가자 상태를 'left'로 변경
+      roomRedisRepository.updateParticipantStatus(
+          leaveRequest.roomId(),
+          leaveRequest.participantIdentity(),
+          "left"
+      );
+
+      // 2. 방의 참가자 목록에서 제거
+      roomRedisRepository.removeParticipant(
+          user.getUserName(),
+          roomKey
+      );
+
+      // 3. LiveKit 서버에서 참가자 제거
+      try {
+        if (roomServiceClient != null) {
+          roomServiceClient.removeParticipant(
+              String.valueOf(leaveRequest.roomId()),
+              leaveRequest.participantIdentity()
+          ).execute();
+        }
+      } catch (Exception e) {
+        log.warn("Failed to remove participant from LiveKit server: {}", e.getMessage());
+        // LiveKit 서버 오류는 치명적이지 않으므로 계속 진행
+      }
+
+      // 4. 방에 참가자가 없으면 방 종료
+      String updatedParticipants = (String) redisTemplate.opsForHash().get(roomKey, "participants");
+      if (updatedParticipants == null || updatedParticipants.trim().isEmpty()) {
+        closeRoom(leaveRequest.roomId());
+        log.info("Room closed automatically as last participant left. RoomId: {}", leaveRequest.roomId());
+      }
+
+      log.info("User left room successfully. RoomId: {}, User: {}, Identity: {}",
+          leaveRequest.roomId(), user.getUserName(), leaveRequest.participantIdentity());
+
+    } catch (Exception e) {
+      if (e instanceof ApiException) {
+        throw e;
+      }
+      log.error("Room leave error for user: {} in room: {}", user.getUserName(), leaveRequest.roomId(), e);
+      throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
+          "방 나가기 중 오류가 발생했습니다: " + e.getMessage());
+    }
+  }
+   // 방장이 방을 완전히 종료하는 기능
+  public void closeRoom(HttpServletRequest request, Long roomId) {
+    User user = validateUserFromCookie(request);
+
+    String roomKey = RedisKeyConstants.ROOM_KEY_PREFIX + roomId;
+    Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
+
+    isExistingRoom(roomData);
+
+    // 방장 권한 확인
+    String hostEmail = (String) roomData.get("host");
+    if (!user.getUserEmail().equals(hostEmail)) {
+      throw new ApiException(HttpStatus.FORBIDDEN, "방을 종료할 권한이 없습니다. 방장만 방을 종료할 수 있습니다.");
+    }
+
+    closeRoom(roomId);
+    log.info("Room closed by host. RoomId: {}, Host: {}", roomId, user.getUserName());
+  }
+
+  //내부적으로 방을 종료하는 로직
+  private void closeRoom(Long roomId) {
+    try {
+      // 1. 방 상태를 'closed'로 변경
+      String roomKey = RedisKeyConstants.ROOM_KEY_PREFIX + roomId;
+      redisTemplate.opsForHash().put(roomKey, "status", "closed");
+      redisTemplate.opsForHash().put(roomKey, "closedAt", LocalDateTime.now().toString());
+
+      // 2. 모든 참가자 상태를 'removed'로 변경
+      roomRedisRepository.closeAllParticipants(roomId);
+
+      // 3. LiveKit 서버에서 방 종료
+      try {
+        if (roomServiceClient != null) {
+          roomServiceClient.deleteRoom(String.valueOf(roomId)).execute();
+        }
+      } catch (Exception e) {
+        log.warn("Failed to delete room from LiveKit server: {}", e.getMessage());
+      }
+
+      // 4. Redis에서 방 정보 TTL을 1시간으로 단축 (로그 보관용)
+      redisTemplate.expire(roomKey, Duration.ofHours(1));
+
+      log.info("Room closed and cleanup completed. RoomId: {}", roomId);
+
+    } catch (Exception e) {
+      log.error("Room closure error for roomId: {}", roomId, e);
+      throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
+          "방 종료 중 오류가 발생했습니다: " + e.getMessage());
+    }
+  }
+
+  public void transferHost(HttpServletRequest request, TransferHostRequest transferRequest) {
+    User currentUser = validateUserFromCookie(request);
+
+    String roomKey = RedisKeyConstants.ROOM_KEY_PREFIX + transferRequest.roomId();
+    Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
+
+    isExistingRoom(roomData);
+
+    // 현재 사용자가 방장인지 확인
+    String currentHost = (String) roomData.get("host");
+    if (!currentUser.getUserEmail().equals(currentHost)) {
+      throw new ApiException(HttpStatus.FORBIDDEN, "방장만 권한을 이양할 수 있습니다.");
+    }
+
+    // 방이 활성 상태인지 확인
+    String roomStatus = (String) roomData.get("status");
+    if (!"active".equals(roomStatus)) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "종료된 방에서는 권한을 이양할 수 없습니다.");
+    }
+
+    User newHost = findParticipantByEmail(transferRequest.roomId(), transferRequest.newHostEmail());
+    if (newHost == null) {
+      throw new ApiException(HttpStatus.BAD_REQUEST,
+          "새로운 방장이 현재 방에 참가하고 있지 않습니다. 먼저 방에 참가해야 합니다.");
+    }
+
+    try {
+      // 방장 권한 이양
+      roomRedisRepository.transferHostAuthority(
+          transferRequest.roomId(),
+          currentUser,
+          newHost,
+          roomKey
+      );
+
+      log.info("Host authority transferred. RoomId: {}, From: {} To: {}",
+          transferRequest.roomId(), currentUser.getUserEmail(), newHost.getUserEmail());
+
+    } catch (Exception e) {
+      log.error("Host transfer error. RoomId: {}, From: {} To: {}",
+          transferRequest.roomId(), currentUser.getUserEmail(), transferRequest.newHostEmail(), e);
+      throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
+          "방장 권한 이양 중 오류가 발생했습니다: " + e.getMessage());
+    }
+  }
+
+  public boolean isHost(HttpServletRequest request, Long roomId) {
+    User user = validateUserFromCookie(request);
+
+    String roomKey = RedisKeyConstants.ROOM_KEY_PREFIX + roomId;
+    Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
+
+    if (roomData.isEmpty()) {
+      return false;
+    }
+
+    String hostEmail = (String) roomData.get("host");
+    return user.getUserEmail().equals(hostEmail);
+  }
+
+  private User findParticipantByEmail(Long roomId, String email) {
+    // Redis에서 해당 방의 모든 참가자 정보 조회
+    String participantPattern = RedisKeyConstants.PARTICIPANT_KEY_PREFIX + roomId + ":*";
+    Set<String> participantKeys = redisTemplate.keys(participantPattern);
+
+    if (participantKeys.isEmpty()) {
+      return null;
+    }
+
+    // 각 참가자의 이메일과 소셜 정보를 확인
+    for (String participantKey : participantKeys) {
+      Map<Object, Object> participantData = redisTemplate.opsForHash().entries(participantKey);
+      String participantEmail = (String) participantData.get("userEmail");
+      String participantStatus = (String) participantData.get("status");
+
+      // 활성 상태이고 이메일이 일치하는 참가자 찾기
+      if ("active".equals(participantStatus) && email.equals(participantEmail)) {
+        // 해당 이메일로 모든 소셜 타입 시도
+        for (Social social : Social.values()) {
+          try {
+            User user = userRepository.getByEmailAndSocial(email, social);
+            log.info("Found participant for host transfer. Email: {}, Social: {}", email, social);
+            return user;
+          } catch (Exception e) {
+            // 해당 소셜 타입으로 찾지 못한 경우 다음 소셜 타입 시도
+            continue;
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  //활성 참가자 목록 조회 (나간 사람 제외)
+  public List<String> getActiveParticipants(Long roomId) {
+    String roomKey = RedisKeyConstants.ROOM_KEY_PREFIX + roomId;
+    String participantsString = (String) redisTemplate.opsForHash().get(roomKey, "participants");
+
+    if (participantsString == null || participantsString.trim().isEmpty()) {
+      return new ArrayList<>();
+    }
+
+    return Arrays.asList(participantsString.split(","));
+  }
+
+  private static void isExistingRoom(Map<Object, Object> roomData) {
+    if (roomData.isEmpty()) {
+      throw new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 방입니다.");
+    }
   }
 
   private String createLiveKitToken(String displayName, String identity, Long roomId, String metadata) {
@@ -274,6 +494,32 @@ public class RoomService {
     }
   }
 
+  private Long generateRoomId() {
+    SecureRandom random = new SecureRandom();
+    Long roomId;
+    int maxAttempts = 10;
+    int attempts = 0;
+
+    do {
+      roomId = 100000L + random.nextInt(900000); // 100000 ~ 999999
+      attempts++;
+
+      // 중복 체크
+      String roomKey = RedisKeyConstants.ROOM_KEY_PREFIX + roomId;
+      if (!redisTemplate.hasKey(roomKey)) {
+        break;
+      }
+
+      if (attempts >= maxAttempts) {
+        return System.currentTimeMillis() % 1000000L;
+      }
+
+    } while (true);
+
+    log.info("Generated unique 6-digit roomId: {}", roomId);
+    return roomId;
+  }
+
   // 고유한 identity 생성 (단순화)
   private String generateUniqueIdentity(String baseName) {
     String timestamp = String.valueOf(System.currentTimeMillis());
@@ -294,19 +540,31 @@ public class RoomService {
   }
 
   private User validateUserFromCookie(HttpServletRequest request) {
-    Cookie[] cookies = request.getCookies();
     String accessToken = null;
 
-    if (cookies != null) {
-      for (Cookie cookie : cookies) {
-        if ("accessToken".equals(cookie.getName()) || "jwt".equals(cookie.getName())) {
-          accessToken = cookie.getValue();
-          break;
+    // 🔥 1. Authorization 헤더에서 먼저 확인
+    String authHeader = request.getHeader("Authorization");
+    if (authHeader != null && authHeader.startsWith("Bearer ")) {
+      accessToken = authHeader.substring(7);
+      System.out.println("🔍 [RoomService] Authorization 헤더에서 토큰 추출: " + accessToken.substring(0, 30) + "...");
+    }
+
+    // 🔥 2. Authorization 헤더에 없으면 쿠키에서 확인
+    if (accessToken == null) {
+      Cookie[] cookies = request.getCookies();
+      if (cookies != null) {
+        for (Cookie cookie : cookies) {
+          if ("accessToken".equals(cookie.getName()) || "jwt".equals(cookie.getName())) {
+            accessToken = cookie.getValue();
+            System.out.println("🔍 [RoomService] 쿠키에서 토큰 추출: " + accessToken.substring(0, 30) + "...");
+            break;
+          }
         }
       }
     }
 
     if (accessToken == null || accessToken.trim().isEmpty()) {
+      System.out.println("❌ [RoomService] 토큰이 Authorization 헤더와 쿠키 모두에 없음");
       throw new ApiException(HttpStatus.UNAUTHORIZED, "인증 토큰이 필요합니다.");
     }
 
@@ -314,9 +572,15 @@ public class RoomService {
       String email = jwtUtil.getEmail(accessToken);
       Social social = jwtUtil.getSocial(accessToken);
 
-      return userRepository.getByEmailAndSocial(email, social);
+      System.out.println("🔍 [RoomService] 토큰에서 추출 - 이메일: " + email + ", 소셜: " + social);
+
+      User user = userRepository.getByEmailAndSocial(email, social);
+      System.out.println("✅ [RoomService] 사용자 조회 성공 - ID: " + user.getUserId());
+
+      return user;
 
     } catch (Exception e) {
+      System.out.println("❌ [RoomService] 토큰 검증 실패: " + e.getMessage());
       log.warn("Invalid token validation attempt from IP: {}", request.getRemoteAddr());
       throw new ApiException(HttpStatus.UNAUTHORIZED, "유효하지 않은 인증 토큰입니다.");
     }
