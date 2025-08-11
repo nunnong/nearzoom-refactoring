@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'  // 🔥 useEffect 추가
 import { useRouter } from 'next/navigation'
 import { X, Edit, Trash2 } from 'lucide-react'
 import api from '@/lib/axios'
@@ -10,6 +10,23 @@ export default function UploadPhotoPage() {
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+  
+  // 🔥 추가: 리다이렉트 정보 상태
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
+  const [actionAfterUpload, setActionAfterUpload] = useState<string | null>(null)
+
+  // 🔥 추가: 저장된 리다이렉트 정보 확인
+  useEffect(() => {
+    const storedRedirectUrl = localStorage.getItem('redirectAfterPhotoUpload')
+    const storedAction = localStorage.getItem('actionAfterPhotoUpload')
+    
+    if (storedRedirectUrl) {
+      setRedirectUrl(storedRedirectUrl)
+    }
+    if (storedAction) {
+      setActionAfterUpload(storedAction)
+    }
+  }, [])
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -50,16 +67,29 @@ export default function UploadPhotoPage() {
       const imageUrl = uploadResponse.data.data.url || uploadResponse.data.url
       
       // 2단계: 받은 URL을 프로필 이미지로 저장
-      const saveResponse = await api.put('/user/save-face-image', imageUrl, {
+      await api.put('/user/save-face-image', imageUrl, {
         headers: {
           'Content-Type': 'text/plain'
         }
       })
       
-      // 서버에 저장되었으므로 localStorage 저장 불필요
+      // 🔥 수정: 저장 완료 후 리다이렉트 처리
+      console.log('✅ 사진 업로드 완료 - 리다이렉트 처리')
       
-      // 저장 완료 후 메인 페이지로 이동
-      router.replace('/')
+      // 저장된 정보 정리
+      localStorage.removeItem('redirectAfterPhotoUpload')
+      localStorage.removeItem('actionAfterPhotoUpload')
+      
+      if (redirectUrl) {
+        console.log('📍 저장된 URL로 리다이렉트:', redirectUrl)
+        router.replace(redirectUrl)
+      } else if (actionAfterUpload === 'createRoom') {
+        console.log('📍 방 생성을 위해 메인으로 이동')
+        router.replace('/?action=createRoom')
+      } else {
+        console.log('📍 기본 메인 페이지로 이동')
+        router.replace('/')
+      }
       
     } catch (error: any) {
       console.error('프로필 이미지 저장 실패:', error)
@@ -81,8 +111,24 @@ export default function UploadPhotoPage() {
     setSelectedImage(null)
   }
 
+  // 🔥 수정: 스킵 시에도 리다이렉트 처리
   const handleSkip = () => {
-    router.replace('/')
+    console.log('⏭️ 사진 업로드 스킵 - 리다이렉트 처리')
+    
+    // 저장된 정보 정리
+    localStorage.removeItem('redirectAfterPhotoUpload')
+    localStorage.removeItem('actionAfterPhotoUpload')
+    
+    if (redirectUrl) {
+      console.log('📍 저장된 URL로 리다이렉트:', redirectUrl)
+      router.replace(redirectUrl)
+    } else if (actionAfterUpload === 'createRoom') {
+      console.log('📍 방 생성을 위해 메인으로 이동')
+      router.replace('/?action=createRoom')
+    } else {
+      console.log('📍 기본 메인 페이지로 이동')
+      router.replace('/')
+    }
   }
 
   return (
@@ -91,7 +137,7 @@ export default function UploadPhotoPage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <button
-            onClick={() => router.back()}
+            onClick={handleSkip}  // 🔥 수정: 뒤로가기 대신 스킵 로직
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
             <X size={20} className="text-gray-600" />
@@ -113,6 +159,18 @@ export default function UploadPhotoPage() {
           <p className="text-gray-600 text-sm mb-6 leading-relaxed">
             가장 잘 나온 사진 하나를 업로드해주세요. AI가 이를 참조하여 더 예쁘고 자연스러운 사진을 만들어 드립니다.
           </p>
+
+          {/* 🔥 추가: 리다이렉트 정보 표시 */}
+          {(redirectUrl || actionAfterUpload) && (
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-600">
+                {actionAfterUpload === 'createRoom' 
+                  ? '📍 사진 등록 후 방을 생성합니다' 
+                  : '📍 사진 등록 후 요청하신 페이지로 이동합니다'
+                }
+              </p>
+            </div>
+          )}
 
           {/* AI 사진 합성용 태그 */}
           <div className="flex items-center space-x-2 text-blue-600 border border-blue-200 rounded-full px-4 py-2 mb-6 w-fit">

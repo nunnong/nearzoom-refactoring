@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useAuth } from '@/hooks/auth'
+import { useAuth } from '@/hooks/auth'  
 import { API_BASE_URL } from '@/constants/api'
 
 type PageState = 'loading' | 'success' | 'error'
@@ -62,6 +62,10 @@ export default function CallbackPage() {
         // 성공 상태로 변경
         setState('success')
         
+        // 🔥 추가: 저장된 리다이렉트 정보 확인
+        const redirectUrl = localStorage.getItem('redirectAfterLogin')
+        const actionAfterLogin = localStorage.getItem('actionAfterLogin')
+        
         // 사용자 정보를 가져온 후 참조 사진이 있는지 확인
         const userInfo = await fetch(`${API_BASE_URL}/user/userInfo`, {
           headers: {
@@ -73,18 +77,47 @@ export default function CallbackPage() {
           const userData = await userInfo.json()
           const hasReferencePhoto = userData.data?.faceImageUrl
           
-          // 참조 사진이 없으면 업로드 페이지로, 있으면 메인 페이지로
+          // 🔥 수정: 리다이렉트 로직 개선
           setTimeout(() => {
+            // 저장된 정보 정리
+            localStorage.removeItem('redirectAfterLogin')
+            localStorage.removeItem('actionAfterLogin')
+            
             if (!hasReferencePhoto) {
+              // 참조 사진이 없으면 업로드 페이지로
+              if (redirectUrl) {
+                // 업로드 완료 후 원래 페이지로 가기 위해 다시 저장
+                localStorage.setItem('redirectAfterPhotoUpload', redirectUrl)
+              }
+              if (actionAfterLogin) {
+                localStorage.setItem('actionAfterPhotoUpload', actionAfterLogin)
+              }
               router.replace('/upload-photo')
+            } else if (redirectUrl) {
+              // 참조 사진이 있고 리다이렉트 URL이 있으면 해당 페이지로
+              console.log('✅ 로그인 완료 - 저장된 URL로 리다이렉트:', redirectUrl)
+              router.replace(redirectUrl)
+            } else if (actionAfterLogin === 'createRoom') {
+              // 방 생성 액션이 있으면 메인 페이지로 (방 생성은 메인에서 처리)
+              console.log('✅ 로그인 완료 - 방 생성을 위해 메인으로')
+              router.replace('/?action=createRoom')
             } else {
+              // 기본적으로 메인 페이지로
               router.replace('/')
             }
           }, 2000)
         } else {
-          // 사용자 정보를 가져오지 못한 경우 메인 페이지로
+          // 사용자 정보를 가져오지 못한 경우
           setTimeout(() => {
-            router.replace('/')
+            // 🔥 추가: 리다이렉트 정보가 있으면 해당 페이지로
+            localStorage.removeItem('redirectAfterLogin')
+            localStorage.removeItem('actionAfterLogin')
+            
+            if (redirectUrl) {
+              router.replace(redirectUrl)
+            } else {
+              router.replace('/')
+            }
           }, 3000)
         }
         
@@ -108,6 +141,10 @@ export default function CallbackPage() {
         }
         
         setErrorMessage(friendlyMessage)
+        
+        // 🔥 수정: 에러 시에도 저장된 정보 정리
+        localStorage.removeItem('redirectAfterLogin')
+        localStorage.removeItem('actionAfterLogin')
         
         // 3초 후 메인 페이지로 이동 (에러 시에도 메인으로)
         setTimeout(() => {
@@ -143,7 +180,7 @@ export default function CallbackPage() {
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">로그인 성공!</h2>
-          <p className="text-gray-600">잠시 후 메인 페이지로 이동합니다.</p>
+          <p className="text-gray-600">잠시 후 요청하신 페이지로 이동합니다.</p>
         </div>
       </div>
     )

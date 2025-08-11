@@ -4,7 +4,7 @@ import { api } from '@/lib/api'
 
 export const userService = {
   // 사용자 정보 가져오기
-  getUserInfo: async (): Promise<User> => {
+  getUserInfo: async (): Promise<any> => {
     const response = await api.get(API_ENDPOINTS.USER_INFO)
     return response.data
   },
