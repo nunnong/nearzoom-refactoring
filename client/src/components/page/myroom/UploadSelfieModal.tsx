@@ -11,6 +11,7 @@ interface UploadSelfieModalProps {
     name?: string
     email?: string
     profileImage?: string
+    faceImageUrl?: string
   } | null
 }
 
@@ -20,10 +21,9 @@ export default function UploadSelfieModal({ isOpen, onClose, userProfile }: Uplo
   const [currentReferenceImage, setCurrentReferenceImage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // 모달이 열릴 때 서버에서 기존 참조 사진 로드
   React.useEffect(() => {
     if (isOpen) {
-      // userProfile에서 참조 사진 URL 가져오기 (프로필 사진과 구분)
+      // userProfile에서 참조 사진 URL 가져오기 (이전에 올려놨던 것)
       const referenceImageUrl = userProfile?.faceImageUrl
       setCurrentReferenceImage(referenceImageUrl || null)
     }
@@ -59,21 +59,23 @@ export default function UploadSelfieModal({ isOpen, onClose, userProfile }: Uplo
       const formData = new FormData()
       formData.append('file', blob, 'profile.jpg')
       
-      // 이미지 업로드 API 호출 (URL을 반환받음)
-      const uploadResponse = await api.post('/upload/image', formData, {
+      // **이미지 업로드 API 호출 (URL을 반환받음)**
+      const uploadResponse = await api.post('https://image.nearzoom.store/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
-        }
+        },
+        withCredentials: false // CORS 에러 방지를 위해 credentials 비활성화 -> 이거 고쳐야 하나?
       })
       
-      const imageUrl = uploadResponse.data.data.url || uploadResponse.data.url
+      const imageUrl = uploadResponse.data.data.fileurl || uploadResponse.data.fileurl
       
-      // 2단계: 받은 URL을 프로필 이미지로 저장
-      const saveResponse = await api.put('/user/save-face-image', imageUrl, {
-        headers: {
-          'Content-Type': 'text/plain'
-        }
-      })
+      // 2단계: 받은 URL을 프로필 이미지로 저장 (save-face-image 엔드포인트로 url 보내기)
+      // URL 파라미터로 전송하도록 변경
+const saveResponse = await api.put(`/user/save-face-image?prettyFaceUrl=${encodeURIComponent(imageUrl)}`, null, {
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
       
       // 저장 완료 후 모달 닫기
       onClose()
@@ -154,7 +156,7 @@ export default function UploadSelfieModal({ isOpen, onClose, userProfile }: Uplo
             <span className="text-sm font-medium">AI 사진 합성용</span>
           </button>
 
-          {/* 프로필 이미지 */}
+          {/* 참조 이미지 */}
           <div className="flex justify-center mb-8">
             <div className="w-32 h-32 rounded-full overflow-hidden bg-gradient-to-br from-orange-200 via-green-200 to-blue-200 p-1">
               <div className="w-full h-full rounded-full overflow-hidden bg-white flex items-center justify-center">

@@ -151,115 +151,134 @@ export const roomAPI = {
     },
     
     async joinRoom(roomId: string | number): Promise<JoinRoomData> {
-        try {
-            console.log('=== 방 참가 API 호출 시작 ===');
-            console.log('참가할 방 ID:', roomId);
+    try {
+        console.log('=== 방 참가 API 호출 시작 ===');
+        console.log('참가할 방 ID (원본):', roomId);
+        
+        // 🔥 수정: roomId를 숫자로 변환
+        const numericRoomId = typeof roomId === 'string' ? parseInt(roomId, 10) : roomId;
+        
+        if (isNaN(numericRoomId)) {
+            throw new Error('유효하지 않은 방 ID입니다');
+        }
+        
+        console.log('참가할 방 ID (숫자):', numericRoomId);
+        
+        const authState = useAuthStore.getState();
+        if (!authState.isAuthenticated || !authState.accessToken) {
+            console.error('❌ 로그인되지 않은 상태에서 방 참가 시도');
+            throw new Error('로그인이 필요합니다');
+        }
+        
+        const headers = getAuthHeaders();
+        console.log('요청 헤더:', headers);
+        
+        // 🔥 수정: 숫자로 변환된 roomId 사용
+        const requestBody = { roomId: numericRoomId };
+        console.log('요청 본문:', requestBody);
+        
+        const response = await fetch(`${API_BASE_URL}/room/join`, {
+            method: "POST",
+            headers: headers,
+            credentials: 'include',
+            body: JSON.stringify(requestBody),   
+        });
+
+        console.log('방 참가 응답 상태:', response.status);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('방 참가 실패 응답 내용:', errorText);
             
-            const authState = useAuthStore.getState();
-            if (!authState.isAuthenticated || !authState.accessToken) {
-                console.error('❌ 로그인되지 않은 상태에서 방 참가 시도');
-                throw new Error('로그인이 필요합니다');
+            if (response.status === 401) {
+                throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
+            } else if (response.status === 404) {
+                throw new Error('존재하지 않는 방입니다.');
+            } else if (response.status === 403) {
+                throw new Error('방에 참가할 권한이 없습니다.');
+            } else {
+                throw new Error(`방 참가 실패: ${response.status} - ${errorText}`);
             }
-            
-            const headers = getAuthHeaders();
-            console.log('요청 헤더:', headers);
-            
-            const requestBody = { roomId: roomId.toString() };
-            console.log('요청 본문:', requestBody);
-            
-            const response = await fetch(`${API_BASE_URL}/room/join`, {
-                method: "POST",
-                headers: headers,
-                credentials: 'include',
-                body: JSON.stringify(requestBody),   
-            });
+        }
+        
+        const result: ApiResponse<JoinRoomData> = await response.json();
+        console.log('방 참가 성공 응답:', result);
 
-            console.log('방 참가 응답 상태:', response.status);
+        if (result.error) {
+            throw new Error(result.message);
+        }
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('방 참가 실패 응답 내용:', errorText);
-                
-                if (response.status === 401) {
-                    throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-                } else if (response.status === 404) {
-                    throw new Error('존재하지 않는 방입니다.');
-                } else if (response.status === 403) {
-                    throw new Error('방에 참가할 권한이 없습니다.');
-                } else {
-                    throw new Error(`방 참가 실패: ${response.status} - ${errorText}`);
-                }
-            }
-            
-            const result: ApiResponse<JoinRoomData> = await response.json();
-            console.log('방 참가 성공 응답:', result);
+        if (!result.data) {
+            throw new Error('방 참가 응답에 데이터가 없습니다');
+        }
 
-            if (result.error) {
-                throw new Error(result.message);
-            }
-
-            if (!result.data) {
-                throw new Error('방 참가 응답에 데이터가 없습니다');
-            }
-
-            return result.data;
-        } catch (error) {
-            console.error("방 참가 api 오류:", error);
-            throw error;
-        }  
-    },
+        return result.data;
+    } catch (error) {
+        console.error("방 참가 api 오류:", error);
+        throw error;
+    }  
+},
     
     async getRoomInfo(roomId: string | number): Promise<RoomInfoData> {
-        try {
-            console.log('=== 방 정보 조회 API 호출 시작 ===');
-            console.log('조회할 방 ID:', roomId);
-            
-            const authState = useAuthStore.getState();
-            if (!authState.isAuthenticated || !authState.accessToken) {
-                console.error('❌ 로그인되지 않은 상태에서 방 정보 조회 시도');
-                throw new Error('로그인이 필요합니다');
-            }
-            
-            const headers = getAuthHeaders();
-            
-            const response = await fetch(`${API_BASE_URL}/room/${roomId}/info`, {
-                method: "GET",
-                headers: headers,
-                credentials: 'include',
-            });
-
-            console.log('방 정보 조회 응답 상태:', response.status);
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('방 정보 조회 실패 응답 내용:', errorText);
-                
-                if (response.status === 401) {
-                    throw new Error('인증이 필요합니다. 다시 로그인해주세요.');
-                } else if (response.status === 404) {
-                    throw new Error('존재하지 않는 방입니다.');
-                } else {
-                    throw new Error(`방 정보 조회 실패: ${response.status} - ${errorText}`);
-                }
-            }
-            
-            const result: ApiResponse<RoomInfoData> = await response.json();
-            console.log('방 정보 조회 성공 응답:', result);
-
-            if (result.error) {
-                throw new Error(result.message);
-            }
-
-            if (!result.data) {
-                throw new Error('방 정보 조회 응답에 데이터가 없습니다');
-            }
-
-            return result.data;
-        } catch (error) {
-            console.error("방 정보 조회 api 오류:", error);
-            throw error;
-        }
+  try {
+    console.log('=== 방 정보 조회 API 호출 시작 ===')
+    
+    // 🔥 수정: roomId를 숫자로 변환
+    const numericRoomId = typeof roomId === 'string' ? parseInt(roomId, 10) : roomId
+    
+    if (isNaN(numericRoomId)) {
+      throw new Error('유효하지 않은 방 ID입니다')
     }
+    
+    console.log('조회할 방 ID (숫자):', numericRoomId)
+    
+    const authState = useAuthStore.getState()
+    if (!authState.isAuthenticated || !authState.accessToken) {
+      console.error('❌ 로그인되지 않은 상태에서 방 정보 조회 시도')
+      throw new Error('로그인이 필요합니다')
+    }
+    
+    const headers = getAuthHeaders()
+    
+    // 🔥 수정: 숫자로 변환된 roomId 사용
+    const response = await fetch(`${API_BASE_URL}/room/${numericRoomId}/info`, {
+      method: "GET",
+      headers: headers,
+      credentials: 'include',
+    })
+
+    console.log('방 정보 조회 응답 상태:', response.status)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('방 정보 조회 실패 응답 내용:', errorText)
+      
+      if (response.status === 401) {
+        throw new Error('인증이 필요합니다. 다시 로그인해주세요.')
+      } else if (response.status === 404) {
+        throw new Error('존재하지 않는 방입니다.')
+      } else {
+        throw new Error(`방 정보 조회 실패: ${response.status} - ${errorText}`)
+      }
+    }
+    
+    const result: ApiResponse<RoomInfoData> = await response.json()
+    console.log('방 정보 조회 성공 응답:', result)
+
+    if (result.error) {
+      throw new Error(result.message)
+    }
+
+    if (!result.data) {
+      throw new Error('방 정보 조회 응답에 데이터가 없습니다')
+    }
+
+    return result.data
+  } catch (error) {
+    console.error("방 정보 조회 api 오류:", error)
+    throw error
+  }
+}
 };
 
 export const generateRoomUrl = (roomId: number | string): string => {

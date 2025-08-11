@@ -1,17 +1,100 @@
 "use client"
 
 import type { JSX } from "react"
-import { useAuth } from '@/hooks/auth'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useAuth } from '@/hooks/auth'  // 수정: '@/hooks/auth' -> '@/hooks/useAuth'
+import { useAuthStore } from '@/stores/authStore'
 
 const LoginPage = (): JSX.Element => {
-  const { startSocialLogin } = useAuth()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { startSocialLogin, isAuthenticated, isLoading } = useAuth()
+  
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
+  const [actionAfterLogin, setActionAfterLogin] = useState<string | null>(null)
 
+  // 🔥 URL 파라미터나 localStorage에서 리다이렉트 정보 확인
+  useEffect(() => {
+    // URL 파라미터에서 리다이렉트 URL 확인
+    const redirectParam = searchParams.get('redirect')
+    
+    // localStorage에서 리다이렉트 정보 확인
+    const storedRedirect = localStorage.getItem('redirectAfterLogin')
+    const storedAction = localStorage.getItem('actionAfterLogin')
+    
+    if (redirectParam) {
+      setRedirectUrl(decodeURIComponent(redirectParam))
+    } else if (storedRedirect) {
+      setRedirectUrl(storedRedirect)
+    }
+    
+    if (storedAction) {
+      setActionAfterLogin(storedAction)
+    }
+  }, [searchParams])
+
+  // 🔥 로그인 상태 확인 및 리다이렉트 처리
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      // 로그인이 완료된 경우 리다이렉트 처리
+      handleLoginSuccess()
+    }
+  }, [isAuthenticated, isLoading])
+
+  // 🔥 로그인 성공 후 처리
+  const handleLoginSuccess = () => {
+    // 저장된 정보 정리
+    localStorage.removeItem('redirectAfterLogin')
+    localStorage.removeItem('actionAfterLogin')
+    
+    if (redirectUrl) {
+      console.log('✅ 로그인 완료 - 저장된 URL로 리다이렉트:', redirectUrl)
+      router.push(redirectUrl)
+    } else if (actionAfterLogin === 'createRoom') {
+      console.log('✅ 로그인 완료 - 메인 페이지로 이동 (방 생성을 위해)')
+      router.push('/')
+    } else {
+      console.log('✅ 로그인 완료 - 메인 페이지로 이동')
+      router.push('/')
+    }
+  }
+
+  // 🔥 소셜 로그인 시작 (리다이렉트 정보 유지)
   const handleKakaoLogin = () => {
+    // 현재 리다이렉트 정보를 localStorage에 저장
+    if (redirectUrl) {
+      localStorage.setItem('redirectAfterLogin', redirectUrl)
+    }
+    if (actionAfterLogin) {
+      localStorage.setItem('actionAfterLogin', actionAfterLogin)
+    }
+    
     startSocialLogin('KAKAO')
   }
 
   const handleGoogleLogin = () => {
+    // 현재 리다이렉트 정보를 localStorage에 저장
+    if (redirectUrl) {
+      localStorage.setItem('redirectAfterLogin', redirectUrl)
+    }
+    if (actionAfterLogin) {
+      localStorage.setItem('actionAfterLogin', actionAfterLogin)
+    }
+    
     startSocialLogin('GOOGLE')
+  }
+
+  // 이미 로그인된 경우 리다이렉트
+  if (isAuthenticated && !isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p>리다이렉트 중...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -19,14 +102,26 @@ const LoginPage = (): JSX.Element => {
       <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-md mx-4">
         {/* 제목 */}
         <h3 className="text-center text-2xl font-bold text-black">로그인</h3>
-        <p className="mt-2 text-center text-sm text-gray-600">소셜 계정으로 간편하게 로그인하세요</p>
+        <p className="mt-2 text-center text-sm text-gray-600">
+          {redirectUrl ? '로그인 후 요청하신 페이지로 이동합니다' : '소셜 계정으로 간편하게 로그인하세요'}
+        </p>
+        
+        {/* 🔥 리다이렉트 정보 표시 */}
+        {actionAfterLogin === 'createRoom' && (
+          <div className="mt-2 p-2 bg-blue-50 rounded-lg">
+            <p className="text-center text-sm text-blue-600">
+              ✨ 로그인 후 방을 생성합니다
+            </p>
+          </div>
+        )}
 
         {/* 소셜 로그인 버튼들 */}
         <div className="mt-6 flex flex-col gap-3">
           {/* 카카오 로그인 버튼 */}
           <button
             onClick={handleKakaoLogin}
-            className="w-full px-4 py-3 rounded-lg font-medium transition-colors bg-[#FEE500] text-black hover:bg-[#FDD835]"
+            disabled={isLoading}
+            className="w-full px-4 py-3 rounded-lg font-medium transition-colors bg-[#FEE500] text-black hover:bg-[#FDD835] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="flex items-center justify-center space-x-3">
               <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -35,14 +130,15 @@ const LoginPage = (): JSX.Element => {
                   d="M12 3C7.03 3 3 6.14 3 10.1c0 2.54 1.66 4.77 4.16 6.07l-1.09 4.02c-.07.26.2.47.43.33l4.75-3.15c.25.01.5.02.75.02 4.97 0 9-3.14 9-7.1S16.97 3 12 3z"
                 />
               </svg>
-              <span>카카오로 계속하기</span>
+              <span>{isLoading ? '로그인 중...' : '카카오로 계속하기'}</span>
             </div>
           </button>
 
           {/* 구글 로그인 버튼 */}
           <button
             onClick={handleGoogleLogin}
-            className="w-full px-4 py-3 rounded-lg font-medium transition-colors bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+            disabled={isLoading}
+            className="w-full px-4 py-3 rounded-lg font-medium transition-colors bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="flex items-center justify-center space-x-3">
               <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -63,7 +159,7 @@ const LoginPage = (): JSX.Element => {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              <span>Google로 계속하기</span>
+              <span>{isLoading ? '로그인 중...' : 'Google로 계속하기'}</span>
             </div>
           </button>
         </div>
@@ -75,6 +171,18 @@ const LoginPage = (): JSX.Element => {
           </div>
           <div className="relative flex justify-center bg-white px-2 text-xs text-gray-500">또는</div>
         </div>
+
+        {/* 🔥 취소 버튼 추가 (리다이렉트가 있는 경우) */}
+        {(redirectUrl || actionAfterLogin) && (
+          <div className="text-center mb-4">
+            <button
+              onClick={() => router.push('/')}
+              className="text-sm text-gray-500 hover:text-gray-700 underline"
+            >
+              메인으로 돌아가기
+            </button>
+          </div>
+        )}
 
         {/* 약관 */}
         <p className="text-center text-xs text-gray-500">

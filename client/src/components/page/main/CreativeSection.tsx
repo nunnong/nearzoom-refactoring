@@ -2,7 +2,6 @@ import GallerySection from "./GallerySection"
 import Header from "./Header"
 import HeroSection from "./HeroSection"
 
-
 interface CreativeSectionProps {
   isLoggedIn: boolean
   onLogin: () => void
@@ -25,7 +24,8 @@ export default function CreativeSection({
   onMyPage,
   onMyFeed,
   onAfterLoginClick,
-  user
+  user,
+  isCreatingRoom = false  // 🔥 추가: 기본값 설정
 }: CreativeSectionProps) {
   return (
     <div className="bg-stone-100 p-4 md:p-8">
@@ -41,6 +41,7 @@ export default function CreativeSection({
       <HeroSection 
         isLoggedIn={isLoggedIn}
         onAfterLoginClick={onAfterLoginClick}
+        isCreatingRoom={isCreatingRoom}  // 🔥 추가: prop 전달
       />
       
       <GallerySection />
