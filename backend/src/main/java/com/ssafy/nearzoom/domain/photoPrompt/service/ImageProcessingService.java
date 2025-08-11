@@ -36,7 +36,7 @@ public class ImageProcessingService {
   private final RedisTemplate<String, String> redisTemplate;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
-  public ProcessingServerResponse processImage(Long roomId) {
+  public void processImage(Long roomId) {
     String roomKey = "room:" + roomId;
     Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
 
@@ -52,12 +52,12 @@ public class ImageProcessingService {
         extractedData.processingOptions()
     );
 
-    return sendRequestToImageServer(serverRequest, roomId, extractedData.backgroundPromptId());
+    sendRequestToImageServer(serverRequest, roomId, extractedData.backgroundPromptId());
   }
 
   private ProcessingServerResponse sendRequestToImageServer(
       ImageServerRequest serverRequest, Long roomId, String backgroundPromptId) {
-      String uploadUrl = "/upload"; ///image/jobs
+      String uploadUrl = "/jobs";
     try {
       ImageServerResponse serverResponse = imageServerWebClient
           .post()
