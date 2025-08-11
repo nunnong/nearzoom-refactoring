@@ -78,8 +78,8 @@ public class FollowService {
 
     @Transactional(readOnly = true)
     public FollowCountsResponse getCounts(Long userId) { // 한번에 둘 다
-        int followers = followRepository.countByFollowee_Id(userId);
-        int following = followRepository.countByFollower_Id(userId);
+        int followers = followRepository.countByFollowee_UserId(userId);
+        int following = followRepository.countByFollower_UserId(userId);
         return new FollowCountsResponse(followers, following);
     }
 }

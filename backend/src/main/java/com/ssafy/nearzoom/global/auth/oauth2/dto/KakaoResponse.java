@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class KakaoResponse implements OAuth2Response {
 
-    // null 값 어떻게 할지 고민
     private final Map<String, Object> attribute;
 
     private Map<String, Object> getKakaoAccount() {
@@ -34,6 +33,11 @@ public class KakaoResponse implements OAuth2Response {
     }
 
     @Override
+    public String getAccountName() {
+        return getKakaoAccount().get("email").toString();
+    }
+
+    @Override
     public String getProfileImage() {
         return getProfile().get("profile_image_url").toString();
     }
@@ -46,6 +50,6 @@ public class KakaoResponse implements OAuth2Response {
 
     @Override
     public User toEntity() {
-        return User.of(getName(), getEmail(), getProfileImage(), social());
+        return User.of(getName(), getEmail(), getProfileImage(), getAccountName(), social());
     }
 }

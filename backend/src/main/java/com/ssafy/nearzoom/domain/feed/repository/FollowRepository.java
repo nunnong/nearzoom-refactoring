@@ -18,10 +18,7 @@ public interface FollowRepository extends JpaRepository<Follow, Long> {
 
     boolean existsByFollower_UserIdAndFollowee_UserId(Long followerId, Long followeeId);
 
-    int countByFollowee_Id(Long userId);
+    int countByFollowee_UserId(Long userId);
 
-    int countByFollower_Id(Long userId);
-
-    @Query("select f.followee.userId from Follow f where f.follower.userId = :followerId")
-    List<Long> findFolloweeIdsByFollowerId(Long followerId);
+    int countByFollower_UserId(Long userId);
 }

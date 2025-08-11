@@ -21,6 +21,11 @@ public class GoogleResponse implements OAuth2Response {
     }
 
     @Override
+    public String getAccountName() {
+        return attribute.get("email").toString();
+    }
+
+    @Override
     public String getProfileImage() {
         return attribute.get("picture").toString();
     }
@@ -29,9 +34,9 @@ public class GoogleResponse implements OAuth2Response {
     public Social social() {
         return Social.GOOGLE;
     }
-    
+
     @Override
     public User toEntity() {
-        return User.of(getName(), getEmail(), getProfileImage(), social());
+        return User.of(getName(), getEmail(), getProfileImage(), getAccountName(), social());
     }
 }
