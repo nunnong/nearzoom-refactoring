@@ -69,7 +69,7 @@ public class SecurityConfig {
 
         http.authorizeHttpRequests(
             (auth) -> auth
-                .requestMatchers("/auth/refresh", "user/logout", "webhooks/**")
+                .requestMatchers("/auth/refresh", "/user/logout", "/webhooks/**")
                 .permitAll()
                 .anyRequest().authenticated());
 

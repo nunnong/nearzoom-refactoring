@@ -17,6 +17,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @EntityListeners(AuditingEntityListener.class)
 public class BaseEntity {
 
+    @Column(updatable = false)
     @CreatedDate
     @Comment("생성일")
     private LocalDateTime createdAt;

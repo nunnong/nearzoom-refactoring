@@ -14,7 +14,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByUserEmailAndSocialType(String userEmail, Social socialType);
 
-    // 물어보기 Optional은 null이아닌 빈 객체로 표현해야 한다는 뜻인데 @NonNull이 필요한지?
+    Optional<User> findByUserEmail(String userEmail);
+
+    // TODO: Optional은 null이아닌 빈 객체로 표현해야 한다는 뜻인데 @NonNull이 필요한지?
     default @NonNull User getByEmailAndSocial(@NonNull String userEmail,
         @NonNull Social socialType) {
         return findByUserEmailAndSocialType(userEmail, socialType)
