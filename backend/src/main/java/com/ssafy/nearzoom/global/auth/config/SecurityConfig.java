@@ -20,62 +20,62 @@ import org.springframework.web.cors.CorsConfiguration;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+  private final CustomOAuth2UserService customOAuth2UserService;
+  private final CustomSuccessHandler customSuccessHandler;
+  private final JWTUtil jwtUtil;
 
-    private final CustomOAuth2UserService customOAuth2UserService;
-    private final CustomSuccessHandler customSuccessHandler;
-    private final JWTUtil jwtUtil;
+  @Bean
+  public SecurityFilterChain filterChain(HttpSecurity http)
+      throws Exception {
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http)
-        throws Exception {
+    http.cors(cors -> cors.configurationSource(request -> {
+      CorsConfiguration config = new CorsConfiguration();
 
-        http.cors(cors -> cors.configurationSource(request -> {
-            CorsConfiguration config = new CorsConfiguration();
+      config.setAllowedOrigins(List.of("http://localhost:3000"));
+      config.setAllowedMethods(List.of("GET", "PUT", "POST", "DELETE", "PATCH", "OPTIONS"));
+      config.setAllowedHeaders(List.of("*"));
+      config.setAllowCredentials(true);
+      config.setExposedHeaders(List.of("Set-Cookie", "Authorization"));
 
-            config.setAllowedOrigins(List.of("https://nearzoom.store"));
-            config.setAllowedMethods(List.of("GET", "POST", "DELETE", "PATCH", "PUT", "OPTIONS"));
-            config.setAllowedHeaders(List.of("*"));
-            config.setAllowCredentials(true);
-            config.setExposedHeaders(List.of("Set-Cookie", "Authorization"));
+      return config;
+    }));
 
-            return config;
-        }));
+    http.csrf(csrf -> csrf.disable());
+    http.formLogin(form -> form.disable());
+    http.httpBasic(httpBasic -> httpBasic.disable());
+    http.exceptionHandling(ex -> ex
+        .authenticationEntryPoint((request, response, authException) -> {
+          response.setContentType("application/json");
+          response.setCharacterEncoding("UTF-8");
+          response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+          response.getWriter().write("{\"error\":\"로그인 인증 실패!\"}");
+        })
+        .accessDeniedHandler((request, response, accessDeniedException) -> {
+          response.setContentType("application/json");
+          response.setCharacterEncoding("UTF-8");
+          response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+          response.getWriter().write("{\"error\":\"접근 권한이 없음!\"}");
+        })
+    );
 
-        http.csrf(csrf -> csrf.disable());
-        http.formLogin(form -> form.disable());
-        http.httpBasic(httpBasic -> httpBasic.disable());
-        http.exceptionHandling(ex -> ex
-            .authenticationEntryPoint((request, response, authException) -> {
-                response.setContentType("application/json");
-                response.setCharacterEncoding("UTF-8");
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.getWriter().write("{\"error\":\"로그인 인증 실패!\"}");
-            })
-            .accessDeniedHandler((request, response, accessDeniedException) -> {
-                response.setContentType("application/json");
-                response.setCharacterEncoding("UTF-8");
-                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                response.getWriter().write("{\"error\":\"접근 권한이 없음!\"}");
-            })
-        );
+    http.addFilterAfter(new JWTFilter(jwtUtil),
+        OAuth2LoginAuthenticationFilter.class);
 
-        http.addFilterAfter(new JWTFilter(jwtUtil),
-            OAuth2LoginAuthenticationFilter.class);
+    http.oauth2Login(oauth2 -> oauth2
+        .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
+        .successHandler(customSuccessHandler)
+    );
 
-        http.oauth2Login(oauth2 -> oauth2
-            .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
-            .successHandler(customSuccessHandler)
-        );
+    http.authorizeHttpRequests(
+        (auth) -> auth
+            .requestMatchers("/auth/refresh", "user/logout", "/api/s3-test/**",
+                "myroom/photos/**", "/favicon.ico")
+            .permitAll()
+            .anyRequest().authenticated());
 
-        http.authorizeHttpRequests(
-            (auth) -> auth
-                .requestMatchers("/auth/refresh", "user/logout")
-                .permitAll()
-                .anyRequest().authenticated());
+    http.sessionManagement(
+        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
-        http.sessionManagement(
-            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
-
-        return http.build();
-    }
+    return http.build();
+  }
 }

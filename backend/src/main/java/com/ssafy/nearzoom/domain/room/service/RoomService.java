@@ -540,19 +540,31 @@ public class RoomService {
   }
 
   private User validateUserFromCookie(HttpServletRequest request) {
-    Cookie[] cookies = request.getCookies();
     String accessToken = null;
 
-    if (cookies != null) {
-      for (Cookie cookie : cookies) {
-        if ("accessToken".equals(cookie.getName()) || "jwt".equals(cookie.getName())) {
-          accessToken = cookie.getValue();
-          break;
+    // 🔥 1. Authorization 헤더에서 먼저 확인
+    String authHeader = request.getHeader("Authorization");
+    if (authHeader != null && authHeader.startsWith("Bearer ")) {
+      accessToken = authHeader.substring(7);
+      System.out.println("🔍 [RoomService] Authorization 헤더에서 토큰 추출: " + accessToken.substring(0, 30) + "...");
+    }
+
+    // 🔥 2. Authorization 헤더에 없으면 쿠키에서 확인
+    if (accessToken == null) {
+      Cookie[] cookies = request.getCookies();
+      if (cookies != null) {
+        for (Cookie cookie : cookies) {
+          if ("accessToken".equals(cookie.getName()) || "jwt".equals(cookie.getName())) {
+            accessToken = cookie.getValue();
+            System.out.println("🔍 [RoomService] 쿠키에서 토큰 추출: " + accessToken.substring(0, 30) + "...");
+            break;
+          }
         }
       }
     }
 
     if (accessToken == null || accessToken.trim().isEmpty()) {
+      System.out.println("❌ [RoomService] 토큰이 Authorization 헤더와 쿠키 모두에 없음");
       throw new ApiException(HttpStatus.UNAUTHORIZED, "인증 토큰이 필요합니다.");
     }
 
@@ -560,9 +572,15 @@ public class RoomService {
       String email = jwtUtil.getEmail(accessToken);
       Social social = jwtUtil.getSocial(accessToken);
 
-      return userRepository.getByEmailAndSocial(email, social);
+      System.out.println("🔍 [RoomService] 토큰에서 추출 - 이메일: " + email + ", 소셜: " + social);
+
+      User user = userRepository.getByEmailAndSocial(email, social);
+      System.out.println("✅ [RoomService] 사용자 조회 성공 - ID: " + user.getUserId());
+
+      return user;
 
     } catch (Exception e) {
+      System.out.println("❌ [RoomService] 토큰 검증 실패: " + e.getMessage());
       log.warn("Invalid token validation attempt from IP: {}", request.getRemoteAddr());
       throw new ApiException(HttpStatus.UNAUTHORIZED, "유효하지 않은 인증 토큰입니다.");
     }
