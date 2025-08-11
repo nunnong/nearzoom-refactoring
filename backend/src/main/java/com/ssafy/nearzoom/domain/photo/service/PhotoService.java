@@ -22,10 +22,13 @@ public class PhotoService {
       String jobId = webhook.jobId();
 
       // 1. Redis에서 roomId 가져오기
-      String roomId = redisTemplate.opsForValue().get("job_room:" + jobId);
+      String roomIdString = redisTemplate.opsForValue().get("job_room:" + jobId);
 
-      if (roomId == null) {
-        log.error("❌ job_room:{} 키를 찾을 수 없습니다. PhotoPrompt 저장 로직을 확인해주세요.", jobId);
+      Long roomId;
+      try {
+        roomId = Long.valueOf(roomIdString);
+      } catch (NumberFormatException e) {
+        log.error("❌ roomId 변환 실패. roomIdString: {}", roomIdString, e);
         return;
       }
 
