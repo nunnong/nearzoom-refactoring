@@ -32,10 +32,10 @@ public class Photo extends BaseEntity {
   private String userList;
 
   @Column(name = "roomId", length = 100, nullable = false)
-  private String roomId;
+  private Long roomId;
 
   // 생성자
-  public Photo(String imgUrl, String roomId, String userList) {
+  public Photo(String imgUrl, Long roomId, String userList) {
     this.imgUrl = imgUrl;
     this.roomId = roomId;
     this.userList = userList;
