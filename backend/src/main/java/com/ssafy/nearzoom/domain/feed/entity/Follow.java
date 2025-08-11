@@ -33,7 +33,7 @@ public class Follow extends BaseEntity {
     private Follow(User follower, User followee) {
         this.follower = follower;
         this.followee = followee;
-        this.id = FollowId.of(follower.getUserId(), followee.getUserId()); // ★ PK 세팅
+        this.id = FollowId.of(follower.getUserId(), followee.getUserId());
     }
 
     public static Follow of(User follower, User followee) {

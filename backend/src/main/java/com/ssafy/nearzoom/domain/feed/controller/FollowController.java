@@ -1,5 +1,6 @@
 package com.ssafy.nearzoom.domain.feed.controller;
 
+import com.ssafy.nearzoom.domain.feed.dto.FollowCountsResponse;
 import com.ssafy.nearzoom.domain.feed.service.FollowService;
 import com.ssafy.nearzoom.domain.user.dto.UserInfoResponse;
 import com.ssafy.nearzoom.global.response.ApiResponse;
@@ -45,6 +46,12 @@ public class FollowController {
     public ResponseEntity<ApiResponse<List<UserInfoResponse>>> getFollowers(
         @PathVariable Long userId) {
         return ApiResponse.ok(followService.getFollowers(userId));
+    }
+
+    @GetMapping("/count/{userId}")
+    public ResponseEntity<ApiResponse<FollowCountsResponse>> countFollow(
+        @PathVariable Long userId) {
+        return ApiResponse.ok(followService.getCounts(userId));
     }
 
     @GetMapping("/check/{followeeId}")

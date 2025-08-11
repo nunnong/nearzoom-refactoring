@@ -1,6 +1,5 @@
 package com.ssafy.nearzoom.domain.feed.entity;
 
-import com.ssafy.nearzoom.domain.photo.entity.Photo;
 import com.ssafy.nearzoom.domain.user.entity.User;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
@@ -18,25 +17,25 @@ import lombok.NoArgsConstructor;
 public class Likes {
 
     @EmbeddedId
-    private LikesId likesid;
+    private LikesId likesId;
+
+    @MapsId("feedId")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "feed_id", nullable = false)
+    private Feed feed;
 
     @MapsId("userId")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @MapsId("photoId")
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "photo_id", nullable = false)
-    private Photo photo;
-
-    private Likes(User user, Photo photo) {
+    private Likes(Feed feed, User user) {
+        this.feed = feed;
         this.user = user;
-        this.photo = photo;
-        this.likesid = LikesId.of(user.getUserId(), photo.getPhotoId());
+        this.likesId = LikesId.of(feed.getFeedId(), user.getUserId());
     }
 
-    public static Likes of(User user, Photo photo) {
-        return new Likes(user, photo);
+    public static Likes of(Feed feed, User user) {
+        return new Likes(feed, user);
     }
 }

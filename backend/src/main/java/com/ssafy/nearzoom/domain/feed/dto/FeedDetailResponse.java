@@ -5,11 +5,13 @@ import java.time.LocalDateTime;
 
 public record FeedDetailResponse(
     Long feedId,
+    String imgUrl,
+    String caption,
     Long authorId,
-    Long photoId,
-    String photoUrl,
+    String accountName,
+    String profileImage,
     LocalDateTime createdAt,
-    LocalDateTime updatedAt
+    boolean liked
 ) {
 
 }

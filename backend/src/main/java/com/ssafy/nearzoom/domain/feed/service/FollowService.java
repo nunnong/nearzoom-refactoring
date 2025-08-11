@@ -1,5 +1,6 @@
 package com.ssafy.nearzoom.domain.feed.service;
 
+import com.ssafy.nearzoom.domain.feed.dto.FollowCountsResponse;
 import com.ssafy.nearzoom.domain.feed.entity.Follow;
 import com.ssafy.nearzoom.domain.feed.repository.FollowRepository;
 import com.ssafy.nearzoom.domain.user.dto.UserAuthInfoResponse;
@@ -73,5 +74,12 @@ public class FollowService {
 
         return followRepository.existsByFollower_UserIdAndFollowee_UserId(follower.getUserId(),
             followeeId);
+    }
+
+    @Transactional(readOnly = true)
+    public FollowCountsResponse getCounts(Long userId) { // 한번에 둘 다
+        int followers = followRepository.countByFollowee_Id(userId);
+        int following = followRepository.countByFollower_Id(userId);
+        return new FollowCountsResponse(followers, following);
     }
 }
