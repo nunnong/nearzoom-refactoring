@@ -39,3 +39,4 @@ out/
 
 # Redis volume data
 backend/redis-data/
+"*.rdb"
