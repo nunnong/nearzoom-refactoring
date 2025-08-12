@@ -37,6 +37,6 @@ public class GoogleResponse implements OAuth2Response {
 
     @Override
     public User toEntity() {
-        return User.of(getName(), getEmail(), getProfileImage(), getAccountName(), social());
+        return User.of(getName(), getEmail(), getAccountName(), getProfileImage(), social());
     }
 }
