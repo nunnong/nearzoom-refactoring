@@ -5,19 +5,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.nearzoom.domain.photoPrompt.dto.imageServer.ImageServerRequest;
 import com.ssafy.nearzoom.domain.photoPrompt.dto.imageServer.ImageServerResponse;
 import com.ssafy.nearzoom.domain.photoPrompt.dto.imageServer.ProcessingOptions;
-import com.ssafy.nearzoom.domain.photoPrompt.dto.imageServer.ProcessingServerResponse;
-import com.ssafy.nearzoom.domain.photoPrompt.dto.imageServer.RoomImageData;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.imageServer.FrameComposeRequest;
 import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingResult;
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PhotoPrompt;
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PromptStatus;
 import com.ssafy.nearzoom.domain.photoPrompt.repository.PhotoPromptRepository;
+import com.ssafy.nearzoom.domain.user.repository.UserRepository;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeoutException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -26,6 +25,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import reactor.util.retry.Retry;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ImageProcessingService {
@@ -34,45 +34,269 @@ public class ImageProcessingService {
   private final WebClient imageServerWebClient;
   private final PhotoPromptRepository photoPromptRepository;
   private final RedisTemplate<String, String> redisTemplate;
+  private final UserRepository userRepository;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
-  public void processImage(Long roomId) {
+  // 개별 이미지 즉시 처리 (설정 완료되는 즉시 호출)
+  public void processIndividualImageImmediately(Long roomId, int imageOrder,
+      String imageUrl, List<String> personImageUrls, ProcessingOptions options,
+      String promptId) {
+    try {
+      // 이미지 서버 요청 생성
+      ImageServerRequest request = new ImageServerRequest(
+          imageUrl,
+          personImageUrls, // 프론트에서 받은 person_ids 사용
+          options
+      );
+
+      // 이미지 서버로 전송
+      ImageServerResponse response = sendToImageServer("/jobs", request);
+
+      if (response == null || response.data() == null || response.data().jobId() == null) {
+        throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
+            "이미지 서버에서 올바른 응답을 받지 못했습니다.");
+      }
+
+      String jobId = response.data().jobId();
+
+      // Job 정보 Redis에 저장
+      saveIndividualJobInfo(jobId, roomId, imageOrder, imageUrl, options, promptId);
+
+      log.info("개별 이미지 처리 요청 완료 - JobId: {}, RoomId: {}, Order: {}",
+          jobId, roomId, imageOrder);
+
+    } catch (Exception e) {
+      log.error("개별 이미지 즉시 처리 실패 - RoomId: {}, Order: {}, Error: {}",
+          roomId, imageOrder, e.getMessage());
+
+      // 프롬프트 상태 업데이트
+      if (promptId != null) {
+        updatePromptStatus(Long.valueOf(promptId), PromptStatus.FAIL);
+      }
+
+      throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
+          "이미지 처리 중 오류가 발생했습니다: " + e.getMessage());
+    }
+  }
+
+  // 개별 이미지 처리 완료 시 호출 (웹훅에서 호출)
+  public void handleIndividualImageCompleted(String jobId, String processedImageUrl) {
+    Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries("individual_job:" + jobId);
+
+    if (jobInfo.isEmpty()) {
+      log.error("Individual Job 정보를 찾을 수 없습니다: {}", jobId);
+      return;
+    }
+
+    Long roomId = Long.valueOf((String) jobInfo.get("room_id"));
+    int imageOrder = Integer.parseInt((String) jobInfo.get("image_order"));
+    String promptId = (String) jobInfo.get("prompt_id");
+
+    log.info("개별 이미지 처리 완료 - JobId: {}, RoomId: {}, Order: {}, ProcessedUrl: {}",
+        jobId, roomId, imageOrder, processedImageUrl);
+
+    // 프롬프트 상태 업데이트
+    if (promptId != null) {
+      updatePromptStatus(Long.valueOf(promptId), PromptStatus.SUCCESS);
+    }
+
+    // 처리된 이미지 URL 저장
+    String roomKey = "room:" + roomId;
+    redisTemplate.opsForHash().put(roomKey, "processed_image_" + imageOrder, processedImageUrl);
+
+    // 완료된 개별 처리 수 증가
+    redisTemplate.opsForHash().increment(roomKey, "completed_individual_count", 1);
+
+    // 모든 개별 처리가 완료되었는지 확인
+    checkAndStartFrameComposition(roomId);
+  }
+
+  // 모든 개별 처리 완료 확인 및 프레임 합성 시작
+  private void checkAndStartFrameComposition(Long roomId) {
     String roomKey = "room:" + roomId;
     Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
 
-    if (roomData.isEmpty()) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "방 정보를 찾을 수 없습니다.");
+    String totalImagesStr = (String) roomData.get("total_images");
+    String completedCountStr = (String) roomData.get("completed_individual_count");
+
+    if (totalImagesStr == null || completedCountStr == null) {
+      log.warn("총 이미지 수 또는 완료 수 정보가 없습니다 - RoomId: {}", roomId);
+      return;
     }
 
-    RoomImageData extractedData = extractAndValidateRoomData(roomData);
+    int totalImages = Integer.parseInt(totalImagesStr);
+    int completedImages = Integer.parseInt(completedCountStr);
 
-    ImageServerRequest serverRequest = new ImageServerRequest(
-        extractedData.imageUrl(),
-        extractedData.personIds(),
-        extractedData.processingOptions()
-    );
+    log.info("개별 처리 진행률 확인 - RoomId: {}, Completed: {}/{}",
+        roomId, completedImages, totalImages);
 
-    sendRequestToImageServer(serverRequest, roomId, extractedData.backgroundPromptId());
+    if (completedImages == totalImages && totalImages > 0) {
+      log.info("모든 개별 처리 완료. 프레임 합성 시작 - RoomId: {}", roomId);
+      startFrameComposition(roomId, roomData, totalImages);
+    }
   }
 
-  private ProcessingServerResponse sendRequestToImageServer(
-      ImageServerRequest serverRequest, Long roomId, String backgroundPromptId) {
-      String uploadUrl = "/jobs";
+  // 프레임 합성 시작
+  private void startFrameComposition(Long roomId, Map<Object, Object> roomData, int totalImages) {
     try {
-      ImageServerResponse serverResponse = imageServerWebClient
-          .post()
-          .uri(uploadUrl)
-          .bodyValue(serverRequest)
+      // 처리된 이미지 URL들을 순서대로 수집
+      List<String> processedImageUrls = new ArrayList<>();
 
+      for (int i = 0; i < totalImages; i++) {
+        String processedUrl = (String) roomData.get("processed_image_" + i);
+        if (processedUrl == null) {
+          throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
+              "처리된 이미지를 찾을 수 없습니다: order " + i);
+        }
+        processedImageUrls.add(processedUrl);
+      }
+
+      String frameColor = (String) roomData.get("frame_color");
+      if (frameColor == null) {
+        frameColor = "#FFFFFF"; // 기본값
+      }
+
+      // 프레임 합성 요청
+      FrameComposeRequest composeRequest = new FrameComposeRequest(
+          processedImageUrls,
+          frameColor
+      );
+
+      log.info("프레임 합성 요청 시작 - RoomId: {}, ImageCount: {}, FrameColor: {}",
+          roomId, totalImages, frameColor);
+
+      ImageServerResponse response = sendToImageServer("/frame", composeRequest);
+
+      if (response == null || response.data() == null || response.data().jobId() == null) {
+        throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
+            "프레임 합성 서버에서 올바른 응답을 받지 못했습니다.");
+      }
+
+      String composeJobId = response.data().jobId();
+
+      // 프레임 합성 Job 정보 저장
+      saveFrameComposeJobInfo(composeJobId, roomId, processedImageUrls, frameColor);
+
+      // 방 상태 업데이트
+      redisTemplate.opsForHash().put("room:" + roomId, "compose_job_id", composeJobId);
+      redisTemplate.opsForHash().put("room:" + roomId, "status", "frame_composing");
+
+      log.info("프레임 합성 요청 완료 - ComposeJobId: {}, RoomId: {}", composeJobId, roomId);
+
+    } catch (Exception e) {
+      log.error("프레임 합성 시작 실패 - RoomId: {}, Error: {}", roomId, e.getMessage());
+      redisTemplate.opsForHash().put("room:" + roomId, "status", "frame_compose_failed");
+      redisTemplate.opsForHash().put("room:" + roomId, "error_message",
+          "프레임 합성 시작 실패: " + e.getMessage());
+    }
+  }
+  // 프레임 합성 완료 처리 (웹훅에서 호출)
+  public void handleFrameCompositionCompleted(String jobId, String finalImageUrl) {
+    Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries("frame_job:" + jobId);
+
+    if (jobInfo.isEmpty()) {
+      log.error("Frame Job 정보를 찾을 수 없습니다: {}", jobId);
+      return;
+    }
+
+    Long roomId = Long.valueOf((String) jobInfo.get("room_id"));
+
+    log.info("프레임 합성 완료 - JobId: {}, RoomId: {}, FinalUrl: {}",
+        jobId, roomId, finalImageUrl);
+
+    // 최종 결과 저장
+    String roomKey = "room:" + roomId;
+    redisTemplate.opsForHash().put(roomKey, "final_image_url", finalImageUrl);
+    redisTemplate.opsForHash().put(roomKey, "status", "all_completed");
+
+    // 최종 결과를 별도 키에도 저장 (조회 편의성)
+    redisTemplate.opsForValue().set("final_result:" + roomId, finalImageUrl, Duration.ofDays(1));
+
+    log.info("전체 프로세스 완료 - RoomId: {}, FinalImageUrl: {}", roomId, finalImageUrl);
+  }
+
+  // 처리 결과 조회
+  public ImageProcessingResult getProcessingResult(String roomId) {
+    try {
+      Long roomIdLong = Long.parseLong(roomId);
+
+      // 최종 결과 확인
+      String finalImageUrl = redisTemplate.opsForValue().get("final_result:" + roomIdLong);
+      if (finalImageUrl != null) {
+        return new ImageProcessingResult(
+            roomId,
+            "SUCCESS",
+            finalImageUrl,
+            null,
+            null,
+            null
+        );
+      }
+
+      // 진행 중인 상태 확인
+      String roomKey = "room:" + roomIdLong;
+      Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
+
+      if (roomData.isEmpty()) {
+        throw new ApiException(HttpStatus.NOT_FOUND, "처리 중인 작업을 찾을 수 없습니다.");
+      }
+
+      String status = (String) roomData.get("status");
+      String errorMessage = (String) roomData.get("error_message");
+
+      if ("frame_compose_failed".equals(status) || errorMessage != null) {
+        return new ImageProcessingResult(
+            roomId,
+            "FAILED",
+            null,
+            null,
+            "PROCESSING_ERROR",
+            errorMessage != null ? errorMessage : "처리 중 오류가 발생했습니다."
+        );
+      }
+
+      // 진행 상황 계산
+      String totalImagesStr = (String) roomData.get("total_images");
+      String completedCountStr = (String) roomData.get("completed_individual_count");
+
+      int totalImages = totalImagesStr != null ? Integer.parseInt(totalImagesStr) : 0;
+      int completedImages = completedCountStr != null ? Integer.parseInt(completedCountStr) : 0;
+
+      String progressMessage;
+      if ("frame_composing".equals(status)) {
+        progressMessage = "개별 처리 완료, 프레임 합성 중...";
+      } else {
+        progressMessage = String.format("개별 처리 진행 중: %d/%d", completedImages, totalImages);
+      }
+
+      return new ImageProcessingResult(
+          roomId,
+          "PROCESSING",
+          null,
+          progressMessage,
+          null,
+          null
+      );
+
+    } catch (NumberFormatException e) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, "올바르지 않은 roomId 형식입니다.");
+    }
+  }
+
+  // 이미지 서버로 요청 전송
+  private ImageServerResponse sendToImageServer(String endpoint, Object request) {
+    try {
+      return imageServerWebClient
+          .post()
+          .uri(endpoint)
+          .bodyValue(request)
           .retrieve()
           .onStatus(
               status -> status.is4xxClientError() || status.is5xxServerError(),
               response -> response.bodyToMono(String.class)
                   .map(this::handleImageServerError)
           )
-
           .bodyToMono(ImageServerResponse.class)
-
           .timeout(Duration.ofMinutes(10))
           .retryWhen(
               Retry.backoff(3, Duration.ofSeconds(2))
@@ -81,11 +305,52 @@ public class ImageProcessingService {
           )
           .block();
 
-      return handleSuccessResponse(serverResponse, roomId, backgroundPromptId);
-
     } catch (Exception e) {
-      return handleFailureResponse(e, backgroundPromptId);
+      log.error("이미지 서버 요청 실패 - Endpoint: {}, Error: {}", endpoint, e.getMessage());
+      throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
+          "이미지 서버 요청 실패: " + e.getMessage());
     }
+  }
+
+  // 개별 Job 정보 저장
+  private void saveIndividualJobInfo(String jobId, Long roomId, int imageOrder,
+      String imageUrl, ProcessingOptions options, String promptId) {
+    Map<String, String> jobInfo = new HashMap<>();
+    jobInfo.put("room_id", String.valueOf(roomId));
+    jobInfo.put("image_order", String.valueOf(imageOrder));
+    jobInfo.put("image_url", imageUrl);
+    jobInfo.put("background_type", options.backgroundType());
+    jobInfo.put("job_type", "individual");
+    jobInfo.put("status", "processing");
+    jobInfo.put("created_at", String.valueOf(System.currentTimeMillis()));
+
+    if (promptId != null) {
+      jobInfo.put("prompt_id", promptId);
+    }
+    if (options.promptText() != null) {
+      jobInfo.put("prompt_text", options.promptText());
+    }
+    if (options.backgroundColor() != null) {
+      jobInfo.put("background_color", options.backgroundColor());
+    }
+
+    redisTemplate.opsForHash().putAll("individual_job:" + jobId, jobInfo);
+    redisTemplate.expire("individual_job:" + jobId, Duration.ofHours(2));
+  }
+
+  // 프레임 합성 Job 정보 저장
+  private void saveFrameComposeJobInfo(String jobId, Long roomId,
+      List<String> processedImageUrls, String frameColor) {
+    Map<String, String> jobInfo = new HashMap<>();
+    jobInfo.put("room_id", String.valueOf(roomId));
+    jobInfo.put("processed_image_urls", String.join(",", processedImageUrls));
+    jobInfo.put("frame_color", frameColor);
+    jobInfo.put("job_type", "frame_compose");
+    jobInfo.put("status", "processing");
+    jobInfo.put("created_at", String.valueOf(System.currentTimeMillis()));
+
+    redisTemplate.opsForHash().putAll("frame_job:" + jobId, jobInfo);
+    redisTemplate.expire("frame_job:" + jobId, Duration.ofHours(2));
   }
 
   private ApiException handleImageServerError(String errorBody) {
@@ -93,127 +358,10 @@ public class ImageProcessingService {
       JsonNode root = objectMapper.readTree(errorBody);
       String code = root.path("error").path("code").asText();
       String message = root.path("error").path("message").asText();
-
       return new ApiException(HttpStatus.BAD_GATEWAY, code + ": " + message);
-
     } catch (Exception parseException) {
       return new ApiException(HttpStatus.BAD_GATEWAY, "이미지 서버 오류: " + errorBody);
     }
-  }
-
-  private ProcessingServerResponse handleSuccessResponse(
-      ImageServerResponse serverResponse, Long roomId, String backgroundPromptId) {
-
-    if (serverResponse == null || serverResponse.data() == null || serverResponse.data().jobId() == null) {
-      throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
-          "이미지 서버에서 올바른 응답을 받지 못했습니다.");
-    }
-
-    String jobId = serverResponse.data().jobId();
-
-    if (backgroundPromptId != null) {
-      redisTemplate.opsForValue().set(
-          "job:" + jobId,
-          backgroundPromptId,
-          Duration.ofMinutes(30)
-      );
-    }
-
-    redisTemplate.opsForValue().set(
-        "job_room:" + jobId,
-        String.valueOf(roomId),
-        Duration.ofMinutes(30)
-    );
-
-    return new ProcessingServerResponse(
-        roomId,
-        jobId,
-        "이미지 서버로 전송 완료",
-        String.format("서버 응답: %s (상태: %s)",
-            "처리 요청이 성공적으로 접수되었습니다.", serverResponse.data().status())
-    );
-  }
-
-  private ProcessingServerResponse handleFailureResponse(Exception e, String backgroundPromptId) {
-    if (backgroundPromptId != null) {
-      updatePromptStatus(Long.valueOf(backgroundPromptId), PromptStatus.FAIL);
-    }
-
-    throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
-        "이미지 서버 전송 실패: " + e.getMessage());
-  }
-
-  public ImageProcessingResult getProcessingResult(String jobId) {
-    String resultKey = "result:" + jobId;
-    Map<Object, Object> resultData = redisTemplate.opsForHash().entries(resultKey);
-
-    if (resultData.isEmpty()) {
-      throw new ApiException(HttpStatus.NOT_FOUND, "처리 결과를 찾을 수 없습니다.");
-    }
-
-    String status = (String) resultData.get("status");
-    if ("SUCCESS".equals(status)) {
-      return new ImageProcessingResult(
-          jobId,
-          status,
-          (String) resultData.get("processed_image_url"),
-          (String) resultData.get("person_ids"),
-          null,
-          null
-      );
-    } else {
-      return new ImageProcessingResult(
-          jobId,
-          status,
-          null,
-          null,
-          (String) resultData.get("error_code"),
-          (String) resultData.get("error_message")
-      );
-    }
-  }
-
-  private RoomImageData extractAndValidateRoomData(Map<Object, Object> roomData) {
-    String selectedImages = (String) roomData.get("selectedImages");
-    String imageCount = (String) roomData.get("imageCount");
-    String imageUrl = (String) roomData.get("image_url");
-    String roomUsers = (String) roomData.get("participants");
-    String backgroundType = (String) roomData.get("background_type");
-
-    String backgroundColor = (String) roomData.get("background_color");
-    String backgroundPromptText = (String) roomData.get("background_prompt_text");
-    String backgroundPromptId = (String) roomData.get("background_prompt_id");
-
-    if (selectedImages == null || imageCount == null || imageUrl == null) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "선택된 이미지 정보가 없습니다.");
-    }
-
-    if (roomUsers == null) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "방 사용자 정보가 없습니다.");
-    }
-
-    if (backgroundType == null) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "배경 타입 정보가 없습니다.");
-    }
-
-    ProcessingOptions processingOptions;
-    if ("color".equals(backgroundType)) {
-      if (backgroundColor == null) {
-        throw new ApiException(HttpStatus.BAD_REQUEST, "배경 색상 정보가 없습니다.");
-      }
-      processingOptions = new ProcessingOptions("color", null, backgroundColor);
-    } else if ("prompt".equals(backgroundType)) {
-      if (backgroundPromptText == null) {
-        throw new ApiException(HttpStatus.BAD_REQUEST, "배경 프롬프트 정보가 없습니다.");
-      }
-      processingOptions = new ProcessingOptions("prompt", backgroundPromptText, null);
-    } else {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "유효하지 않은 배경 타입입니다.");
-    }
-
-    List<String> personIds = Arrays.asList(roomUsers.split(","));
-
-    return new RoomImageData(imageUrl, personIds, processingOptions, backgroundPromptId);
   }
 
   private void updatePromptStatus(Long promptId, PromptStatus status) {
@@ -222,9 +370,10 @@ public class ImageProcessingService {
       if (photoPrompt != null) {
         photoPrompt.updateStatus(status);
         photoPromptRepository.save(photoPrompt);
+        log.info("프롬프트 상태 업데이트 - PromptId: {}, Status: {}", promptId, status);
       }
     } catch (Exception e) {
-      // 실패해도 전체 프로세스에 영향주지 않도록 예외 처리만
+      log.warn("프롬프트 상태 업데이트 실패 - PromptId: {}, Error: {}", promptId, e.getMessage());
     }
   }
 }

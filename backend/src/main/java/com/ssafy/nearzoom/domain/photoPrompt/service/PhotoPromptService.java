@@ -3,8 +3,11 @@ package com.ssafy.nearzoom.domain.photoPrompt.service;
 import com.ssafy.nearzoom.domain.photo.service.PhotoService;
 import com.ssafy.nearzoom.domain.photoPrompt.dto.imageInfo.BackgroundInfoRequest;
 import com.ssafy.nearzoom.domain.photoPrompt.dto.imageInfo.PhotoSelectionRequest;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.imageInfo.IndividualImageRequest;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.imageServer.ProcessingOptions;
 import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingResult;
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PhotoPrompt;
+import com.ssafy.nearzoom.domain.photoPrompt.entity.PromptStatus;
 import com.ssafy.nearzoom.domain.photoPrompt.repository.PhotoPromptRepository;
 import com.ssafy.nearzoom.domain.user.entity.Social;
 import com.ssafy.nearzoom.domain.user.entity.User;
@@ -12,14 +15,19 @@ import com.ssafy.nearzoom.domain.user.repository.UserRepository;
 import com.ssafy.nearzoom.global.auth.jwt.JWTUtil;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PhotoPromptService {
@@ -30,77 +38,248 @@ public class PhotoPromptService {
   private final RedisTemplate<String, String> redisTemplate;
   private final ImageProcessingService imageProcessingService;
 
-  public void savePhotoSelection(HttpServletRequest request, PhotoSelectionRequest selectionRequest) {
+  // 1단계: 기본 설정 저장 (프레임 색상만)
+  public void saveBasicSettings(HttpServletRequest request, PhotoSelectionRequest selectionRequest) {
     validateUser(request);
-
-    int cutCount = selectionRequest.cutCount();
-    if (cutCount != 1 && cutCount != 2 && cutCount != 4) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "컷 개수가 유효하지 않습니다. (1, 2, 4개만 가능)");
-    }
 
     String roomKey = "room:" + selectionRequest.roomId();
-    String imageIds = String.join(",", selectionRequest.selectedCutIds().stream()
-        .map(String::valueOf).toArray(String[]::new));
 
-    Map<String, String> imageData = new HashMap<>();
-    imageData.put("selectedImages", imageIds);
-    imageData.put("imageCount", String.valueOf(cutCount));
+    Map<String, String> basicData = new HashMap<>();
+    basicData.put("frame_color", selectionRequest.frameColor());
+    basicData.put("status", "basic_settings_saved");
 
-    redisTemplate.opsForHash().putAll(roomKey, imageData);
+    redisTemplate.opsForHash().putAll(roomKey, basicData);
+    redisTemplate.expire(roomKey, Duration.ofHours(2));
+
+    log.info("기본 설정 저장 완료 - RoomId: {}, FrameColor: {}",
+        selectionRequest.roomId(), selectionRequest.frameColor());
   }
 
-  @Transactional
-  public void saveBackgroundInfo(HttpServletRequest request, BackgroundInfoRequest backgroundRequest) {
+  // 2단계: 개별 이미지별 배경 설정 저장 및 즉시 처리
+  public void saveIndividualImageBackground(HttpServletRequest request,
+      IndividualImageRequest imageRequest) {
     validateUser(request);
 
-    String type = backgroundRequest.backgroundType();
-    if (!"solid".equals(type) && !"prompt".equals(type)) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "유효하지 않은 처리 타입입니다.");
-    }
-
-    String roomKey = "room:" + backgroundRequest.roomId();
+    String roomKey = "room:" + imageRequest.roomId();
     Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
 
     if (roomData.isEmpty()) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "방 정보를 찾을 수 없습니다.");
     }
 
-    String imageUrl = backgroundRequest.imageUrl();
-    if (imageUrl == null || imageUrl.trim().isEmpty()) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "이미지 URL이 필요합니다.");
-    }
-    redisTemplate.opsForHash().put(roomKey, "image_url", imageUrl);
+    int imageOrder = imageRequest.imageOrder();
+    String backgroundType = imageRequest.backgroundType();
 
-    if ("prompt".equals(type)) {
-      String promptText = backgroundRequest.promptText();
-      if (promptText == null || promptText.trim().isEmpty()) {
-        throw new ApiException(HttpStatus.BAD_REQUEST, "프롬프트 텍스트가 공백입니다.");
-      }
+    // ProcessingOptions 생성
+    ProcessingOptions processingOptions;
+    String promptId = null;
 
+    if ("prompt".equals(backgroundType)) {
+      String promptText = imageRequest.promptText();
+
+      // 프롬프트 테이블에 저장
       PhotoPrompt photoPrompt = new PhotoPrompt(promptText);
       photoPromptRepository.save(photoPrompt);
+      promptId = String.valueOf(photoPrompt.getPromptId());
 
-      redisTemplate.opsForHash().put(roomKey, "background_prompt_text", promptText);
-      redisTemplate.opsForHash().put(roomKey, "background_prompt_id", String.valueOf(photoPrompt.getPromptId()));
-      redisTemplate.opsForHash().put(roomKey, "background_type", "prompt");
-
+      processingOptions = new ProcessingOptions("prompt", promptText, null);
     } else { // solid
-      String color = backgroundRequest.colorValue();
-      if (color == null || color.trim().isEmpty()) {
-        throw new ApiException(HttpStatus.BAD_REQUEST, "색상 값이 필요합니다.");
-      }
-
-      redisTemplate.opsForHash().put(roomKey, "background_color", color);
-      redisTemplate.opsForHash().put(roomKey, "background_type", "color");
+      String color = imageRequest.colorValue();
+      processingOptions = new ProcessingOptions("color", null, color);
     }
 
-    imageProcessingService.processImage(backgroundRequest.roomId());
+    // 설정 정보를 Redis에 저장 (상태 추적용)
+    Map<String, String> imageData = new HashMap<>();
+    imageData.put("image_url_" + imageOrder, imageRequest.imageUrl());
+    imageData.put("background_type_" + imageOrder, backgroundType);
+    if (promptId != null) {
+      imageData.put("prompt_id_" + imageOrder, promptId);
+    }
+
+    // 총 이미지 수 업데이트 (동적으로 증가)
+    String currentMaxOrder = (String) roomData.get("max_image_order");
+    int maxOrder = currentMaxOrder != null ? Integer.parseInt(currentMaxOrder) : -1;
+    if (imageOrder > maxOrder) {
+      imageData.put("max_image_order", String.valueOf(imageOrder));
+      imageData.put("total_images", String.valueOf(imageOrder + 1));
+    }
+
+    redisTemplate.opsForHash().putAll(roomKey, imageData);
+
+    // 즉시 이미지 서버로 전송
+//    try {
+//      imageProcessingService.processIndividualImageImmediately(
+//          imageRequest.roomId(),
+//          imageOrder,
+//          imageRequest.imageUrl(),
+//          imageRequest.personIds(),
+//          processingOptions,
+//          promptId
+//      );
+//
+//      log.info("이미지 서버 전송 완료 - RoomId: {}, Order: {}",
+//          imageRequest.roomId(), imageOrder);
+//
+//    } catch (Exception e) {
+//      log.error("이미지 서버 전송 실패 - RoomId: {}, Order: {}, Error: {}",
+//          imageRequest.roomId(), imageOrder, e.getMessage());
+//
+//      // 프롬프트 상태를 실패로 업데이트
+//      if (promptId != null) {
+//        try {
+//          PhotoPrompt photoPrompt = photoPromptRepository.findById(Long.valueOf(promptId)).orElse(null);
+//          if (photoPrompt != null) {
+//            photoPrompt.updateStatus(PromptStatus.FAIL);
+//            photoPromptRepository.save(photoPrompt);
+//          }
+//        } catch (Exception ex) {
+//          log.warn("프롬프트 상태 업데이트 실패: {}", ex.getMessage());
+//        }
+//      }
+//
+//      throw e;
+//    }
   }
 
-  public ImageProcessingResult getProcessingResult(String jobId) {
-    return imageProcessingService.getProcessingResult(jobId);
+  // 설정 완료된 이미지 개수 카운트
+  private int countConfiguredImages(Map<Object, Object> roomData) {
+    String totalImagesStr = (String) roomData.get("total_images");
+    if (totalImagesStr == null) return 0;
+
+    int totalImages = Integer.parseInt(totalImagesStr);
+    int count = 0;
+
+    for (int i = 0; i < totalImages; i++) {
+      if (roomData.containsKey("image_url_" + i) &&
+          roomData.containsKey("background_type_" + i)) {
+        count++;
+      }
+    }
+    return count;
   }
 
+  // 3단계: 처리 결과 조회
+  public ImageProcessingResult getProcessingResult(String roomIdOrJobId) {
+    // roomId로 조회하는 경우
+    try {
+      Long roomId = Long.parseLong(roomIdOrJobId);
+      return imageProcessingService.getProcessingResult(String.valueOf(roomId));
+    } catch (NumberFormatException e) {
+      // jobId로 조회하는 경우 (기존 호환성)
+      return imageProcessingService.getProcessingResult(roomIdOrJobId);
+    }
+  }
+
+  // 방 상태 조회
+  public Map<String, Object> getRoomStatus(Long roomId) {
+    String roomKey = "room:" + roomId;
+    Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
+
+    if (roomData.isEmpty()) {
+      throw new ApiException(HttpStatus.NOT_FOUND, "방 정보를 찾을 수 없습니다.");
+    }
+
+    Map<String, Object> status = new HashMap<>();
+
+    String totalImagesStr = (String) roomData.get("total_images");
+    String currentStatus = (String) roomData.get("status");
+
+    status.put("roomId", roomId);
+    status.put("status", currentStatus != null ? currentStatus : "unknown");
+    status.put("totalImages", totalImagesStr != null ? Integer.parseInt(totalImagesStr) : 0);
+
+    if (totalImagesStr != null) {
+      int totalImages = Integer.parseInt(totalImagesStr);
+      int configuredImages = countConfiguredImages(roomData);
+
+      status.put("configurationProgress", Map.of(
+          "total", totalImages,
+          "configured", configuredImages,
+          "isComplete", configuredImages == totalImages
+      ));
+
+      // 각 이미지별 설정 상태
+      Map<String, Object> imageConfigs = new HashMap<>();
+      for (int i = 0; i < totalImages; i++) {
+        Map<String, Object> config = new HashMap<>();
+        config.put("hasImageUrl", roomData.containsKey("image_url_" + i));
+        config.put("hasBackgroundType", roomData.containsKey("background_type_" + i));
+        config.put("backgroundType", roomData.get("background_type_" + i));
+
+        if ("prompt".equals(roomData.get("background_type_" + i))) {
+          config.put("promptId", roomData.get("prompt_id_" + i));
+        }
+
+        imageConfigs.put("image_" + i, config);
+      }
+      status.put("imageConfigurations", imageConfigs);
+    }
+
+    return status;
+  }
+
+  // 방 초기화 (재시작용)
+  public void resetRoom(HttpServletRequest request, Long roomId) {
+    validateUser(request);
+
+    String roomKey = "room:" + roomId;
+
+    // 기존 배치 작업들 정리
+    String batchPattern = "batch:" + roomId + ":*";
+    Set<String> batchKeys = redisTemplate.keys(batchPattern);
+    if (batchKeys != null) {
+      for (String batchKey : batchKeys) {
+        redisTemplate.delete(batchKey);
+      }
+    }
+
+    // 최종 결과 삭제
+    redisTemplate.delete("final_result:" + roomId);
+
+    // 방 데이터 초기화
+    redisTemplate.delete(roomKey);
+
+    log.info("방 초기화 완료 - RoomId: {}", roomId);
+  }
+
+  // 처리 진행률 조회
+  public Map<String, Object> getProcessingProgress(Long roomId) {
+    String roomKey = "room:" + roomId;
+    Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
+
+    if (roomData.isEmpty()) {
+      return Map.of(
+          "status", "not_found",
+          "message", "방 정보를 찾을 수 없습니다."
+      );
+    }
+
+    String status = (String) roomData.get("status");
+    String totalImagesStr = (String) roomData.get("total_images");
+    String completedCountStr = (String) roomData.get("completed_individual_count");
+
+    int totalImages = totalImagesStr != null ? Integer.parseInt(totalImagesStr) : 0;
+    int completedImages = completedCountStr != null ? Integer.parseInt(completedCountStr) : 0;
+
+    Map<String, Object> progress = new HashMap<>();
+    progress.put("status", status != null ? status : "not_started");
+    progress.put("totalImages", totalImages);
+    progress.put("completedImages", completedImages);
+    progress.put("progressPercentage", totalImages > 0 ? (completedImages * 100 / totalImages) : 0);
+
+    if ("frame_compose_failed".equals(status)) {
+      progress.put("errorMessage", roomData.get("error_message"));
+    } else if ("all_completed".equals(status)) {
+      progress.put("finalImageUrl", roomData.get("final_image_url"));
+    } else if ("frame_composing".equals(status)) {
+      progress.put("message", "개별 처리 완료, 최종 합성 중...");
+      progress.put("composeJobId", roomData.get("compose_job_id"));
+    }
+
+    return progress;
+  }
+
+  // 사용자 검증
   private void validateUser(HttpServletRequest request) {
     String authHeader = request.getHeader("Authorization");
     if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -116,5 +295,4 @@ public class PhotoPromptService {
       throw new ApiException(HttpStatus.UNAUTHORIZED, "사용자를 찾을 수 없습니다.");
     }
   }
-
 }
