@@ -32,6 +32,7 @@ export default function ControlPanel({
 
   return (
     <div className="rounded-2xl border border-white/30 bg-white/90 p-4 shadow-lg backdrop-blur-sm">
+      {/* 컨트롤 버튼들 */}
       <div className="flex justify-center gap-4">
         {/* 마이크 버튼 */}
         <button

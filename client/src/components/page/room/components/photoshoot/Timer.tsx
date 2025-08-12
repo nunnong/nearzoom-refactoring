@@ -19,154 +19,171 @@ export default function Timer({
     prevSeconds.current = seconds
   }, [seconds])
 
-  // 타이머가 활성화x
+  // 타이머가 활성화되지 않았으면 표시하지 않음
   if (!isActive) return null
 
   const isUrgent = seconds <= 3 && seconds > 0
   const isComplete = seconds === 0
   
-  // 원의 둘레 
-  const radius = 59
+  // 원의 둘레 (크기 줄임)
+  const radius = 42
   const circumference = 2 * Math.PI * radius 
   
-  // 진행률 계산 (5초 기준으로 수정)
-  const totalSeconds = 5 // 초기 카운트다운 시간
-  const progress = seconds > 0 ? (totalSeconds - seconds) / totalSeconds : 1
+  // 진행률 계산 (5초 기준) - Room에 맞게 수정
+  const progress = seconds > 0 ? (5 - seconds) / 5 : 1
   const strokeDashoffset = circumference - (circumference * progress)
 
   return (
-    <div className={`absolute top-6 right-6 z-30 ${className}`}>
+    <div className={`absolute top-4 right-4 z-30 ${className}`}>
       <div className="relative flex flex-col items-center">
         {/* 메인 타이머 SVG */}
         <div 
           className={`
             relative transition-all duration-300 ease-out
-            ${isComplete ? 'scale-125' : isUrgent ? 'scale-110 animate-pulse' : 'scale-100'}
+            ${isComplete ? 'scale-110' : isUrgent ? 'scale-105 animate-pulse' : 'scale-100'}
           `}
-          style={{ width: '120px', height: '120px' }}
+          style={{ width: '90px', height: '90px' }}
         >
           <svg 
             xmlns="http://www.w3.org/2000/svg" 
-            width="120" 
-            height="120" 
-            viewBox="0 0 124 124"
-            className="block w-full h-full drop-shadow-2xl"
+            width="90" 
+            height="90" 
+            viewBox="0 0 90 90"
+            className="block w-full h-full drop-shadow-xl"
           >
             {/* 배경 원 */}
             <circle 
-              cx="62" 
-              cy="62" 
-              r="59" 
+              cx="45" 
+              cy="45" 
+              r="42" 
               fill="none" 
-              stroke="rgba(255, 255, 255, 0.4)" 
-              strokeWidth="6px"
+              stroke="rgba(255, 255, 255, 0.2)" 
+              strokeWidth="4px"
             />
             
             {/* 진행률 원 */}
             <circle 
-              cx="62" 
-              cy="62" 
-              r="59" 
+              cx="45" 
+              cy="45" 
+              r="42" 
               fill="none" 
-              stroke={isComplete ? "#10B981" : isUrgent ? "#EF4444" : "#3B82F6"}
-              strokeWidth="6px" 
+              stroke={
+                isComplete 
+                  ? "#00ff88" 
+                  : isUrgent 
+                    ? "#ff006f" 
+                    : "#00d4ff"
+              }
+              strokeWidth="4px" 
               strokeLinecap="round"
               style={{
                 transform: 'rotate(-90deg)',
                 transformOrigin: 'center',
                 strokeDasharray: circumference,
                 strokeDashoffset: isComplete ? 0 : strokeDashoffset,
-                transition: 'stroke-dashoffset 1s ease-linear, stroke 0.3s ease'
+                transition: 'stroke-dashoffset 1s ease-linear, stroke 0.3s ease',
+                filter: isComplete 
+                  ? 'drop-shadow(0 0 8px #00ff88)' 
+                  : isUrgent 
+                    ? 'drop-shadow(0 0 8px #ff006f)' 
+                    : 'drop-shadow(0 0 6px #00d4ff)'
               }}
             />
-            
-            {/* 완료 시 체크마크 */}
-            {isComplete && (
-              <polyline 
-                points="73.56 48.63 57.88 72.69 49.38 62" 
-                fill="none" 
-                stroke="#10B981" 
-                strokeWidth="6px" 
-                strokeLinecap="round"
-                style={{
-                  strokeDasharray: 45,
-                  strokeDashoffset: 45,
-                  animation: 'checkmark 0.5s ease-in-out 0.2s forwards'
-                }}
-              />
-            )}
           </svg>
 
           {/* 중앙 숫자 표시 */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div 
               className={`
-                font-extrabold text-white transition-all duration-300 drop-shadow-lg
+                font-black text-white transition-all duration-300 drop-shadow-lg
                 ${isComplete 
-                  ? 'text-2xl text-green-400' 
+                  ? 'text-lg' 
                   : isUrgent 
-                    ? 'text-4xl text-red-400 scale-110' 
-                    : 'text-3xl text-blue-400'
+                    ? 'text-2xl scale-110' 
+                    : 'text-xl'
                 }
               `}
+              style={{
+                textShadow: isComplete 
+                  ? '0 0 12px #00ff88' 
+                  : isUrgent 
+                    ? '0 0 12px #ff006f' 
+                    : '0 0 8px #00d4ff'
+              }}
             >
               {isComplete ? (
                 <div className="text-center">
-                  <div className="text-3xl mb-1"></div>
+                  <div className="text-2xl">✨</div>
                 </div>
               ) : (
                 <div className="text-center">
-                  <div className="text-5xl font-black">{seconds}</div>
+                  <div className="text-3xl font-black">{seconds}</div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* 긴급 상태 펄스 효과 */}
+          {/* 네온 글로우 효과 */}
           {isUrgent && !isComplete && (
-            <div className="absolute inset-2 rounded-full border-2 border-red-400 animate-ping opacity-75"></div>
+            <div 
+              className="absolute inset-1 rounded-full animate-ping opacity-60"
+              style={{
+                boxShadow: '0 0 20px #ff006f, inset 0 0 20px #ff006f'
+              }}
+            ></div>
           )}
         </div>
 
-        {/* 안내 텍스트*/}
-        <div className="mt-2 text-center bg-black/70 backdrop-blur-sm rounded-lg px-3 py-2">
+        {/* 세련된 안내 텍스트 */}
+        <div className="mt-3 text-center">
           <div 
             className={`
-              font-bold transition-all duration-300 text-white text-sm
+              inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300
               ${isComplete 
-                ? 'text-green-400' 
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30' 
                 : isUrgent 
-                  ? 'text-red-400 animate-bounce' 
-                  : ''
+                  ? 'bg-pink-500/20 text-pink-300 border border-pink-400/30 animate-bounce' 
+                  : 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30'
               }
             `}
+            style={{
+              backdropFilter: 'blur(12px)',
+              boxShadow: isComplete 
+                ? '0 0 20px rgba(16, 185, 129, 0.3)' 
+                : isUrgent 
+                  ? '0 0 20px rgba(255, 0, 111, 0.3)' 
+                  : '0 0 20px rgba(0, 212, 255, 0.3)'
+            }}
           >
-            {isComplete ? '촬영 완료!' : isUrgent ? '준비하세요!' : '촬영 준비 중...'}
+            {/* 상태 아이콘 */}
+            <div className={`w-2 h-2 rounded-full ${
+              isComplete 
+                ? 'bg-emerald-400 animate-pulse' 
+                : isUrgent 
+                  ? 'bg-pink-400 animate-pulse' 
+                  : 'bg-cyan-400 animate-pulse'
+            }`}></div>
+            
+            {/* 메시지 */}
+            <span>
+              {isComplete 
+                ? 'SHOT!' 
+                : isUrgent 
+                  ? 'SMILE!' 
+                  : 'READY'
+              }
+            </span>
           </div>
           
-          {!isComplete && !isUrgent && (
-            <div className="text-gray-300 text-xs mt-1">
-              포즈를 취해주세요
-            </div>
-          )}
+          
         </div>
-
-        {/* 완료시만 화면 중앙에 큰 메시지 표시
-        {isComplete && (
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
-            <div className="bg-green-500 text-white px-8 py-4 rounded-2xl shadow-2xl text-center animate-bounce">
-              <div className="text-6xl mb-2">📸</div>
-              <div className="text-2xl font-bold">촬영 완료!</div>
-            </div>
-          </div>
-        )} */}
       </div>
 
       {/* CSS 애니메이션 정의 */}
       <style>{`
         @keyframes checkmark {
           0% {
-            stroke-dashoffset: 45;
+            stroke-dashoffset: 30;
           }
           100% {
             stroke-dashoffset: 0;

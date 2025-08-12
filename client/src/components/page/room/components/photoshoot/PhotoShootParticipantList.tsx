@@ -1,18 +1,12 @@
 'use client'
 
 import { useParticipants, useLocalParticipant } from '@livekit/components-react'
-import StartButton from './StartButton'
-import { usePhotoBoothStore } from '../providers/PhotoBoothProvider'
+import { usePhotoBoothStore } from '../../providers/PhotoBoothProvider'
+import PhotoShootButton from './PhotoShootButton'
 
-interface ParticipantListProps {
-  showStartButton?: boolean
-  onStartCall?: () => void
-}
+interface PhotoShootParticipantListProps {}
 
-export default function ParticipantList({
-  showStartButton = true,
-  onStartCall = () => console.log('📞 Call started'),
-}: ParticipantListProps) {
+export default function PhotoShootParticipantList({}: PhotoShootParticipantListProps) {
   const participants = useParticipants()
   const { localParticipant } = useLocalParticipant()
   const isRoomLeader = usePhotoBoothStore(state => state.isRoomLeader)
@@ -48,6 +42,7 @@ export default function ParticipantList({
       // TODO: Show error message to user
     }
   }
+
   const handleCopyUrl = async () => {
     try {
       const currentUrl = window.location.href
@@ -58,8 +53,6 @@ export default function ParticipantList({
       alert('복사에 실패했습니다.')
     }
   }
-
-
 
   return (
     <div className="flex-1 rounded-2xl border border-white/30 bg-white/90 p-4 shadow-lg backdrop-blur-sm">
@@ -289,10 +282,10 @@ export default function ParticipantList({
         )}
       </div>
 
-      {/* START 버튼 (기존 Room StartButton 사용) */}
-      {showStartButton && (
-        <StartButton className="mt-6" onStartCall={onStartCall} />
-      )}
+      {/* PhotoShoot 촬영 버튼 */}
+      <div className="mt-6">
+        <PhotoShootButton className="w-full" />
+      </div>
     </div>
   )
 }
