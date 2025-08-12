@@ -10,7 +10,7 @@ public class CookieUtil {
         cookie.setSecure(true);
         cookie.setPath("/");
         cookie.setMaxAge(24 * 60 * 60);
-        cookie.setDomain(".nearzoom.store");
+        cookie.setDomain("nearzoom.store");
         return cookie;
     }
 }
