@@ -24,7 +24,7 @@ export const createCanvasSlice: StateCreator<
     width: CANVAS_CONFIG.width,
     height: CANVAS_CONFIG.height,
   },
-  frameVisible: true,
+  frameVisible: false,
   backgroundColor: CANVAS_CONFIG.backgroundColor,
   setCanvasSize: size =>
     set(() => ({
