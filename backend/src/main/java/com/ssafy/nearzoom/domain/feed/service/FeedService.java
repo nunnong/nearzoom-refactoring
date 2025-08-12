@@ -134,33 +134,7 @@ public class FeedService {
     }
 
     /**
-     * 🆔 계정명으로 피드 조회 (프로필 + 피드 통합)
-     */
-    @Transactional(readOnly = true)
-    public FeedDetailResponse getFeedByAccountName(Authentication authentication, String accountName) {
-
-        // 1. 계정명으로 사용자 찾기
-        User targetUser = userRepository.findByAccountName(accountName)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
-
-        // 2. 해당 사용자의 피드 찾기 (1명당 1개)
-        Feed feed = feedRepository.findByUser_UserId(targetUser.getUserId())
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "피드를 찾을 수 없습니다."));
-
-        // 3. 현재 로그인 사용자 정보
-        User loginUser = getLoginUser(authentication);
-
-        // 4. 좋아요 상태 확인
-        boolean liked = likesRepository.existsByFeed_FeedIdAndUser_UserId(
-                feed.getFeedId(), loginUser.getUserId()
-        );
-
-        // 5. 기존 toCard 메서드 재사용
-        return toCard(feed, loginUser.getUserId());
-    }
-
-    /**
-     * 🔍 피드 검색 (= 사용자 검색, 계정 통합 적용)
+     * 🔍 피드 검색 (= 사용자 검색) - accountName만 검색하도록 단순화
      */
     @Transactional(readOnly = true)
     public List<FeedDetailResponse> searchFeeds(Authentication authentication, String query, int size) {
@@ -168,35 +142,17 @@ public class FeedService {
             return List.of();
         }
 
-        String searchQuery = query.trim().toLowerCase();
-        PageRequest pageRequest = PageRequest.ofSize(size * 2); // 중복 제거를 위해 더 많이 조회
+        String searchQuery = query.trim();
+        PageRequest pageRequest = PageRequest.ofSize(size);
 
-        // 1. 사용자 검색 (계정명, 이메일, 사용자명)
-        List<User> users = userRepository.searchByAccountNameOrEmailOrUserName(
-                searchQuery, searchQuery, searchQuery, pageRequest
-        );
+        // 1. accountName으로만 검색
+        List<User> users = userRepository.searchByAccountNameOnly(searchQuery, pageRequest);
 
-        // 2. 계정 통합 처리 (같은 이메일 사용자명 중복 제거)
-        Map<String, User> uniqueUsers = new LinkedHashMap<>();
-        for (User user : users) {
-            String emailUsername = extractEmailUsername(user.getUserEmail());
-
-            if (uniqueUsers.containsKey(emailUsername)) {
-                User existingUser = uniqueUsers.get(emailUsername);
-                // Gmail 우선순위로 교체
-                if (hasHigherEmailPriority(user.getUserEmail(), existingUser.getUserEmail())) {
-                    uniqueUsers.put(emailUsername, user);
-                }
-            } else {
-                uniqueUsers.put(emailUsername, user);
-            }
-        }
-
-        // 3. 현재 로그인 사용자
+        // 2. 현재 로그인 사용자
         User loginUser = getLoginUser(authentication);
 
-        // 4. 각 사용자의 피드 조회 (피드가 있는 사용자만)
-        return uniqueUsers.values().stream()
+        // 3. 🔥 계정 통합 로직 완전 제거 - 바로 피드 조회
+        return users.stream()
                 .map(user -> {
                     // 해당 사용자의 피드 찾기
                     Optional<Feed> feedOpt = feedRepository.findByUser_UserId(user.getUserId());
@@ -208,20 +164,5 @@ public class FeedService {
                 .filter(Objects::nonNull)
                 .limit(size)
                 .toList();
-    }
-
-    private String extractEmailUsername(String email) {
-        return email.split("@")[0];
-    }
-
-    private boolean hasHigherEmailPriority(String email1, String email2) {
-        return getEmailPriority(email1) < getEmailPriority(email2);
-    }
-
-    private int getEmailPriority(String email) {
-        if (email.endsWith("@gmail.com")) return 1;
-        if (email.endsWith("@naver.com")) return 2;
-        if (email.endsWith("@daum.net")) return 3;
-        return 9;
     }
 }
