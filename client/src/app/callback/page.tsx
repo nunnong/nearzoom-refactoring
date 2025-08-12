@@ -109,6 +109,10 @@ export default function CallbackPage() {
         
         setErrorMessage(friendlyMessage)
         
+        // 🔥 에러 시에만 저장된 정보 정리
+        localStorage.removeItem('redirectAfterLogin')
+        localStorage.removeItem('actionAfterLogin')
+        
         // 3초 후 메인 페이지로 이동 (에러 시에도 메인으로)
         setTimeout(() => {
           router.replace('/')
@@ -143,7 +147,7 @@ export default function CallbackPage() {
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">로그인 성공!</h2>
-          <p className="text-gray-600">잠시 후 메인 페이지로 이동합니다.</p>
+          <p className="text-gray-600">참조 사진 페이지로 이동합니다...</p>
         </div>
       </div>
     )

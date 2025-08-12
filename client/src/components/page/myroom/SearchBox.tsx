@@ -17,7 +17,7 @@ interface SearchBoxProps {
 
 const SearchBox: React.FC<SearchBoxProps> = ({
   onFiltersChange,
-  placeholder = '친구 이름으로 검색하세요 (스페이스바로 필터 추가)',
+  placeholder = '친구 메일로 검색하세요 (스페이스바로 필터 추가)',
 }) => {
   const [searchValue, setSearchValue] = useState<string>('')
   const [filters, setFilters] = useState<Filter[]>([])
@@ -25,6 +25,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
 
+  // 날짜 관련 함수
   const addDateFilter = (start: string, end?: string) => {
     const dateValue = end ? `${start} ~ ${end}` : start
     const newFilter: Filter = {
@@ -42,10 +43,11 @@ const SearchBox: React.FC<SearchBoxProps> = ({
     setEndDate('')
   }
 
+  // 좋아요
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>): void => {
     setSearchValue(e.target.value)
   }
-
+  // 하트 필터 여부
   const addHeartFilter = () => {
     // 이미 하트 필터가 있는지 확인
     const existingHeartFilter = filters.find(f => f.type === 'heart')
@@ -59,7 +61,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({
       id: Date.now().toString(),
       type: 'heart',
       value: 'liked',
-      display: '♥ 좋아요'
+      display: '♥좋아요♥'
     }
 
     const updatedFilters = [...filters, newFilter]
@@ -67,6 +69,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({
     onFiltersChange?.(updatedFilters)
   }
 
+  // 편집 되어 있는지 확인
   const addEditedFilter = () => {
     // 기존 편집 필터가 있는지 확인
     const existingEditFilter = filters.find(f => f.type === 'edited')
@@ -175,13 +178,14 @@ const SearchBox: React.FC<SearchBoxProps> = ({
           onClick={addHeartFilter}
           className={`ml-2 p-2 transition-colors ${
             filters.some(f => f.type === 'heart')
-              ? 'text-red-500 bg-red-50 rounded-full'
-              : 'text-gray-400 hover:text-red-500'
+              ? 'text-red-500 bg-red-50 rounded-full' // 꽉 찬 하트
+              : 'text-gray-400 hover:text-red-500' // 회색 하트
           }`}
           title={filters.some(f => f.type === 'heart') ? '좋아요 필터 적용됨' : '좋아요 필터 추가'}
         >
           <HeartIcon className="h-5 w-5" />
         </button>
+        
         <button
           onClick={addEditedFilter}
           className={`ml-2 p-2 transition-colors ${

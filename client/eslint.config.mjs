@@ -23,25 +23,24 @@ const eslintConfig = [
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
       '@typescript-eslint/no-explicit-any': 'warn',
-      
       // Import 관련 규칙
-      'import/order': [
-        'error',
-        {
-          groups: [
-            'builtin',
-            'external',
-            'internal',
-            ['parent', 'sibling'],
-            'index',
-          ],
-          'newlines-between': 'always',
-          alphabetize: {
-            order: 'asc',
-            caseInsensitive: true,
-          },
-        },
-      ],
+      // 'import/order': [
+      //   'error',
+      //   {
+      //     groups: [
+      //       'builtin',
+      //       'external',
+      //       'internal',
+      //       ['parent', 'sibling'],
+      //       'index',
+      //     ],
+      //     'newlines-between': 'always',
+      //     alphabetize: {
+      //       order: 'asc',
+      //       caseInsensitive: true,
+      //     },
+      //   },
+      // ],
       
       // 일반 규칙
       'prefer-const': 'error',

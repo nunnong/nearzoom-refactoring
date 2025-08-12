@@ -8,17 +8,20 @@ export const API_BASE_URL =
 // 프론트엔드 콜백 URL
 export const FRONTEND_BASE_URL =
   process.env.NODE_ENV === 'production'
-    ? 'https://api.nearzoom.store'
-    : 'http://localhost:3000'
+    ? 'http://localhost:3000'
+    : 'https://nearzoom.store' // 프론트엔드 포트
 
 export const API_ENDPOINTS = {
   // Auth
   REFRESH: '/auth/refresh',
 
   // MyRoom
-  PHOTOS: '/photoprompt/result/{jobId}',
-  LIKE: '/photos/heart',
+  PHOTOS: '/myroom/photos',
+  HEART: '/myroom/photos/heart',
+  DELETE_PHOTO: '/myroom/photos',
   SAVE_EDITED: '/myroom/photos/save-edited',
+  SAVE_FACE_IMAGE: '/user/save-face-image',
+  IMAGE_PROXY: '/myroom/image', // 이미지 프록시 엔드포인트
 
   // Room (회의룸)
   CREATE_ROOM: '/room/create',
@@ -48,5 +51,4 @@ export const API_ENDPOINTS = {
   EMAIL_USER_INFO: '/user/email-user-info',
   LOGOUT: '/user/logout',
   SIGNOUT: '/user/signout',
-  SAVE_FACE_IMAGE: '/user/save-face-image',
 }
