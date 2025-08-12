@@ -6,7 +6,7 @@ import { api } from '@/lib/api'
 import { tokenStorage, sessionManager, userTransformer } from '@/lib/auth'
 
 interface AuthActions {
-  setTokens: ({ accessToken }: { accessToken: string }) => void
+  setTokens: ({ accessToken }: { accessToken: string | null }) => void
   setUser: (user: User) => void
   setLoading: (isLoading: boolean) => void
   clearTokens: () => void
@@ -23,17 +23,19 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   isAuthenticated: false,
 
   setTokens: ({ accessToken }) => {
-    console.log('setTokens 호출됨, 토큰:', accessToken)
     set({
       accessToken,
       isAuthenticated: !!accessToken,
     })
-    console.log('상태 업데이트 완료, isAuthenticated:', !!accessToken)
 
     if (typeof window !== 'undefined') {
-      tokenStorage.save(accessToken)
-      sessionManager.saveTimestamp()
-      console.log('localStorage에 토큰 및 세션 타임스탬프 저장 완료')
+      if (accessToken) {
+        tokenStorage.save(accessToken)
+        sessionManager.saveTimestamp()
+      } else {
+        tokenStorage.remove()
+        sessionManager.removeTimestamp()
+      }
     }
   },
 

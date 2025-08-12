@@ -32,5 +32,8 @@
   // 문자열 안에서 자동완성 가능
   "editor.quickSuggestions": {
     "strings": true
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
   }
 }
