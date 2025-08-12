@@ -1,7 +1,7 @@
 import { useAuthStore } from '@/stores/authStore';
 
 const API_BASE_URL = process.env.NODE_ENV === 'production'
-    ? 'https://www.nearzoom.store'
+    ? 'https://api.nearzoom.store'
     : 'http://localhost:8080';
 
 // 🔥 강화된 디버깅이 포함된 토큰 가져오기 함수
