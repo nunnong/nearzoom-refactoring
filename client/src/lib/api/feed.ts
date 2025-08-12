@@ -12,48 +12,50 @@ interface ApiResponse<T> {
 // ✅ 백엔드 DTO와 정확히 일치하는 타입들
 interface BackendFeedDetailResponse {
   feedId: number
+  imgUrl: string        // ✅ photoUrl → imgUrl
+  caption: string       // ✅ 추가됨
   authorId: number
+  accountName: string   // ✅ userName → accountName
+  profileImage: string  // ✅ 사용자 프로필 이미지
+  createdAt: string     // LocalDateTime → string
+  liked: boolean        // ✅ 현재 사용자의 좋아요 여부
+}
+
+// ✅ 백엔드 CreateFeedRequest
+interface BackendCreateFeedRequest {
   photoId: number
-  photoUrl: string
-  createdAt: string    // LocalDateTime → string
-  updatedAt: string
+  caption: string
 }
 
-interface BackendFeedItem {
-  feedId: number
-  userId: number
-  photoId: number
-  photoUrl: string
-  createdAt: string
+// ✅ 백엔드 FollowCountsResponse
+interface BackendFollowCountsResponse {
+  followerCount: number
+  followingCount: number
 }
 
-interface BackendFeedListResponse {
-  items: BackendFeedItem[]
-  nextCursor: number | null
-  hasNext: boolean
-}
-
-// ✅ 백엔드 UserInfoResponse와 정확히 일치
+// ✅ 백엔드 UserInfoResponse
 interface BackendUserInfoResponse {
   userName: string
   userEmail: string
-  userProfileImage: string | null
+  profileImage: string
+  prettyFace: string
 }
 
-// ✅ 프론트엔드 타입들 (photoId, photoUrl 추가)
-interface CanvasFeedItem extends UserFeed {
+// ✅ 프론트엔드 타입들
+interface CanvasFeedItem extends Omit<UserFeed, 'photoId'> {
   elements: FeedElement[]
   authorId: string
   authorName: string
   authorAvatar?: string
-  photoId: string       // 🔥 백엔드 photoId 추가
-  photoUrl: string      // 🔥 백엔드 photoUrl 추가
+  photoId: number        // ✅ 백엔드와 일치하도록 number로 고정
+  photoUrl: string
   likesCount: number
   commentsCount?: number
 }
 
 interface CreateFeedData {
   photoId: number
+  caption: string    // ✅ 추가됨
 }
 
 interface UpdateFeedData extends Partial<CreateFeedData> {
@@ -168,7 +170,7 @@ const getUserInfoFromApi = async (userId: string): Promise<{ name: string; avata
     if (!result.error && result.data) {
       const userData = { 
         name: result.data.userName, 
-        avatar: result.data.userProfileImage || undefined,
+        avatar: result.data.profileImage || undefined,
         timestamp: Date.now() 
       }
       userCache.set(userId, userData)
@@ -189,66 +191,67 @@ const getUserInfoFromApi = async (userId: string): Promise<{ name: string; avata
   }
 }
 
-// ✅ 백엔드 응답을 프론트엔드 타입으로 변환 (photoId, photoUrl 추가)
+// ✅ 백엔드 응답을 프론트엔드 타입으로 변환
 const transformBackendFeedToCanvasFeed = async (
   backendFeed: BackendFeedDetailResponse
 ): Promise<CanvasFeedItem> => {
-  const userInfo = await getUserInfoFromApi(backendFeed.authorId.toString())
-
   return {
     id: backendFeed.feedId.toString(),
     userId: backendFeed.authorId.toString(),
-    name: `Feed ${backendFeed.feedId}`,
-    description: '',
+    userName: backendFeed.accountName,
+    name: backendFeed.caption || `Feed ${backendFeed.feedId}`,
+    description: backendFeed.caption || '',
     isPublic: true,
     backgroundColor: '#ffffff',
-    backgroundImageUrl: backendFeed.photoUrl,
+    backgroundImageUrl: backendFeed.imgUrl,
     totalHeight: 1600,
     
     authorId: backendFeed.authorId.toString(),
-    authorName: userInfo.name,
-    authorAvatar: userInfo.avatar,
-    photoId: backendFeed.photoId.toString(),  // 🔥 photoId 추가
-    photoUrl: backendFeed.photoUrl,           // 🔥 photoUrl 추가
+    authorName: backendFeed.accountName,
+    authorAvatar: backendFeed.profileImage,
+    photoId: backendFeed.feedId,  // feedId를 photoId로 사용
+    photoUrl: backendFeed.imgUrl,
     
     elements: [],
     
     followersCount: 0,
-    likesCount: 0, // 별도로 조회
+    likesCount: 0, // 별도로 조회하지 않음 (백엔드에서 좋아요 수 API 없음)
     isFollowing: false,
-    isLiked: false, // 별도로 조회
+    isLiked: backendFeed.liked,
     
     createdAt: backendFeed.createdAt,
-    updatedAt: backendFeed.updatedAt
+    updatedAt: backendFeed.createdAt
   }
 }
 
 // === API 함수들 ===
 
-// ✅ 피드 생성 (백엔드 응답 구조에 맞춰 수정)
-export const createFeed = async (photoId: number): Promise<{ success: boolean; data?: CanvasFeedItem; error?: string }> => {
+// ✅ 피드 생성 (POST /feeds)
+export const createFeed = async (
+  photoId: number, 
+  caption: string = ''
+): Promise<{ success: boolean; data?: CanvasFeedItem; error?: string }> => {
   try {
-    const response = await fetchWithAuth(`${API_ENDPOINTS.feeds}/${photoId}`, {
+    const requestBody: BackendCreateFeedRequest = {
+      photoId,
+      caption
+    }
+
+    const response = await fetchWithAuth(`${API_ENDPOINTS.feeds}`, {
       method: 'POST',
+      body: JSON.stringify(requestBody)
     })
 
-    const result: ApiResponse<BackendFeedDetailResponse> = await response.json()
+    const result: ApiResponse<number> = await response.json()  // 백엔드는 feedId(Long) 반환
     
     if (!result.error && result.data) {
-      const canvasFeed = await transformBackendFeedToCanvasFeed(result.data)
-      
-      // 좋아요 정보 추가 조회
-      const [likesCount, isLiked] = await Promise.all([
-        getLikeCount(result.data.photoId),
-        checkLikeStatus(result.data.photoId)
-      ])
-      
-      canvasFeed.likesCount = likesCount
-      canvasFeed.isLiked = isLiked
-      
-      return {
-        success: true,
-        data: canvasFeed
+      // 생성된 피드를 다시 조회
+      const feedDetailResult = await getFeed(result.data.toString())
+      if (feedDetailResult.success && feedDetailResult.data) {
+        return {
+          success: true,
+          data: feedDetailResult.data
+        }
       }
     }
 
@@ -265,7 +268,7 @@ export const createFeed = async (photoId: number): Promise<{ success: boolean; d
   }
 }
 
-// ✅ 단일 피드 조회
+// ✅ 단일 피드 조회 (GET /feeds/{feedId})
 export const getFeed = async (feedId: string): Promise<{ success: boolean; data?: CanvasFeedItem; error?: string }> => {
   try {
     const response = await fetchWithAuth(`${API_ENDPOINTS.feeds}/${feedId}`)
@@ -273,15 +276,6 @@ export const getFeed = async (feedId: string): Promise<{ success: boolean; data?
     
     if (!result.error && result.data) {
       const canvasFeed = await transformBackendFeedToCanvasFeed(result.data)
-      
-      // 좋아요 정보 추가 조회
-      const [likesCount, isLiked] = await Promise.all([
-        getLikeCount(result.data.photoId),
-        checkLikeStatus(result.data.photoId)
-      ])
-      
-      canvasFeed.likesCount = likesCount
-      canvasFeed.isLiked = isLiked
       
       return {
         success: true,
@@ -302,25 +296,63 @@ export const getFeed = async (feedId: string): Promise<{ success: boolean; data?
   }
 }
 
-// ✅ 피드 삭제
-export const deleteFeed = async (feedId: string): Promise<{ success: boolean; error?: string }> => {
+// ✅ 사용자 피드 목록 조회 (GET /feeds/users/{userId})
+export const getUserFeeds = async (
+  userId: number,
+  cursorCreatedAt?: string,
+  cursorId?: number,
+  size: number = 20
+): Promise<{ 
+  success: boolean; 
+  data?: { 
+    items: CanvasFeedItem[]; 
+    hasMore: boolean;
+    nextCursor?: { createdAt: string; feedId: number } | null;
+  }; 
+  error?: string 
+}> => {
   try {
-    const response = await fetchWithAuth(`${API_ENDPOINTS.feeds}/${feedId}`, {
-      method: 'DELETE'
-    })
+    const params = new URLSearchParams()
+    if (cursorCreatedAt) params.append('cursorCreatedAt', cursorCreatedAt)
+    if (cursorId) params.append('cursorId', cursorId.toString())
+    params.append('size', size.toString())
 
-    const result: ApiResponse<null> = await response.json()
+    const url = `${API_ENDPOINTS.feeds}/users/${userId}?${params.toString()}`
+    const response = await fetchWithAuth(url)
+    const result: ApiResponse<BackendFeedDetailResponse[]> = await response.json()
     
-    if (!result.error) {
-      return { success: true }
+    if (!result.error && Array.isArray(result.data)) {
+      const canvasFeeds = await Promise.all(
+        result.data.map(feed => transformBackendFeedToCanvasFeed(feed))
+      )
+      
+      // 다음 커서 계산 (마지막 아이템 기준)
+      const hasMore = result.data.length === size
+      let nextCursor = null
+      if (hasMore && result.data.length > 0) {
+        const lastFeed = result.data[result.data.length - 1]
+        nextCursor = {
+          createdAt: lastFeed.createdAt,
+          feedId: lastFeed.feedId
+        }
+      }
+      
+      return {
+        success: true,
+        data: {
+          items: canvasFeeds,
+          hasMore,
+          nextCursor
+        }
+      }
     }
 
     return {
       success: false,
-      error: result.message || '피드 삭제에 실패했습니다.'
+      error: result.message || '사용자 피드를 불러오는데 실패했습니다.'
     }
   } catch (error) {
-    console.error('Failed to delete feed:', error)
+    console.error('Failed to get user feeds:', error)
     return {
       success: false,
       error: handleApiError(error)
@@ -328,20 +360,137 @@ export const deleteFeed = async (feedId: string): Promise<{ success: boolean; er
   }
 }
 
-// ✅ 좋아요 토글
-export const toggleFeedLike = async (photoId: number): Promise<{ success: boolean; data?: { isLiked: boolean; likesCount: number }; error?: string }> => {
+// ✅ 팔로잉 피드 목록 조회 (GET /feeds/following)
+export const getFollowingFeeds = async (
+  cursorCreatedAt?: string,
+  cursorId?: number,
+  size: number = 20
+): Promise<{ 
+  success: boolean; 
+  data?: { 
+    items: CanvasFeedItem[]; 
+    hasMore: boolean;
+    nextCursor?: { createdAt: string; feedId: number } | null;
+  }; 
+  error?: string 
+}> => {
   try {
-    const currentLikeStatus = await checkLikeStatus(photoId)
+    const params = new URLSearchParams()
+    if (cursorCreatedAt) params.append('cursorCreatedAt', cursorCreatedAt)
+    if (cursorId) params.append('cursorId', cursorId.toString())
+    params.append('size', size.toString())
+
+    const url = `${API_ENDPOINTS.feeds}/following?${params.toString()}`
+    const response = await fetchWithAuth(url)
+    const result: ApiResponse<BackendFeedDetailResponse[]> = await response.json()
+    
+    if (!result.error && Array.isArray(result.data)) {
+      const canvasFeeds = await Promise.all(
+        result.data.map(feed => transformBackendFeedToCanvasFeed(feed))
+      )
+      
+      // 다음 커서 계산
+      const hasMore = result.data.length === size
+      let nextCursor = null
+      if (hasMore && result.data.length > 0) {
+        const lastFeed = result.data[result.data.length - 1]
+        nextCursor = {
+          createdAt: lastFeed.createdAt,
+          feedId: lastFeed.feedId
+        }
+      }
+      
+      return {
+        success: true,
+        data: {
+          items: canvasFeeds,
+          hasMore,
+          nextCursor
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: result.message || '팔로잉 피드를 불러오는데 실패했습니다.'
+    }
+  } catch (error) {
+    console.error('Failed to get following feeds:', error)
+    return {
+      success: false,
+      error: handleApiError(error)
+    }
+  }
+}
+
+// ✅ 랜덤 피드 목록 조회 (GET /feeds/random)
+export const getRandomFeeds = async (
+  size: number = 20
+): Promise<{ 
+  success: boolean; 
+  data?: { 
+    items: CanvasFeedItem[]; 
+    hasMore: boolean;
+  }; 
+  error?: string 
+}> => {
+  try {
+    const params = new URLSearchParams()
+    params.append('size', size.toString())
+
+    const url = `${API_ENDPOINTS.feeds}/random?${params.toString()}`
+    const response = await fetchWithAuth(url)
+    const result: ApiResponse<BackendFeedDetailResponse[]> = await response.json()
+    
+    if (!result.error && Array.isArray(result.data)) {
+      const canvasFeeds = await Promise.all(
+        result.data.map(feed => transformBackendFeedToCanvasFeed(feed))
+      )
+      
+      return {
+        success: true,
+        data: {
+          items: canvasFeeds,
+          hasMore: false  // 랜덤 피드는 페이징 없음
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: result.message || '랜덤 피드를 불러오는데 실패했습니다.'
+    }
+  } catch (error) {
+    console.error('Failed to get random feeds:', error)
+    return {
+      success: false,
+      error: handleApiError(error)
+    }
+  }
+}
+
+// ✅ 피드 삭제 (백엔드에서 미지원)
+export const deleteFeed = async (feedId: string): Promise<{ success: boolean; error?: string }> => {
+  return {
+    success: false,
+    error: '피드 삭제는 현재 백엔드에서 지원되지 않습니다.'
+  }
+}
+
+// ✅ 좋아요 토글 (POST/DELETE /likes/{feedId})
+export const toggleFeedLike = async (feedId: number): Promise<{ success: boolean; data?: { isLiked: boolean; likesCount?: number }; error?: string }> => {
+  try {
+    const currentLikeStatus = await checkLikeStatus(feedId)
     
     let response: Response
     if (currentLikeStatus) {
       // 좋아요 취소
-      response = await fetchWithAuth(`${API_ENDPOINTS.likes}/${photoId}`, {
+      response = await fetchWithAuth(`${API_ENDPOINTS.likes}/${feedId}`, {
         method: 'DELETE'
       })
     } else {
       // 좋아요 추가
-      response = await fetchWithAuth(`${API_ENDPOINTS.likes}/${photoId}`, {
+      response = await fetchWithAuth(`${API_ENDPOINTS.likes}/${feedId}`, {
         method: 'POST'
       })
     }
@@ -349,14 +498,11 @@ export const toggleFeedLike = async (photoId: number): Promise<{ success: boolea
     const result: ApiResponse<null> = await response.json()
     
     if (!result.error) {
-      // 새로운 좋아요 수 가져오기
-      const newLikesCount = await getLikeCount(photoId)
-      
       return {
         success: true,
         data: {
-          isLiked: !currentLikeStatus,
-          likesCount: newLikesCount
+          isLiked: !currentLikeStatus
+          // 좋아요 수는 백엔드에서 제공하지 않음
         }
       }
     }
@@ -374,27 +520,10 @@ export const toggleFeedLike = async (photoId: number): Promise<{ success: boolea
   }
 }
 
-// ✅ 좋아요 수 조회
-export const getLikeCount = async (photoId: number): Promise<number> => {
+// ✅ 좋아요 상태 확인 (GET /likes/check/{feedId})
+export const checkLikeStatus = async (feedId: number): Promise<boolean> => {
   try {
-    const response = await fetchWithAuth(`${API_ENDPOINTS.likes}/${photoId}/count`)
-    const result: ApiResponse<number> = await response.json()
-    
-    if (!result.error && typeof result.data === 'number') {
-      return result.data
-    }
-    
-    return 0
-  } catch (error) {
-    console.error('Failed to get like count:', error)
-    return 0
-  }
-}
-
-// ✅ 좋아요 상태 확인
-export const checkLikeStatus = async (photoId: number): Promise<boolean> => {
-  try {
-    const response = await fetchWithAuth(`${API_ENDPOINTS.likes}/${photoId}/me`)
+    const response = await fetchWithAuth(`${API_ENDPOINTS.likes}/check/${feedId}`)
     const result: ApiResponse<boolean> = await response.json()
     
     if (!result.error && typeof result.data === 'boolean') {
@@ -408,7 +537,7 @@ export const checkLikeStatus = async (photoId: number): Promise<boolean> => {
   }
 }
 
-// ✅ 팔로우/언팔로우
+// ✅ 팔로우/언팔로우 (POST/DELETE /follows/{followeeId})
 export const toggleFollow = async (followeeId: number): Promise<{ success: boolean; data?: boolean; error?: string }> => {
   try {
     const isCurrentlyFollowing = await checkFollowStatus(followeeId)
@@ -448,7 +577,7 @@ export const toggleFollow = async (followeeId: number): Promise<{ success: boole
   }
 }
 
-// ✅ 팔로우 상태 확인
+// ✅ 팔로우 상태 확인 (GET /follows/check/{followeeId})
 export const checkFollowStatus = async (followeeId: number): Promise<boolean> => {
   try {
     const response = await fetchWithAuth(`${API_ENDPOINTS.follows}/check/${followeeId}`)
@@ -465,7 +594,7 @@ export const checkFollowStatus = async (followeeId: number): Promise<boolean> =>
   }
 }
 
-// ✅ 팔로잉 목록 조회
+// ✅ 팔로잉 목록 조회 (GET /follows/following/{userId})
 export const getFollowing = async (userId: number): Promise<{ success: boolean; data?: BackendUserInfoResponse[]; error?: string }> => {
   try {
     const response = await fetchWithAuth(`${API_ENDPOINTS.follows}/following/${userId}`)
@@ -491,7 +620,7 @@ export const getFollowing = async (userId: number): Promise<{ success: boolean; 
   }
 }
 
-// ✅ 팔로워 목록 조회
+// ✅ 팔로워 목록 조회 (GET /follows/followers/{userId})
 export const getFollowers = async (userId: number): Promise<{ success: boolean; data?: BackendUserInfoResponse[]; error?: string }> => {
   try {
     const response = await fetchWithAuth(`${API_ENDPOINTS.follows}/followers/${userId}`)
@@ -517,26 +646,78 @@ export const getFollowers = async (userId: number): Promise<{ success: boolean; 
   }
 }
 
-// === 호환성을 위한 기존 함수들 ===
+// ✅ 팔로우 수 조회 (GET /follows/count/{userId})
+export const getFollowCounts = async (userId: number): Promise<{ success: boolean; data?: BackendFollowCountsResponse; error?: string }> => {
+  try {
+    const response = await fetchWithAuth(`${API_ENDPOINTS.follows}/count/${userId}`)
+    const result: ApiResponse<BackendFollowCountsResponse> = await response.json()
+    
+    if (!result.error && result.data) {
+      return {
+        success: true,
+        data: result.data
+      }
+    }
 
-// 피드 목록 조회 (백엔드에서 구현 필요)
+    return {
+      success: false,
+      error: result.message || '팔로우 수를 불러오는데 실패했습니다.'
+    }
+  } catch (error) {
+    console.error('Failed to get follow counts:', error)
+    return {
+      success: false,
+      error: handleApiError(error)
+    }
+  }
+}
+
+// === 호환성을 위한 기존 함수들 (페이지네이션 방식) ===
+
+// 피드 목록 조회 (기존 방식 호환)
 export const getFeeds = async (
   userId?: string,
   page: number = 1,
   limit: number = 12
 ): Promise<{ success: boolean; data?: PaginatedResponse<CanvasFeedItem>; error?: string }> => {
   try {
-    // TODO: 백엔드에 피드 목록 API 추가 필요
-    console.warn('getFeeds: 백엔드에 피드 목록 API가 필요합니다.')
-    
-    return {
-      success: true,
-      data: {
-        items: [],
-        hasMore: false,
-        total: 0,
-        page,
-        limit
+    if (userId) {
+      // 사용자별 피드 조회
+      const result = await getUserFeeds(parseInt(userId), undefined, undefined, limit)
+      if (result.success && result.data) {
+        return {
+          success: true,
+          data: {
+            items: result.data.items,
+            hasMore: result.data.hasMore,
+            total: result.data.items.length,
+            page,
+            limit
+          }
+        }
+      }
+      return {
+        success: false,
+        error: result.error
+      }
+    } else {
+      // 랜덤 피드 조회
+      const result = await getRandomFeeds(limit)
+      if (result.success && result.data) {
+        return {
+          success: true,
+          data: {
+            items: result.data.items,
+            hasMore: result.data.hasMore,
+            total: result.data.items.length,
+            page,
+            limit
+          }
+        }
+      }
+      return {
+        success: false,
+        error: result.error
       }
     }
   } catch (error) {
@@ -602,6 +783,12 @@ export const updateFeedBackgroundImage = async (
   backgroundImageUrl: string | undefined
 ): Promise<{ success: boolean; data?: CanvasFeedItem; error?: string }> => {
   return updateFeed(feedId, { backgroundImageUrl })
+}
+
+// 제거된 함수들 (백엔드에서 지원하지 않음)
+export const getLikeCount = async (feedId: number): Promise<number> => {
+  console.warn('getLikeCount: 백엔드에서 좋아요 수 조회 API를 지원하지 않습니다.')
+  return 0
 }
 
 // === 인증 및 유틸리티 함수들 ===
