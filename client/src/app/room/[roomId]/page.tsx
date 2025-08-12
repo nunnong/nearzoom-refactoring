@@ -1,7 +1,7 @@
 'use client'
 
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 
 import { useRoomStore } from '@/stores/roomStore'
 import { useAuthStore } from '@/stores/authStore'
@@ -10,7 +10,7 @@ import { roomAPI, JoinRoomData, getErrorMessage } from '@/lib/api/room'
 
 type PageState = 'loading' | 'success' | 'error' | 'login_required'
 
-export default function RoomJoinPage() {
+function RoomJoinContent() {
   const { roomId } = useParams()
   const router = useRouter()
 
@@ -354,5 +354,13 @@ export default function RoomJoinPage() {
     <div className="flex min-h-screen items-center justify-center">
       <p>예상치 못한 오류가 발생했습니다.</p>
     </div>
+  )
+}
+
+export default function RoomJoinPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <RoomJoinContent />
+    </Suspense>
   )
 }

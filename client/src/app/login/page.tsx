@@ -1,12 +1,12 @@
 "use client"
 
 import type { JSX } from "react"
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/auth'  // 수정: '@/hooks/auth' -> '@/hooks/useAuth'
 import { useAuthStore } from '@/stores/authStore'
 
-const LoginPage = (): JSX.Element => {
+const LoginContent = (): JSX.Element => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { startSocialLogin, isAuthenticated, isLoading } = useAuth()
@@ -194,6 +194,14 @@ const LoginPage = (): JSX.Element => {
         </p>
       </div>
     </div>
+  )
+}
+
+const LoginPage = (): JSX.Element => {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   )
 }
 

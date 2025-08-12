@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import LandingPage from '@/app/landing/page'
 import MainPage from '@/components/page/main/MainPage'
 
-export default function Home() {
+function HomeContent() {
   const [showLanding, setShowLanding] = useState(false)
   const searchParams = useSearchParams()
   
@@ -41,4 +41,12 @@ export default function Home() {
   }
   
   return <MainPage />
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <HomeContent />
+    </Suspense>
+  )
 }

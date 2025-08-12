@@ -13,7 +13,7 @@ import {
 } from '@heroicons/react/24/outline'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
-import React, { useState, useRef, useEffect } from 'react'
+import React, { Suspense, useState, useRef, useEffect } from 'react'
 
 import { saveImageToLocal, updateImageInLocal } from '@/utils/localStorage'
 
@@ -66,7 +66,7 @@ interface TextData {
   rotation?: number
 }
 
-const DrawingPage: React.FC = () => {
+const DrawingContent: React.FC = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const stageRef = useRef<any>(null)
@@ -915,6 +915,14 @@ const DrawingPage: React.FC = () => {
         />
       )}
     </div>
+  )
+}
+
+const DrawingPage: React.FC = () => {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <DrawingContent />
+    </Suspense>
   )
 }
 

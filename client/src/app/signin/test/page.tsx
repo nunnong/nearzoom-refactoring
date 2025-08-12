@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUserStore } from '@/components/page/room/providers/AuthProvider'
 
-export default function SignInPage() {
+function SignInContent() {
   const [username, setUsername] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
@@ -72,5 +72,13 @@ export default function SignInPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SignInContent />
+    </Suspense>
   )
 }

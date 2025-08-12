@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/auth'  
 import { API_BASE_URL } from '@/constants/api'
 
 type PageState = 'loading' | 'success' | 'error'
 
-export default function CallbackPage() {
+function CallbackContent() {
   
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -200,5 +200,13 @@ export default function CallbackPage() {
         <p className="text-sm text-gray-500">잠시 후 자동으로 이동합니다.</p>
       </div>
     </div>
+  )
+}
+
+export default function CallbackPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CallbackContent />
+    </Suspense>
   )
 }

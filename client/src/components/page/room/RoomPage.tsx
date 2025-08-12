@@ -73,10 +73,10 @@ export default function RoomPage({ roomName }: RoomPageProps) {
     setMounted(true)
   }, [])
 
-  // username 체크 및 리다이렉트
+  // username이 없으면 리다이렉트
   useEffect(() => {
     if (mounted && !username) {
-      const redirectUrl = `/room/${roomName}`
+      const redirectUrl = `/room-test/${roomName}`
       router.push(`/signin/test?redirect=${encodeURIComponent(redirectUrl)}`)
     }
   }, [mounted, username, roomName, router])
