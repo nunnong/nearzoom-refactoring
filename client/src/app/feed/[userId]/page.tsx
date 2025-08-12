@@ -11,7 +11,18 @@ import SideList from '@/components/page/myroom/SideList'
 import FeedViewer from '@/components/page/feed/FeedViewer'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
-// 🔥 피드 사용자 정보 타입 (User 타입과 분리)
+// ✅ 백엔드 연동 임포트
+import { 
+  getUserFeeds, 
+  toggleFeedLike,
+  checkFollowStatus 
+} from '@/lib/api/feed'
+import { 
+  getFollowStats,
+  toggleFollow 
+} from '@/lib/api/follow'
+
+// ✅ 백엔드 연동 타입 (간소화)
 interface UserFeedInfo {
   id: string
   name: string
@@ -23,8 +34,6 @@ interface UserFeedInfo {
   followingCount: number
   postsCount: number
   isFollowing: boolean
-  isLiked: boolean
-  isPublic: boolean
 }
 
 const UserFeedPage: React.FC = () => {
@@ -37,9 +46,9 @@ const UserFeedPage: React.FC = () => {
   const [userInfo, setUserInfo] = useState<UserFeedInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isFollowing, setIsFollowing] = useState(false)
-  const [isLiked, setIsLiked] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // 🔥 본인 피드 접근 시 /my로 리다이렉트 (타입 안전하게)
+  // ✅ 본인 피드 접근 시 /my로 리다이렉트
   useEffect(() => {
     if (isAuthenticated && currentUser && String(currentUser.id) === String(userId)) {
       router.push('/my')
@@ -47,7 +56,7 @@ const UserFeedPage: React.FC = () => {
     }
   }, [isAuthenticated, currentUser, userId, router])
 
-  // Mock 사용자 정보 로드
+  // ✅ 백엔드 API로 사용자 정보 로드
   useEffect(() => {
     // 본인 피드인 경우 로딩하지 않음 (리다이렉트됨)
     if (isAuthenticated && currentUser && String(currentUser.id) === String(userId)) {
@@ -55,33 +64,69 @@ const UserFeedPage: React.FC = () => {
     }
 
     const loadUserInfo = async () => {
-      setIsLoading(true)
+      if (!userId) return
       
-      // Mock API 호출 시뮬레이션
-      setTimeout(() => {
-        const mockUserInfo: UserFeedInfo = {
-          id: userId,
-          name: ['이예쁜', '박감성', '정아름', '최귀염', '문달콤'][Math.floor(Math.random() * 5)],
-          email: `user${userId}@example.com`,
-          profileImage: Math.random() > 0.5 ? `/api/placeholder/80/80?seed=${userId}` : undefined,
-          feedName: '내 소중한 다이어리 ✨',
-          feedDescription: '일상의 소중한 순간들을 기록하는 공간입니다',
-          followersCount: Math.floor(Math.random() * 500) + 50,
-          followingCount: Math.floor(Math.random() * 200) + 20,
-          postsCount: Math.floor(Math.random() * 100) + 10,
-          isFollowing: Math.random() > 0.5,
-          isLiked: Math.random() > 0.7,
-          isPublic: Math.random() > 0.2, // 80% 공개
+      setIsLoading(true)
+      setError(null)
+      
+      try {
+        // 1. 팔로우 통계 조회
+        const followStatsResult = await getFollowStats(userId)
+        const followStats = followStatsResult.success ? followStatsResult.data : null
+
+        // 2. 팔로우 상태 확인
+        const isCurrentlyFollowing = await checkFollowStatus(Number(userId))
+
+        // 3. 사용자 피드 정보 조회 (첫 번째 피드만 사용해서 사용자 정보 추출)
+        const userFeedsResult = await getUserFeeds(Number(userId), undefined, undefined, 1)
+        
+        if (!userFeedsResult.success || !userFeedsResult.data?.items.length) {
+          // 피드가 없는 사용자인 경우 기본 정보 생성
+          const mockUserInfo: UserFeedInfo = {
+            id: userId,
+            name: `User ${userId}`,
+            email: `user${userId}@example.com`,
+            profileImage: undefined,
+            feedName: '피드',
+            feedDescription: '아직 게시물이 없습니다.',
+            followersCount: followStats?.followersCount || 0,
+            followingCount: followStats?.followingCount || 0,
+            postsCount: 0,
+            isFollowing: isCurrentlyFollowing,
+          }
+          
+          setUserInfo(mockUserInfo)
+          setIsFollowing(isCurrentlyFollowing)
+        } else {
+          // 첫 번째 피드에서 사용자 정보 추출
+          const firstFeed = userFeedsResult.data.items[0]
+          
+          const userFeedInfo: UserFeedInfo = {
+            id: userId,
+            name: firstFeed.userName || firstFeed.authorName || `User ${userId}`,
+            email: `${firstFeed.userName || 'user'}@example.com`, // 실제 이메일 API 필요
+            profileImage: firstFeed.authorAvatar,
+            feedName: `${firstFeed.userName || firstFeed.authorName}님의 피드`,
+            feedDescription: firstFeed.description || '소중한 순간들을 기록하는 공간입니다.',
+            followersCount: followStats?.followersCount || 0,
+            followingCount: followStats?.followingCount || 0,
+            postsCount: userFeedsResult.data.items.length,
+            isFollowing: isCurrentlyFollowing,
+          }
+          
+          setUserInfo(userFeedInfo)
+          setIsFollowing(isCurrentlyFollowing)
         }
         
-        setUserInfo(mockUserInfo)
-        setIsFollowing(mockUserInfo.isFollowing)
-        setIsLiked(mockUserInfo.isLiked)
+      } catch (error) {
+        console.error('Failed to load user info:', error)
+        setError('사용자 정보를 불러오는데 실패했습니다.')
+      } finally {
         setIsLoading(false)
-      }, 1000)
+      }
     }
     
-    if (userId) {
+    if (userId && isAuthenticated && currentUser) {
       loadUserInfo()
     }
   }, [userId, isAuthenticated, currentUser])
@@ -96,16 +141,38 @@ const UserFeedPage: React.FC = () => {
     console.log('Account settings')
   }
 
+  // ✅ 백엔드 API 팔로우 처리
   const handleFollow = async () => {
-    setIsFollowing(prev => !prev)
-    // TODO: 실제 팔로우 API 호출
-    console.log(isFollowing ? 'Unfollow' : 'Follow', userId)
-  }
-
-  const handleLike = async () => {
-    setIsLiked(prev => !prev)
-    // TODO: 실제 좋아요 API 호출
-    console.log(isLiked ? 'Unlike' : 'Like', userId)
+    if (!userId) return
+    
+    try {
+      const result = await toggleFollow(userId) // ✅ string으로 전달
+      
+      if (result.success && typeof result.data === 'boolean') {
+        const newFollowingStatus = result.data
+        setIsFollowing(newFollowingStatus)
+        
+        // 팔로우 상태 변경 시 팔로워 수 업데이트
+        if (userInfo) {
+          setUserInfo(prev => {
+            if (!prev) return null
+            return {
+              ...prev,
+              followersCount: newFollowingStatus 
+                ? prev.followersCount + 1 
+                : Math.max(0, prev.followersCount - 1),
+              isFollowing: newFollowingStatus
+            }
+          })
+        }
+      } else {
+        console.error('Follow toggle failed:', result.error)
+        // 에러 발생 시 토스트 메시지 등 표시 가능
+      }
+    } catch (error) {
+      console.error('Failed to toggle follow:', error)
+      // 에러 발생 시 UI 피드백 제공
+    }
   }
 
   // 🔥 로그인하지 않은 경우
@@ -137,59 +204,29 @@ const UserFeedPage: React.FC = () => {
     )
   }
 
-  if (!userInfo) {
+  if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">피드를 찾을 수 없습니다</h2>
-          <p className="text-gray-600">존재하지 않거나 비공개 피드입니다.</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">오류가 발생했습니다</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+          >
+            다시 시도
+          </button>
         </div>
       </div>
     )
   }
 
-  // 비공개 피드이고 팔로우하지 않은 경우
-  if (!userInfo.isPublic && !userInfo.isFollowing) {
+  if (!userInfo) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <SideList
-          isOpen={isSidebarOpen}
-          userProfile={currentUser}
-          onUploadSelfie={handleUploadSelfie}
-          onAccount={handleAccount}
-          onClose={() => setIsSidebarOpen(false)}
-        />
-
-        <div className={`transition-all duration-300 ${isSidebarOpen ? 'lg:ml-64' : 'ml-0'}`}>
-          <EnhancedHeader
-            title={userInfo.feedName}
-            userProfile={currentUser}
-            onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-            showNavigation={true}
-          />
-
-          <main className="flex items-center justify-center h-[calc(100vh-120px)]">
-            <div className="text-center max-w-md mx-auto p-8">
-              <div className="w-20 h-20 mx-auto bg-gray-200 rounded-full flex items-center justify-center mb-4">
-                {userInfo.profileImage ? (
-                  <img src={userInfo.profileImage} alt={userInfo.name} className="w-full h-full rounded-full object-cover" />
-                ) : (
-                  <span className="text-2xl font-bold text-gray-600">{userInfo.name.charAt(0)}</span>
-                )}
-              </div>
-              
-              <h2 className="text-xl font-bold text-gray-900 mb-2">{userInfo.name}</h2>
-              <p className="text-gray-600 mb-6">이 계정은 비공개 피드입니다.</p>
-              
-              <button
-                onClick={handleFollow}
-                className="inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-              >
-                <UserPlusIcon className="h-5 w-5 mr-2" />
-                팔로우 요청
-              </button>
-            </div>
-          </main>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">피드를 찾을 수 없습니다</h2>
+          <p className="text-gray-600">존재하지 않거나 접근할 수 없는 피드입니다.</p>
         </div>
       </div>
     )
@@ -217,9 +254,15 @@ const UserFeedPage: React.FC = () => {
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
                 {userInfo.profileImage ? (
-                  <img src={userInfo.profileImage} alt={userInfo.name} className="w-full h-full object-cover" />
+                  <img 
+                    src={userInfo.profileImage} 
+                    alt={userInfo.name} 
+                    className="w-full h-full object-cover" 
+                  />
                 ) : (
-                  <span className="text-sm font-medium text-gray-600">{userInfo.name.charAt(0)}</span>
+                  <span className="text-sm font-medium text-gray-600">
+                    {userInfo.name.charAt(0)}
+                  </span>
                 )}
               </div>
               <div className="hidden sm:block">
@@ -232,7 +275,8 @@ const UserFeedPage: React.FC = () => {
               {/* 팔로우 버튼 */}
               <button
                 onClick={handleFollow}
-                className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                disabled={isLoading}
+                className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
                   isFollowing
                     ? 'bg-gray-200 hover:bg-gray-300 text-gray-900'
                     : 'bg-blue-600 hover:bg-blue-700 text-white'
@@ -248,18 +292,6 @@ const UserFeedPage: React.FC = () => {
                     <UserPlusIcon className="h-4 w-4 mr-1" />
                     <span className="hidden sm:block">팔로우</span>
                   </>
-                )}
-              </button>
-
-              {/* 좋아요 버튼 */}
-              <button
-                onClick={handleLike}
-                className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-100"
-              >
-                {isLiked ? (
-                  <HeartSolidIcon className="h-4 w-4 text-red-500" />
-                ) : (
-                  <HeartIcon className="h-4 w-4 text-gray-600" />
                 )}
               </button>
             </div>

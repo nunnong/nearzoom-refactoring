@@ -2,10 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react'
 import FeedCanvas from './FeedCanvas'
 import EditToolbar from './EditToolbar'
 import BackgroundColorPicker from './BackgroundColorPicker'
-// 기존 drawing 컴포넌트들 재사용
+// 기존 drawing 컴포넌트들 재사용 (로컬 데모용)
 import StickerModal from '@/components/page/drawing/StickerModal'
 import TextModal from '@/components/page/drawing/TextModal'
-import PhotoUploadModal from './PhotoUploadModal' // ✅ 다시 추가
+import PhotoUploadModal from './PhotoUploadModal'
 import { useFeedEditor } from '@/hooks/useFeedEditor'
 import { FeedElement, StickerElement, TextElement, PhotoElement } from '@/lib/types/feed'
 
@@ -13,19 +13,19 @@ import { FeedElement, StickerElement, TextElement, PhotoElement } from '@/lib/ty
 import { 
   createFeed, 
   getFeed, 
-  deleteFeed,
   getCurrentUser,
   handleApiError 
 } from '@/lib/api/feed'
 
 interface FeedEditorProps {
   userId?: string
-  feedId?: string // 기존 피드 편집용
-  photoId?: string // ✅ myroom에서 선택된 photoId (URL 파라미터에서)
+  feedId?: string | null  // 기존 피드 편집용
+  photoId?: number        // ✅ 선택된 photoId
   mode?: 'create' | 'edit' // 생성 모드 vs 편집 모드
   className?: string
+  onSave?: (caption: string) => Promise<void> // ✅ 부모에서 처리
   onComplete?: () => void // ✅ 편집 완료 시 콜백 (/my로 이동)
-  onCancel?: () => void // 취소 콜백 (/myroom으로 이동)
+  onCancel?: () => void   // 취소 콜백
 }
 
 // 🔥 EditToolbar와 일치하는 타입 사용 (save 추가)
@@ -34,10 +34,11 @@ export type EditTool = 'select' | 'photo' | 'sticker' | 'text' | 'draw' | 'backg
 const FeedEditor: React.FC<FeedEditorProps> = ({
   userId,
   feedId,
-  photoId, // ✅ myroom에서 전달받은 photoId
+  photoId, // ✅ 선택된 photoId
   mode = 'create',
   className = '',
-  onComplete, // ✅ 편집 완료 콜백 (/my로 이동)
+  onSave, // ✅ 부모에서 처리하는 저장 함수
+  onComplete,
   onCancel
 }) => {
   const [activeTool, setActiveTool] = useState<EditTool>('select')
@@ -51,8 +52,8 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
   // ✅ 백엔드 연동 상태
   const [isSaving, setIsSaving] = useState(false)
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null)
-  const [basePhotoId, setBasePhotoId] = useState<number | null>(null)
   const [currentFeedId, setCurrentFeedId] = useState<string | null>(feedId || null)
+  const [caption, setCaption] = useState<string>('') // ✅ 피드 설명
 
   const {
     elements,
@@ -74,7 +75,7 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
     panTo,
   } = useFeedEditor({ userId: userId || currentUser?.id || '' })
 
-  // 🔥 배경색 상태 관리
+  // 🔥 배경색 상태 관리 (로컬에서만 사용)
   const [selectedBgColor, setSelectedBgColor] = useState(feedData?.backgroundColor || '#fef7f0')
 
   // ✅ 현재 사용자 정보 로드
@@ -94,16 +95,14 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
     }
   }, [userId])
 
-  // ✅ myroom에서 전달받은 photoId로 초기화
+  // ✅ photoId 확인 및 알림
   useEffect(() => {
     if (photoId) {
-      const photoIdNum = parseInt(photoId)
-      if (!isNaN(photoIdNum)) {
-        setBasePhotoId(photoIdNum)
-        showToast('사진이 로드되었습니다. 자유롭게 편집해보세요!')
-      }
+      showToast('사진이 선택되었습니다. 설명을 입력하고 저장해주세요!')
+    } else if (mode === 'create') {
+      showToast('사진을 먼저 선택해주세요', 'error')
     }
-  }, [photoId])
+  }, [photoId, mode])
 
   // ✅ 기존 피드 데이터 로드 (편집 모드)
   useEffect(() => {
@@ -113,11 +112,8 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
           const result = await getFeed(feedId)
           if (result.success && result.data) {
             setSelectedBgColor(result.data.backgroundColor)
-            // photoId 추출
-            const photoIdMatch = result.data.backgroundImageUrl?.match(/\/photos\/(\d+)/)
-            if (photoIdMatch) {
-              setBasePhotoId(parseInt(photoIdMatch[1]))
-            }
+            setCaption(result.data.description || '')
+            setCurrentFeedId(feedId)
           }
         } catch (error) {
           console.error('피드 로드 실패:', error)
@@ -142,36 +138,43 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
     setTimeout(() => setToastMessage(null), 3000)
   }, [])
 
-  // ✅ 피드 저장 후 완료 처리
+  // ✅ 피드 저장 처리 (부모 컴포넌트의 onSave 사용)
   const handleSaveFeed = useCallback(async () => {
-    if (!basePhotoId) {
+    if (!photoId && mode === 'create') {
       showToast('사진을 먼저 선택해주세요', 'error')
+      return
+    }
+
+    if (!caption.trim()) {
+      showToast('피드 설명을 입력해주세요', 'error')
       return
     }
 
     setIsSaving(true)
     
     try {
-      if (mode === 'create') {
-        // 새 피드 생성
-        const result = await createFeed(basePhotoId)
-        
-        if (result.success && result.data) {
-          setCurrentFeedId(result.data.id)
-          showToast('피드가 성공적으로 생성되었습니다!')
+      if (onSave) {
+        await onSave(caption)
+      } else {
+        // 기본 저장 로직 (onSave가 없는 경우)
+        if (mode === 'create' && photoId) {
+          const result = await createFeed(photoId, caption)
           
-          // 편집 완료 - /my 페이지로 이동
-          if (onComplete) {
-            setTimeout(() => {
-              onComplete()
-            }, 1500)
+          if (result.success && result.data) {
+            setCurrentFeedId(result.data.id)
+            showToast('피드가 성공적으로 생성되었습니다!')
+            
+            if (onComplete) {
+              setTimeout(() => {
+                onComplete()
+              }, 1500)
+            }
+          } else {
+            throw new Error(result.error || '피드 생성에 실패했습니다')
           }
         } else {
-          throw new Error(result.error || '피드 생성에 실패했습니다')
+          showToast('피드 업데이트 기능은 현재 지원되지 않습니다', 'error')
         }
-      } else {
-        // 기존 피드 업데이트
-        showToast('피드 업데이트 기능은 아직 지원되지 않습니다', 'error')
       }
     } catch (error) {
       console.error('피드 저장 실패:', error)
@@ -179,60 +182,12 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
     } finally {
       setIsSaving(false)
     }
-  }, [basePhotoId, mode, onComplete])
+  }, [photoId, caption, mode, onSave, onComplete])
 
-  // ✅ 피드 삭제 함수
-  const handleDeleteFeed = useCallback(async () => {
-    if (!currentFeedId || mode !== 'edit') return
-    
-    if (!confirm('정말 이 피드를 삭제하시겠습니까?')) return
-
-    setIsSaving(true)
-    
-    try {
-      const result = await deleteFeed(currentFeedId)
-      
-      if (result.success) {
-        showToast('피드가 삭제되었습니다')
-        if (onCancel) {
-          onCancel()
-        }
-      } else {
-        throw new Error(result.error || '피드 삭제에 실패했습니다')
-      }
-    } catch (error) {
-      console.error('피드 삭제 실패:', error)
-      showToast(handleApiError(error), 'error')
-    } finally {
-      setIsSaving(false)
-    }
-  }, [currentFeedId, mode, onCancel])
-
-  // 🔥 캔버스 크기 기반 랜덤 위치 생성
-  const getRandomPosition = useCallback(() => {
-    const canvasWidth = containerRef.current?.clientWidth || 800
-    const canvasHeight = containerRef.current?.clientHeight || 600
-    
-    return {
-      x: Math.random() * Math.max(canvasWidth - 300, 100) + 100,
-      y: Math.random() * Math.max(canvasHeight - 300, 100) + 100,
-    }
-  }, [containerRef])
-
-  // 🔥 배경색 변경 핸들러 - 현재는 로컬 상태만 업데이트
+  // 🔥 배경색 변경 핸들러 - 로컬에서만 사용 (백엔드 미지원)
   const handleBackgroundColorChange = async (color: string) => {
-    const previousColor = selectedBgColor
     setSelectedBgColor(color)
-    
-    try {
-      // ⚠️ 백엔드에서 배경색 업데이트 API를 지원하지 않으므로 로컬만 업데이트
-      console.log('Background color changed to:', color)
-      showToast('배경색이 변경되었습니다 (저장 시 반영됩니다)')
-    } catch (error) {
-      console.error('Failed to update background color:', error)
-      setSelectedBgColor(previousColor)
-      showToast('배경색 변경에 실패했습니다', 'error')
-    }
+    showToast('배경색이 변경되었습니다 (로컬 표시용)')
   }
 
   // 도구 변경 핸들러
@@ -280,19 +235,29 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
       if (selectedElement === elementId) {
         setSelectedElement(null)
       }
-      showToast('요소가 삭제되었습니다')
+      showToast('요소가 삭제되었습니다 (로컬에서만)')
     } catch (error) {
       console.error('Failed to delete element:', error)
       showToast('요소 삭제에 실패했습니다', 'error')
     }
   }
 
-  // ⚠️ 스티커 추가 - 백엔드에서 지원하지 않으므로 경고 표시
+  // 🔥 캔버스 크기 기반 랜덤 위치 생성
+  const getRandomPosition = useCallback(() => {
+    const canvasWidth = containerRef.current?.clientWidth || 800
+    const canvasHeight = containerRef.current?.clientHeight || 600
+    
+    return {
+      x: Math.random() * Math.max(canvasWidth - 300, 100) + 100,
+      y: Math.random() * Math.max(canvasHeight - 300, 100) + 100,
+    }
+  }, [containerRef])
+
+  // ⚠️ 스티커 추가 - 로컬 데모용 (백엔드 미지원)
   const handleStickerAdd = (stickerUrl: string) => {
-    showToast('스티커 기능은 현재 백엔드에서 지원되지 않습니다', 'error')
+    showToast('스티커는 로컬에서만 표시됩니다 (백엔드 미지원)', 'error')
     setShowStickerModal(false)
     
-    // 로컬 상태에만 추가 (데모용)
     try {
       const { x, y } = getRandomPosition()
       
@@ -320,12 +285,11 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
     }
   }
 
-  // ⚠️ 텍스트 추가 - 백엔드에서 지원하지 않으므로 경고 표시
+  // ⚠️ 텍스트 추가 - 로컬 데모용 (백엔드 미지원)
   const handleTextAdd = (text: string, fontFamily: string, fontSize: number, color: string) => {
-    showToast('텍스트 기능은 현재 백엔드에서 지원되지 않습니다', 'error')
+    showToast('텍스트는 로컬에서만 표시됩니다 (백엔드 미지원)', 'error')
     setShowTextModal(false)
 
-    // 로컬 상태에만 추가 (데모용)
     try {
       const { x, y } = getRandomPosition()
       
@@ -356,20 +320,25 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
     }
   }
 
-  // 사진 추가
+  // 사진 추가 - 현재는 기본 사진만 지원
   const handlePhotoAdd = () => {
+    if (photoId) {
+      showToast('이미 사진이 선택되어 있습니다', 'error')
+      return
+    }
     setShowPhotoModal(true)
   }
 
-  // ✅ 사진 선택 - 실제 photoId 설정 (백엔드 API 용)
-  const handlePhotoSelect = (imageData: string, photoId?: number) => {
-    try {
-      if (photoId) {
-        // 실제 업로드된 사진의 photoId 설정
-        setBasePhotoId(photoId)
-        showToast('사진이 선택되었습니다. 저장 버튼을 눌러 피드를 생성하세요.')
-      } else {
-        // 로컬 이미지의 경우 (데모용)
+  // ✅ 사진 선택 처리 (PhotoUploadModal의 ImageInfo 타입에 맞춤)
+  const handlePhotoSelect = (imageData: string, imageInfo?: any) => {
+    if (imageInfo?.photoId) {
+      // 실제 업로드된 사진의 photoId 사용
+      showToast('새 사진이 선택되었습니다. 이제 설명을 입력하고 저장해주세요.')
+    } else {
+      showToast('로컬 이미지는 데모용으로만 표시됩니다', 'error')
+      
+      // 로컬 이미지 캔버스에 추가 (데모용)
+      try {
         const { x, y } = getRandomPosition()
         
         const photoData = {
@@ -390,16 +359,14 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
         
         if (newElement && newElement.id) {
           setSelectedElement(newElement.id)
-          showToast('사진이 추가되었습니다 (로컬에만 표시됩니다)')
         }
+      } catch (error) {
+        console.error('Failed to add photo:', error)
       }
-      
-      setShowPhotoModal(false)
-      setActiveTool('select')
-    } catch (error) {
-      console.error('Failed to add photo:', error)
-      showToast('사진 추가에 실패했습니다', 'error')
     }
+    
+    setShowPhotoModal(false)
+    setActiveTool('select')
   }
 
   // 🔥 키보드 단축키 핸들러
@@ -422,26 +389,6 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
           setSelectedElement(null)
           setActiveTool('select')
           break
-        case '1':
-          if (!e.ctrlKey && !e.metaKey) {
-            setActiveTool('select')
-          }
-          break
-        case '2':
-          if (!e.ctrlKey && !e.metaKey) {
-            setActiveTool('photo')
-          }
-          break
-        case '3':
-          if (!e.ctrlKey && !e.metaKey) {
-            setActiveTool('sticker')
-          }
-          break
-        case '4':
-          if (!e.ctrlKey && !e.metaKey) {
-            setActiveTool('text')
-          }
-          break
         case 's':
           if (e.ctrlKey || e.metaKey) {
             e.preventDefault()
@@ -454,15 +401,6 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedElement, handleSaveFeed])
-
-  // 🔥 컴포넌트 언마운트 시 정리
-  useEffect(() => {
-    return () => {
-      if (toastMessage) {
-        setToastMessage(null)
-      }
-    }
-  }, [])
 
   return (
     <div className={`relative w-full h-full overflow-hidden bg-gray-100 ${className}`}>
@@ -481,34 +419,58 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
           // ✅ 추가 프롭스
           onSave={handleSaveFeed}
           onCancel={onCancel}
-          onDelete={mode === 'edit' ? handleDeleteFeed : undefined}
           isSaving={isSaving}
-          canSave={!!basePhotoId}
+          canSave={!!photoId && !!caption.trim()}
           mode={mode}
         />
       </div>
 
-      {/* 백엔드 제약사항 경고 */}
+      {/* 백엔드 제약사항 안내 */}
       <div className="absolute top-16 left-4 right-4 z-30">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-yellow-800">
-                현재 백엔드에서는 사진 기반 피드 생성만 지원됩니다. 
-                스티커, 텍스트, 요소 편집 기능은 추후 구현 예정입니다.
-              </p>
+              <h3 className="text-sm font-medium text-blue-800">현재 백엔드 지원 기능</h3>
+              <div className="mt-2 text-sm text-blue-700">
+                <ul className="list-disc list-inside space-y-1">
+                  <li>✅ 사진 기반 피드 생성 (photoId + caption)</li>
+                  <li>⚠️ 스티커, 텍스트는 로컬 데모용 (저장되지 않음)</li>
+                  <li>⚠️ 캔버스 편집 요소들은 추후 구현 예정</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
+      {/* 피드 설명 입력 */}
+      <div className="absolute top-36 left-4 right-4 z-30">
+        <div className="bg-white rounded-lg shadow-sm border p-4">
+          <label htmlFor="caption" className="block text-sm font-medium text-gray-700 mb-2">
+            피드 설명 (필수)
+          </label>
+          <textarea
+            id="caption"
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            placeholder="이 피드에 대한 설명을 입력해주세요..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            rows={2}
+            maxLength={200}
+          />
+          <div className="mt-1 text-xs text-gray-500">
+            {caption.length}/200 글자
+          </div>
+        </div>
+      </div>
+
       {/* 메인 캔버스 영역 */}
-      <div className="absolute inset-0 pt-28">
+      <div className="absolute inset-0 pt-64">
         <FeedCanvas
           userId={userId || currentUser?.id || ''}
           elements={elements as any}
@@ -530,7 +492,7 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
 
       {/* 🔥 우측 사이드 패널 - 색상 팔레트 */}
       {showColorPicker && (
-        <div className="absolute top-28 right-0 bottom-0 w-80 z-20">
+        <div className="absolute top-64 right-0 bottom-0 w-80 z-20">
           <BackgroundColorPicker
             selectedColor={selectedBgColor}
             onColorChange={handleBackgroundColorChange}
@@ -539,7 +501,7 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
         </div>
       )}
 
-      {/* 기존 drawing 모달들 재사용 */}
+      {/* 로컬 데모용 모달들 */}
       <StickerModal
         isOpen={showStickerModal}
         onClose={() => setShowStickerModal(false)}
@@ -555,8 +517,6 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
           { name: '귀여움', family: 'Jua, cursive', displayName: 'Jua' },
           { name: '힙함', family: 'Black Han Sans, sans-serif', displayName: 'Black Han Sans' },
           { name: '손글씨', family: 'Gamja Flower, cursive', displayName: 'Gamja Flower' },
-          { name: '삐뚤빼뚤', family: 'Gaegu, cursive', displayName: 'Gaegu' },
-          { name: '기본', family: 'Arial, sans-serif', displayName: 'Arial' },
         ]}
         colors={[
           '#000000', '#FFFFFF', '#DC2626', '#EA580C', '#CA8A04', '#16A34A',
@@ -570,10 +530,10 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
       <PhotoUploadModal
         isOpen={showPhotoModal}
         onClose={() => setShowPhotoModal(false)}
-        onPhotoSelect={(imageData: string) => handlePhotoSelect(imageData)}
-        onPhotoUpload={(file: File, photoId?: number | undefined) => {
-          if (photoId) {
-            setBasePhotoId(photoId)
+        onPhotoSelect={handlePhotoSelect}
+        onPhotoUpload={(file: File, uploadedImageInfo?: any) => {
+          // PhotoUploadModal에서 실제 업로드 처리
+          if (uploadedImageInfo?.photoId) {
             showToast('사진이 업로드되었습니다!')
             setShowPhotoModal(false)
           }
@@ -599,22 +559,12 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
               <span className="text-gray-700 font-medium">
-                {isSaving ? '저장 중...' : '로드 중...'}
+                {isSaving ? '피드 저장 중...' : '로딩 중...'}
               </span>
             </div>
           </div>
         </div>
       )}
-
-      {/* 🔥 키보드 단축키 도움말 */}
-      <div className="absolute bottom-4 left-4 bg-black/70 text-white text-xs rounded p-3 z-30 max-w-xs">
-        <div className="font-semibold mb-1">키보드 단축키</div>
-        <div>Ctrl+S: 저장</div>
-        <div>Del/Backspace: 삭제</div>
-        <div>Esc: 선택 해제</div>
-        <div>1-4: 도구 선택</div>
-        <div>Ctrl+Wheel: 확대/축소</div>
-      </div>
 
       {/* 피드 정보 표시 (개발용) */}
       {process.env.NODE_ENV === 'development' && (
@@ -623,8 +573,9 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
           <div>모드: {mode}</div>
           <div>사용자: {currentUser?.name || 'Unknown'}</div>
           <div>피드 ID: {currentFeedId || 'None'}</div>
-          <div>사진 ID: {basePhotoId || 'None'}</div>
-          <div>요소 수: {elements.length}</div>
+          <div>사진 ID: {photoId || 'None'}</div>
+          <div>설명: {caption.length > 0 ? '입력됨' : '미입력'}</div>
+          <div>요소 수: {elements.length} (로컬)</div>
         </div>
       )}
     </div>
