@@ -4,7 +4,6 @@ import type { JSX } from "react"
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/auth/useAuth'
-import { useRouter } from 'next/navigation'
 
 const LoginPage = (): JSX.Element => {
   const router = useRouter()
