@@ -65,7 +65,7 @@ export interface DrawingElement extends BaseFeedElement {
 export type FeedElement = PhotoElement | StickerElement | TextElement | DrawingElement
 
 // ============================================================================
-// 백엔드 연동 타입들 (실제 백엔드 DTO와 정확히 일치)
+// 백엔드 연동 타입들 (실제 백엔드 DTO와 정확히 일치) ✅ 수정됨
 // ============================================================================
 
 // ✅ 백엔드 ApiResponse 구조
@@ -75,38 +75,40 @@ export interface BackendApiResponse<T> {
   data: T | null
 }
 
-// ✅ 백엔드 FeedDetailResponse
+// ✅ 백엔드 FeedDetailResponse (실제 백엔드 DTO와 일치하도록 수정)
 export interface BackendFeedDetailResponse {
   feedId: number
-  authorId: number
+  imgUrl: string        // ✅ photoUrl → imgUrl
+  caption: string       // ✅ 추가됨
+  authorId: number      // ✅ 유지
+  accountName: string   // ✅ userName 대신 accountName
+  profileImage: string  // ✅ 추가됨 (사용자 프로필 이미지)
+  createdAt: string     // ✅ LocalDateTime → ISO string
+  liked: boolean        // ✅ 추가됨 (현재 사용자의 좋아요 여부)
+}
+
+// ✅ 백엔드 CreateFeedRequest (실제 백엔드 DTO와 일치)
+export interface BackendCreateFeedRequest {
   photoId: number
-  photoUrl: string
-  createdAt: string    // LocalDateTime → string
-  updatedAt: string
+  caption: string
 }
 
-// ✅ 백엔드 FeedItem
-export interface BackendFeedItem {
-  feedId: number
-  userId: number
-  photoId: number
-  photoUrl: string
-  createdAt: string
+// ✅ 백엔드 FollowCountsResponse (실제 백엔드 DTO와 일치)
+export interface BackendFollowCountsResponse {
+  followerCount: number
+  followingCount: number
 }
 
-// ✅ 백엔드 FeedListResponse
-export interface BackendFeedListResponse {
-  items: BackendFeedItem[]
-  nextCursor: number | null
-  hasNext: boolean
-}
-
-// ✅ 백엔드 UserInfoResponse
+// ✅ 백엔드 UserInfoResponse (실제 백엔드 DTO와 일치하도록 수정)
 export interface BackendUserInfoResponse {
   userName: string
   userEmail: string
-  userProfileImage: string | null
+  profileImage: string
+  prettyFace: string    // ✅ 추가됨
 }
+
+// ✅ 제거됨 - 백엔드에 없는 타입들
+// BackendFeedItem, BackendFeedListResponse 제거
 
 // ============================================================================
 // 기존 UserFeed (api/feed.ts의 CanvasFeedItem과 호환성 유지)
@@ -116,23 +118,23 @@ export interface BackendUserInfoResponse {
 export interface UserFeed {
   id: string
   userId: string
-  userName?: string      // ✅ 추가 - 사용자 이름
+  userName?: string
   name: string
   description: string
   isPublic: boolean
   backgroundColor: string
   backgroundImageUrl?: string
-  photoId?: number       // ✅ 추가 - 백엔드 photoId 
-  photoUrl?: string      // ✅ 추가 - 백엔드 photoUrl
+  photoId?: number
+  photoUrl?: string
   totalHeight: number
   followersCount: number
   isFollowing: boolean
   isLiked: boolean
-  likesCount: number     // ✅ 추가 - 좋아요 수
-  authorName?: string    // ✅ 추가 - 작성자 이름 (userName과 동일하지만 별칭)
-  authorId?: string      // ✅ 추가 - 작성자 ID (userId와 동일하지만 별칭)
-  authorAvatar?: string  // ✅ 추가 - 작성자 아바타
-  elements?: FeedElement[] // ✅ 추가 - 캔버스 요소들 (옵셔널)
+  likesCount: number
+  authorName?: string
+  authorId?: string
+  authorAvatar?: string
+  elements?: FeedElement[]
   createdAt: string
   updatedAt: string
 }
@@ -161,10 +163,8 @@ export interface UserProfile {
 // ============================================================================
 
 // ✅ 백엔드 데이터 + 캔버스 편집 기능을 모두 포함한 완전한 피드 타입
-// src/lib/types/feed.ts에서 CanvasFeedItem 수정
 export interface CanvasFeedItem extends Omit<UserFeed, 'photoId'> {
-  // photoId를 제외하고 UserFeed 확장 후 새로 정의
-  photoId: string | number  // ✅ 새로운 타입으로 정의
+  photoId: string | number
   
   // 백엔드에서 가져온 추가 정보
   authorId: string
@@ -194,15 +194,20 @@ export interface FeedApiResponse {
   error?: string
 }
 
-// 피드 목록 API 응답
+// 피드 목록 API 응답 (커서 페이징 지원 + 기존 페이지네이션 호환)
 export interface FeedListApiResponse {
   success: boolean
   data?: {
     items: CanvasFeedItem[]
     hasMore: boolean
-    total: number
-    page: number
-    limit: number
+    nextCursor?: {
+      createdAt: string
+      feedId: number
+    } | null
+    // 기존 페이지네이션 호환성
+    total?: number
+    page?: number
+    limit?: number
   }
   error?: string
 }
@@ -212,7 +217,7 @@ export interface LikeApiResponse {
   success: boolean
   data?: {
     isLiked: boolean
-    likesCount: number
+    likesCount?: number
   }
   error?: string
 }
@@ -231,13 +236,21 @@ export interface UserListApiResponse {
   error?: string
 }
 
+// 팔로우 카운트 API 응답
+export interface FollowCountApiResponse {
+  success: boolean
+  data?: BackendFollowCountsResponse
+  error?: string
+}
+
 // ============================================================================
-// 요청 타입들
+// 요청 타입들 (백엔드 DTO와 일치하도록 수정)
 // ============================================================================
 
-// 피드 생성 요청
+// 피드 생성 요청 (백엔드 CreateFeedRequest와 일치)
 export interface CreateFeedRequest {
   photoId: number
+  caption: string
 }
 
 // 피드 업데이트 요청 (현재 백엔드 미지원)
@@ -249,6 +262,13 @@ export interface UpdateFeedRequest {
   backgroundColor?: string
   backgroundImageUrl?: string
   totalHeight?: number
+}
+
+// 커서 페이징 파라미터 (백엔드 API와 일치)
+export interface CursorPagingParams {
+  cursorCreatedAt?: string  // LocalDateTime
+  cursorId?: number
+  size?: number
 }
 
 // ============================================================================
@@ -307,4 +327,36 @@ export const isTextElement = (element: FeedElement): element is TextElement => {
 
 export const isDrawingElement = (element: FeedElement): element is DrawingElement => {
   return element.type === 'DRAWING'
+}
+
+// ============================================================================
+// 백엔드 데이터 변환 유틸리티 함수들
+// ============================================================================
+
+// 백엔드 FeedDetailResponse를 프론트엔드 CanvasFeedItem으로 변환
+export const transformBackendFeedToCanvasFeed = (
+  backendFeed: BackendFeedDetailResponse
+): CanvasFeedItem => {
+  return {
+    id: backendFeed.feedId.toString(),
+    userId: backendFeed.authorId.toString(),
+    userName: backendFeed.accountName,
+    name: backendFeed.caption || 'Untitled Feed',
+    description: backendFeed.caption || '',
+    isPublic: true,
+    backgroundColor: '#ffffff',
+    photoId: backendFeed.feedId,
+    photoUrl: backendFeed.imgUrl,
+    totalHeight: 1600,
+    followersCount: 0,
+    isFollowing: false,
+    isLiked: backendFeed.liked,
+    likesCount: 0,
+    authorName: backendFeed.accountName,
+    authorId: backendFeed.authorId.toString(),
+    authorAvatar: backendFeed.profileImage,
+    elements: [],
+    createdAt: backendFeed.createdAt,
+    updatedAt: backendFeed.createdAt,
+  }
 }
