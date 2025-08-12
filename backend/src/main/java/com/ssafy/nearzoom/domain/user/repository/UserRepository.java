@@ -28,28 +28,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 .orElseThrow(UserNotFoundException::new);
     }
 
-    // ✅ 추가할 메서드들:
-
-    /**
-     * 계정명으로 사용자 조회
-     */
-    Optional<User> findByAccountName(String accountName);
-
-    /**
-     * 통합 사용자 검색 (계정명, 이메일, 사용자명)
-     */
+    // 조회 (accountName 계정명)
     @Query("""
         SELECT u FROM User u 
-        WHERE (LOWER(u.accountName) LIKE LOWER(CONCAT('%', :accountName, '%'))
-           OR LOWER(u.userEmail) LIKE LOWER(CONCAT('%', :email, '%'))
-           OR LOWER(u.userName) LIKE LOWER(CONCAT('%', :userName, '%')))
-           AND u.deletedAt IS NULL
+        WHERE LOWER(u.accountName) LIKE LOWER(CONCAT('%', :accountName, '%')) 
+        AND u.deletedAt IS NULL 
         ORDER BY u.createdAt DESC
-    """)
-    List<User> searchByAccountNameOrEmailOrUserName(
-            @Param("accountName") String accountName,
-            @Param("email") String email,
-            @Param("userName") String userName,
-            Pageable pageable
-    );
+        """)
+    List<User> searchByAccountNameOnly(@Param("accountName") String accountName, Pageable pageable);
 }

@@ -26,62 +26,51 @@ public class FeedController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<Long>> create(Authentication authentication,
-        @RequestBody CreateFeedRequest req) {
+                                                    @RequestBody CreateFeedRequest req) {
         return ApiResponse.create(feedService.create(authentication, req));
     }
 
     @GetMapping("/{feedId}")
     public ResponseEntity<ApiResponse<FeedDetailResponse>> detailFeeds(
-        Authentication authentication,
-        @PathVariable Long feedId) {
+            Authentication authentication,
+            @PathVariable Long feedId) {
         return ApiResponse.ok(feedService.detailFeeds(authentication, feedId));
     }
 
     @GetMapping("/users/{userId}")
     public ResponseEntity<ApiResponse<List<FeedDetailResponse>>> userFeeds(
-        Authentication authentication,
-        @PathVariable Long userId,
-        @RequestParam(required = false) LocalDateTime cursorCreatedAt,
-        @RequestParam(required = false) Long cursorId,
-        @RequestParam(defaultValue = "20") int size) {
+            Authentication authentication,
+            @PathVariable Long userId,
+            @RequestParam(required = false) LocalDateTime cursorCreatedAt,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.ok(
-            feedService.userFeed(authentication, userId, cursorCreatedAt, cursorId, size)
+                feedService.userFeed(authentication, userId, cursorCreatedAt, cursorId, size)
         );
     }
 
     @GetMapping("/following")
     public ResponseEntity<ApiResponse<List<FeedDetailResponse>>> followingFeeds(
-        Authentication authentication,
-        @RequestParam(required = false) LocalDateTime cursorCreatedAt,
-        @RequestParam(required = false) Long cursorId,
-        @RequestParam(defaultValue = "20") int size) {
+            Authentication authentication,
+            @RequestParam(required = false) LocalDateTime cursorCreatedAt,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.ok(
-            feedService.followingFeed(authentication, cursorCreatedAt, cursorId, size)
+                feedService.followingFeed(authentication, cursorCreatedAt, cursorId, size)
         );
     }
 
     @GetMapping("/random")
     public ResponseEntity<ApiResponse<List<FeedDetailResponse>>> random(
-        Authentication authentication,
-        @RequestParam(defaultValue = "20") int size) {
+            Authentication authentication,
+            @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.ok(
-            feedService.randomFeed(authentication, size)
+                feedService.randomFeed(authentication, size)
         );
     }
 
-
     /**
-     * 🆔 계정명으로 피드 조회 (프로필 정보 포함)
-     */
-    @GetMapping("/user/{accountName}")  // 기존 경로와 구분하기 위해 /user/ 사용
-    public ResponseEntity<ApiResponse<FeedDetailResponse>> getFeedByAccountName(
-            Authentication authentication,
-            @PathVariable String accountName) {
-        return ApiResponse.ok(feedService.getFeedByAccountName(authentication, accountName));
-    }
-
-    /**
-     * 🔍 피드 검색 (= 사용자 검색)
+     * 🔍 피드 검색 (= 사용자 검색) - accountName만 검색
      */
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<List<FeedDetailResponse>>> searchFeeds(
@@ -90,5 +79,4 @@ public class FeedController {
             @RequestParam(defaultValue = "10") int size) {
         return ApiResponse.ok(feedService.searchFeeds(authentication, query, size));
     }
-
 }
