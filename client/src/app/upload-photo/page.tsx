@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { X, Edit } from 'lucide-react'
 import api from '@/lib/axios'
 
-export default function UploadPhotoPage() {
+function UploadPhotoContent() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [currentReferenceImage, setCurrentReferenceImage] = useState<string | null>(null)
@@ -273,5 +273,17 @@ export default function UploadPhotoPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function UploadPhotoPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-600">로딩 중...</div>
+      </div>
+    }>
+      <UploadPhotoContent />
+    </Suspense>
   )
 }
