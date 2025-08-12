@@ -84,6 +84,31 @@ export default function UploadPhotoPage() {
       const blob = await base64Response.blob()
       const formData = new FormData()
       formData.append('file', blob, 'profile.jpg')
+      
+      // 이미지 업로드 API 호출 (URL을 반환받음)
+      const uploadResponse = await api.post(
+        'https://image.nearzoom.store/upload',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          withCredentials: false, // CORS 에러 방지를 위해 credentials 비활성화 -> 이거 고쳐야 하나?
+        }
+      )
+      
+      const imageUrl =
+        uploadResponse.data.data.file_url || uploadResponse.data.file_url
+
+      // 2단계: 받은 URL을 프로필 이미지로 저장 (save-face-image 엔드포인트로 url 보내기)
+      // URL 파라미터로 전송하도록 변경
+      const saveResponse = await api.put(
+        `/user/save-face-image?prettyFaceUrl=${encodeURIComponent(imageUrl)}`,
+        null,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
 
       const uploadResponse = await api.post(
         'https://image.nearzoom.store/upload',
@@ -105,11 +130,12 @@ export default function UploadPhotoPage() {
         params: {
           prettyFaceUrl: imageUrl
         }
-      })
-
-      // 적절한 목적지로 이동
-      const destination = getRedirectDestination()
-      router.replace(destination)
+      )
+      
+      // 서버에 저장되었으므로 localStorage 저장 불필요
+      
+      // 저장 완료 후 메인 페이지로 이동
+      router.replace('/')
       
     } catch (error: any) {
       console.error('프로필 이미지 저장 실패:', error)

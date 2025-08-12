@@ -44,7 +44,7 @@ const SideList: React.FC<SideListProps> = ({
 
   const handleMenuClick = (item: MenuItem): void => {
     item.onClick?.()
-    onClose?.()
+    // 사이드바를 자동으로 닫지 않도록 onClose 호출 제거
   }
 
   if (!isOpen) return null

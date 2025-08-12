@@ -11,7 +11,7 @@ export default function HeroSection({ isLoggedIn, onAfterLoginClick, isCreatingR
     <>
       <div className="mb-4 md:mb-8 text-center">
         <Image
-          src="/nearzoomlogologo.png"
+          src="/6e7c8c3342.png"
           alt="Creative"
           width={1400}
           height={179}

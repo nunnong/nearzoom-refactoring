@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
 import { authService } from '@/services/authService'
@@ -8,10 +8,18 @@ import { useRoomStore } from '@/stores/roomStore'
 import { roomAPI } from '@/lib/api/room' // 🔥 방 API import
 import type { SocialType } from '@/types/auth'
 
+interface Filter {
+  id: string
+  type: 'heart' | 'name' | 'date' | 'edited'
+  value: string
+  display: string
+}
+
 export const useAuth = () => {
   // 🔥 방 생성 상태만 추가 (로그인 모달은 제거)
   const [isCreatingRoom, setIsCreatingRoom] = useState(false)
   const router = useRouter()
+  const [filters, setFilters] = useState<Filter[]>([])
 
   const {
     accessToken,

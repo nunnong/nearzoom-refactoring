@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { X, Edit } from 'lucide-react'
 import api from '@/lib/axios'
+import { API_BASE_URL } from '@/constants/api'
 
 interface UploadSelfieModalProps {
   isOpen: boolean
@@ -49,6 +50,7 @@ export default function UploadSelfieModal({
     if (file) {
       const reader = new FileReader()
       reader.onload = e => {
+      reader.onload = e => {
         const result = e.target?.result as string
         setSelectedImage(result)
       }
@@ -62,6 +64,7 @@ export default function UploadSelfieModal({
 
   const handleSave = async () => {
     if (!selectedImage) return
+
 
     try {
       setIsUploading(true)

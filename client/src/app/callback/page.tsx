@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useAuth } from '@/hooks/auth'  
+import { useAuth } from '@/hooks/auth'
 import { API_BASE_URL } from '@/constants/api'
 
 type PageState = 'loading' | 'success' | 'error'
@@ -62,30 +62,31 @@ export default function CallbackPage() {
         // 성공 상태로 변경
         setState('success')
         
-        // 🔥 저장된 리다이렉트 정보 확인
-        const redirectUrl = localStorage.getItem('redirectAfterLogin')
-        const actionAfterLogin = localStorage.getItem('actionAfterLogin')
-        
-        console.log('🔍 Callback에서 확인된 정보:', { redirectUrl, actionAfterLogin })
-        
-        // 🔥 수정: 항상 참조사진 페이지를 거치도록 변경
-        setTimeout(() => {
-          if (redirectUrl) {
-            console.log('✅ 로그인 성공 - 참조사진 페이지로 이동 (공유 URL 보존)')
-            const encodedRedirectUrl = encodeURIComponent(redirectUrl)
-            router.replace(`/upload-photo?returnUrl=${encodedRedirectUrl}`)
-          } else if (actionAfterLogin === 'createRoom') {
-            console.log('✅ 로그인 성공 - 참조사진 페이지로 이동 (방 생성 예정)')
-            router.replace('/upload-photo?action=createRoom')
-          } else {
-            console.log('✅ 로그인 성공 - 참조사진 페이지로 이동 (기본)')
-            router.replace('/upload-photo')
+        // 사용자 정보를 가져온 후 참조 사진이 있는지 확인
+        const userInfo = await fetch(`${API_BASE_URL}/user/userInfo`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
           }
+        })
+        
+        if (userInfo.ok) {
+          const userData = await userInfo.json()
+          const hasReferencePhoto = userData.data?.faceImageUrl
           
-          // 🔥 정리는 참조사진 페이지에서 하도록 여기서는 제거하지 않음
-          // localStorage.removeItem('redirectAfterLogin')
-          // localStorage.removeItem('actionAfterLogin')
-        }, 1000) // 1초로 단축
+          // 참조 사진이 없으면 업로드 페이지로, 있으면 메인 페이지로
+          setTimeout(() => {
+            if (!hasReferencePhoto) {
+              router.replace('/upload-photo')
+            } else {
+              router.replace('/')
+            }
+          }, 2000)
+        } else {
+          // 사용자 정보를 가져오지 못한 경우 메인 페이지로
+          setTimeout(() => {
+            router.replace('/')
+          }, 3000)
+        }
         
       } catch (error: any) {
         console.error('OAuth2 로그인 콜백 처리 중 오류:', error)

@@ -4,6 +4,7 @@ import type { JSX } from "react"
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/auth/useAuth'
+import { useRouter } from 'next/navigation'
 
 const LoginPage = (): JSX.Element => {
   const router = useRouter()
@@ -183,6 +184,23 @@ const LoginPage = (): JSX.Element => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-md mx-4 relative">
+        {/* X 버튼 */}
+        <button
+          onClick={() => router.back()}
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors group"
+          aria-label="닫기"
+        >
+          <svg
+            className="w-4 h-4 text-gray-600 group-hover:text-gray-800"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
       <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-md mx-4 relative">
         {/* 제목 */}
         <h3 className="text-center text-2xl font-bold text-black">로그인</h3>

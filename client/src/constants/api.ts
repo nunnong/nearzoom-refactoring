@@ -2,25 +2,26 @@
 // 백엔드 API 서버 주소
 export const API_BASE_URL =
   process.env.NODE_ENV === 'production'
-    ? 'https://nearzoom.store'
-    : 'http://localhost:8080'
+    ? 'https://api.nearzoom.store'
+    : 'http://localhost:8080' // 개발 환경에서 백엔드 포트
 
 // 프론트엔드 콜백 URL
 export const FRONTEND_BASE_URL =
   process.env.NODE_ENV === 'production'
-    ? 'https://nearzoom.store'
-    : 'http://localhost:3000'
+    ? 'http://localhost:3000'
+    : 'https://nearzoom.store' // 프론트엔드 포트
 
 export const API_ENDPOINTS = {
   // Auth
   REFRESH: '/auth/refresh',
 
   // MyRoom
-  MYROOM: '/myroom/photos',
-  PHOTOS: '/photoprompt/result/{jobId}',
-  LIKE: '/photos/heart',
+  PHOTOS: '/myroom/photos',
+  HEART: '/myroom/photos/heart',
+  DELETE_PHOTO: '/myroom/photos',
   SAVE_EDITED: '/myroom/photos/save-edited',
-  
+  SAVE_FACE_IMAGE: '/user/save-face-image',
+  IMAGE_PROXY: '/myroom/image', // 이미지 프록시 엔드포인트
 
   // Room (회의룸)
   CREATE_ROOM: '/room/create',
@@ -31,7 +32,7 @@ export const API_ENDPOINTS = {
 
   // Follow System(피드 쪽)
   FOLLOW: '/follows',
-  UNFOLLOW: '/follows',  
+  UNFOLLOW: '/follows',
   FOLLOWING_LIST: '/follows/following',
   FOLLOWERS_LIST: '/follows/followers',
   FOLLOW_CHECK: '/follows/check',
@@ -50,5 +51,4 @@ export const API_ENDPOINTS = {
   EMAIL_USER_INFO: '/user/email-user-info',
   LOGOUT: '/user/logout',
   SIGNOUT: '/user/signout',
-  SAVE_FACE_IMAGE: '/user/save-face-image',
 }
