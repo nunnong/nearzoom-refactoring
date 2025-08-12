@@ -17,12 +17,12 @@ import { Track } from 'livekit-client'
 // 최대 4명을 위한 커스텀 그리드 레이아웃 정의
 const FOUR_PERSON_LAYOUTS: GridLayoutDefinition[] = [
   {
-    columns: 1,
-    rows: 1,
+    columns: 2,
+    rows: 2,
   },
   {
     columns: 2,
-    rows: 1,
+    rows: 2,
   },
   {
     columns: 2,
@@ -55,10 +55,12 @@ export default function WaitingComponent({
     console.error = (...args: any[]) => {
       const message = args.join(' ')
       // Stream closed, InvalidStateError 등을 조용히 처리
-      if (message.includes('Stream closed') || 
-          message.includes('InvalidStateError') ||
-          message.includes('error when trying to pipe') ||
-          message.includes('intercept-console-error')) {
+      if (
+        message.includes('Stream closed') ||
+        message.includes('InvalidStateError') ||
+        message.includes('error when trying to pipe') ||
+        message.includes('intercept-console-error')
+      ) {
         console.warn('🔇 Stream error intercepted:', message.substring(0, 100))
         return
       }
