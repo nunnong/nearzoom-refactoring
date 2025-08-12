@@ -2,49 +2,52 @@
 
 import { 
   CanvasFeedItem,
-  BackendFeedItem,
-  BackendFeedListResponse,
+  BackendFeedDetailResponse,
   BackendUserInfoResponse,
-  BackendApiResponse
+  BackendApiResponse,
+  BackendFollowCountsResponse
 } from '@/lib/types/feed'
 
 import {
+  getUserFeeds,
+  getFollowingFeeds,
+  getRandomFeeds,
   getFeed,
   toggleFeedLike,
-  getLikeCount,
-  checkLikeStatus,
+  checkFollowStatus,  // ✅ checkLikeStatus → checkFollowStatus
   getCurrentUser,
   handleApiError,
   fetchWithAuth
 } from './feed'
 
 // ============================================================================
-// 백엔드 연동 타입들
+// 백엔드 연동 타입들 (실제 백엔드 API 기반)
 // ============================================================================
 
 // ✅ 백엔드 기반 탐색 피드 (CanvasFeedItem 확장)
-export interface ExploreFeed extends CanvasFeedItem {
+export interface ExploreFeed extends Omit<CanvasFeedItem, 'source'> {
   category?: string
   discoverScore?: number // 클라이언트에서 계산
-  source: 'explore' | 'popular' | 'recent' | 'recommended'
+  source: 'following' | 'user' | 'random'  // ✅ 실제 백엔드 API에 맞춤
 }
 
-// ✅ 탐색 카테고리 (백엔드에서 지원할 수 있는 범위)
+// ✅ 탐색 카테고리 (실제 백엔드 엔드포인트 기반)
 export interface ExploreCategory {
   id: string
   name: string
   description: string
   icon: string
   color: string
-  endpoint: string  // 백엔드 API 엔드포인트
+  endpoint: string  // 실제 백엔드 API 엔드포인트
 }
 
 // ✅ 백엔드 지원 가능한 필터
 export interface ExploreFilters {
-  sort?: 'latest' | 'popular' | 'random'  // 백엔드에서 정렬
-  cursor?: string                         // 페이지네이션 커서
-  limit?: number                          // 페이지 크기
-  excludeMyPosts?: boolean               // 내 게시물 제외
+  userId?: number                        // 특정 사용자 피드
+  cursorCreatedAt?: string              // 커서 페이징
+  cursorId?: number                     // 커서 페이징
+  size?: number                         // 페이지 크기
+  excludeMyPosts?: boolean             // 내 게시물 제외 (프론트에서 처리)
 }
 
 // ✅ 사용자 프로필 (백엔드 UserInfoResponse 기반)
@@ -53,6 +56,7 @@ export interface UserProfile {
   username: string
   email: string
   avatar?: string
+  prettyFace?: string
   bio?: string
   feedsCount: number
   followersCount: number
@@ -62,7 +66,7 @@ export interface UserProfile {
 }
 
 // ============================================================================
-// API 설정
+// API 설정 (실제 백엔드 엔드포인트)
 // ============================================================================
 
 const API_BASE_URL = (() => {
@@ -71,97 +75,83 @@ const API_BASE_URL = (() => {
 })()
 
 const API_ENDPOINTS = {
-  explore: '/feeds/explore',        // 전체 탐색 피드
-  popular: '/feeds/popular',        // 인기 피드 (백엔드 구현 필요)
-  recent: '/feeds/recent',          // 최신 피드 (백엔드 구현 필요)  
-  userFeeds: '/feeds/user',         // 특정 사용자 피드
-  users: '/users',                  // 사용자 정보
-  search: '/feeds/search',          // 피드 검색 (백엔드 구현 필요)
+  following: '/feeds/following',    // ✅ 팔로잉 피드
+  random: '/feeds/random',          // ✅ 랜덤 피드  
+  userFeeds: '/feeds/users',        // ✅ 특정 사용자 피드
+  feeds: '/feeds',                  // ✅ 피드 관련
+  follows: '/follows',              // ✅ 팔로우 관련
 } as const
 
 // ============================================================================
 // 유틸리티 함수들
 // ============================================================================
 
-// ✅ nextCursor 변환 유틸리티 (타입 안전성 보장)
-const convertCursorToString = (cursor: number | string | null | undefined): string | undefined => {
-  if (cursor === null || cursor === undefined) {
-    return undefined
-  }
-  return cursor.toString()
-}
-
-// ✅ 백엔드 데이터 변환 함수들
-const transformBackendFeedToExploreFeed = async (
-  backendFeed: BackendFeedItem,
-  source: ExploreFeed['source'] = 'explore'
-): Promise<ExploreFeed> => {
-  try {
-    // 기본 피드 정보 조회 (캐시된 사용자 정보 포함)
-    const feedResult = await getFeed(backendFeed.feedId.toString())
-    
-    if (!feedResult.success || !feedResult.data) {
-      throw new Error('피드 정보를 가져올 수 없습니다.')
-    }
-
-    const exploreFeed: ExploreFeed = {
-      ...feedResult.data,
-      source,
-      discoverScore: calculateDiscoverScore(feedResult.data, source)
-    }
-
-    return exploreFeed
-  } catch (error) {
-    console.error('Failed to transform backend feed:', error)
-    // 기본값으로 변환
-    return {
-      id: backendFeed.feedId.toString(),
-      authorId: backendFeed.userId.toString(),
-      photoId: backendFeed.photoId.toString(),
-      photoUrl: backendFeed.photoUrl,
-      createdAt: backendFeed.createdAt,
-      updatedAt: backendFeed.createdAt,
-      authorName: `User ${backendFeed.userId}`,
-      likesCount: 0,
-      isLiked: false,
-      isFollowing: false,
-      
-      // UserFeed 필수 속성들
-      userId: backendFeed.userId.toString(),
-      name: `Feed ${backendFeed.feedId}`,
-      description: '',
-      isPublic: true,
-      backgroundColor: '#ffffff',
-      totalHeight: 1600,
-      followersCount: 0,
-      
-      // CanvasFeedItem 필수 속성들
-      elements: [],
-      
-      // ExploreFeed 속성들
-      source,
-      discoverScore: 50
-    }
+// ✅ 백엔드 CanvasFeedItem을 ExploreFeed로 변환
+const transformCanvasFeedToExploreFeed = (
+  canvasFeed: CanvasFeedItem,
+  source: ExploreFeed['source'],
+  category?: string
+): ExploreFeed => {
+  return {
+    ...canvasFeed,
+    source,
+    category,
+    discoverScore: calculateDiscoverScore(canvasFeed, source)
   }
 }
 
 // ✅ 백엔드 UserInfoResponse를 UserProfile로 변환
-const transformBackendUserToProfile = (
+const transformBackendUserToProfile = async (
   backendUser: BackendUserInfoResponse,
   userId: string,
   currentUserId?: string
-): UserProfile => {
-  return {
-    id: userId,
-    username: backendUser.userName,
-    email: backendUser.userEmail,
-    avatar: backendUser.userProfileImage || undefined,
-    bio: '',
-    feedsCount: 0,        // 별도 API로 조회 필요
-    followersCount: 0,    // 별도 API로 조회 필요
-    followingCount: 0,    // 별도 API로 조회 필요
-    isFollowing: false,   // 별도 API로 조회 필요
-    isMe: userId === currentUserId
+): Promise<UserProfile> => {
+  try {
+    // 팔로우 관계 확인 (자기 자신은 제외)
+    const isFollowing = currentUserId && currentUserId !== userId 
+      ? await checkFollowStatus(Number(userId)) 
+      : false
+
+    // 팔로우 수 조회
+    let followCounts: BackendFollowCountsResponse | null = null
+    try {
+      const response = await fetchWithAuth(`${API_ENDPOINTS.follows}/count/${userId}`)
+      const result: BackendApiResponse<BackendFollowCountsResponse> = await response.json()
+      if (!result.error && result.data) {
+        followCounts = result.data
+      }
+    } catch (error) {
+      console.warn('Failed to get follow counts:', error)
+    }
+
+    return {
+      id: userId,
+      username: backendUser.userName,
+      email: backendUser.userEmail,
+      avatar: backendUser.profileImage || undefined,
+      prettyFace: backendUser.prettyFace || undefined,
+      bio: '', // 백엔드에서 bio 필드 추가 필요
+      feedsCount: 0, // 별도 API로 조회 필요
+      followersCount: followCounts?.followerCount || 0,
+      followingCount: followCounts?.followingCount || 0,
+      isFollowing,
+      isMe: userId === currentUserId
+    }
+  } catch (error) {
+    console.error('Failed to transform user profile:', error)
+    return {
+      id: userId,
+      username: backendUser.userName,
+      email: backendUser.userEmail,
+      avatar: backendUser.profileImage || undefined,
+      prettyFace: backendUser.prettyFace || undefined,
+      bio: '',
+      feedsCount: 0,
+      followersCount: 0,
+      followingCount: 0,
+      isFollowing: false,
+      isMe: userId === currentUserId
+    }
   }
 }
 
@@ -179,22 +169,20 @@ const calculateDiscoverScore = (
   let score = 0
   
   switch (source) {
-    case 'popular':
-      // 좋아요 수 중심
-      score = Math.min(100, likes * 5)
-      break
-    case 'recent':
-      // 최신성 중심
+    case 'following':
+      // 팔로잉 피드는 시간순으로만
       if (ageInHours < 1) score = 100
       else if (ageInHours < 6) score = 80
       else if (ageInHours < 24) score = 60
       else score = 30
       break
-    case 'explore':
-      // 좋아요와 최신성 혼합
-      const popularityScore = Math.min(50, likes * 2)
-      const recencyScore = ageInHours < 24 ? 50 - (ageInHours * 2) : 10
-      score = popularityScore + recencyScore
+    case 'user':
+      // 사용자 피드는 좋아요 수 중심
+      score = Math.min(100, likes * 5)
+      break
+    case 'random':
+      // 랜덤은 고정 점수
+      score = 50
       break
     default:
       score = 50
@@ -204,54 +192,37 @@ const calculateDiscoverScore = (
 }
 
 // ============================================================================
-// 탐색 카테고리 정의
+// 탐색 카테고리 정의 (실제 백엔드 엔드포인트 기반)
 // ============================================================================
 
-// ✅ 백엔드에서 실제 지원 가능한 카테고리들
 export const getExploreCategories = (): ExploreCategory[] => {
   return [
     {
-      id: 'recent',
-      name: '최신',
-      description: '방금 올라온 따끈한 피드들',
-      icon: '🆕',
+      id: 'following',
+      name: '팔로잉',
+      description: '팔로우한 사용자들의 피드',
+      icon: '👥',
       color: 'bg-blue-500',
-      endpoint: API_ENDPOINTS.recent
-    },
-    {
-      id: 'popular',
-      name: '인기',
-      description: '가장 많은 사랑을 받은 피드들',
-      icon: '🔥',
-      color: 'bg-red-500',
-      endpoint: API_ENDPOINTS.popular
-    },
-    {
-      id: 'explore',
-      name: '탐색',
-      description: '새로운 발견의 재미',
-      icon: '🔍',
-      color: 'bg-purple-500',
-      endpoint: API_ENDPOINTS.explore
+      endpoint: API_ENDPOINTS.following
     },
     {
       id: 'random',
       name: '랜덤',
       description: '예상치 못한 놀라운 피드들',
       icon: '🎲',
-      color: 'bg-gray-500',
-      endpoint: API_ENDPOINTS.explore + '?sort=random'
+      color: 'bg-purple-500',
+      endpoint: API_ENDPOINTS.random
     }
   ]
 }
 
 // ============================================================================
-// 메인 API 함수들
+// 메인 API 함수들 (실제 백엔드 엔드포인트 기반)
 // ============================================================================
 
-// ✅ 탐색 피드 목록 조회 (nextCursor 타입 오류 수정)
+// ✅ 탐색 피드 목록 조회 (실제 백엔드 API 사용)
 export const getExploreFeeds = async (
-  category: string = 'explore',
+  category: string = 'random',
   cursor?: string,
   limit: number = 20,
   filters: ExploreFilters = {}
@@ -260,55 +231,85 @@ export const getExploreFeeds = async (
   data?: {
     feeds: ExploreFeed[]
     hasMore: boolean
-    nextCursor?: string
+    nextCursor?: {
+      createdAt: string
+      feedId: number
+    } | null
     total?: number
   }
   error?: string
 }> => {
   try {
-    const categoryConfig = getExploreCategories().find(c => c.id === category)
-    const endpoint = categoryConfig?.endpoint || API_ENDPOINTS.explore
+    let result
     
-    // 쿼리 파라미터 구성
-    const params = new URLSearchParams()
-    if (cursor) params.append('cursor', cursor)
-    if (limit) params.append('limit', limit.toString())
-    if (filters.sort) params.append('sort', filters.sort)
-    if (filters.excludeMyPosts) params.append('excludeMyPosts', 'true')
+    switch (category) {
+      case 'following':
+        result = await getFollowingFeeds(
+          filters.cursorCreatedAt,
+          filters.cursorId,
+          filters.size || limit
+        )
+        break
+      case 'random':
+        result = await getRandomFeeds(filters.size || limit)
+        break
+      case 'user':
+        if (!filters.userId) {
+          return {
+            success: false,
+            error: '사용자 피드 조회에는 userId가 필요합니다.'
+          }
+        }
+        result = await getUserFeeds(
+          filters.userId,
+          filters.cursorCreatedAt,
+          filters.cursorId,
+          filters.size || limit
+        )
+        break
+      default:
+        // 기본값으로 랜덤 피드 조회
+        result = await getRandomFeeds(filters.size || limit)
+    }
     
-    const url = `${endpoint}?${params.toString()}`
-    const response = await fetchWithAuth(url)
-    const result: BackendApiResponse<BackendFeedListResponse> = await response.json()
-    
-    if (result.error || !result.data) {
+    if (!result.success || !result.data) {
       return {
         success: false,
-        error: result.message || '탐색 피드를 불러오는데 실패했습니다.'
+        error: result.error || '탐색 피드를 불러오는데 실패했습니다.'
       }
     }
     
-    // 백엔드 데이터를 ExploreFeed로 변환
-    const exploreFeeds: ExploreFeed[] = []
-    for (const backendFeed of result.data.items) {
-      const exploreFeed = await transformBackendFeedToExploreFeed(
-        backendFeed, 
-        category as ExploreFeed['source']
-      )
-      exploreFeeds.push(exploreFeed)
+    // CanvasFeedItem을 ExploreFeed로 변환
+    const exploreFeeds: ExploreFeed[] = result.data.items.map(feed =>
+      transformCanvasFeedToExploreFeed(feed, category as ExploreFeed['source'])
+    )
+    
+    // 내 게시물 제외 필터링 (프론트엔드에서 처리)
+    let filteredFeeds = exploreFeeds
+    if (filters.excludeMyPosts) {
+      try {
+        const currentUser = await getCurrentUser()
+        if (currentUser) {
+          filteredFeeds = exploreFeeds.filter(feed => feed.userId !== currentUser.id)
+        }
+      } catch (error) {
+        console.warn('Failed to filter my posts:', error)
+      }
     }
     
-    // 점수에 따라 정렬 (백엔드에서 정렬하지 않는 경우)
-    if (!filters.sort || filters.sort === 'popular') {
-      exploreFeeds.sort((a, b) => (b.discoverScore || 0) - (a.discoverScore || 0))
-    }
+    // 점수에 따라 정렬
+    filteredFeeds.sort((a, b) => (b.discoverScore || 0) - (a.discoverScore || 0))
+    
+    // nextCursor 안전 처리
+    const nextCursor = (result.data as any).nextCursor || null
     
     return {
       success: true,
       data: {
-        feeds: exploreFeeds,
-        hasMore: result.data.hasNext,
-        nextCursor: convertCursorToString(result.data.nextCursor), // 🔥 타입 안전 변환
-        total: exploreFeeds.length
+        feeds: filteredFeeds,
+        hasMore: result.data.hasMore,
+        nextCursor,
+        total: filteredFeeds.length
       }
     }
   } catch (error) {
@@ -320,251 +321,59 @@ export const getExploreFeeds = async (
   }
 }
 
-// ✅ 특정 사용자의 피드 목록 조회 (nextCursor 타입 오류 수정)
-export const getUserFeeds = async (
+// ✅ 특정 사용자의 피드 목록 조회 (실제 백엔드 API 사용)
+export const getExploreUserFeeds = async (
   userId: string,
-  cursor?: string,
+  cursorCreatedAt?: string,
+  cursorId?: number,
   limit: number = 20
 ): Promise<{
   success: boolean
   data?: {
     feeds: ExploreFeed[]
     hasMore: boolean
-    nextCursor?: string
+    nextCursor?: {
+      createdAt: string
+      feedId: number
+    } | null
     total?: number
   }
   error?: string
 }> => {
   try {
-    const params = new URLSearchParams()
-    if (cursor) params.append('cursor', cursor)
-    if (limit) params.append('limit', limit.toString())
+    const result = await getUserFeeds(
+      Number(userId),
+      cursorCreatedAt,
+      cursorId,
+      limit
+    )
     
-    const url = `${API_ENDPOINTS.userFeeds}/${userId}?${params.toString()}`
-    const response = await fetchWithAuth(url)
-    const result: BackendApiResponse<BackendFeedListResponse> = await response.json()
-    
-    if (result.error || !result.data) {
+    if (!result.success || !result.data) {
       return {
         success: false,
-        error: result.message || '사용자 피드를 불러오는데 실패했습니다.'
+        error: result.error || '사용자 피드를 불러오는데 실패했습니다.'
       }
     }
     
-    // 백엔드 데이터를 ExploreFeed로 변환
-    const exploreFeeds: ExploreFeed[] = []
-    for (const backendFeed of result.data.items) {
-      const exploreFeed = await transformBackendFeedToExploreFeed(
-        backendFeed,
-        'explore'
-      )
-      exploreFeeds.push(exploreFeed)
-    }
+    // CanvasFeedItem을 ExploreFeed로 변환
+    const exploreFeeds: ExploreFeed[] = result.data.items.map(feed =>
+      transformCanvasFeedToExploreFeed(feed, 'user')
+    )
+    
+    // nextCursor 안전 처리
+    const nextCursor = (result.data as any).nextCursor || null
     
     return {
       success: true,
       data: {
         feeds: exploreFeeds,
-        hasMore: result.data.hasNext,
-        nextCursor: convertCursorToString(result.data.nextCursor), // 🔥 타입 안전 변환
+        hasMore: result.data.hasMore,
+        nextCursor,
         total: exploreFeeds.length
       }
     }
   } catch (error) {
     console.error('Failed to get user feeds:', error)
-    return {
-      success: false,
-      error: handleApiError(error)
-    }
-  }
-}
-
-// ✅ 피드 검색 (nextCursor 타입 오류 수정)
-export const searchFeeds = async (
-  query: string,
-  cursor?: string,
-  limit: number = 20
-): Promise<{
-  success: boolean
-  data?: {
-    feeds: ExploreFeed[]
-    users: UserProfile[]
-    hasMore: boolean
-    nextCursor?: string
-  }
-  error?: string
-}> => {
-  try {
-    const params = new URLSearchParams()
-    params.append('q', query)
-    if (cursor) params.append('cursor', cursor)
-    if (limit) params.append('limit', limit.toString())
-    
-    const url = `${API_ENDPOINTS.search}?${params.toString()}`
-    const response = await fetchWithAuth(url)
-    const result: BackendApiResponse<{
-      feeds: BackendFeedItem[]
-      users: { userId: number, userInfo: BackendUserInfoResponse }[]
-      hasMore: boolean
-      nextCursor?: number
-    }> = await response.json()
-    
-    if (result.error || !result.data) {
-      return {
-        success: false,
-        error: result.message || '검색에 실패했습니다.'
-      }
-    }
-    
-    // 피드 변환
-    const exploreFeeds: ExploreFeed[] = []
-    for (const backendFeed of result.data.feeds) {
-      const exploreFeed = await transformBackendFeedToExploreFeed(
-        backendFeed,
-        'explore'
-      )
-      exploreFeeds.push(exploreFeed)
-    }
-    
-    // 사용자 변환
-    const currentUser = await getCurrentUser()
-    const users: UserProfile[] = result.data.users.map(({ userId, userInfo }) =>
-      transformBackendUserToProfile(userInfo, userId.toString(), currentUser?.id)
-    )
-    
-    return {
-      success: true,
-      data: {
-        feeds: exploreFeeds,
-        users,
-        hasMore: result.data.hasMore,
-        nextCursor: convertCursorToString(result.data.nextCursor) // 🔥 타입 안전 변환
-      }
-    }
-  } catch (error) {
-    console.error('Failed to search feeds:', error)
-    return {
-      success: false,
-      error: handleApiError(error)
-    }
-  }
-}
-
-// ✅ 추천 사용자 목록 조회 (백엔드 구현 필요)
-export const getRecommendedUsers = async (
-  limit: number = 10
-): Promise<{
-  success: boolean
-  data?: UserProfile[]
-  error?: string
-}> => {
-  try {
-    const url = `${API_ENDPOINTS.users}/recommended?limit=${limit}`
-    const response = await fetchWithAuth(url)
-    const result: BackendApiResponse<{ userId: number, userInfo: BackendUserInfoResponse }[]> = await response.json()
-    
-    if (result.error || !result.data) {
-      return {
-        success: false,
-        error: result.message || '추천 사용자를 불러오는데 실패했습니다.'
-      }
-    }
-    
-    const currentUser = await getCurrentUser()
-    const users: UserProfile[] = result.data.map(({ userId, userInfo }) =>
-      transformBackendUserToProfile(userInfo, userId.toString(), currentUser?.id)
-    )
-    
-    return {
-      success: true,
-      data: users
-    }
-  } catch (error) {
-    console.error('Failed to get recommended users:', error)
-    return {
-      success: false,
-      error: handleApiError(error)
-    }
-  }
-}
-
-// ✅ 관련 피드 조회
-export const getRelatedFeeds = async (
-  feedId: string,
-  limit: number = 10
-): Promise<{
-  success: boolean
-  data?: ExploreFeed[]
-  error?: string
-}> => {
-  try {
-    const url = `${API_ENDPOINTS.explore}/${feedId}/related?limit=${limit}`
-    const response = await fetchWithAuth(url)
-    const result: BackendApiResponse<BackendFeedItem[]> = await response.json()
-    
-    if (result.error || !result.data) {
-      return {
-        success: false,
-        error: result.message || '관련 피드를 불러오는데 실패했습니다.'
-      }
-    }
-    
-    const exploreFeeds: ExploreFeed[] = []
-    for (const backendFeed of result.data) {
-      const exploreFeed = await transformBackendFeedToExploreFeed(
-        backendFeed,
-        'explore'
-      )
-      exploreFeeds.push(exploreFeed)
-    }
-    
-    return {
-      success: true,
-      data: exploreFeeds
-    }
-  } catch (error) {
-    console.error('Failed to get related feeds:', error)
-    return {
-      success: false,
-      error: handleApiError(error)
-    }
-  }
-}
-
-// ✅ 탐색 통계 조회 (백엔드 구현 필요)
-export const getExploreStats = async (): Promise<{
-  success: boolean
-  data?: {
-    totalFeeds: number
-    totalUsers: number
-    todayFeeds: number
-    popularFeeds: number
-  }
-  error?: string
-}> => {
-  try {
-    const url = `${API_ENDPOINTS.explore}/stats`
-    const response = await fetchWithAuth(url)
-    const result: BackendApiResponse<{
-      totalFeeds: number
-      totalUsers: number
-      todayFeeds: number
-      popularFeeds: number
-    }> = await response.json()
-    
-    if (result.error || !result.data) {
-      return {
-        success: false,
-        error: result.message || '통계를 불러오는데 실패했습니다.'
-      }
-    }
-    
-    return {
-      success: true,
-      data: result.data
-    }
-  } catch (error) {
-    console.error('Failed to get explore stats:', error)
     return {
       success: false,
       error: handleApiError(error)
@@ -581,23 +390,21 @@ export const toggleExploreFeedLike = async (
   feedId: string
 ): Promise<{
   success: boolean
-  data?: { isLiked: boolean; likesCount: number }
+  data?: { isLiked: boolean; likesCount?: number }
   error?: string
 }> => {
   try {
-    // ExploreFeed의 id는 실제 feedId와 동일하므로 그대로 사용
     const result = await getFeed(feedId)
     
     if (!result.success || !result.data) {
-      throw new Error('피드를 찾을 수 없습니다.')
+      return {
+        success: false,
+        error: '피드를 찾을 수 없습니다.'
+      }
     }
     
     // photoId를 사용해서 좋아요 토글
     const likeResult = await toggleFeedLike(Number(result.data.photoId))
-    
-    if (!likeResult.success) {
-      throw new Error(likeResult.error || '좋아요 처리에 실패했습니다.')
-    }
     
     return likeResult
   } catch (error) {
@@ -610,32 +417,116 @@ export const toggleExploreFeedLike = async (
 }
 
 // ============================================================================
-// 호환성을 위한 레거시 함수들 (간소화)
+// 피드 검색 기능 (구현됨)
 // ============================================================================
 
-// ✅ 카테고리별 미리보기 (메인 함수 재사용)
-export const getCategoryPreview = async (
-  categoryId: string,
-  limit: number = 6
-): Promise<ExploreFeed[]> => {
+// ✅ 피드 검색 (사용자명 기반)
+export const searchFeeds = async (
+  query: string,
+  cursorCreatedAt?: string,
+  cursorId?: number,
+  limit: number = 20
+): Promise<{
+  success: boolean
+  data?: {
+    feeds: ExploreFeed[]
+    hasMore: boolean
+    nextCursor?: {
+      createdAt: string
+      feedId: number
+    } | null
+  }
+  error?: string
+}> => {
   try {
-    const result = await getExploreFeeds(categoryId, undefined, limit)
-    return result.data?.feeds || []
+    if (!query?.trim()) {
+      return {
+        success: true,
+        data: {
+          feeds: [],
+          hasMore: false,
+          nextCursor: null
+        }
+      }
+    }
+
+    const params = new URLSearchParams()
+    params.append('query', query.trim())
+    if (cursorCreatedAt) params.append('cursorCreatedAt', cursorCreatedAt)
+    if (cursorId) params.append('cursorId', cursorId.toString())
+    params.append('size', limit.toString())
+    
+    const url = `${API_ENDPOINTS.feeds}/search?${params.toString()}`
+    const response = await fetchWithAuth(url)
+    const result: BackendApiResponse<BackendFeedDetailResponse[]> = await response.json()
+    
+    if (result.error || !Array.isArray(result.data)) {
+      return {
+        success: false,
+        error: result.message || '검색에 실패했습니다.'
+      }
+    }
+    
+    // BackendFeedDetailResponse를 ExploreFeed로 변환
+    const exploreFeeds: ExploreFeed[] = []
+    for (const backendFeed of result.data) {
+      // CanvasFeedItem으로 먼저 변환
+      const canvasFeed: CanvasFeedItem = {
+        id: backendFeed.feedId.toString(),
+        userId: backendFeed.authorId.toString(),
+        userName: backendFeed.accountName,
+        name: backendFeed.caption || `Feed ${backendFeed.feedId}`,
+        description: backendFeed.caption || '',
+        isPublic: true,
+        backgroundColor: '#ffffff',
+        backgroundImageUrl: backendFeed.imgUrl,
+        totalHeight: 1600,
+        followersCount: 0,
+        isFollowing: false,
+        isLiked: backendFeed.liked,
+        likesCount: 0,
+        authorName: backendFeed.accountName,
+        authorId: backendFeed.authorId.toString(),
+        authorAvatar: backendFeed.profileImage,
+        elements: [],
+        createdAt: backendFeed.createdAt,
+        updatedAt: backendFeed.createdAt,
+        photoId: backendFeed.feedId,
+        photoUrl: backendFeed.imgUrl,
+      }
+      
+      // ExploreFeed로 변환
+      const exploreFeed = transformCanvasFeedToExploreFeed(canvasFeed, 'user', 'search')
+      exploreFeeds.push(exploreFeed)
+    }
+    
+    // 다음 커서 계산
+    const hasMore = result.data.length === limit
+    let nextCursor = null
+    if (hasMore && result.data.length > 0) {
+      const lastFeed = result.data[result.data.length - 1]
+      nextCursor = {
+        createdAt: lastFeed.createdAt,
+        feedId: lastFeed.feedId
+      }
+    }
+    
+    return {
+      success: true,
+      data: {
+        feeds: exploreFeeds,
+        hasMore,
+        nextCursor
+      }
+    }
   } catch (error) {
-    console.error('Failed to get category preview:', error)
-    return []
+    console.error('Failed to search feeds:', error)
+    return {
+      success: false,
+      error: handleApiError(error)
+    }
   }
 }
-
-// ✅ 해시태그 자동완성 제거 (해시태그 기능 없음)
-export const getHashtagSuggestions = async (
-  query: string,
-  limit: number = 10
-): Promise<string[]> => {
-  console.warn('해시태그 기능이 제거되었습니다.')
-  return []
-}
-
 // ============================================================================
 // 유틸리티 함수들
 // ============================================================================
@@ -646,5 +537,21 @@ export const isExploreFeed = (item: any): item is ExploreFeed => {
 
 export const getExploreApiEndpoint = (categoryId: string): string => {
   const category = getExploreCategories().find(c => c.id === categoryId)
-  return category?.endpoint || API_ENDPOINTS.explore
+  return category?.endpoint || API_ENDPOINTS.random
+}
+
+// ✅ 커서 변환 유틸리티
+export const createCursorString = (createdAt: string, feedId: number): string => {
+  return `${createdAt}|${feedId}`
+}
+
+export const parseCursorString = (cursor: string): { createdAt: string; feedId: number } | null => {
+  try {
+    const [createdAt, feedIdStr] = cursor.split('|')
+    const feedId = parseInt(feedIdStr)
+    if (!createdAt || isNaN(feedId)) return null
+    return { createdAt, feedId }
+  } catch {
+    return null
+  }
 }

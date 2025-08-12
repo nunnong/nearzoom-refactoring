@@ -2,7 +2,8 @@
 
 import {
   BackendUserInfoResponse,
-  BackendApiResponse
+  BackendApiResponse,
+  BackendFollowCountsResponse
 } from '@/lib/types/feed'
 
 import {
@@ -12,7 +13,7 @@ import {
 } from './feed'
 
 // ============================================================================
-// 백엔드 연동 타입들
+// 백엔드 연동 타입들 (실제 백엔드 API에 맞춤)
 // ============================================================================
 
 // ✅ 백엔드 기반 사용자 프로필 (UserInfoResponse 확장)
@@ -21,6 +22,7 @@ export interface UserProfile {
   username: string
   email: string
   avatar?: string
+  prettyFace?: string  // ✅ 백엔드 UserInfoResponse에 있는 필드
   bio?: string
   feedsCount: number
   followersCount: number
@@ -28,32 +30,6 @@ export interface UserProfile {
   isFollowing: boolean
   isFollowedBy: boolean
   joinedAt: string
-}
-
-// ✅ 백엔드 팔로우 관계 응답
-export interface BackendFollowResponse {
-  followerId: number
-  followeeId: number
-  createdAt: string
-}
-
-// ✅ 백엔드 팔로우 통계 응답
-export interface BackendFollowStatsResponse {
-  userId: number
-  followersCount: number
-  followingCount: number
-}
-
-// ✅ 백엔드 사용자 검색 응답
-export interface BackendUserSearchResponse {
-  users: {
-    userId: number
-    userInfo: BackendUserInfoResponse
-    followStats?: BackendFollowStatsResponse
-  }[]
-  hasMore: boolean
-  nextCursor?: number
-  total: number
 }
 
 // ============================================================================
@@ -66,49 +42,39 @@ const API_BASE_URL = (() => {
 })()
 
 const API_ENDPOINTS = {
-  follows: '/follows',              // 팔로우 관계 관리
-  users: '/users',                  // 사용자 정보
-  search: '/users/search',          // 사용자 검색
-  recommended: '/users/recommended' // 추천 사용자
+  follows: '/follows',     // 팔로우 관계 관리
+  users: '/users',         // 사용자 정보 (현재 백엔드에서 미지원)
 } as const
 
 // ============================================================================
 // 유틸리티 함수들
 // ============================================================================
 
-// ✅ nextCursor 변환 유틸리티
-const convertCursorToString = (cursor: number | string | null | undefined): string | undefined => {
-  if (cursor === null || cursor === undefined) {
-    return undefined
-  }
-  return cursor.toString()
-}
-
 // ✅ 백엔드 UserInfoResponse를 UserProfile로 변환
 const transformBackendUserToProfile = async (
   backendUser: BackendUserInfoResponse,
   userId: string,
   currentUserId?: string,
-  followStats?: BackendFollowStatsResponse
+  followCounts?: BackendFollowCountsResponse
 ): Promise<UserProfile> => {
   try {
-    // 팔로우 관계 확인
-    const [isFollowing, isFollowedBy] = await Promise.all([
-      currentUserId && currentUserId !== userId ? checkFollowStatus(Number(userId)) : Promise.resolve(false),
-      currentUserId && currentUserId !== userId ? checkIfFollowedBy(Number(userId)) : Promise.resolve(false)
-    ])
+    // 팔로우 관계 확인 (자기 자신은 제외)
+    const isFollowing = currentUserId && currentUserId !== userId 
+      ? await checkFollowStatus(Number(userId)) 
+      : false
 
     return {
       id: userId,
       username: backendUser.userName,
       email: backendUser.userEmail,
-      avatar: backendUser.userProfileImage || undefined,
+      avatar: backendUser.profileImage || undefined,
+      prettyFace: backendUser.prettyFace || undefined,
       bio: '', // 백엔드에서 bio 필드 추가 필요
       feedsCount: 0, // 별도 API로 조회 필요
-      followersCount: followStats?.followersCount || 0,
-      followingCount: followStats?.followingCount || 0,
+      followersCount: followCounts?.followerCount || 0,
+      followingCount: followCounts?.followingCount || 0,
       isFollowing,
-      isFollowedBy,
+      isFollowedBy: false, // 역방향 팔로우 확인 API 없음
       joinedAt: new Date().toISOString() // 백엔드에서 가입일 필드 추가 필요
     }
   } catch (error) {
@@ -117,11 +83,12 @@ const transformBackendUserToProfile = async (
       id: userId,
       username: backendUser.userName,
       email: backendUser.userEmail,
-      avatar: backendUser.userProfileImage || undefined,
+      avatar: backendUser.profileImage || undefined,
+      prettyFace: backendUser.prettyFace || undefined,
       bio: '',
       feedsCount: 0,
-      followersCount: followStats?.followersCount || 0,
-      followingCount: followStats?.followingCount || 0,
+      followersCount: followCounts?.followerCount || 0,
+      followingCount: followCounts?.followingCount || 0,
       isFollowing: false,
       isFollowedBy: false,
       joinedAt: new Date().toISOString()
@@ -130,10 +97,10 @@ const transformBackendUserToProfile = async (
 }
 
 // ============================================================================
-// 메인 API 함수들
+// 메인 API 함수들 (실제 백엔드 엔드포인트 기반)
 // ============================================================================
 
-// ✅ 사용자 팔로우
+// ✅ 사용자 팔로우 (POST /follows/{followeeId})
 export const followUser = async (targetUserId: string): Promise<{
   success: boolean
   error?: string
@@ -174,7 +141,7 @@ export const followUser = async (targetUserId: string): Promise<{
       method: 'POST'
     })
 
-    const result: BackendApiResponse<BackendFollowResponse> = await response.json()
+    const result: BackendApiResponse<null> = await response.json()
 
     if (result.error) {
       return {
@@ -195,7 +162,7 @@ export const followUser = async (targetUserId: string): Promise<{
   }
 }
 
-// ✅ 사용자 언팔로우
+// ✅ 사용자 언팔로우 (DELETE /follows/{followeeId})
 export const unfollowUser = async (targetUserId: string): Promise<{
   success: boolean
   error?: string
@@ -250,7 +217,7 @@ export const unfollowUser = async (targetUserId: string): Promise<{
   }
 }
 
-// ✅ 팔로우 상태 확인
+// ✅ 팔로우 상태 확인 (GET /follows/check/{followeeId})
 export const checkFollowStatus = async (followeeId: number): Promise<boolean> => {
   try {
     const response = await fetchWithAuth(`${API_ENDPOINTS.follows}/check/${followeeId}`)
@@ -267,34 +234,14 @@ export const checkFollowStatus = async (followeeId: number): Promise<boolean> =>
   }
 }
 
-// ✅ 나를 팔로우하는지 확인
-export const checkIfFollowedBy = async (followerId: number): Promise<boolean> => {
-  try {
-    const response = await fetchWithAuth(`${API_ENDPOINTS.follows}/check-reverse/${followerId}`)
-    const result: BackendApiResponse<boolean> = await response.json()
-    
-    if (!result.error && typeof result.data === 'boolean') {
-      return result.data
-    }
-    
-    return false
-  } catch (error) {
-    console.error('Failed to check if followed by:', error)
-    return false
-  }
-}
-
-// ✅ 팔로워 목록 조회
+// ✅ 팔로워 목록 조회 (GET /follows/followers/{userId})
 export const getFollowers = async (
-  userId: string,
-  cursor?: string,
-  limit: number = 20
+  userId: string
 ): Promise<{
   success: boolean
   data?: {
     users: UserProfile[]
     hasMore: boolean
-    nextCursor?: string
     total: number
   }
   error?: string
@@ -307,15 +254,10 @@ export const getFollowers = async (
       }
     }
 
-    const params = new URLSearchParams()
-    if (cursor) params.append('cursor', cursor)
-    if (limit) params.append('limit', limit.toString())
+    const response = await fetchWithAuth(`${API_ENDPOINTS.follows}/followers/${userId}`)
+    const result: BackendApiResponse<BackendUserInfoResponse[]> = await response.json()
 
-    const url = `${API_ENDPOINTS.follows}/followers/${userId}?${params.toString()}`
-    const response = await fetchWithAuth(url)
-    const result: BackendApiResponse<BackendUserSearchResponse> = await response.json()
-
-    if (result.error || !result.data) {
+    if (result.error || !Array.isArray(result.data)) {
       return {
         success: false,
         error: result.message || '팔로워 목록을 불러오는데 실패했습니다.'
@@ -325,12 +267,12 @@ export const getFollowers = async (
     const currentUser = await getCurrentUser()
     const users: UserProfile[] = []
 
-    for (const { userId: followerId, userInfo, followStats } of result.data.users) {
+    for (const userInfo of result.data) {
+      // userId는 userEmail을 기반으로 추정 (실제로는 백엔드에서 userId 제공 필요)
       const userProfile = await transformBackendUserToProfile(
         userInfo,
-        followerId.toString(),
-        currentUser?.id,
-        followStats
+        userInfo.userEmail, // 임시로 email을 ID로 사용
+        currentUser?.id
       )
       users.push(userProfile)
     }
@@ -339,9 +281,8 @@ export const getFollowers = async (
       success: true,
       data: {
         users,
-        hasMore: result.data.hasMore,
-        nextCursor: convertCursorToString(result.data.nextCursor),
-        total: result.data.total
+        hasMore: false, // 백엔드에서 페이징 정보 없음
+        total: users.length
       }
     }
   } catch (error) {
@@ -353,17 +294,14 @@ export const getFollowers = async (
   }
 }
 
-// ✅ 팔로잉 목록 조회
+// ✅ 팔로잉 목록 조회 (GET /follows/following/{userId})
 export const getFollowing = async (
-  userId: string,
-  cursor?: string,
-  limit: number = 20
+  userId: string
 ): Promise<{
   success: boolean
   data?: {
     users: UserProfile[]
     hasMore: boolean
-    nextCursor?: string
     total: number
   }
   error?: string
@@ -376,15 +314,10 @@ export const getFollowing = async (
       }
     }
 
-    const params = new URLSearchParams()
-    if (cursor) params.append('cursor', cursor)
-    if (limit) params.append('limit', limit.toString())
+    const response = await fetchWithAuth(`${API_ENDPOINTS.follows}/following/${userId}`)
+    const result: BackendApiResponse<BackendUserInfoResponse[]> = await response.json()
 
-    const url = `${API_ENDPOINTS.follows}/following/${userId}?${params.toString()}`
-    const response = await fetchWithAuth(url)
-    const result: BackendApiResponse<BackendUserSearchResponse> = await response.json()
-
-    if (result.error || !result.data) {
+    if (result.error || !Array.isArray(result.data)) {
       return {
         success: false,
         error: result.message || '팔로잉 목록을 불러오는데 실패했습니다.'
@@ -394,12 +327,12 @@ export const getFollowing = async (
     const currentUser = await getCurrentUser()
     const users: UserProfile[] = []
 
-    for (const { userId: followingId, userInfo, followStats } of result.data.users) {
+    for (const userInfo of result.data) {
+      // userId는 userEmail을 기반으로 추정 (실제로는 백엔드에서 userId 제공 필요)
       const userProfile = await transformBackendUserToProfile(
         userInfo,
-        followingId.toString(),
-        currentUser?.id,
-        followStats
+        userInfo.userEmail, // 임시로 email을 ID로 사용
+        currentUser?.id
       )
       users.push(userProfile)
     }
@@ -408,9 +341,8 @@ export const getFollowing = async (
       success: true,
       data: {
         users,
-        hasMore: result.data.hasMore,
-        nextCursor: convertCursorToString(result.data.nextCursor),
-        total: result.data.total
+        hasMore: false, // 백엔드에서 페이징 정보 없음
+        total: users.length
       }
     }
   } catch (error) {
@@ -422,186 +354,7 @@ export const getFollowing = async (
   }
 }
 
-// ✅ 사용자 프로필 조회
-export const getUserProfile = async (
-  userId: string
-): Promise<{
-  success: boolean
-  data?: UserProfile
-  error?: string
-}> => {
-  try {
-    if (!userId?.trim()) {
-      return {
-        success: false,
-        error: '유효하지 않은 사용자 ID입니다.'
-      }
-    }
-
-    const response = await fetchWithAuth(`${API_ENDPOINTS.users}/${userId}`)
-    const result: BackendApiResponse<BackendUserInfoResponse> = await response.json()
-
-    if (result.error || !result.data) {
-      return {
-        success: false,
-        error: result.message || '사용자 정보를 찾을 수 없습니다.'
-      }
-    }
-
-    // 팔로우 통계 조회
-    const statsResponse = await fetchWithAuth(`${API_ENDPOINTS.follows}/stats/${userId}`)
-    const statsResult: BackendApiResponse<BackendFollowStatsResponse> = await statsResponse.json()
-
-    const currentUser = await getCurrentUser()
-    const userProfile = await transformBackendUserToProfile(
-      result.data,
-      userId,
-      currentUser?.id,
-      statsResult.data || undefined
-    )
-
-    return {
-      success: true,
-      data: userProfile
-    }
-  } catch (error) {
-    console.error('Failed to get user profile:', error)
-    return {
-      success: false,
-      error: handleApiError(error)
-    }
-  }
-}
-
-// ✅ 사용자 검색
-export const searchUsers = async (
-  query: string,
-  cursor?: string,
-  limit: number = 20
-): Promise<{
-  success: boolean
-  data?: {
-    users: UserProfile[]
-    hasMore: boolean
-    nextCursor?: string
-    total: number
-  }
-  error?: string
-}> => {
-  try {
-    if (!query?.trim()) {
-      return {
-        success: true,
-        data: {
-          users: [],
-          hasMore: false,
-          nextCursor: undefined,
-          total: 0
-        }
-      }
-    }
-
-    const params = new URLSearchParams()
-    params.append('q', query.trim())
-    if (cursor) params.append('cursor', cursor)
-    if (limit) params.append('limit', limit.toString())
-
-    const url = `${API_ENDPOINTS.search}?${params.toString()}`
-    const response = await fetchWithAuth(url)
-    const result: BackendApiResponse<BackendUserSearchResponse> = await response.json()
-
-    if (result.error || !result.data) {
-      return {
-        success: false,
-        error: result.message || '사용자 검색에 실패했습니다.'
-      }
-    }
-
-    const currentUser = await getCurrentUser()
-    const users: UserProfile[] = []
-
-    for (const { userId, userInfo, followStats } of result.data.users) {
-      const userProfile = await transformBackendUserToProfile(
-        userInfo,
-        userId.toString(),
-        currentUser?.id,
-        followStats
-      )
-      users.push(userProfile)
-    }
-
-    return {
-      success: true,
-      data: {
-        users,
-        hasMore: result.data.hasMore,
-        nextCursor: convertCursorToString(result.data.nextCursor),
-        total: result.data.total
-      }
-    }
-  } catch (error) {
-    console.error('Failed to search users:', error)
-    return {
-      success: false,
-      error: handleApiError(error)
-    }
-  }
-}
-
-// ✅ 추천 사용자 조회
-export const getRecommendedUsers = async (
-  limit: number = 10
-): Promise<{
-  success: boolean
-  data?: UserProfile[]
-  error?: string
-}> => {
-  try {
-    if (limit < 1 || limit > 50) {
-      return {
-        success: false,
-        error: '유효하지 않은 제한 수입니다. (1-50)'
-      }
-    }
-
-    const url = `${API_ENDPOINTS.recommended}?limit=${limit}`
-    const response = await fetchWithAuth(url)
-    const result: BackendApiResponse<BackendUserSearchResponse> = await response.json()
-
-    if (result.error || !result.data) {
-      return {
-        success: false,
-        error: result.message || '추천 사용자를 불러오는데 실패했습니다.'
-      }
-    }
-
-    const currentUser = await getCurrentUser()
-    const users: UserProfile[] = []
-
-    for (const { userId, userInfo, followStats } of result.data.users) {
-      const userProfile = await transformBackendUserToProfile(
-        userInfo,
-        userId.toString(),
-        currentUser?.id,
-        followStats
-      )
-      users.push(userProfile)
-    }
-
-    return {
-      success: true,
-      data: users
-    }
-  } catch (error) {
-    console.error('Failed to get recommended users:', error)
-    return {
-      success: false,
-      error: handleApiError(error)
-    }
-  }
-}
-
-// ✅ 팔로우 통계 조회
+// ✅ 팔로우 통계 조회 (GET /follows/count/{userId})
 export const getFollowStats = async (
   userId: string
 ): Promise<{
@@ -620,8 +373,8 @@ export const getFollowStats = async (
       }
     }
 
-    const response = await fetchWithAuth(`${API_ENDPOINTS.follows}/stats/${userId}`)
-    const result: BackendApiResponse<BackendFollowStatsResponse> = await response.json()
+    const response = await fetchWithAuth(`${API_ENDPOINTS.follows}/count/${userId}`)
+    const result: BackendApiResponse<BackendFollowCountsResponse> = await response.json()
 
     if (result.error || !result.data) {
       return {
@@ -633,7 +386,7 @@ export const getFollowStats = async (
     return {
       success: true,
       data: {
-        followersCount: result.data.followersCount,
+        followersCount: result.data.followerCount,
         followingCount: result.data.followingCount
       }
     }
@@ -685,7 +438,66 @@ export const toggleFollow = async (targetUserId: string): Promise<{
   }
 }
 
-// ✅ 상호 팔로우 확인
+// ============================================================================
+// 백엔드에서 현재 지원하지 않는 기능들
+// ============================================================================
+
+// ✅ 사용자 프로필 조회 (백엔드에 사용자 정보 API 없음)
+export const getUserProfile = async (
+  userId: string
+): Promise<{
+  success: boolean
+  data?: UserProfile
+  error?: string
+}> => {
+  return {
+    success: false,
+    error: '사용자 프로필 조회 API가 백엔드에서 지원되지 않습니다. /users/{userId} 엔드포인트가 필요합니다.'
+  }
+}
+
+// ✅ 사용자 검색 (백엔드에 사용자 검색 API 없음)
+export const searchUsers = async (
+  query: string,
+  cursor?: string,
+  limit: number = 20
+): Promise<{
+  success: boolean
+  data?: {
+    users: UserProfile[]
+    hasMore: boolean
+    nextCursor?: string
+    total: number
+  }
+  error?: string
+}> => {
+  return {
+    success: false,
+    error: '사용자 검색 API가 백엔드에서 지원되지 않습니다. /users/search 엔드포인트가 필요합니다.'
+  }
+}
+
+// ✅ 추천 사용자 조회 (백엔드에 추천 API 없음)
+export const getRecommendedUsers = async (
+  limit: number = 10
+): Promise<{
+  success: boolean
+  data?: UserProfile[]
+  error?: string
+}> => {
+  return {
+    success: false,
+    error: '추천 사용자 API가 백엔드에서 지원되지 않습니다. /users/recommended 엔드포인트가 필요합니다.'
+  }
+}
+
+// ✅ 나를 팔로우하는지 확인 (백엔드에 역방향 확인 API 없음)
+export const checkIfFollowedBy = async (followerId: number): Promise<boolean> => {
+  console.warn('checkIfFollowedBy: 역방향 팔로우 확인 API가 백엔드에서 지원되지 않습니다.')
+  return false
+}
+
+// ✅ 상호 팔로우 확인 (역방향 API 없음으로 제한적 지원)
 export const checkMutualFollow = async (userId: string): Promise<{
   success: boolean
   data?: {
@@ -696,17 +508,14 @@ export const checkMutualFollow = async (userId: string): Promise<{
   error?: string
 }> => {
   try {
-    const [isFollowing, isFollowedBy] = await Promise.all([
-      checkFollowStatus(Number(userId)),
-      checkIfFollowedBy(Number(userId))
-    ])
-
+    const isFollowing = await checkFollowStatus(Number(userId))
+    
     return {
       success: true,
       data: {
         isFollowing,
-        isFollowedBy,
-        isMutual: isFollowing && isFollowedBy
+        isFollowedBy: false, // 역방향 API 없음
+        isMutual: false // 역방향 확인 불가로 항상 false
       }
     }
   } catch (error) {
@@ -719,7 +528,7 @@ export const checkMutualFollow = async (userId: string): Promise<{
 }
 
 // ============================================================================
-// 호환성을 위한 레거시 함수들 (deprecated)
+// 호환성을 위한 레거시 함수들
 // ============================================================================
 
 // ✅ 기존 코드 호환성을 위한 함수들 (간단한 래퍼)
@@ -728,7 +537,7 @@ export const getFollowersLegacy = async (
   page: number = 1,
   limit: number = 20
 ): Promise<{ users: UserProfile[], hasMore: boolean, total: number }> => {
-  const result = await getFollowers(userId, undefined, limit)
+  const result = await getFollowers(userId)
   
   if (!result.success || !result.data) {
     return {
@@ -750,7 +559,7 @@ export const getFollowingLegacy = async (
   page: number = 1,
   limit: number = 20
 ): Promise<{ users: UserProfile[], hasMore: boolean, total: number }> => {
-  const result = await getFollowing(userId, undefined, limit)
+  const result = await getFollowing(userId)
   
   if (!result.success || !result.data) {
     return {
@@ -772,36 +581,27 @@ export const searchUsersLegacy = async (
   page: number = 1,
   limit: number = 20
 ): Promise<{ users: UserProfile[], hasMore: boolean, total: number }> => {
-  const result = await searchUsers(query, undefined, limit)
-  
-  if (!result.success || !result.data) {
-    return {
-      users: [],
-      hasMore: false,
-      total: 0
-    }
-  }
-  
+  console.warn('searchUsersLegacy: 사용자 검색이 백엔드에서 지원되지 않습니다.')
   return {
-    users: result.data.users,
-    hasMore: result.data.hasMore,
-    total: result.data.total
+    users: [],
+    hasMore: false,
+    total: 0
   }
 }
 
 export const getRecommendedUsersLegacy = async (
   limit: number = 10
 ): Promise<UserProfile[]> => {
-  const result = await getRecommendedUsers(limit)
-  return result.data || []
+  console.warn('getRecommendedUsersLegacy: 추천 사용자가 백엔드에서 지원되지 않습니다.')
+  return []
 }
 
 export const getUserProfileLegacy = async (
   userId: string,
   viewerUserId?: string
 ): Promise<UserProfile | null> => {
-  const result = await getUserProfile(userId)
-  return result.data || null
+  console.warn('getUserProfileLegacy: 사용자 프로필 조회가 백엔드에서 지원되지 않습니다.')
+  return null
 }
 
 // ============================================================================
@@ -810,29 +610,4 @@ export const getUserProfileLegacy = async (
 
 export const isUserProfile = (item: any): item is UserProfile => {
   return item && typeof item === 'object' && 'id' in item && 'username' in item
-}
-
-// ============================================================================
-// 개발용 함수들 (더 이상 사용되지 않음)
-// ============================================================================
-
-/**
- * @deprecated 백엔드 연동으로 더미 데이터가 필요하지 않습니다.
- */
-export const initializeDummyUsers = (): void => {
-  console.warn('initializeDummyUsers는 더 이상 사용되지 않습니다. 백엔드에서 실제 데이터를 제공합니다.')
-}
-
-/**
- * @deprecated 백엔드 연동으로 로컬 사용자 설정이 필요하지 않습니다.
- */
-export const setCurrentUser = (userId: string): void => {
-  console.warn('setCurrentUser는 더 이상 사용되지 않습니다. 인증 토큰을 통해 사용자를 식별합니다.')
-}
-
-/**
- * @deprecated 백엔드 연동으로 로컬 데이터 초기화가 필요하지 않습니다.
- */
-export const clearAllData = (): void => {
-  console.warn('clearAllData는 더 이상 사용되지 않습니다. 백엔드 데이터를 사용합니다.')
 }
