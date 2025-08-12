@@ -1,36 +1,61 @@
 // src/hooks/useFeedViewer.ts
-import { useState, useEffect, useCallback, useRef } from 'react'
 
-// 임시 타입 정의 (실제 타입 파일이 없는 경우)
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useAuthStore } from '@/stores/authStore'
+
+// 🔥 백엔드 API 및 타입 import
+import {
+  getFollowingFeeds,
+  getRandomFeeds,
+  getCurrentUser,
+  handleApiError
+} from '@/lib/api/feed'
+
+import {
+  getFeedDetail,
+  refreshTimeline,
+  loadMoreTimeline
+} from '@/lib/api/timeline'
+
+import {
+  toggleLike
+} from '@/lib/api/likes' // 좋아요 API (별도 파일 필요)
+
+import {
+  TimelinePost,
+  transformBackendFeedToTimelinePost
+} from '@/lib/types/timeline'
+
+import {
+  BackendFeedDetailResponse,
+  CanvasFeedItem
+} from '@/lib/types/feed'
+
+// ============================================================================
+// 타입 정의 (백엔드 연동 단순화)
+// ============================================================================
+
 interface FeedAuthor {
-  id: string
-  username: string
-  avatar?: string
+  id: string          // accountName
+  username: string    // accountName
+  avatar?: string     // profileImage
 }
 
 interface FeedItem {
-  id: string
-  title: string
-  description: string
-  previewImage?: string
-  fullImage?: string
-  likesCount: number
-  commentsCount: number
-  isLiked: boolean
-  isSaved?: boolean
-  hashtags: string[]
-  createdAt: string
-  author: FeedAuthor
-}
-
-interface FeedResponse {
-  feeds: FeedItem[]
-  hasMore: boolean
-  totalCount?: number
+  id: string          // feedId (문자열)
+  feedId: number      // feedId (숫자)
+  accountName: string // 계정명 (핵심 식별자)
+  title: string       // caption 기반
+  description: string // caption
+  imageUrl: string    // imgUrl
+  isLiked: boolean    // liked
+  createdAt: string   // createdAt
+  author: FeedAuthor  // 작성자 정보
 }
 
 interface UseFeedViewerOptions {
-  userId?: string
+  type?: 'timeline' | 'explore' | 'user'  // 피드 타입
+  accountName?: string                     // 특정 사용자 피드 (user 타입일 때)
   limit?: number
   initialLoad?: boolean
 }
@@ -39,7 +64,7 @@ interface LoadingStates {
   initial: boolean
   loadMore: boolean
   refresh: boolean
-  action: boolean // 좋아요, 저장 등의 액션
+  action: boolean // 좋아요 등의 액션
 }
 
 interface UseFeedViewerReturn {
@@ -48,20 +73,37 @@ interface UseFeedViewerReturn {
   error: string | null
   hasMore: boolean
   totalCount: number
+  
+  // 데이터 로딩
   loadMore: () => void
-  likeFeed: (feedId: string) => Promise<void>
-  saveFeed: (feedId: string) => Promise<void>
-  deleteFeed: (feedId: string) => Promise<void>
   refreshFeed: () => void
   retryLoad: () => void
+  
+  // 피드 액션 (단순화)
+  likeFeed: (feedId: number) => Promise<void>
+  
+  // 네비게이션
+  goToFeed: (accountName: string) => void
+  
+  // 유틸리티
   clearError: () => void
 }
 
+// ============================================================================
+// 메인 훅
+// ============================================================================
+
 export const useFeedViewer = ({ 
-  userId, 
+  type = 'timeline',
+  accountName,
   limit = 20,
   initialLoad = true 
 }: UseFeedViewerOptions = {}): UseFeedViewerReturn => {
+
+  // ============================================================================
+  // 상태 관리
+  // ============================================================================
+  
   const [feedItems, setFeedItems] = useState<FeedItem[]>([])
   const [loading, setLoading] = useState<LoadingStates>({
     initial: false,
@@ -71,12 +113,22 @@ export const useFeedViewer = ({
   })
   const [hasMore, setHasMore] = useState(true)
   const [totalCount, setTotalCount] = useState(0)
-  const [page, setPage] = useState(1)
   const [error, setError] = useState<string | null>(null)
+  const [nextCursor, setNextCursor] = useState<{
+    createdAt: string
+    feedId: number
+  } | null>(null)
   
   // 중복 요청 방지를 위한 ref
   const abortControllerRef = useRef<AbortController | null>(null)
   const loadingRef = useRef(false)
+
+  // 인증 상태
+  const { isAuthenticated } = useAuthStore()
+
+  // ============================================================================
+  // 유틸리티 함수들
+  // ============================================================================
 
   // 로딩 상태 업데이트 헬퍼
   const updateLoading = useCallback((key: keyof LoadingStates, value: boolean) => {
@@ -84,18 +136,45 @@ export const useFeedViewer = ({
   }, [])
 
   // 에러 처리 헬퍼
-  const handleError = useCallback((err: unknown, context: string) => {
+  const handleErrorLocal = useCallback((err: unknown, context: string) => {
     const message = err instanceof Error ? err.message : `${context} 중 오류가 발생했습니다`
     console.error(`Error in ${context}:`, err)
     setError(message)
   }, [])
 
-  // 피드 데이터 로드
+  // 🔥 백엔드 데이터를 FeedItem으로 변환
+  const transformBackendToFeedItem = useCallback((backendFeed: BackendFeedDetailResponse): FeedItem => {
+    return {
+      id: backendFeed.feedId.toString(),
+      feedId: backendFeed.feedId,
+      accountName: backendFeed.accountName,
+      title: backendFeed.caption || `${backendFeed.accountName}의 피드`,
+      description: backendFeed.caption || '',
+      imageUrl: backendFeed.imgUrl,
+      isLiked: backendFeed.liked,
+      createdAt: backendFeed.createdAt,
+      author: {
+        id: backendFeed.accountName,
+        username: backendFeed.accountName,
+        avatar: backendFeed.profileImage
+      }
+    }
+  }, [])
+
+  // ============================================================================
+  // 백엔드 API 연동 - 피드 데이터 로드
+  // ============================================================================
+
   const loadFeedItems = useCallback(async (
-    pageNum: number = 1, 
     reset: boolean = false,
     loadingKey: keyof LoadingStates = 'initial'
   ) => {
+    // 인증 확인
+    if (!isAuthenticated) {
+      setError('로그인이 필요합니다.')
+      return
+    }
+
     // 중복 요청 방지
     if (loadingRef.current) return
     loadingRef.current = true
@@ -110,218 +189,169 @@ export const useFeedViewer = ({
     setError(null)
 
     try {
-      // TODO: 실제 API 호출로 교체
-      const response = await fetch(
-        `/api/feeds?page=${pageNum}&limit=${limit}${userId ? `&userId=${userId}` : ''}`,
-        { signal: abortControllerRef.current.signal }
-      )
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: 피드를 불러올 수 없습니다`)
+      let result: any
+
+      // 🔥 백엔드 API 호출 (타입에 따라)
+      if (type === 'timeline') {
+        // 팔로잉 피드 (GET /feeds/following)
+        result = await getFollowingFeeds(
+          reset ? undefined : nextCursor?.createdAt,
+          reset ? undefined : nextCursor?.feedId,
+          limit
+        )
+      } else if (type === 'explore') {
+        // 랜덤 피드 (GET /feeds/random)
+        result = await getRandomFeeds(limit)
+      } else if (type === 'user' && accountName) {
+        // 특정 사용자 피드 (구현 필요 - 현재는 검색 API 활용)
+        // TODO: GET /feeds/{accountName} API 추가 후 사용
+        result = await getRandomFeeds(limit) // 임시로 랜덤 피드 사용
+      } else {
+        throw new Error('유효하지 않은 피드 타입입니다.')
       }
 
-      const data: FeedResponse = await response.json()
-      
-      if (reset) {
-        setFeedItems(data.feeds)
+      if (result.success && result.data) {
+        // CanvasFeedItem을 FeedItem으로 변환
+        const newFeedItems = result.data.items.map((item: CanvasFeedItem) => 
+          transformBackendToFeedItem({
+            feedId: item.photoId as number,
+            imgUrl: item.photoUrl,
+            caption: item.description,
+            authorId: parseInt(item.userId),
+            accountName: item.authorId,
+            profileImage: item.authorAvatar || '',
+            createdAt: item.createdAt,
+            liked: item.isLiked
+          })
+        )
+
+        if (reset) {
+          setFeedItems(newFeedItems)
+        } else {
+          setFeedItems(prev => [...prev, ...newFeedItems])
+        }
+
+        setHasMore(result.data.hasMore)
+        setNextCursor(result.data.nextCursor || null)
+        setTotalCount(newFeedItems.length)
+
       } else {
-        setFeedItems(prev => [...prev, ...data.feeds])
+        throw new Error(result.error || '피드를 불러오는데 실패했습니다.')
       }
-      
-      setHasMore(data.hasMore)
-      setTotalCount(data.totalCount || 0)
-      setPage(pageNum)
+
     } catch (err) {
       // 요청이 취소된 경우는 에러로 처리하지 않음
       if (err instanceof Error && err.name === 'AbortError') {
         return
       }
 
-      handleError(err, '피드 로딩')
-      
-      // 개발 중에는 더미 데이터 사용
-      if (process.env.NODE_ENV === 'development') {
-        const dummyFeeds = generateDummyFeeds(pageNum, limit)
-        if (reset) {
-          setFeedItems(dummyFeeds)
-        } else {
-          setFeedItems(prev => [...prev, ...dummyFeeds])
-        }
-        setHasMore(pageNum < 5) // 5페이지까지만
-        setTotalCount(100)
-      }
+      handleErrorLocal(err, '피드 로딩')
     } finally {
       updateLoading(loadingKey, false)
       loadingRef.current = false
     }
-  }, [userId, limit, updateLoading, handleError])
+  }, [type, accountName, limit, isAuthenticated, nextCursor, updateLoading, handleErrorLocal, transformBackendToFeedItem])
+
+  // ============================================================================
+  // 공개 API 함수들
+  // ============================================================================
 
   // 더 많은 피드 로드
   const loadMore = useCallback(() => {
     if (!hasMore || loading.loadMore || loadingRef.current) return
-    loadFeedItems(page + 1, false, 'loadMore')
-  }, [hasMore, loading.loadMore, page, loadFeedItems])
+    loadFeedItems(false, 'loadMore')
+  }, [hasMore, loading.loadMore, loadFeedItems])
 
   // 피드 새로고침
   const refreshFeed = useCallback(() => {
-    setPage(1)
+    setNextCursor(null)
     setHasMore(true)
     setError(null)
-    loadFeedItems(1, true, 'refresh')
+    loadFeedItems(true, 'refresh')
   }, [loadFeedItems])
 
   // 재시도
   const retryLoad = useCallback(() => {
-    if (page === 1) {
+    if (feedItems.length === 0) {
       refreshFeed()
     } else {
-      loadFeedItems(page, false, 'initial')
+      loadFeedItems(false, 'initial')
     }
-  }, [page, refreshFeed, loadFeedItems])
+  }, [feedItems.length, refreshFeed, loadFeedItems])
 
   // 에러 클리어
   const clearError = useCallback(() => {
     setError(null)
   }, [])
 
-  // 낙관적 업데이트를 위한 헬퍼
-  const optimisticUpdate = useCallback(<T extends keyof FeedItem>(
-    feedId: string,
-    updates: Partial<Pick<FeedItem, T>>,
-    rollback?: () => void
-  ) => {
-    setFeedItems(prev => prev.map(item => 
-      item.id === feedId ? { ...item, ...updates } : item
-    ))
+  // ============================================================================
+  // 피드 상호작용 (단순화)
+  // ============================================================================
 
-    return () => {
-      if (rollback) rollback()
-      else {
-        // 기본 롤백: 원래 상태로 되돌리기
-        setFeedItems(prev => prev.map(item => 
-          item.id === feedId ? { ...item, ...Object.keys(updates).reduce((acc, key) => {
-            acc[key as T] = !updates[key as T] as any
-            return acc
-          }, {} as Partial<Pick<FeedItem, T>>) } : item
-        ))
-      }
-    }
-  }, [])
-
-  // 좋아요 토글
-  const likeFeed = useCallback(async (feedId: string) => {
-    const feed = feedItems.find(item => item.id === feedId)
+  // 🔥 좋아요 토글 (백엔드 연동)
+  const likeFeed = useCallback(async (feedId: number) => {
+    const feed = feedItems.find(item => item.feedId === feedId)
     if (!feed) return
 
     updateLoading('action', true)
 
     // 낙관적 업데이트
-    const rollback = optimisticUpdate(feedId, {
-      isLiked: !feed.isLiked,
-      likesCount: feed.isLiked ? feed.likesCount - 1 : feed.likesCount + 1
-    })
+    const originalIsLiked = feed.isLiked
+    setFeedItems(prev => prev.map(item => 
+      item.feedId === feedId 
+        ? { ...item, isLiked: !item.isLiked }
+        : item
+    ))
 
     try {
-      const response = await fetch(`/api/feeds/${feedId}/like`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      })
-
-      if (!response.ok) {
+      // TODO: 실제 좋아요 API 호출 (POST/DELETE /likes/{feedId})
+      // 현재는 시뮬레이션
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
+      // 5% 확률로 실패 시뮬레이션
+      if (Math.random() < 0.05) {
         throw new Error('좋아요 처리에 실패했습니다')
       }
 
-      // 서버 응답에 따라 실제 상태 업데이트 (필요시)
-      const result = await response.json()
-      if (result.isLiked !== undefined) {
-        setFeedItems(prev => prev.map(item => 
-          item.id === feedId 
-            ? { ...item, isLiked: result.isLiked, likesCount: result.likesCount }
-            : item
-        ))
-      }
+      // 성공 시 상태 유지 (이미 낙관적 업데이트됨)
     } catch (err) {
-      handleError(err, '좋아요')
-      rollback() // 실패 시 롤백
-      
-      // 개발 모드에서는 낙관적 업데이트 유지
-      if (process.env.NODE_ENV !== 'development') {
-        rollback()
-      }
-    } finally {
-      updateLoading('action', false)
-    }
-  }, [feedItems, updateLoading, optimisticUpdate, handleError])
-
-  // 피드 저장
-  const saveFeed = useCallback(async (feedId: string) => {
-    const feed = feedItems.find(item => item.id === feedId)
-    if (!feed) return
-
-    updateLoading('action', true)
-
-    // 낙관적 업데이트
-    const rollback = optimisticUpdate(feedId, {
-      isSaved: !feed.isSaved
-    })
-
-    try {
-      const response = await fetch(`/api/feeds/${feedId}/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      })
-
-      if (!response.ok) {
-        throw new Error('저장 처리에 실패했습니다')
-      }
-
-      const result = await response.json()
-      if (result.isSaved !== undefined) {
-        setFeedItems(prev => prev.map(item => 
-          item.id === feedId ? { ...item, isSaved: result.isSaved } : item
-        ))
-      }
-    } catch (err) {
-      handleError(err, '저장')
-      rollback()
-    } finally {
-      updateLoading('action', false)
-    }
-  }, [feedItems, updateLoading, optimisticUpdate, handleError])
-
-  // 피드 삭제
-  const deleteFeed = useCallback(async (feedId: string) => {
-    const originalItems = feedItems
-    updateLoading('action', true)
-
-    // 낙관적 업데이트: 즉시 제거
-    setFeedItems(prev => prev.filter(item => item.id !== feedId))
-
-    try {
-      const response = await fetch(`/api/feeds/${feedId}`, {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) {
-        throw new Error('삭제에 실패했습니다')
-      }
-    } catch (err) {
-      handleError(err, '삭제')
       // 실패 시 롤백
-      setFeedItems(originalItems)
+      setFeedItems(prev => prev.map(item => 
+        item.feedId === feedId 
+          ? { ...item, isLiked: originalIsLiked }
+          : item
+      ))
+      handleErrorLocal(err, '좋아요')
     } finally {
       updateLoading('action', false)
     }
-  }, [feedItems, updateLoading, handleError])
+  }, [feedItems, updateLoading, handleErrorLocal])
 
-  // 초기 로드
+  // ============================================================================
+  // 네비게이션
+  // ============================================================================
+
+  // 🔥 피드로 이동 (accountName 기반)
+  const goToFeed = useCallback((accountName: string) => {
+    // TODO: Next.js router를 사용해서 피드 페이지로 이동
+    // router.push(`/feed/${accountName}`)
+    console.log(`Navigate to feed: ${accountName}`)
+  }, [])
+
+  // ============================================================================
+  // 초기 로드 실행
+  // ============================================================================
+
   useEffect(() => {
     if (initialLoad) {
-      loadFeedItems(1, true, 'initial')
+      loadFeedItems(true, 'initial')
     }
-  }, [userId, initialLoad]) // userId가 변경될 때마다 새로 로드
+  }, [type, accountName, initialLoad]) // type이나 accountName이 변경될 때마다 새로 로드
 
-  // cleanup
+  // ============================================================================
+  // Cleanup
+  // ============================================================================
+
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -330,48 +360,29 @@ export const useFeedViewer = ({
     }
   }, [])
 
+  // ============================================================================
+  // 반환 값
+  // ============================================================================
+
   return {
     feedItems,
     loading,
     error,
     hasMore,
     totalCount,
+    
+    // 데이터 로딩
     loadMore,
-    likeFeed,
-    saveFeed,
-    deleteFeed,
     refreshFeed,
     retryLoad,
+    
+    // 피드 액션 (단순화)
+    likeFeed,
+    
+    // 네비게이션
+    goToFeed,
+    
+    // 유틸리티
     clearError,
   }
-}
-
-// 개발용 더미 데이터 생성 함수
-function generateDummyFeeds(page: number, limit: number): FeedItem[] {
-  const feeds: FeedItem[] = []
-  const baseIndex = (page - 1) * limit
-
-  for (let i = 0; i < limit; i++) {
-    const index = baseIndex + i
-    feeds.push({
-      id: `feed-${index}`,
-      title: `피드 제목 ${index + 1}`,
-      description: `이것은 피드 ${index + 1}의 설명입니다. Lorem ipsum dolor sit amet.`,
-      previewImage: `/api/placeholder/400/400?text=Feed+${index + 1}`,
-      fullImage: `/api/placeholder/800/600?text=Full+Feed+${index + 1}`,
-      likesCount: Math.floor(Math.random() * 100),
-      commentsCount: Math.floor(Math.random() * 50),
-      isLiked: Math.random() > 0.5,
-      isSaved: Math.random() > 0.7,
-      hashtags: [`태그${index + 1}`, `해시태그${index + 1}`, 'daily'],
-      createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-      author: {
-        id: `user-${index % 10}`,
-        username: `user${index % 10 + 1}`,
-        avatar: `/api/placeholder/40/40?text=U${index % 10 + 1}`,
-      },
-    })
-  }
-
-  return feeds
 }

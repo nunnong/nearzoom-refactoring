@@ -4,7 +4,7 @@ import {
   CanvasFeedItem,
   BackendFeedDetailResponse,
   BackendUserInfoResponse,
-  ApiResponse,  // 🔥 BackendApiResponse 대신 ApiResponse 사용
+  BackendApiResponse,  // 🔥 수정: BackendApiResponse 사용 (타입 통일)
   BackendFollowCountsResponse,
 } from '@/lib/types/feed'
 
@@ -79,6 +79,15 @@ export interface UserProfile {
   isMe: boolean
 }
 
+// 🔥 새로 추가: 스마트 검색 결과 타입
+export interface SmartSearchResult {
+  users: UserProfile[]
+  exactMatch?: UserProfile  // 정확히 일치하는 결과
+  hasMore: boolean
+  nextCursor?: string
+  total: number
+}
+
 // ============================================================================
 // API 설정 (실제 백엔드 엔드포인트)
 // ============================================================================
@@ -95,7 +104,6 @@ const API_ENDPOINTS = {
   follows: '/follows', // ✅ 팔로우 관련
   // 🔥 새로 추가된 API 엔드포인트들
   feedSearch: '/feeds/search', // ✅ 피드/사용자 검색
-  userFeed: '/feeds/user', // ✅ accountName으로 피드 조회
 } as const
 
 // ============================================================================
@@ -329,7 +337,7 @@ export const getExploreFeeds = async (
   }
 }
 
-// 🔥 새로 추가: accountName으로 사용자 피드 조회 (새 API 사용)
+// 🔥 수정: accountName으로 사용자 피드 조회 (search API 활용)
 export const getUserFeedByAccountName = async (
   accountName: string
 ): Promise<{
@@ -345,24 +353,41 @@ export const getUserFeedByAccountName = async (
       }
     }
 
-    const response = await fetchWithAuth(
-      `${API_ENDPOINTS.userFeed}/${accountName}`
-    )
-    const result: ApiResponse<BackendFeedDetailResponse> = // 🔥 타입 수정
-      await response.json()
-
-    if (result.error || !result.data) {
+    // 🔥 수정: search API를 사용해서 정확한 계정명 검색
+    const searchResult = await searchUsers(accountName.trim(), undefined, 1)
+    
+    if (!searchResult.success || !searchResult.data) {
       return {
         success: false,
-        error: result.message || '사용자 피드를 찾을 수 없습니다.',
+        error: searchResult.error || '사용자를 찾을 수 없습니다.',
       }
     }
 
-    const exploreFeed = transformBackendFeedToExploreFeed(result.data, 'user')
+    // 정확히 일치하는 사용자 찾기
+    const exactUser = searchResult.data.users.find(
+      user => user.username.toLowerCase() === accountName.toLowerCase()
+    )
+
+    if (!exactUser) {
+      return {
+        success: false,
+        error: '정확히 일치하는 사용자를 찾을 수 없습니다.',
+      }
+    }
+
+    // 해당 사용자의 피드 검색
+    const feedSearchResult = await searchFeeds(exactUser.username, undefined, undefined, 1)
+    
+    if (!feedSearchResult.success || !feedSearchResult.data?.feeds.length) {
+      return {
+        success: false,
+        error: '사용자 피드를 찾을 수 없습니다.',
+      }
+    }
 
     return {
       success: true,
-      data: exploreFeed,
+      data: feedSearchResult.data.feeds[0],
     }
   } catch (error) {
     console.error('Failed to get user feed by account name:', error)
@@ -373,19 +398,14 @@ export const getUserFeedByAccountName = async (
   }
 }
 
-// 🔥 새로 추가: 사용자 검색 (새 API 사용) - UserProfile 반환으로 변경
+// 🔥 수정: 스마트 사용자 검색 (부분 검색 + 정확 검색)
 export const searchUsers = async (
   query: string,
   cursor?: string,
   limit: number = 20
 ): Promise<{
   success: boolean
-  data?: {
-    users: UserProfile[]
-    hasMore: boolean
-    nextCursor?: string
-    total: number
-  }
+  data?: SmartSearchResult
   error?: string
 }> => {
   try {
@@ -400,8 +420,10 @@ export const searchUsers = async (
       }
     }
 
+    const trimmedQuery = query.trim()
+    
     const params = new URLSearchParams()
-    params.append('query', query.trim())
+    params.append('query', trimmedQuery)
     if (cursor) {
       const parsedCursor = parseCursorString(cursor)
       if (parsedCursor) {
@@ -413,8 +435,7 @@ export const searchUsers = async (
 
     const url = `${API_ENDPOINTS.feedSearch}?${params.toString()}`
     const response = await fetchWithAuth(url)
-    const result: ApiResponse<BackendFeedDetailResponse[]> = // 🔥 타입 수정
-      await response.json()
+    const result: BackendApiResponse<BackendFeedDetailResponse[]> = await response.json()
 
     if (result.error || !Array.isArray(result.data)) {
       return {
@@ -444,11 +465,32 @@ export const searchUsers = async (
           followersCount: 0, // 별도 조회 필요
           followingCount: 0, // 별도 조회 필요
           isFollowing: false, // 별도 조회 필요
-          isMe: currentUser?.accountName === backendFeed.accountName, // 🔥 수정: accountName 비교
+          isMe: currentUser?.accountName === backendFeed.accountName,
         }
         users.push(userProfile)
       }
     }
+
+    // 🔥 스마트 검색 로직: 정확 매칭 + 관련도 정렬
+    const exactMatch = users.find(
+      user => user.username.toLowerCase() === trimmedQuery.toLowerCase()
+    )
+
+    // 정확 매칭을 맨 앞으로, 나머지는 관련도 순으로 정렬
+    const sortedUsers = [...users].sort((a, b) => {
+      // 1. 정확 매칭이 최우선
+      if (a.username.toLowerCase() === trimmedQuery.toLowerCase()) return -1
+      if (b.username.toLowerCase() === trimmedQuery.toLowerCase()) return 1
+      
+      // 2. 시작하는 것이 우선
+      const aStarts = a.username.toLowerCase().startsWith(trimmedQuery.toLowerCase())
+      const bStarts = b.username.toLowerCase().startsWith(trimmedQuery.toLowerCase())
+      if (aStarts && !bStarts) return -1
+      if (!aStarts && bStarts) return 1
+      
+      // 3. 나머지는 알파벳 순
+      return a.username.localeCompare(b.username)
+    })
 
     // 다음 커서 계산
     const hasMore = result.data.length === limit
@@ -461,10 +503,11 @@ export const searchUsers = async (
     return {
       success: true,
       data: {
-        users,
+        users: sortedUsers,
+        exactMatch,
         hasMore,
         nextCursor,
-        total: users.length,
+        total: sortedUsers.length,
       },
     }
   } catch (error) {
@@ -514,7 +557,7 @@ export const searchFeeds = async (
 
     const url = `${API_ENDPOINTS.feedSearch}?${params.toString()}`
     const response = await fetchWithAuth(url)
-    const result: ApiResponse<BackendFeedDetailResponse[]> =
+    const result: BackendApiResponse<BackendFeedDetailResponse[]> =
       await response.json()
 
     if (result.error || !Array.isArray(result.data)) {

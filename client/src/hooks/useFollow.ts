@@ -1,4 +1,31 @@
+// src/hooks/useFollow.ts
+
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { useAuthStore } from '@/stores/authStore'
+
+// 🔥 백엔드 API 및 타입 import
+import {
+  followUser as followUserAPI,
+  unfollowUser as unfollowUserAPI,
+  toggleFollow as toggleFollowAPI,
+  checkFollowStatusByAccountName,
+  getFollowStats as getFollowStatsAPI,
+  getFollowing,
+  getFollowers
+} from '@/lib/api/follow'
+
+import {
+  getCurrentUser
+} from '@/lib/api/feed'
+
+import {
+  BackendFollowCountsResponse,
+  BackendUserProfileResponse
+} from '@/lib/types/feed'
+
+// ============================================================================
+// 타입 정의 (백엔드 연동 단순화)
+// ============================================================================
 
 interface FollowStats {
   followersCount: number
@@ -7,25 +34,21 @@ interface FollowStats {
 
 interface FollowState {
   isFollowing: boolean
-  isFollowedBy: boolean
   stats?: FollowStats
 }
 
 interface UseFollowOptions {
-  currentUserId?: string
-  initialFollowingUsers?: string[]
   enableOptimisticUpdates?: boolean
-  enableBatchOperations?: boolean
   maxRetries?: number
   retryDelay?: number
-  onFollowSuccess?: (userId: string, stats?: FollowStats) => void
-  onUnfollowSuccess?: (userId: string, stats?: FollowStats) => void
-  onError?: (error: string, userId?: string) => void
-  onStatsUpdate?: (userId: string, stats: FollowStats) => void
+  onFollowSuccess?: (accountName: string, stats?: FollowStats) => void
+  onUnfollowSuccess?: (accountName: string, stats?: FollowStats) => void
+  onError?: (error: string, accountName?: string) => void
+  onStatsUpdate?: (accountName: string, stats: FollowStats) => void
 }
 
 interface FollowOperation {
-  userId: string
+  accountName: string
   action: 'follow' | 'unfollow'
   timestamp: number
   retryCount: number
@@ -35,40 +58,33 @@ interface UseFollowReturn {
   // 상태
   isLoading: boolean
   loadingUsers: Set<string>
-  followingUsers: string[]
   followStates: Map<string, FollowState>
   error: string | null
   
-  // 기본 작업
-  followUser: (userId: string) => Promise<void>
-  unfollowUser: (userId: string) => Promise<void>
-  toggleFollow: (userId: string, currentlyFollowing?: boolean) => Promise<void>
-  
-  // 배치 작업
-  followMultiple: (userIds: string[]) => Promise<void>
-  unfollowMultiple: (userIds: string[]) => Promise<void>
+  // 기본 작업 (accountName 기반)
+  followUser: (accountName: string) => Promise<void>
+  unfollowUser: (accountName: string) => Promise<void>
+  toggleFollow: (accountName: string, currentlyFollowing?: boolean) => Promise<void>
   
   // 상태 확인
-  isFollowing: (userId: string) => boolean
-  isFollowedBy: (userId: string) => boolean
-  getFollowStats: (userId: string) => FollowStats | undefined
+  isFollowing: (accountName: string) => boolean
+  getFollowStats: (accountName: string) => FollowStats | undefined
   
   // 유틸리티
-  refreshFollowState: (userId: string) => Promise<void>
-  refreshAllFollowStates: () => Promise<void>
+  refreshFollowState: (accountName: string) => Promise<void>
   clearError: () => void
   
   // 설정
-  setFollowingUsers: (users: string[]) => void
-  updateFollowState: (userId: string, state: Partial<FollowState>) => void
+  updateFollowState: (accountName: string, state: Partial<FollowState>) => void
 }
+
+// ============================================================================
+// 메인 훅
+// ============================================================================
 
 export const useFollow = (options: UseFollowOptions = {}): UseFollowReturn => {
   const {
-    currentUserId,
-    initialFollowingUsers = [],
     enableOptimisticUpdates = true,
-    enableBatchOperations = true,
     maxRetries = 3,
     retryDelay = 1000,
     onFollowSuccess,
@@ -77,9 +93,12 @@ export const useFollow = (options: UseFollowOptions = {}): UseFollowReturn => {
     onStatsUpdate
   } = options
 
+  // ============================================================================
+  // 상태 관리
+  // ============================================================================
+  
   const [isLoading, setIsLoading] = useState(false)
   const [loadingUsers, setLoadingUsers] = useState<Set<string>>(new Set())
-  const [followingUsers, setFollowingUsers] = useState<Set<string>>(new Set(initialFollowingUsers))
   const [followStates, setFollowStates] = useState<Map<string, FollowState>>(new Map())
   const [error, setError] = useState<string | null>(null)
   
@@ -88,401 +107,338 @@ export const useFollow = (options: UseFollowOptions = {}): UseFollowReturn => {
   const abortControllers = useRef<Map<string, AbortController>>(new Map())
   const retryTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
-  // 초기 팔로우 상태 로드
-  useEffect(() => {
-    if (currentUserId && initialFollowingUsers.length === 0) {
-      loadInitialFollowStates()
-    }
-  }, [currentUserId])
+  // 인증 상태
+  const { isAuthenticated } = useAuthStore()
+
+  // ============================================================================
+  // 유틸리티 함수들
+  // ============================================================================
 
   // 로딩 중인 사용자 추가/제거 헬퍼
-  const addLoadingUser = useCallback((userId: string) => {
-    setLoadingUsers(prev => new Set([...prev, userId]))
+  const addLoadingUser = useCallback((accountName: string) => {
+    setLoadingUsers(prev => new Set([...prev, accountName]))
   }, [])
 
-  const removeLoadingUser = useCallback((userId: string) => {
+  const removeLoadingUser = useCallback((accountName: string) => {
     setLoadingUsers(prev => {
       const newSet = new Set(prev)
-      newSet.delete(userId)
+      newSet.delete(accountName)
       return newSet
     })
   }, [])
 
-  // 초기 팔로우 상태 로드
-  const loadInitialFollowStates = useCallback(async () => {
-    if (!currentUserId) return
-
-    setIsLoading(true)
-    try {
-      // Mock API 호출 시뮬레이션
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // TODO: 실제 API 호출
-      // const { followingUsers, followStates } = await getFollowStatesAPI(currentUserId)
-      
-      // Mock 데이터
-      const mockFollowingUsers = ['user1', 'user2', 'user3']
-      const mockFollowStates = new Map([
-        ['user1', { isFollowing: true, isFollowedBy: false, stats: { followersCount: 150, followingCount: 89 } }],
-        ['user2', { isFollowing: true, isFollowedBy: true, stats: { followersCount: 234, followingCount: 156 } }],
-        ['user3', { isFollowing: true, isFollowedBy: false, stats: { followersCount: 89, followingCount: 45 } }],
-      ])
-
-      setFollowingUsers(new Set(mockFollowingUsers))
-      setFollowStates(mockFollowStates)
-      
-    } catch (error) {
-      console.error('Failed to load initial follow states:', error)
-      onError?.('팔로우 정보를 불러오는데 실패했습니다.')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [currentUserId, onError])
-
+  // ============================================================================
   // 재시도 로직
+  // ============================================================================
+
   const retryOperation = useCallback(async (operation: FollowOperation) => {
-    const { userId, action, retryCount } = operation
+    const { accountName, action, retryCount } = operation
     
     if (retryCount >= maxRetries) {
-      pendingOperations.current.delete(userId)
-      removeLoadingUser(userId)
-      onError?.(`${action === 'follow' ? '팔로우' : '언팔로우'}에 실패했습니다. (최대 재시도 횟수 초과)`, userId)
+      pendingOperations.current.delete(accountName)
+      removeLoadingUser(accountName)
+      onError?.(`${action === 'follow' ? '팔로우' : '언팔로우'}에 실패했습니다. (최대 재시도 횟수 초과)`, accountName)
       return
     }
 
     const timeoutId = setTimeout(async () => {
-      retryTimeouts.current.delete(userId)
+      retryTimeouts.current.delete(accountName)
       const updatedOperation = { ...operation, retryCount: retryCount + 1 }
-      pendingOperations.current.set(userId, updatedOperation)
+      pendingOperations.current.set(accountName, updatedOperation)
       
       if (action === 'follow') {
-        await executeFollowOperation(userId)
+        await executeFollowOperation(accountName)
       } else {
-        await executeUnfollowOperation(userId)
+        await executeUnfollowOperation(accountName)
       }
     }, retryDelay * Math.pow(2, retryCount)) // 지수 백오프
 
-    retryTimeouts.current.set(userId, timeoutId)
+    retryTimeouts.current.set(accountName, timeoutId)
   }, [maxRetries, retryDelay, onError, removeLoadingUser])
 
-  // 팔로우 실행 로직
-  const executeFollowOperation = useCallback(async (userId: string) => {
-    const operation = pendingOperations.current.get(userId)
+  // ============================================================================
+  // 백엔드 API 연동 - 팔로우 실행 로직
+  // ============================================================================
+
+  const executeFollowOperation = useCallback(async (accountName: string) => {
+    const operation = pendingOperations.current.get(accountName)
     if (!operation) return
 
     const abortController = new AbortController()
-    abortControllers.current.set(userId, abortController)
+    abortControllers.current.set(accountName, abortController)
 
     try {
-      // Mock API 호출 시뮬레이션
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          // 10% 확률로 실패 시뮬레이션
-          if (Math.random() < 0.1) {
-            reject(new Error('Network error'))
-          } else {
-            resolve(void 0)
+      // 🔥 백엔드 API 호출 (POST /follows/{accountName})
+      const result = await followUserAPI(accountName)
+
+      if (result.success) {
+        // 🔥 팔로우 후 통계 조회 (안전한 처리)
+        let stats: FollowStats | undefined
+        try {
+          const statsResult = await getFollowStatsAPI(accountName)
+          if (statsResult && statsResult.success && statsResult.data) {
+            stats = {
+              followersCount: statsResult.data.followersCount,
+              followingCount: statsResult.data.followingCount
+            }
           }
-        }, 800)
+        } catch (statsError) {
+          console.warn('Failed to get follow stats after follow:', statsError)
+          // 통계 조회 실패는 무시하고 계속 진행
+        }
 
-        abortController.signal.addEventListener('abort', () => {
-          clearTimeout(timeout)
-          reject(new Error('Operation was cancelled'))
-        })
-      })
+        // 성공 시 상태 업데이트
+        setFollowStates(prev => new Map(prev).set(accountName, {
+          isFollowing: true,
+          stats
+        }))
 
-      // 성공 시 상태 업데이트
-      setFollowingUsers(prev => new Set([...prev, userId]))
-      
-      // Mock 통계 업데이트
-      const mockStats: FollowStats = {
-        followersCount: Math.floor(Math.random() * 500) + 50,
-        followingCount: Math.floor(Math.random() * 200) + 20
+        pendingOperations.current.delete(accountName)
+        abortControllers.current.delete(accountName)
+        
+        onFollowSuccess?.(accountName, stats)
+        if (stats) {
+          onStatsUpdate?.(accountName, stats)
+        }
+      } else {
+        throw new Error(result.error || '팔로우에 실패했습니다.')
       }
 
-      setFollowStates(prev => new Map(prev).set(userId, {
-        isFollowing: true,
-        isFollowedBy: prev.get(userId)?.isFollowedBy || false,
-        stats: mockStats
-      }))
-
-      pendingOperations.current.delete(userId)
-      abortControllers.current.delete(userId)
-      onFollowSuccess?.(userId, mockStats)
-      onStatsUpdate?.(userId, mockStats)
-
     } catch (error) {
-      abortControllers.current.delete(userId)
+      abortControllers.current.delete(accountName)
       
       if (error instanceof Error && error.message === 'Operation was cancelled') {
-        pendingOperations.current.delete(userId)
+        pendingOperations.current.delete(accountName)
         return
       }
 
+      console.error('Follow operation failed:', error)
       await retryOperation(operation)
     } finally {
-      removeLoadingUser(userId)
+      removeLoadingUser(accountName)
     }
   }, [onFollowSuccess, onStatsUpdate, retryOperation, removeLoadingUser])
 
-  // 언팔로우 실행 로직
-  const executeUnfollowOperation = useCallback(async (userId: string) => {
-    const operation = pendingOperations.current.get(userId)
+  // ============================================================================
+  // 백엔드 API 연동 - 언팔로우 실행 로직
+  // ============================================================================
+
+  const executeUnfollowOperation = useCallback(async (accountName: string) => {
+    const operation = pendingOperations.current.get(accountName)
     if (!operation) return
 
     const abortController = new AbortController()
-    abortControllers.current.set(userId, abortController)
+    abortControllers.current.set(accountName, abortController)
 
     try {
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          if (Math.random() < 0.1) {
-            reject(new Error('Network error'))
-          } else {
-            resolve(void 0)
+      // 🔥 백엔드 API 호출 (DELETE /follows/{accountName})
+      const result = await unfollowUserAPI(accountName)
+
+      if (result.success) {
+        // 🔥 언팔로우 후 통계 조회 (안전한 처리)
+        let stats: FollowStats | undefined
+        try {
+          const statsResult = await getFollowStatsAPI(accountName)
+          if (statsResult && statsResult.success && statsResult.data) {
+            stats = {
+              followersCount: statsResult.data.followersCount,
+              followingCount: statsResult.data.followingCount
+            }
           }
-        }, 800)
+        } catch (statsError) {
+          console.warn('Failed to get follow stats after unfollow:', statsError)
+          // 통계 조회 실패는 무시하고 계속 진행
+        }
 
-        abortController.signal.addEventListener('abort', () => {
-          clearTimeout(timeout)
-          reject(new Error('Operation was cancelled'))
-        })
-      })
+        // 성공 시 상태 업데이트
+        setFollowStates(prev => new Map(prev).set(accountName, {
+          isFollowing: false,
+          stats
+        }))
 
-      setFollowingUsers(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(userId)
-        return newSet
-      })
-
-      const currentState = followStates.get(userId)
-      const mockStats: FollowStats = {
-        followersCount: Math.max(0, (currentState?.stats?.followersCount || 100) - 1),
-        followingCount: currentState?.stats?.followingCount || 50
+        pendingOperations.current.delete(accountName)
+        abortControllers.current.delete(accountName)
+        
+        onUnfollowSuccess?.(accountName, stats)
+        if (stats) {
+          onStatsUpdate?.(accountName, stats)
+        }
+      } else {
+        throw new Error(result.error || '언팔로우에 실패했습니다.')
       }
 
-      setFollowStates(prev => new Map(prev).set(userId, {
-        isFollowing: false,
-        isFollowedBy: prev.get(userId)?.isFollowedBy || false,
-        stats: mockStats
-      }))
-
-      pendingOperations.current.delete(userId)
-      abortControllers.current.delete(userId)
-      onUnfollowSuccess?.(userId, mockStats)
-      onStatsUpdate?.(userId, mockStats)
-
     } catch (error) {
-      abortControllers.current.delete(userId)
+      abortControllers.current.delete(accountName)
       
       if (error instanceof Error && error.message === 'Operation was cancelled') {
-        pendingOperations.current.delete(userId)
+        pendingOperations.current.delete(accountName)
         return
       }
 
+      console.error('Unfollow operation failed:', error)
       await retryOperation(operation)
     } finally {
-      removeLoadingUser(userId)
+      removeLoadingUser(accountName)
     }
-  }, [followStates, onUnfollowSuccess, onStatsUpdate, retryOperation, removeLoadingUser])
+  }, [onUnfollowSuccess, onStatsUpdate, retryOperation, removeLoadingUser])
 
-  // 팔로우 함수
-  const followUser = useCallback(async (userId: string) => {
-    if (pendingOperations.current.has(userId)) return
-    if (followingUsers.has(userId)) return
+  // ============================================================================
+  // 공개 API 함수들
+  // ============================================================================
+
+  // 🔥 팔로우 함수 (백엔드 연동)
+  const followUser = useCallback(async (accountName: string) => {
+    if (!isAuthenticated) {
+      onError?.('로그인이 필요합니다.', accountName)
+      return
+    }
+
+    if (pendingOperations.current.has(accountName)) return
+    
+    // 이미 팔로우 중인지 확인
+    const currentState = followStates.get(accountName)
+    if (currentState?.isFollowing) return
 
     setError(null)
-    addLoadingUser(userId)
+    addLoadingUser(accountName)
 
     // 낙관적 업데이트
     if (enableOptimisticUpdates) {
-      setFollowingUsers(prev => new Set([...prev, userId]))
+      setFollowStates(prev => new Map(prev).set(accountName, {
+        isFollowing: true,
+        stats: prev.get(accountName)?.stats
+      }))
     }
 
     const operation: FollowOperation = {
-      userId,
+      accountName,
       action: 'follow',
       timestamp: Date.now(),
       retryCount: 0
     }
 
-    pendingOperations.current.set(userId, operation)
-    await executeFollowOperation(userId)
-  }, [followingUsers, enableOptimisticUpdates, addLoadingUser, executeFollowOperation])
+    pendingOperations.current.set(accountName, operation)
+    await executeFollowOperation(accountName)
+  }, [isAuthenticated, followStates, enableOptimisticUpdates, addLoadingUser, executeFollowOperation, onError])
 
-  // 언팔로우 함수
-  const unfollowUser = useCallback(async (userId: string) => {
-    if (pendingOperations.current.has(userId)) return
-    if (!followingUsers.has(userId)) return
+  // 🔥 언팔로우 함수 (백엔드 연동)
+  const unfollowUser = useCallback(async (accountName: string) => {
+    if (!isAuthenticated) {
+      onError?.('로그인이 필요합니다.', accountName)
+      return
+    }
+
+    if (pendingOperations.current.has(accountName)) return
+    
+    // 팔로우 중이 아닌지 확인
+    const currentState = followStates.get(accountName)
+    if (!currentState?.isFollowing) return
 
     setError(null)
-    addLoadingUser(userId)
+    addLoadingUser(accountName)
 
     // 낙관적 업데이트
     if (enableOptimisticUpdates) {
-      setFollowingUsers(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(userId)
-        return newSet
-      })
+      setFollowStates(prev => new Map(prev).set(accountName, {
+        isFollowing: false,
+        stats: prev.get(accountName)?.stats
+      }))
     }
 
     const operation: FollowOperation = {
-      userId,
+      accountName,
       action: 'unfollow',
       timestamp: Date.now(),
       retryCount: 0
     }
 
-    pendingOperations.current.set(userId, operation)
-    await executeUnfollowOperation(userId)
-  }, [followingUsers, enableOptimisticUpdates, addLoadingUser, executeUnfollowOperation])
+    pendingOperations.current.set(accountName, operation)
+    await executeUnfollowOperation(accountName)
+  }, [isAuthenticated, followStates, enableOptimisticUpdates, addLoadingUser, executeUnfollowOperation, onError])
 
-  // 토글 팔로우
-  const toggleFollow = useCallback(async (userId: string, currentlyFollowing?: boolean) => {
-    const isCurrentlyFollowing = currentlyFollowing ?? followingUsers.has(userId)
+  // 🔥 토글 팔로우 (백엔드 연동)
+  const toggleFollow = useCallback(async (accountName: string, currentlyFollowing?: boolean) => {
+    const currentState = followStates.get(accountName)
+    const isCurrentlyFollowing = currentlyFollowing ?? currentState?.isFollowing ?? false
     
     if (isCurrentlyFollowing) {
-      await unfollowUser(userId)
+      await unfollowUser(accountName)
     } else {
-      await followUser(userId)
+      await followUser(accountName)
     }
-  }, [followingUsers, followUser, unfollowUser])
+  }, [followStates, followUser, unfollowUser])
 
-  // 배치 팔로우
-  const followMultiple = useCallback(async (userIds: string[]) => {
-    if (!enableBatchOperations) {
-      // 배치 작업이 비활성화된 경우 순차 실행
-      for (const userId of userIds) {
-        await followUser(userId)
-      }
-      return
-    }
-
-    const validUserIds = userIds.filter(id => !followingUsers.has(id) && !pendingOperations.current.has(id))
-    if (validUserIds.length === 0) return
-
-    setError(null)
-    validUserIds.forEach(addLoadingUser)
-
-    // 낙관적 업데이트
-    if (enableOptimisticUpdates) {
-      setFollowingUsers(prev => new Set([...prev, ...validUserIds]))
-    }
-
-    await Promise.allSettled(validUserIds.map(userId => {
-      const operation: FollowOperation = {
-        userId,
-        action: 'follow',
-        timestamp: Date.now(),
-        retryCount: 0
-      }
-      pendingOperations.current.set(userId, operation)
-      return executeFollowOperation(userId)
-    }))
-  }, [enableBatchOperations, followingUsers, enableOptimisticUpdates, addLoadingUser, followUser, executeFollowOperation])
-
-  // 배치 언팔로우
-  const unfollowMultiple = useCallback(async (userIds: string[]) => {
-    if (!enableBatchOperations) {
-      for (const userId of userIds) {
-        await unfollowUser(userId)
-      }
-      return
-    }
-
-    const validUserIds = userIds.filter(id => followingUsers.has(id) && !pendingOperations.current.has(id))
-    if (validUserIds.length === 0) return
-
-    setError(null)
-    validUserIds.forEach(addLoadingUser)
-
-    if (enableOptimisticUpdates) {
-      setFollowingUsers(prev => {
-        const newSet = new Set(prev)
-        validUserIds.forEach(id => newSet.delete(id))
-        return newSet
-      })
-    }
-
-    await Promise.allSettled(validUserIds.map(userId => {
-      const operation: FollowOperation = {
-        userId,
-        action: 'unfollow',
-        timestamp: Date.now(),
-        retryCount: 0
-      }
-      pendingOperations.current.set(userId, operation)
-      return executeUnfollowOperation(userId)
-    }))
-  }, [enableBatchOperations, followingUsers, enableOptimisticUpdates, addLoadingUser, unfollowUser, executeUnfollowOperation])
-
+  // ============================================================================
   // 상태 확인 함수들
-  const isFollowing = useCallback((userId: string) => {
-    return followingUsers.has(userId)
-  }, [followingUsers])
+  // ============================================================================
 
-  const isFollowedBy = useCallback((userId: string) => {
-    return followStates.get(userId)?.isFollowedBy || false
+  const isFollowing = useCallback((accountName: string) => {
+    return followStates.get(accountName)?.isFollowing || false
   }, [followStates])
 
-  const getFollowStats = useCallback((userId: string) => {
-    return followStates.get(userId)?.stats
+  const getFollowStats = useCallback((accountName: string): FollowStats | undefined => {
+    return followStates.get(accountName)?.stats
   }, [followStates])
 
-  // 새로고침 함수들
-  const refreshFollowState = useCallback(async (userId: string) => {
-    addLoadingUser(userId)
+  // ============================================================================
+  // 새로고침 함수들 (백엔드 연동)
+  // ============================================================================
+
+  // 🔥 팔로우 상태 새로고침 (백엔드 API 호출)
+  const refreshFollowState = useCallback(async (accountName: string) => {
+    if (!isAuthenticated) return
+
+    addLoadingUser(accountName)
     try {
-      // Mock API 호출
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
-      const mockState: FollowState = {
-        isFollowing: followingUsers.has(userId),
-        isFollowedBy: Math.random() > 0.5,
-        stats: {
-          followersCount: Math.floor(Math.random() * 500) + 50,
-          followingCount: Math.floor(Math.random() * 200) + 20
-        }
+      // 🔥 백엔드에서 팔로우 상태 조회 (GET /follows/check/{accountName})
+      const [followStatusResult, statsResult] = await Promise.all([
+        checkFollowStatusByAccountName(accountName).catch(() => false),
+        getFollowStatsAPI(accountName).catch(() => ({ success: false, data: null }))
+      ])
+
+      const isFollowing = followStatusResult || false
+      const stats: FollowStats | undefined = statsResult && statsResult.success && statsResult.data ? {
+        followersCount: statsResult.data.followersCount,
+        followingCount: statsResult.data.followingCount
+      } : undefined
+
+      const newState: FollowState = {
+        isFollowing,
+        stats
       }
 
-      setFollowStates(prev => new Map(prev).set(userId, mockState))
-      if (mockState.stats) {
-        onStatsUpdate?.(userId, mockState.stats)
+      setFollowStates(prev => new Map(prev).set(accountName, newState))
+      
+      if (stats) {
+        onStatsUpdate?.(accountName, stats)
       }
     } catch (error) {
-      onError?.('팔로우 상태 새로고침에 실패했습니다.', userId)
+      console.error('Failed to refresh follow state:', error)
+      onError?.('팔로우 상태 새로고침에 실패했습니다.', accountName)
     } finally {
-      removeLoadingUser(userId)
+      removeLoadingUser(accountName)
     }
-  }, [followingUsers, addLoadingUser, removeLoadingUser, onStatsUpdate, onError])
+  }, [isAuthenticated, addLoadingUser, removeLoadingUser, onStatsUpdate, onError])
 
-  const refreshAllFollowStates = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      await loadInitialFollowStates()
-    } finally {
-      setIsLoading(false)
-    }
-  }, [loadInitialFollowStates])
-
+  // ============================================================================
   // 유틸리티 함수들
+  // ============================================================================
+
   const clearError = useCallback(() => {
     setError(null)
   }, [])
 
-  const setFollowingUsersExternal = useCallback((users: string[]) => {
-    setFollowingUsers(new Set(users))
-  }, [])
-
-  const updateFollowState = useCallback((userId: string, state: Partial<FollowState>) => {
+  const updateFollowState = useCallback((accountName: string, state: Partial<FollowState>) => {
     setFollowStates(prev => {
-      const currentState = prev.get(userId) || { isFollowing: false, isFollowedBy: false }
-      return new Map(prev).set(userId, { ...currentState, ...state })
+      const currentState = prev.get(accountName) || { isFollowing: false }
+      return new Map(prev).set(accountName, { ...currentState, ...state })
     })
   }, [])
 
-  // 정리
+  // ============================================================================
+  // Cleanup
+  // ============================================================================
+
   useEffect(() => {
     return () => {
       // 모든 진행 중인 작업 취소
@@ -497,35 +453,31 @@ export const useFollow = (options: UseFollowOptions = {}): UseFollowReturn => {
     }
   }, [])
 
+  // ============================================================================
+  // 반환 값
+  // ============================================================================
+
   return {
     // 상태
     isLoading,
     loadingUsers,
-    followingUsers: Array.from(followingUsers),
     followStates,
     error,
     
-    // 기본 작업
+    // 기본 작업 (accountName 기반)
     followUser,
     unfollowUser,
     toggleFollow,
     
-    // 배치 작업
-    followMultiple,
-    unfollowMultiple,
-    
     // 상태 확인
     isFollowing,
-    isFollowedBy,
     getFollowStats,
     
     // 유틸리티
     refreshFollowState,
-    refreshAllFollowStates,
     clearError,
     
     // 설정
-    setFollowingUsers: setFollowingUsersExternal,
     updateFollowState,
   }
 }

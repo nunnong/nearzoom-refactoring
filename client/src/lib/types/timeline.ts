@@ -1,362 +1,277 @@
-// src/lib/types/feed.ts
+// src/lib/types/timeline.ts
+
+import { 
+  BackendFeedDetailResponse,
+  BackendApiResponse
+} from './feed'
 
 // ============================================================================
-// 기본 위치 및 크기 타입 (캔버스 편집용 - 프론트엔드 전용)
-// ============================================================================
-export interface Position {
-  x: number
-  y: number
-}
-
-export interface Size {
-  width: number
-  height: number
-}
-
-export interface Transform extends Position, Size {
-  rotation: number
-  zIndex: number
-}
-
-// ============================================================================
-// 피드 요소 타입들 (캔버스 편집용 - 프론트엔드 전용)
-// ============================================================================
-interface BaseFeedElement extends Transform {
-  id: string
-  type: string
-  createdAt: string
-  updatedAt: string
-}
-
-// 사진 요소
-export interface PhotoElement extends BaseFeedElement {
-  type: 'PHOTO'
-  photoId: string
-  src: string
-  alt: string
-}
-
-// 스티커 요소
-export interface StickerElement extends BaseFeedElement {
-  type: 'STICKER'
-  stickerUrl: string
-  stickerType: 'emoji' | 'icon' | 'custom'
-}
-
-// 텍스트 요소
-export interface TextElement extends BaseFeedElement {
-  type: 'TEXT'
-  content: string
-  fontSize: number
-  fontFamily: string
-  color: string
-  textAlign: 'left' | 'center' | 'right'
-}
-
-// 드로잉 요소
-export interface DrawingElement extends BaseFeedElement {
-  type: 'DRAWING'
-  svgData: string
-  strokeWidth: number
-  strokeColor: string
-}
-
-// 피드 요소 유니온 타입
-export type FeedElement = PhotoElement | StickerElement | TextElement | DrawingElement
-
-// ============================================================================
-// 백엔드 연동 타입들 (실제 백엔드 DTO와 정확히 일치) ✅ 수정됨
+// 🎯 단순화된 타임라인 타입들 (accountName 중심)
 // ============================================================================
 
-// ✅ 백엔드 ApiResponse 구조
-export interface BackendApiResponse<T> {
-  error: boolean
-  message: string | null
-  data: T | null
-}
-
-// ✅ 백엔드 FeedDetailResponse (실제 백엔드 DTO와 일치하도록 수정)
-export interface BackendFeedDetailResponse {
-  feedId: number
-  imgUrl: string        // ✅ photoUrl → imgUrl
-  caption: string       // ✅ 추가됨
-  authorId: number      // ✅ 유지
-  accountName: string   // ✅ userName 대신 accountName
-  profileImage: string  // ✅ 추가됨 (사용자 프로필 이미지)
-  createdAt: string     // ✅ LocalDateTime → ISO string
-  liked: boolean        // ✅ 추가됨 (현재 사용자의 좋아요 여부)
-}
-
-// ✅ 백엔드 CreateFeedRequest (실제 백엔드 DTO와 일치)
-export interface BackendCreateFeedRequest {
-  photoId: number
-  caption: string
-}
-
-// ✅ 백엔드 FollowCountsResponse (실제 백엔드 DTO와 일치)
-export interface BackendFollowCountsResponse {
-  followerCount: number
-  followingCount: number
-}
-
-// ✅ 백엔드 UserInfoResponse (실제 백엔드 DTO와 일치하도록 수정)
-export interface BackendUserInfoResponse {
-  userName: string
-  userEmail: string
-  profileImage: string
-  prettyFace: string    // ✅ 추가됨
-}
-
-// ✅ 제거됨 - 백엔드에 없는 타입들
-// BackendFeedItem, BackendFeedListResponse 제거
-
-// ============================================================================
-// 기존 UserFeed (api/feed.ts의 CanvasFeedItem과 호환성 유지)
-// ============================================================================
-
-// 🔥 기존 UserFeed 인터페이스 (기존 컴포넌트 호환성 유지)
-export interface UserFeed {
-  id: string
-  userId: string
-  userName?: string
-  name: string
-  description: string
-  isPublic: boolean
-  backgroundColor: string
-  backgroundImageUrl?: string
-  photoId?: number
-  photoUrl?: string
-  totalHeight: number
-  followersCount: number
-  isFollowing: boolean
-  isLiked: boolean
-  likesCount: number
-  authorName?: string
-  authorId?: string
-  authorAvatar?: string
-  elements?: FeedElement[]
-  createdAt: string
-  updatedAt: string
-}
-
-export interface UserProfile {
-  id: string
-  userId: string
-  userName: string
-  userEmail: string
-  userProfileImage?: string
-  followersCount: number
-  followingCount: number
-  postsCount: number
-  bio?: string
-  website?: string
-  location?: string
-  joinedAt: string
-  isFollowing?: boolean
-  isFollowedBy?: boolean
-  isBlocked?: boolean
-  isPrivate?: boolean
-}
-
-// ============================================================================
-// 백엔드 연동 확장 타입들 (api/feed.ts와 완벽 호환)
-// ============================================================================
-
-// ✅ 백엔드 데이터 + 캔버스 편집 기능을 모두 포함한 완전한 피드 타입
-export interface CanvasFeedItem extends Omit<UserFeed, 'photoId'> {
-  photoId: string | number
+// ✅ 타임라인 포스트 (1사용자 = 1피드 = 1계정명)
+export interface TimelinePost {
+  // 🔥 핵심: accountName이 모든 식별자의 기준
+  id: string                    // feedId (문자열) 
+  feedId: number               // 백엔드 feedId (숫자)
+  accountName: string          // 계정명 (유일 식별자, 이메일과 1:1)
   
-  // 백엔드에서 가져온 추가 정보
-  authorId: string
-  authorName: string
-  authorAvatar?: string
-  photoUrl: string
+  // 작성자 정보 (단순화)
+  authorName: string           // 표시할 이름 (accountName과 동일)
+  authorAvatar?: string        // 프로필 이미지
   
-  // 피드 상호작용 정보
-  likesCount: number
+  // 콘텐츠 정보
+  content: string              // caption
+  imageUrl: string             // imgUrl
   
-  // ExploreFeed 호환성
-  source?: 'popular' | 'recent' | 'recommended' | 'random'
-  discoverScore?: number
+  // 상호작용 정보 (게시물별 좋아요만)
+  isLiked: boolean             // 현재 사용자의 좋아요 여부
   
-  // 캔버스 편집 요소들
-  elements: FeedElement[]
+  // 시간 정보
+  createdAt: string            // ISO 문자열
+  
+  // 타임라인 소스 (단순화)
+  source: 'timeline' | 'explore'  // 타임라인(팔로잉) or 탐색(랜덤)
 }
 
-// ============================================================================
-// API 응답 타입들
-// ============================================================================
-
-// 피드 생성/수정/조회 API 응답
-export interface FeedApiResponse {
-  success: boolean
-  data?: CanvasFeedItem
-  error?: string
-}
-
-// 피드 목록 API 응답 (커서 페이징 지원 + 기존 페이지네이션 호환)
-export interface FeedListApiResponse {
+// ✅ 타임라인 API 응답 (백엔드 커서 페이징)
+export interface TimelineApiResponse {
   success: boolean
   data?: {
-    items: CanvasFeedItem[]
+    posts: TimelinePost[]
     hasMore: boolean
     nextCursor?: {
       createdAt: string
       feedId: number
     } | null
-    // 기존 페이지네이션 호환성
-    total?: number
-    page?: number
-    limit?: number
+    type: 'timeline' | 'explore'
   }
   error?: string
 }
 
-// 좋아요 API 응답
-export interface LikeApiResponse {
-  success: boolean
-  data?: {
-    isLiked: boolean
-    likesCount?: number
-  }
-  error?: string
-}
-
-// 팔로우 API 응답
-export interface FollowApiResponse {
-  success: boolean
-  data?: boolean
-  error?: string
-}
-
-// 사용자 목록 API 응답 (팔로워/팔로잉)
-export interface UserListApiResponse {
-  success: boolean
-  data?: BackendUserInfoResponse[]
-  error?: string
-}
-
-// 팔로우 카운트 API 응답
-export interface FollowCountApiResponse {
-  success: boolean
-  data?: BackendFollowCountsResponse
-  error?: string
-}
-
-// ============================================================================
-// 요청 타입들 (백엔드 DTO와 일치하도록 수정)
-// ============================================================================
-
-// 피드 생성 요청 (백엔드 CreateFeedRequest와 일치)
-export interface CreateFeedRequest {
-  photoId: number
-  caption: string
-}
-
-// 피드 업데이트 요청 (현재 백엔드 미지원)
-export interface UpdateFeedRequest {
-  name?: string
-  description?: string
-  isPublic?: boolean
-  elements?: FeedElement[]
-  backgroundColor?: string
-  backgroundImageUrl?: string
-  totalHeight?: number
-}
-
-// 커서 페이징 파라미터 (백엔드 API와 일치)
-export interface CursorPagingParams {
-  cursorCreatedAt?: string  // LocalDateTime
+// ✅ 타임라인 필터 (백엔드 지원 범위만)
+export interface TimelineFilters {
+  // 백엔드 커서 페이징
+  cursorCreatedAt?: string
   cursorId?: number
   size?: number
 }
 
-// ============================================================================
-// 유틸리티 타입들
-// ============================================================================
-
-// 페이지네이션 응답 (호환성)
-export interface PaginatedResponse<T> {
-  items: T[]
+// ✅ 타임라인 상태 (단순화)
+export interface TimelineState {
+  posts: TimelinePost[]
+  loading: boolean
+  error: string | null
   hasMore: boolean
-  total: number
-  page: number
-  limit: number
+  nextCursor: {
+    createdAt: string
+    feedId: number
+  } | null
+  type: 'timeline' | 'explore'
+  lastUpdated: string
 }
 
-// 기본 API 응답 (호환성)
-export interface ApiResponse<T> {
+// ============================================================================
+// 상호작용 타입들 (게시물별 좋아요만)
+// ============================================================================
+
+// ✅ 좋아요 액션 결과
+export interface LikeActionResult {
   success: boolean
-  data?: T
+  data?: {
+    feedId: number             // 게시물 ID
+    isLiked: boolean
+  }
   error?: string
+}
+
+// ✅ 팔로우 액션 결과 (accountName 기반)
+export interface FollowActionResult {
+  success: boolean
+  data?: {
+    accountName: string        // 계정명
+    isFollowing: boolean
+  }
+  error?: string
+}
+
+// ============================================================================
+// 백엔드 데이터 변환 함수 (단순화)
+// ============================================================================
+
+// ✅ 백엔드 FeedDetailResponse를 TimelinePost로 변환
+export const transformBackendFeedToTimelinePost = (
+  backendFeed: BackendFeedDetailResponse,
+  source: TimelinePost['source'] = 'explore'
+): TimelinePost => {
+  return {
+    // 🔥 accountName 중심 (1사용자 = 1피드 = 1계정명)
+    id: backendFeed.feedId.toString(),
+    feedId: backendFeed.feedId,
+    accountName: backendFeed.accountName,
+    
+    // 작성자 정보
+    authorName: backendFeed.accountName,  // accountName을 그대로 사용
+    authorAvatar: backendFeed.profileImage,
+    
+    // 콘텐츠 정보
+    content: backendFeed.caption || '',
+    imageUrl: backendFeed.imgUrl,
+    
+    // 상호작용 정보 (게시물별 좋아요만)
+    isLiked: backendFeed.liked,
+    
+    // 시간 정보
+    createdAt: backendFeed.createdAt,
+    
+    // 타임라인 소스
+    source
+  }
+}
+
+// ============================================================================
+// 유틸리티 함수들 (단순화)
+// ============================================================================
+
+// ✅ 타임라인 포스트 정렬 (최신순만 - 백엔드에서 이미 정렬됨)
+export const sortTimelinePosts = (posts: TimelinePost[]): TimelinePost[] => {
+  return [...posts].sort((a, b) => {
+    // 최신순: 생성일 역순, 같으면 feedId 역순 (백엔드 기본 정렬과 동일)
+    const dateCompare = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    if (dateCompare !== 0) return dateCompare
+    return b.feedId - a.feedId
+  })
+}
+
+// ✅ 타임라인 포스트 병합 (중복 제거)
+export const mergeTimelinePosts = (
+  existingPosts: TimelinePost[],
+  newPosts: TimelinePost[]
+): TimelinePost[] => {
+  const existingIds = new Set(existingPosts.map(post => post.id))
+  const uniqueNewPosts = newPosts.filter(post => !existingIds.has(post.id))
+  return [...existingPosts, ...uniqueNewPosts]
+}
+
+// ✅ 타임라인 포스트 업데이트 (좋아요 상태만)
+export const updateTimelinePost = (
+  posts: TimelinePost[],
+  feedId: number,
+  updates: Partial<Pick<TimelinePost, 'isLiked'>>
+): TimelinePost[] => {
+  return posts.map(post => 
+    post.feedId === feedId 
+      ? { ...post, ...updates }
+      : post
+  )
+}
+
+// ============================================================================
+// 타입 가드 함수들
+// ============================================================================
+
+// ✅ TimelinePost 타입 가드
+export const isTimelinePost = (obj: any): obj is TimelinePost => {
+  return obj && 
+    typeof obj === 'object' &&
+    typeof obj.id === 'string' &&
+    typeof obj.feedId === 'number' &&
+    typeof obj.accountName === 'string' &&
+    typeof obj.authorName === 'string' &&
+    typeof obj.content === 'string' &&
+    typeof obj.imageUrl === 'string' &&
+    typeof obj.isLiked === 'boolean' &&
+    typeof obj.createdAt === 'string' &&
+    ['timeline', 'explore'].includes(obj.source)
+}
+
+// ✅ TimelineApiResponse 타입 가드
+export const isTimelineApiResponse = (obj: any): obj is TimelineApiResponse => {
+  return obj &&
+    typeof obj === 'object' &&
+    typeof obj.success === 'boolean' &&
+    (obj.data === undefined || (
+      obj.data &&
+      Array.isArray(obj.data.posts) &&
+      typeof obj.data.hasMore === 'boolean'
+    ))
 }
 
 // ============================================================================
 // 상수들
 // ============================================================================
 
-export const DEFAULT_FEED_CONFIG = {
-  backgroundColor: '#ffffff',
-  totalHeight: 1600,
-  elements: [] as FeedElement[],
-  isPublic: true,
+export const TIMELINE_DEFAULTS = {
+  PAGE_SIZE: 20,                // 백엔드 기본 size
+  REFRESH_INTERVAL: 30000,      // 30초 (단순화)
 } as const
 
-export const FEED_ELEMENT_TYPES = {
-  PHOTO: 'PHOTO',
-  STICKER: 'STICKER',
-  TEXT: 'TEXT',
-  DRAWING: 'DRAWING'
+export const TIMELINE_TYPES = {
+  TIMELINE: 'timeline',         // 팔로잉 피드 (GET /feeds/following)
+  EXPLORE: 'explore'            // 랜덤 피드 (GET /feeds/random)
 } as const
 
 // ============================================================================
-// 타입 가드 함수들
+// 백엔드 API 함수 타입들 (단순화된 API)
 // ============================================================================
 
-export const isPhotoElement = (element: FeedElement): element is PhotoElement => {
-  return element.type === 'PHOTO'
-}
-
-export const isStickerElement = (element: FeedElement): element is StickerElement => {
-  return element.type === 'STICKER'
-}
-
-export const isTextElement = (element: FeedElement): element is TextElement => {
-  return element.type === 'TEXT'
-}
-
-export const isDrawingElement = (element: FeedElement): element is DrawingElement => {
-  return element.type === 'DRAWING'
-}
-
-// ============================================================================
-// 백엔드 데이터 변환 유틸리티 함수들
-// ============================================================================
-
-// 백엔드 FeedDetailResponse를 프론트엔드 CanvasFeedItem으로 변환
-export const transformBackendFeedToCanvasFeed = (
-  backendFeed: BackendFeedDetailResponse
-): CanvasFeedItem => {
-  return {
-    id: backendFeed.feedId.toString(),
-    userId: backendFeed.authorId.toString(),
-    userName: backendFeed.accountName,
-    name: backendFeed.caption || 'Untitled Feed',
-    description: backendFeed.caption || '',
-    isPublic: true,
-    backgroundColor: '#ffffff',
-    photoId: backendFeed.feedId,
-    photoUrl: backendFeed.imgUrl,
-    totalHeight: 1600,
-    followersCount: 0,
-    isFollowing: false,
-    isLiked: backendFeed.liked,
-    likesCount: 0,
-    authorName: backendFeed.accountName,
-    authorId: backendFeed.authorId.toString(),
-    authorAvatar: backendFeed.profileImage,
-    elements: [],
-    createdAt: backendFeed.createdAt,
-    updatedAt: backendFeed.createdAt,
+// 타임라인 조회 (팔로잉 피드) - GET /feeds/following
+export type GetTimelineApi = (
+  params?: {
+    cursorCreatedAt?: string
+    cursorId?: number
+    size?: number
   }
+) => Promise<TimelineApiResponse>
+
+// 탐색 조회 (랜덤 피드) - GET /feeds/random  
+export type GetExploreApi = (
+  params?: {
+    size?: number
+  }
+) => Promise<TimelineApiResponse>
+
+// 🔥 통합 피드 조회 (제안) - GET /feeds/{accountName}
+export type GetFeedByAccountNameApi = (
+  accountName: string
+) => Promise<{
+  success: boolean
+  data?: TimelinePost
+  error?: string
+}>
+
+// 게시물 좋아요 토글 - POST/DELETE /likes/{feedId}
+export type ToggleLikeApi = (
+  feedId: number
+) => Promise<LikeActionResult>
+
+// 팔로우 토글 - POST/DELETE /follows/{accountName}
+export type ToggleFollowApi = (
+  accountName: string
+) => Promise<FollowActionResult>
+
+// ============================================================================
+// 타임라인 액션 (단순화)
+// ============================================================================
+
+export type TimelineAction = 
+  | { type: 'LOAD_START' }
+  | { type: 'LOAD_SUCCESS'; posts: TimelinePost[]; hasMore: boolean; nextCursor: { createdAt: string; feedId: number } | null }
+  | { type: 'LOAD_ERROR'; error: string }
+  | { type: 'REFRESH_START' }
+  | { type: 'REFRESH_SUCCESS'; posts: TimelinePost[] }
+  | { type: 'APPEND_POSTS'; posts: TimelinePost[]; hasMore: boolean; nextCursor: { createdAt: string; feedId: number } | null }
+  | { type: 'UPDATE_LIKE'; feedId: number; isLiked: boolean }
+  | { type: 'CLEAR_POSTS' }
+
+// ============================================================================
+// 간소화된 요청 타입들
+// ============================================================================
+
+// ✅ 타임라인 요청 (단순화)
+export interface TimelineRequest {
+  type: 'timeline' | 'explore'
+  cursorCreatedAt?: string     // 커서 페이징
+  cursorId?: number           // 커서 페이징
+  size?: number               // 페이지 크기 (기본: 20)
 }

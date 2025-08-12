@@ -11,7 +11,7 @@ import {
   Bars3Icon,
   XMarkIcon,
   PlusIcon,
-  EllipsisVerticalIcon
+  CogIcon
 } from '@heroicons/react/24/outline';
 import {
   HomeIcon as HomeSolidIcon,
@@ -22,30 +22,200 @@ import {
 } from '@heroicons/react/24/solid';
 import { HeartIcon } from '@heroicons/react/24/outline';
 
-// ✅ 백엔드 API 연동
-import { 
-  getUserFeeds, 
-  getFollowStats,
-  toggleFeedLike,
-  getCurrentUser,
-  handleApiError 
-} from '@/lib/api/feed';
-import { CanvasFeedItem } from '@/lib/types/feed';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
+// ============================================================================
+// 🔥 백엔드 연동 타입 정의
+// ============================================================================
+
+interface FeedDetailResponse {
+  feedId: number
+  imgUrl: string
+  caption: string
+  authorId: number
+  accountName: string
+  profileImage: string
+  createdAt: string
+  liked: boolean
+}
+
+interface FollowCountsResponse {
+  followerCount: number
+  followingCount: number
+}
+
+interface UserInfoResponse {
+  userName: string
+  userEmail: string
+  userProfileImage: string
+  faceImageUrl: string
+}
+
+// LoadingSpinner 컴포넌트
+const LoadingSpinner = ({ size = 'md', className = '' }: { size?: 'sm' | 'md' | 'lg', className?: string }) => {
+  const sizeClasses = {
+    sm: 'h-4 w-4',
+    md: 'h-8 w-8',
+    lg: 'h-12 w-12'
+  };
+
+  return (
+    <div className={`animate-spin rounded-full border-b-2 border-blue-600 ${sizeClasses[size]} ${className}`} />
+  );
+};
 
 export default function MyPage() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  // ✅ 백엔드 연동 상태
-  const [feeds, setFeeds] = useState<CanvasFeedItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [feeds, setFeeds] = useState<FeedDetailResponse[]>([]);
+  const [userInfo, setUserInfo] = useState<UserInfoResponse | null>(null);
   const [followStats, setFollowStats] = useState({ followersCount: 0, followingCount: 0 });
-  const [hasMore, setHasMore] = useState(false);
-  const [nextCursor, setNextCursor] = useState<{ createdAt: string; feedId: number } | null>(null);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loading, setLoading] = useState({ initial: true, loadMore: false });
+  const [error, setError] = useState<string | null>(null);
+
+  // ============================================================================
+  // 🔥 백엔드 API 호출 함수들
+  // ============================================================================
+
+  // 현재 사용자 정보 조회
+  const getCurrentUser = async () => {
+    const response = await fetch('/api/user/userInfo', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    
+    if (!response.ok) throw new Error('사용자 정보 조회 실패');
+    const data = await response.json();
+    return data.data;
+  };
+
+  // 내 게시물 조회
+  const getMyFeeds = async (accountName: string): Promise<FeedDetailResponse[]> => {
+    const response = await fetch(`/api/feeds/users/${accountName}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    
+    if (!response.ok) throw new Error('게시물 조회 실패');
+    const data = await response.json();
+    return data.data;
+  };
+
+  // 팔로우 통계 조회
+  const getFollowStats = async (accountName: string): Promise<FollowCountsResponse> => {
+    const response = await fetch(`/api/follows/count/${accountName}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    
+    if (!response.ok) throw new Error('팔로우 통계 조회 실패');
+    const data = await response.json();
+    return data.data;
+  };
+
+  // 좋아요 토글
+  const toggleLike = async (feedId: number, isLiked: boolean): Promise<void> => {
+    const method = isLiked ? 'DELETE' : 'POST';
+    const response = await fetch(`/api/likes/${feedId}`, {
+      method,
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    
+    if (!response.ok) throw new Error('좋아요 처리 실패');
+  };
+
+  // ============================================================================
+  // 데이터 로딩
+  // ============================================================================
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (!isAuthenticated || !user) return;
+
+      try {
+        setLoading({ initial: true, loadMore: false });
+        setError(null);
+
+        // 1. 사용자 정보 조회
+        const userInfoResult = await getCurrentUser();
+        setUserInfo(userInfoResult);
+
+        // 2. accountName 추출 (실제 백엔드 응답에 따라 조정 필요)
+        const accountName = (user as any)?.accountName || userInfoResult.userName;
+
+        // 3. 팔로우 통계 조회
+        const statsResult = await getFollowStats(accountName);
+        setFollowStats({
+          followersCount: statsResult.followerCount,
+          followingCount: statsResult.followingCount
+        });
+
+        // 4. 내 게시물 조회
+        const feedsResult = await getMyFeeds(accountName);
+        setFeeds(feedsResult);
+
+      } catch (error) {
+        console.error('데이터 로드 실패:', error);
+        setError(error instanceof Error ? error.message : '데이터를 불러오는데 실패했습니다.');
+      } finally {
+        setLoading({ initial: false, loadMore: false });
+      }
+    };
+
+    loadUserData();
+  }, [isAuthenticated, user]);
+
+  // ============================================================================
+  // 이벤트 핸들러들
+  // ============================================================================
+
+  // 게시물 좋아요 토글
+  const handleLike = async (post: FeedDetailResponse) => {
+    try {
+      await toggleLike(post.feedId, post.liked);
+      
+      // 로컬 상태 업데이트
+      setFeeds(prev => prev.map(p => 
+        p.feedId === post.feedId 
+          ? { ...p, liked: !p.liked }
+          : p
+      ));
+    } catch (error) {
+      console.error('좋아요 처리 실패:', error);
+    }
+  };
+
+  // 네비게이션
+  const handleNavigation = (href: string) => {
+    router.push(href);
+    setIsMobileMenuOpen(false);
+  };
+
+  // 게시물 상세로 이동
+  const handlePostClick = (post: FeedDetailResponse) => {
+    router.push(`/feeds/${post.feedId}`);
+  };
+
+  // 새 게시물 만들기
+  const handleCreatePost = () => {
+    router.push('/myroom'); // 사진 선택을 위해 myroom으로 이동
+  };
+
+  // 프로필 설정으로 이동
+  const handleProfileSettings = () => {
+    router.push('/profile');
+  };
+
+  // 에러 재시도
+  const handleRetry = () => {
+    setError(null);
+    window.location.reload();
+  };
 
   // 네비게이션 메뉴 항목들
   const navigationItems = [
@@ -54,144 +224,37 @@ export default function MyPage() {
       href: '/timeline',
       icon: HomeIcon,
       activeIcon: HomeSolidIcon,
-      current: false,
-      showLabel: false
+      current: false
     },
     {
       name: 'Explore',
       href: '/explore',
       icon: MagnifyingGlassIcon,
       activeIcon: MagnifyingGlassSolidIcon,
-      current: false,
-      showLabel: false
+      current: false
     },
     {
       name: 'My Profile',
       href: '/my',
       icon: UserIcon,
       activeIcon: UserSolidIcon,
-      current: true, // 현재 페이지
-      showLabel: false
+      current: true
     },
     {
       name: 'My Room',
       href: '/myroom',
       icon: CalendarIcon,
       activeIcon: CalendarSolidIcon,
-      current: false,
-      showLabel: true
+      current: false
     }
   ];
 
-  // ✅ 내 피드의 게시물들 로드
-  useEffect(() => {
-    const loadMyFeedPosts = async () => {
-      if (!user?.id) return;
-      
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        // 내 피드의 게시물들 조회 (사용자당 1개 피드 원칙)
-        const feedsResult = await getUserFeeds(Number(user.id), undefined, undefined, 20);
-        
-        if (feedsResult.success && feedsResult.data) {
-          setFeeds(feedsResult.data.items); // 실제로는 "게시물들"
-          setHasMore(feedsResult.data.hasMore);
-          setNextCursor(feedsResult.data.nextCursor || null);
-        } else {
-          // 피드가 없으면 빈 배열로 설정 (에러가 아님)
-          setFeeds([]);
-          setHasMore(false);
-          setNextCursor(null);
-        }
-
-        // 팔로우 통계 조회
-        const statsResult = await getFollowStats(user.id.toString());
-        if (statsResult.success && statsResult.data) {
-          setFollowStats(statsResult.data);
-        }
-        
-      } catch (error) {
-        console.error('Failed to load my feed posts:', error);
-        setError(handleApiError(error));
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    if (isAuthenticated && user) {
-      loadMyFeedPosts();
-    }
-  }, [isAuthenticated, user]);
-
-  // ✅ 더 많은 게시물 로드
-  const loadMorePosts = async () => {
-    if (!user?.id || !hasMore || !nextCursor || isLoadingMore) return;
-    
-    setIsLoadingMore(true);
-    
-    try {
-      const result = await getUserFeeds(
-        Number(user.id), 
-        nextCursor.createdAt, 
-        nextCursor.feedId, 
-        20
-      );
-      
-      if (result.success && result.data) {
-        setFeeds(prev => [...prev, ...result.data!.items]); // 게시물들 추가
-        setHasMore(result.data.hasMore);
-        setNextCursor(result.data.nextCursor || null);
-      }
-    } catch (error) {
-      console.error('Failed to load more posts:', error);
-    } finally {
-      setIsLoadingMore(false);
-    }
-  };
-
-  // ✅ 게시물 좋아요 토글
-  const handleLike = async (post: CanvasFeedItem) => {
-    try {
-      const result = await toggleFeedLike(Number(post.photoId));
-      
-      if (result.success && result.data !== undefined) {
-        // 게시물 목록에서 좋아요 상태 업데이트
-        setFeeds(prev => prev.map(p => 
-          p.id === post.id 
-            ? { ...p, isLiked: result.data!.isLiked }
-            : p
-        ));
-      }
-    } catch (error) {
-      console.error('Failed to toggle like:', error);
-    }
-  };
-
-  // 네비게이션 핸들러
-  const handleNavigation = (href: string) => {
-    router.push(href);
-    setIsMobileMenuOpen(false);
-  };
-
-  // 모바일 메뉴 토글
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
-  // 게시물 상세 페이지로 이동
-  const handlePostClick = (postId: string) => {
-    router.push(`/feed/${postId}`);
-  };
-
-  // 새 게시물 만들기
-  const handleCreatePost = () => {
-    router.push('/myroom'); // 사진 선택을 위해 myroom으로 이동
-  };
+  // ============================================================================
+  // 렌더링 조건부 처리
+  // ============================================================================
 
   // 로딩 상태
-  if (authLoading || isLoading) {
+  if (authLoading || loading.initial) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -226,7 +289,7 @@ export default function MyPage() {
       <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* MyDiary 브랜드 */}
+            {/* 브랜드 */}
             <div className="flex items-center">
               <button
                 onClick={() => handleNavigation('/')}
@@ -253,23 +316,30 @@ export default function MyPage() {
                       title={item.name}
                     >
                       <Icon className="h-5 w-5" />
-                      {item.showLabel && <span>{item.name}</span>}
+                      <span>{item.name}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* 사용자 정보 (데스크톱) */}
+            {/* 사용자 정보 & 설정 */}
             <div className="hidden md:flex items-center space-x-4">
+              <button
+                onClick={handleProfileSettings}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+                title="프로필 설정"
+              >
+                <CogIcon className="h-5 w-5" />
+              </button>
               <div className="flex items-center space-x-3">
                 <img
-                  src={user.profileImage || `/api/placeholder/40/40?seed=${user.id}`}
+                  src={userInfo?.userProfileImage || user.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&size=32&background=random`}
                   alt={user.name || 'User'}
                   className="h-8 w-8 rounded-full"
                 />
                 <span className="text-sm font-medium text-gray-700">
-                  {user.name || 'User'}
+                  {userInfo?.userName || user.name || 'User'}
                 </span>
               </div>
             </div>
@@ -277,7 +347,7 @@ export default function MyPage() {
             {/* 모바일 메뉴 버튼 */}
             <div className="md:hidden">
               <button
-                onClick={toggleMobileMenu}
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 transition-colors"
               >
                 {isMobileMenuOpen ? (
@@ -297,18 +367,24 @@ export default function MyPage() {
               {/* 사용자 정보 */}
               <div className="flex items-center space-x-3 px-3 py-2 mb-3">
                 <img
-                  src={user.profileImage || `/api/placeholder/40/40?seed=${user.id}`}
+                  src={userInfo?.userProfileImage || user.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&size=40&background=random`}
                   alt={user.name || 'User'}
                   className="h-10 w-10 rounded-full"
                 />
-                <div>
+                <div className="flex-1">
                   <div className="text-sm font-medium text-gray-900">
-                    {user.name || 'User'}
+                    {userInfo?.userName || user.name || 'User'}
                   </div>
                   <div className="text-xs text-gray-500">
-                    {user.email || 'user@example.com'}
+                    {userInfo?.userEmail || user.email || 'user@example.com'}
                   </div>
                 </div>
+                <button
+                  onClick={handleProfileSettings}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                >
+                  <CogIcon className="h-5 w-5" />
+                </button>
               </div>
 
               {/* 네비게이션 항목들 */}
@@ -341,13 +417,17 @@ export default function MyPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <img
-                src={user.profileImage || `/api/placeholder/80/80?seed=${user.id}`}
+                src={userInfo?.userProfileImage || user.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&size=80&background=random`}
                 alt={user.name || 'User'}
                 className="h-20 w-20 rounded-full"
               />
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{user.name || 'User'}의 피드</h1>
-                <p className="text-gray-500">{user.email || 'user@example.com'}</p>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {userInfo?.userName || user.name || 'User'}의 피드
+                </h1>
+                <p className="text-gray-500">
+                  {userInfo?.userEmail || user.email || 'user@example.com'}
+                </p>
                 <div className="flex items-center space-x-4 mt-2">
                   <span className="text-sm text-gray-600">
                     <strong>{feeds.length}</strong> 게시물
@@ -362,15 +442,38 @@ export default function MyPage() {
               </div>
             </div>
             
-            {/* 새 게시물 만들기 버튼 */}
-            <button
-              onClick={handleCreatePost}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-            >
-              <PlusIcon className="h-5 w-5 mr-2" />
-              새 게시물 만들기
-            </button>
+            {/* 액션 버튼들 */}
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleProfileSettings}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <CogIcon className="h-5 w-5 mr-2" />
+                프로필 설정
+              </button>
+              <button
+                onClick={handleCreatePost}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+              >
+                <PlusIcon className="h-5 w-5 mr-2" />
+                새 게시물 만들기
+              </button>
+            </div>
           </div>
+
+          {/* AI 보정 이미지 (있는 경우) */}
+          {userInfo?.faceImageUrl && (
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">AI 보정 이미지</h3>
+              <div className="w-32 h-32 rounded-lg overflow-hidden bg-gray-100">
+                <img
+                  src={userInfo.faceImageUrl}
+                  alt="AI 보정된 얼굴"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 에러 상태 */}
@@ -378,7 +481,7 @@ export default function MyPage() {
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <p className="text-red-800">{error}</p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={handleRetry}
               className="mt-2 text-red-600 hover:text-red-800 font-medium"
             >
               다시 시도
@@ -387,7 +490,7 @@ export default function MyPage() {
         )}
 
         {/* 게시물 목록 */}
-        {feeds.length === 0 && !isLoading ? (
+        {feeds.length === 0 && !loading.initial ? (
           <div className="text-center py-12">
             <div className="w-24 h-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
               <UserIcon className="h-12 w-12 text-gray-400" />
@@ -406,15 +509,15 @@ export default function MyPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {feeds.map((post) => (
               <div
-                key={post.id}
+                key={post.feedId}
                 className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => handlePostClick(post.id)}
+                onClick={() => handlePostClick(post)}
               >
                 {/* 게시물 이미지 */}
                 <div className="aspect-square relative overflow-hidden">
                   <img
-                    src={post.photoUrl || post.backgroundImageUrl || `/api/placeholder/300/300?seed=${post.id}`}
-                    alt={post.name}
+                    src={post.imgUrl || `https://picsum.photos/300/300?seed=${post.feedId}`}
+                    alt={post.caption}
                     className="w-full h-full object-cover"
                   />
                   
@@ -426,7 +529,7 @@ export default function MyPage() {
                     }}
                     className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white/90 transition-colors"
                   >
-                    {post.isLiked ? (
+                    {post.liked ? (
                       <HeartSolidIcon className="h-5 w-5 text-red-500" />
                     ) : (
                       <HeartIcon className="h-5 w-5 text-gray-600" />
@@ -436,49 +539,26 @@ export default function MyPage() {
 
                 {/* 게시물 정보 */}
                 <div className="p-4">
-                  <h3 className="font-medium text-gray-900 mb-1 truncate">{post.name}</h3>
-                  <p className="text-sm text-gray-500 mb-2 line-clamp-2">{post.description}</p>
+                  <p className="text-sm text-gray-600 mb-2 line-clamp-2">{post.caption}</p>
                   <div className="flex items-center justify-between text-xs text-gray-400">
                     <span>{new Date(post.createdAt).toLocaleDateString()}</span>
-                    <div className="flex items-center space-x-2">
-                      {post.isLiked && (
-                        <span className="flex items-center">
-                          <HeartSolidIcon className="h-3 w-3 text-red-500 mr-1" />
-                          좋아요
-                        </span>
-                      )}
-                    </div>
+                    {post.liked && (
+                      <span className="flex items-center text-red-500">
+                        <HeartSolidIcon className="h-3 w-3 mr-1" />
+                        좋아요
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
             ))}
           </div>
         )}
-
-        {/* 더 보기 버튼 */}
-        {hasMore && (
-          <div className="text-center mt-8">
-            <button
-              onClick={loadMorePosts}
-              disabled={isLoadingMore}
-              className="inline-flex items-center px-6 py-3 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
-            >
-              {isLoadingMore ? (
-                <>
-                  <LoadingSpinner size="sm" className="mr-2" />
-                  로딩 중...
-                </>
-              ) : (
-                '더 보기'
-              )}
-            </button>
-          </div>
-        )}
       </main>
 
       {/* 모바일 하단 네비게이션 */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
-        <div className={`grid grid-cols-${navigationItems.length} py-2`}>
+        <div className="grid grid-cols-4 py-2">
           {navigationItems.map((item) => {
             const Icon = item.current ? item.activeIcon : item.icon;
             return (
