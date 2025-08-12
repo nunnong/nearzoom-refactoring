@@ -107,38 +107,38 @@ public class PhotoPromptService {
     redisTemplate.opsForHash().putAll(roomKey, imageData);
 
     // 즉시 이미지 서버로 전송
-//    try {
-//      imageProcessingService.processIndividualImageImmediately(
-//          imageRequest.roomId(),
-//          imageOrder,
-//          imageRequest.imageUrl(),
-//          imageRequest.personIds(),
-//          processingOptions,
-//          promptId
-//      );
-//
-//      log.info("이미지 서버 전송 완료 - RoomId: {}, Order: {}",
-//          imageRequest.roomId(), imageOrder);
-//
-//    } catch (Exception e) {
-//      log.error("이미지 서버 전송 실패 - RoomId: {}, Order: {}, Error: {}",
-//          imageRequest.roomId(), imageOrder, e.getMessage());
-//
-//      // 프롬프트 상태를 실패로 업데이트
-//      if (promptId != null) {
-//        try {
-//          PhotoPrompt photoPrompt = photoPromptRepository.findById(Long.valueOf(promptId)).orElse(null);
-//          if (photoPrompt != null) {
-//            photoPrompt.updateStatus(PromptStatus.FAIL);
-//            photoPromptRepository.save(photoPrompt);
-//          }
-//        } catch (Exception ex) {
-//          log.warn("프롬프트 상태 업데이트 실패: {}", ex.getMessage());
-//        }
-//      }
-//
-//      throw e;
-//    }
+    try {
+      imageProcessingService.processIndividualImageImmediately(
+          imageRequest.roomId(),
+          imageOrder,
+          imageRequest.imageUrl(),
+          imageRequest.personIds(),
+          processingOptions,
+          promptId
+      );
+
+      log.info("이미지 서버 전송 완료 - RoomId: {}, Order: {}",
+          imageRequest.roomId(), imageOrder);
+
+    } catch (Exception e) {
+      log.error("이미지 서버 전송 실패 - RoomId: {}, Order: {}, Error: {}",
+          imageRequest.roomId(), imageOrder, e.getMessage());
+
+      // 프롬프트 상태를 실패로 업데이트
+      if (promptId != null) {
+        try {
+          PhotoPrompt photoPrompt = photoPromptRepository.findById(Long.valueOf(promptId)).orElse(null);
+          if (photoPrompt != null) {
+            photoPrompt.updateStatus(PromptStatus.FAIL);
+            photoPromptRepository.save(photoPrompt);
+          }
+        } catch (Exception ex) {
+          log.warn("프롬프트 상태 업데이트 실패: {}", ex.getMessage());
+        }
+      }
+
+      throw e;
+    }
   }
 
   // 설정 완료된 이미지 개수 카운트
