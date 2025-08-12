@@ -5,7 +5,6 @@ import {
   useLocalParticipant,
   useTracks,
   TrackLoop,
-  ParticipantTile,
   useGridLayout,
   GridLayoutDefinition,
 } from '@livekit/components-react'
@@ -49,6 +48,28 @@ export default function WaitingComponent({
     null
   ) as React.RefObject<HTMLDivElement>
 
+  // Console error interception for stream closed errors
+  useEffect(() => {
+    const originalError = console.error
+
+    console.error = (...args: any[]) => {
+      const message = args.join(' ')
+      // Stream closed, InvalidStateError 등을 조용히 처리
+      if (message.includes('Stream closed') || 
+          message.includes('InvalidStateError') ||
+          message.includes('error when trying to pipe') ||
+          message.includes('intercept-console-error')) {
+        console.warn('🔇 Stream error intercepted:', message.substring(0, 100))
+        return
+      }
+      originalError.apply(console, args)
+    }
+
+    return () => {
+      console.error = originalError
+    }
+  }, [])
+
   // 최대 4개의 트랙만 처리
   const displayTrackCount = Math.min(cameraTracks.length, 4)
 
@@ -73,21 +94,25 @@ export default function WaitingComponent({
   }, [participants, localParticipant, cameraTracks, layout])
 
   return (
-    <div className={cn('flex flex-1 gap-6 bg-gray-100 px-8 py-6', className)}>
-      {/* 왼쪽: 비디오 영역 */}
-      <div className="flex flex-1 flex-col">
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-[#2D3243]">대기실</h2>
-          <p className="text-sm text-[#2D3243]/70">
-            참가자 {participants.length}명이 대기 중입니다
-            {participants.length > 4 && ' (최대 4명 표시)'}
-          </p>
-        </div>
-
-        <div className="flex-1 rounded-lg bg-white p-6 shadow-sm">
+    <div
+      className={cn(
+        'flex flex-1 flex-col bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50',
+        className
+      )}
+    >
+      <main className="flex flex-1 flex-col gap-4 bg-[#2d3243] p-4 md:flex-row md:gap-6 md:p-6 lg:p-8">
+        {/* 비디오 영역 */}
+        <section className="flex-1">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-white">대기실</h2>
+            <p className="text-sm text-white/70">
+              참가자 {participants.length}명이 대기 중입니다
+              {participants.length > 4 && ' (최대 4명 표시)'}
+            </p>
+          </div>
           <div
             ref={gridRef}
-            className="grid h-full gap-4"
+            className="grid h-full gap-3 sm:gap-4 lg:gap-6"
             style={{
               gridTemplateColumns: `repeat(var(--lk-col-count, 1), 1fr)`,
               gridTemplateRows: `repeat(var(--lk-row-count, 1), 1fr)`,
@@ -95,20 +120,20 @@ export default function WaitingComponent({
           >
             {/* 최대 4개의 트랙만 렌더링 */}
             <TrackLoop tracks={cameraTracks.slice(0, 4)}>
-              <div className="relative min-h-0 min-w-0">
-                <ParticipantTile className="absolute inset-0 h-full w-full overflow-hidden rounded-lg bg-[#2D3243]" />
-              </div>
+              <VideoTile />
             </TrackLoop>
           </div>
-        </div>
-      </div>
+        </section>
 
-      {/* 오른쪽: 사이드바 */}
-      <Sidebar
-        showStartButton={true}
-        showLeaveButton={true}
-        onStartCall={onStartCall}
-      />
+        {/* 사이드바 */}
+        <aside className="w-full shrink-0 md:w-[300px]">
+          <Sidebar
+            showStartButton={true}
+            showLeaveButton={true}
+            onStartCall={onStartCall}
+          />
+        </aside>
+      </main>
     </div>
   )
 }

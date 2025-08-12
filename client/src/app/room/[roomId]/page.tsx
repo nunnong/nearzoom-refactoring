@@ -17,14 +17,14 @@ function RoomJoinContent() {
   const searchParams = useSearchParams()
   const isHost = searchParams?.get('isHost') === 'true'
   const skipJoin = searchParams?.get('skipJoin') === 'true'
-  
+
   const { isAuthenticated, isLoading: authLoading } = useAuthStore()
   const { roomData: storedRoomData, clearRoomData } = useRoomStore()
-  
+
   const [pageState, setPageState] = useState<PageState>('loading')
   const [roomData, setRoomData] = useState<JoinRoomData | null>(null)
   const [errorMessage, setErrorMessage] = useState<string>('')
-  
+
   // 🔥 추가: 실시간 갱신을 위한 상태
   const [lastParticipantCount, setLastParticipantCount] = useState(0)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -33,10 +33,10 @@ function RoomJoinContent() {
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       console.log('❌ 로그인되지 않음 - 로그인 페이지로 리다이렉트')
-      
+
       const currentUrl = `/room/${roomId}${isHost ? '?isHost=true&skipJoin=true' : ''}`
       localStorage.setItem('redirectAfterLogin', currentUrl)
-      
+
       router.push('/login')
       return
     }
@@ -45,46 +45,60 @@ function RoomJoinContent() {
   // 🔥 추가: 방 정보 갱신 함수
   const refreshRoomData = async () => {
     if (!roomId || !isAuthenticated || pageState !== 'success') return
-    
+
     try {
       setIsRefreshing(true)
       console.log('🔄 방 정보 실시간 갱신 중...', roomId)
-      
+
       // 🔥 수정: roomId를 숫자로 변환해서 전달
-      const numericRoomId = typeof roomId === 'string' ? parseInt(roomId, 10) : roomId
-      if (isNaN(numericRoomId)) {
+      const numericRoomId =
+        typeof roomId === 'string' ? parseInt(roomId, 10) : roomId
+      if (isNaN(+numericRoomId)) {
         throw new Error('유효하지 않은 방 ID입니다')
       }
-      
-      const updatedRoomInfo = await roomAPI.getRoomInfo(numericRoomId)
+
+      const updatedRoomInfo = await roomAPI.getRoomInfo(+numericRoomId)
       console.log('✅ 방 정보 갱신 성공:', updatedRoomInfo)
-      
+
       // 기존 roomData 구조에 맞게 변환
       const updatedRoomData: JoinRoomData = {
         ...roomData!,
         // 실제 서버에서 온 정보로 업데이트 (필요한 필드들)
-        participantName: roomData?.participantName || updatedRoomInfo.participants[0]?.name || 'Unknown',
-        createdAt: updatedRoomInfo.createdAt || roomData?.createdAt || new Date().toISOString(),
+        participantName:
+          roomData?.participantName ||
+          updatedRoomInfo.participants[0]?.name ||
+          'Unknown',
+        createdAt:
+          updatedRoomInfo.createdAt ||
+          roomData?.createdAt ||
+          new Date().toISOString(),
         // 다른 필드들도 필요시 추가
       }
-      
+
       setRoomData(updatedRoomData)
-      
+
       // 참가자 수 변경 감지
       const newParticipantCount = updatedRoomInfo.participants?.length || 0
       if (newParticipantCount !== lastParticipantCount) {
-        console.log('👥 참가자 수 변경 감지:', lastParticipantCount, '->', newParticipantCount)
+        console.log(
+          '👥 참가자 수 변경 감지:',
+          lastParticipantCount,
+          '->',
+          newParticipantCount
+        )
         setLastParticipantCount(newParticipantCount)
-        
+
         // 새로운 참가자가 들어왔을 때 알림 (선택사항)
-        if (newParticipantCount > lastParticipantCount && lastParticipantCount > 0) {
+        if (
+          newParticipantCount > lastParticipantCount &&
+          lastParticipantCount > 0
+        ) {
           console.log('🎉 새로운 참가자가 입장했습니다!')
         }
       }
-      
     } catch (error) {
       console.error('❌ 방 정보 갱신 실패:', error)
-      
+
       // 인증 에러인 경우 로그인 페이지로 리다이렉트
       const errorMsg = getErrorMessage(error)
       if (errorMsg.includes('로그인') || errorMsg.includes('인증')) {
@@ -126,14 +140,20 @@ function RoomJoinContent() {
   // 🔥 추가: 가시성 변경 시 갱신 (탭 전환)
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && pageState === 'success' && isAuthenticated && roomId) {
+      if (
+        document.visibilityState === 'visible' &&
+        pageState === 'success' &&
+        isAuthenticated &&
+        roomId
+      ) {
         console.log('👁️ 탭 활성화 - 방 정보 갱신')
         setTimeout(() => refreshRoomData(), 1000) // 1초 후 갱신
       }
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+    return () =>
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [pageState, isAuthenticated, roomId])
 
   // 방 참가 함수
@@ -146,10 +166,9 @@ function RoomJoinContent() {
       console.log('방 참가 성공:', result)
       setRoomData(result)
       setPageState('success')
-      
+
       // 🔥 추가: 참가 성공 후 첫 번째 참가자 수 설정
       setTimeout(() => refreshRoomData(), 2000) // 2초 후 방 정보 갱신
-      
     } catch (error) {
       console.error('방 참가 실패:', error)
 
@@ -174,10 +193,9 @@ function RoomJoinContent() {
         console.log('Zustand에서 방장 데이터 로드 성공:', storedRoomData)
         setRoomData(storedRoomData)
         setPageState('success')
-        
+
         // 🔥 추가: 방장 데이터 로드 후 방 정보 갱신
         setTimeout(() => refreshRoomData(), 1000) // 1초 후 갱신
-        
       } else {
         console.log('Zustand에 방장 데이터 없음')
         setErrorMessage('방 정보를 찾을 수 없습니다. 다시 시도해주세요.')
@@ -238,8 +256,6 @@ function RoomJoinContent() {
     localStorage.setItem('redirectAfterLogin', currentUrl)
     router.push('/login')
   }
-
-  
 
   // 인증 로딩 중일 때
   if (authLoading) {
@@ -334,18 +350,15 @@ function RoomJoinContent() {
       <div className="relative">
         {/* 🔥 추가: 실시간 갱신 상태 표시 */}
         {isRefreshing && (
-          <div className="fixed top-4 right-4 z-50 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg text-sm">
+          <div className="fixed top-4 right-4 z-50 rounded-lg bg-blue-500 px-4 py-2 text-sm text-white shadow-lg">
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
               방 정보 업데이트 중...
             </div>
           </div>
         )}
-        
-        <WaitingPage
-          roomData={roomData}
-          isHost={isHost}
-        />
+
+        <WaitingPage roomData={roomData} isHost={isHost} />
       </div>
     )
   }

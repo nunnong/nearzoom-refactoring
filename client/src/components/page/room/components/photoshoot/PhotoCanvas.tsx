@@ -5,7 +5,7 @@ import { Stage, Layer, Rect, Transformer, Text, Image } from 'react-konva'
 import { CANVAS_CONFIG } from '../../types/photoCanvas'
 import { usePhotoBoothStore } from '../../providers/PhotoBoothProvider'
 import { updatePhotoCanvasState } from '../../stores/photobooth'
-import { 
+import {
   useParticipants,
   useTracks,
   useLocalParticipant,
@@ -27,7 +27,12 @@ export default function PhotoCanvas({
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const transformerRef = useRef<any>(null)
-  
+
+  // Canvas size from store
+  const canvasSize = usePhotoBoothStore(state => state.canvasSize)
+  const frameVisible = usePhotoBoothStore(state => state.frameVisible)
+  const backgroundColor = usePhotoBoothStore(state => state.backgroundColor)
+
   // PhotoBooth store에서 상태들 가져오기
   const frameColor = usePhotoBoothStore(state => state.frameColor)
   const isFlashing = usePhotoBoothStore(state => state.isFlashing)
@@ -36,25 +41,31 @@ export default function PhotoCanvas({
   const currentCutIndex = usePhotoBoothStore(state => state.currentCutIndex)
   const cutCount = usePhotoBoothStore(state => state.cutCount)
   const roomName = usePhotoBoothStore(state => state.roomName)
-  const selectedParticipant = usePhotoBoothStore(state => state.selectedParticipant)
+  const selectedParticipant = usePhotoBoothStore(
+    state => state.selectedParticipant
+  )
   const participants = usePhotoBoothStore(state => state.participants)
-  
+
   // LiveKit 훅들
   const allParticipants = useParticipants()
   const { localParticipant } = useLocalParticipant()
   const cameraTrackRefs = useTracks([Track.Source.Camera])
-  
+
   // VirtualBackground 상태
   const virtualBackgroundReady = useVirtualBackgroundReady()
-  
+
   // 비디오 엘리먼트 상태 관리
-  const [videoElements, setVideoElements] = useState<Record<string, HTMLVideoElement>>({})
-  const [processedCanvases, setProcessedCanvases] = useState<Record<string, HTMLCanvasElement>>({})
-  
+  const [videoElements, setVideoElements] = useState<
+    Record<string, HTMLVideoElement>
+  >({})
+  const [processedCanvases, setProcessedCanvases] = useState<
+    Record<string, HTMLCanvasElement>
+  >({})
+
   // 비디오 업데이트용 refs
   const stageRef = useRef<Konva.Stage>(null)
   const videoUpdateIntervalRef = useRef<NodeJS.Timeout>()
-  
+
   console.log('📹 Camera tracks found:', cameraTrackRefs.length)
   console.log('👥 Participants found:', allParticipants.length)
 
@@ -135,12 +146,12 @@ export default function PhotoCanvas({
         })
 
         console.log('✅ Canvas captured successfully')
-        
+
         // 자동 다운로드 (컷 정보 포함한 파일명)
         const cutInfo = `cut${currentCutIndex + 1}-of-${cutCount}`
         const filename = `photobooth-${cutInfo}.png`
         downloadImage(dataURL, filename)
-        
+
         // 기존 onCapture 콜백도 호출
         onCapture(dataURL)
       } catch (error) {
@@ -162,19 +173,21 @@ export default function PhotoCanvas({
   // LiveKit 비디오 트랙 설정 (VirtualBackground 상태 변경 감지)
   useEffect(() => {
     let isCurrentEffect = true // React Strict Mode 중복 실행 방지
-    
+
     const setupVideoTracks = async () => {
       if (!isCurrentEffect) return // 이미 정리된 effect면 실행하지 않음
-      
-      console.log(`🔄 Setting up video tracks, VirtualBackground: ${virtualBackgroundReady}`)
-      
+
+      console.log(
+        `🔄 Setting up video tracks, VirtualBackground: ${virtualBackgroundReady}`
+      )
+
       const newVideoElements: Record<string, HTMLVideoElement> = {}
       const newProcessedCanvases: Record<string, HTMLCanvasElement> = {}
-      
+
       for (const trackRef of cameraTrackRefs) {
         const participantId = trackRef.participant.identity
         const track = trackRef.publication?.track as VideoTrack | undefined
-        
+
         if (!track || track.kind !== Track.Kind.Video) {
           console.log(`⚠️ No video track for ${participantId}`)
           continue
@@ -200,28 +213,33 @@ export default function PhotoCanvas({
         video.muted = true
         video.playsInline = true
         video.style.display = 'none'
-        
+
         try {
           track.attach(video)
           document.body.appendChild(video)
-          
+
           newVideoElements[participantId] = video
-          
+
           // VirtualBackground가 활성화된 경우 Canvas 생성
           if (virtualBackgroundReady) {
             const canvas = document.createElement('canvas')
             canvas.width = 640
             canvas.height = 480
             newProcessedCanvases[participantId] = canvas
-            console.log(`✅ Video + Canvas created for ${participantId} (with VB)`)
+            console.log(
+              `✅ Video + Canvas created for ${participantId} (with VB)`
+            )
           } else {
             console.log(`✅ Video created for ${participantId} (no VB)`)
           }
         } catch (error) {
-          console.error(`❌ Failed to attach video for ${participantId}:`, error)
+          console.error(
+            `❌ Failed to attach video for ${participantId}:`,
+            error
+          )
         }
       }
-      
+
       // 제거된 참가자의 비디오 정리
       Object.keys(videoElements).forEach(participantId => {
         if (!newVideoElements[participantId]) {
@@ -230,13 +248,13 @@ export default function PhotoCanvas({
           console.log(`🧹 Removed video for ${participantId}`)
         }
       })
-      
+
       setVideoElements(newVideoElements)
       setProcessedCanvases(newProcessedCanvases)
     }
 
     setupVideoTracks()
-    
+
     // Cleanup
     return () => {
       isCurrentEffect = false // 이 effect가 정리됨을 표시
@@ -247,53 +265,56 @@ export default function PhotoCanvas({
   }, [cameraTrackRefs, virtualBackgroundReady])
 
   // 크로마키 처리 함수 (VirtualBackground가 활성화된 경우에만)
-  const processVideoFrame = useCallback((participantId: string) => {
-    const videoElement = videoElements[participantId]
-    const canvas = processedCanvases[participantId]
-    
-    if (!videoElement || !canvas || !virtualBackgroundReady) return
-    
-    // 비디오가 준비되지 않았으면 처리하지 않음
-    if (videoElement.readyState < 2) {
-      return
-    }
-    
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })
-    if (!ctx) return
-    
-    // 비디오 현재 프레임 그리기
-    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height)
-    
-    // 크로마키 처리
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-    const data = imageData.data
-    
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i]
-      const g = data[i + 1]
-      const b = data[i + 2]
-      
-      // 초록색 감지 (G > R && G > B && G > threshold)
-      if (g > 100 && g > r * 1.4 && g > b * 1.4) {
-        data[i + 3] = 0 // 투명하게
+  const processVideoFrame = useCallback(
+    (participantId: string) => {
+      const videoElement = videoElements[participantId]
+      const canvas = processedCanvases[participantId]
+
+      if (!videoElement || !canvas || !virtualBackgroundReady) return
+
+      // 비디오가 준비되지 않았으면 처리하지 않음
+      if (videoElement.readyState < 2) {
+        return
       }
-    }
-    
-    ctx.putImageData(imageData, 0, 0)
-  }, [videoElements, processedCanvases, virtualBackgroundReady])
+
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })
+      if (!ctx) return
+
+      // 비디오 현재 프레임 그리기
+      ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height)
+
+      // 크로마키 처리
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const data = imageData.data
+
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i]
+        const g = data[i + 1]
+        const b = data[i + 2]
+
+        // 초록색 감지 (G > R && G > B && G > threshold)
+        if (g > 100 && g > r * 1.4 && g > b * 1.4) {
+          data[i + 3] = 0 // 투명하게
+        }
+      }
+
+      ctx.putImageData(imageData, 0, 0)
+    },
+    [videoElements, processedCanvases, virtualBackgroundReady]
+  )
 
   // 실시간 비디오 프레임 업데이트 (batchDraw + 크로마키 처리)
   useEffect(() => {
     if (Object.keys(videoElements).length === 0) return
-    
+
     // 기존 인터벌이 있으면 먼저 정리
     if (videoUpdateIntervalRef.current) {
       clearInterval(videoUpdateIntervalRef.current)
       videoUpdateIntervalRef.current = undefined
     }
-    
+
     console.log('🎞️ Starting video update loop with batchDraw + ChromaKey')
-    
+
     // 30 FPS로 비디오 프레임 업데이트
     videoUpdateIntervalRef.current = setInterval(() => {
       // VirtualBackground가 활성화된 경우 크로마키 처리
@@ -302,13 +323,13 @@ export default function PhotoCanvas({
           processVideoFrame(participantId)
         })
       }
-      
+
       // Konva Stage 업데이트
       if (stageRef.current) {
         stageRef.current.batchDraw()
       }
     }, 1000 / 30) // 30 FPS
-    
+
     return () => {
       if (videoUpdateIntervalRef.current) {
         clearInterval(videoUpdateIntervalRef.current)
@@ -316,7 +337,12 @@ export default function PhotoCanvas({
         console.log('⏹️ Stopped video update loop')
       }
     }
-  }, [videoElements, processedCanvases, virtualBackgroundReady, processVideoFrame])
+  }, [
+    videoElements,
+    processedCanvases,
+    virtualBackgroundReady,
+    processVideoFrame,
+  ])
 
   // Transformer 연결
   useEffect(() => {
@@ -339,7 +365,7 @@ export default function PhotoCanvas({
     if (!stageRef.current) return
 
     const stage = stageRef.current
-    
+
     // 모든 참가자의 상태를 DOM 노드에 적용
     Object.entries(participants).forEach(([participantId, transform]) => {
       const node = stage.findOne(`#video-${participantId}`)
@@ -350,9 +376,9 @@ export default function PhotoCanvas({
         const currentRotation = node.rotation()
         const currentWidth = node.width()
         const currentHeight = node.height()
-        
+
         let needsUpdate = false
-        
+
         if (Math.abs(currentX - transform.x) > 0.1) {
           node.x(transform.x)
           needsUpdate = true
@@ -373,11 +399,23 @@ export default function PhotoCanvas({
           node.height(transform.height)
           needsUpdate = true
         }
-        
+
         if (needsUpdate) {
           console.log(`🔄 Syncing DOM node for ${participantId}:`, {
-            from: { x: currentX, y: currentY, rotation: currentRotation, width: currentWidth, height: currentHeight },
-            to: { x: transform.x, y: transform.y, rotation: transform.rotation, width: transform.width, height: transform.height }
+            from: {
+              x: currentX,
+              y: currentY,
+              rotation: currentRotation,
+              width: currentWidth,
+              height: currentHeight,
+            },
+            to: {
+              x: transform.x,
+              y: transform.y,
+              rotation: transform.rotation,
+              width: transform.width,
+              height: transform.height,
+            },
           })
         }
       }
@@ -387,8 +425,10 @@ export default function PhotoCanvas({
   // Z-Index 관리: lastInteractionTime 순서로 정렬 (최근 것이 위에)
   const sortedCameraTracksByZIndex = useMemo(() => {
     return [...cameraTrackRefs].sort((a, b) => {
-      const aTime = participants[a.participant.identity]?.lastInteractionTime || 0
-      const bTime = participants[b.participant.identity]?.lastInteractionTime || 0
+      const aTime =
+        participants[a.participant.identity]?.lastInteractionTime || 0
+      const bTime =
+        participants[b.participant.identity]?.lastInteractionTime || 0
       return aTime - bTime // 오래된 것부터 렌더링 (최근 것이 위에)
     })
   }, [cameraTrackRefs, participants])
@@ -398,8 +438,10 @@ export default function PhotoCanvas({
     (id: string) => {
       if (roomName) {
         // video- prefix 제거하여 순수한 participantId 추출
-        const participantId = id.startsWith('video-') ? id.replace('video-', '') : id
-        
+        const participantId = id.startsWith('video-')
+          ? id.replace('video-', '')
+          : id
+
         // 선택 시 해당 참가자의 lastInteractionTime 업데이트
         const updatedParticipants = {
           ...participants,
@@ -427,16 +469,19 @@ export default function PhotoCanvas({
     [roomName, participants]
   )
 
-  const handleStageClick = useCallback((e: any) => {
-    const clickedOnEmpty = e.target === e.target.getStage()
-    if (clickedOnEmpty) {
-      setSelectedId(null)
-      if (roomName) {
-        updatePhotoCanvasState(roomName, { selectedParticipant: null })
+  const handleStageClick = useCallback(
+    (e: any) => {
+      const clickedOnEmpty = e.target === e.target.getStage()
+      if (clickedOnEmpty) {
+        setSelectedId(null)
+        if (roomName) {
+          updatePhotoCanvasState(roomName, { selectedParticipant: null })
+        }
+        console.log('📍 Empty stage clicked - deselecting via Yjs')
       }
-      console.log('📍 Empty stage clicked - deselecting via Yjs')
-    }
-  }, [roomName])
+    },
+    [roomName]
+  )
 
   // SSR 중이거나 마운트되지 않았으면 로딩 표시
   if (!mounted) {
@@ -444,7 +489,7 @@ export default function PhotoCanvas({
       <div className={`relative ${className}`}>
         <div
           className="flex items-center justify-center rounded-xl bg-gray-200"
-          style={{ width: CANVAS_CONFIG.width, height: CANVAS_CONFIG.height }}
+          style={{ width: canvasSize.width, height: canvasSize.height }}
         >
           <div className="text-center">
             <div className="mx-auto mb-2 h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
@@ -457,10 +502,10 @@ export default function PhotoCanvas({
 
   return (
     <div className={`relative ${className}`}>
-      <Stage 
+      <Stage
         ref={stageRef}
-        width={CANVAS_CONFIG.width} 
-        height={CANVAS_CONFIG.height}
+        width={canvasSize.width}
+        height={canvasSize.height}
         className="overflow-hidden rounded-xl border-2 border-gray-300 shadow-lg"
         onClick={handleStageClick}
       >
@@ -469,20 +514,20 @@ export default function PhotoCanvas({
           <Rect
             x={0}
             y={0}
-            width={CANVAS_CONFIG.width}
-            height={CANVAS_CONFIG.height}
-            fill={CANVAS_CONFIG.backgroundColor}
+            width={canvasSize.width}
+            height={canvasSize.height}
+            fill={backgroundColor}
             listening={false}
           />
 
           {/* 그리드 가이드라인 */}
-          {[1, 2, 3].map(i => (
+          {/* {[1, 2, 3].map(i => (
             <Rect
               key={`v-line-${i}`}
-              x={CANVAS_CONFIG.width * (i / 4)}
+              x={canvasSize.width * (i / 4)}
               y={0}
               width={1}
-              height={CANVAS_CONFIG.height}
+              height={canvasSize.height}
               fill="rgba(0,0,0,0.1)"
               listening={false}
             />
@@ -491,13 +536,13 @@ export default function PhotoCanvas({
             <Rect
               key={`h-line-${i}`}
               x={0}
-              y={CANVAS_CONFIG.height * (i / 4)}
-              width={CANVAS_CONFIG.width}
+              y={canvasSize.height * (i / 4)}
+              width={canvasSize.width}
               height={1}
               fill="rgba(0,0,0,0.1)"
               listening={false}
             />
-          ))}
+          ))} */}
         </Layer>
 
         {/* 참가자 비디오 레이어 */}
@@ -514,7 +559,7 @@ export default function PhotoCanvas({
               height: 240,
               rotation: 0,
             }
-            
+
             if (!videoElement) {
               // 비디오 로딩 중일 때 placeholder
               return (
@@ -532,10 +577,13 @@ export default function PhotoCanvas({
                 />
               )
             }
-            
+
             // VirtualBackground가 활성화되면 처리된 Canvas 사용, 아니면 원본 비디오 사용
-            const displayImage = virtualBackgroundReady && processedCanvas ? processedCanvas : videoElement
-            
+            const displayImage =
+              virtualBackgroundReady && processedCanvas
+                ? processedCanvas
+                : videoElement
+
             return (
               <>
                 <Image
@@ -548,18 +596,26 @@ export default function PhotoCanvas({
                   height={currentTransform.height}
                   rotation={currentTransform.rotation || 0}
                   image={displayImage}
-                  stroke={selectedId === `video-${participantId}` ? '#4ECDC4' : undefined}
+                  stroke={
+                    selectedId === `video-${participantId}`
+                      ? '#4ECDC4'
+                      : undefined
+                  }
                   strokeWidth={selectedId === `video-${participantId}` ? 3 : 0}
-                  onClick={(e) => {
+                  onClick={e => {
                     e.cancelBubble = true
-                    console.log(`📹 Video clicked: ${participantId} - bringing to front`)
+                    console.log(
+                      `📹 Video clicked: ${participantId} - bringing to front`
+                    )
                     handleSelect(`video-${participantId}`)
                   }}
-                  onDragEnd={(e) => {
+                  onDragEnd={e => {
                     const newX = e.target.x()
                     const newY = e.target.y()
-                    console.log(`📹 Video moved: ${participantId} to (${newX}, ${newY})`)
-                    
+                    console.log(
+                      `📹 Video moved: ${participantId} to (${newX}, ${newY})`
+                    )
+
                     // Yjs로 위치 업데이트
                     if (roomName) {
                       const updatedParticipants = {
@@ -571,25 +627,33 @@ export default function PhotoCanvas({
                           width: currentTransform.width,
                           height: currentTransform.height,
                           rotation: currentTransform.rotation || 0,
-                          lastInteractionTime: Date.now()
-                        }
+                          lastInteractionTime: Date.now(),
+                        },
                       }
-                      updatePhotoCanvasState(roomName, { participants: updatedParticipants })
+                      updatePhotoCanvasState(roomName, {
+                        participants: updatedParticipants,
+                      })
                     }
                   }}
-                  onTransformEnd={(e) => {
+                  onTransformEnd={e => {
                     const node = e.target
                     const scaleX = node.scaleX()
                     const scaleY = node.scaleY()
-                    
+
                     console.log(`🔄 Video transformed: ${participantId}`, {
                       x: node.x(),
                       y: node.y(),
-                      width: Math.max(5, (participants[participantId]?.width || 320) * scaleX),
-                      height: Math.max(5, (participants[participantId]?.height || 240) * scaleY),
-                      rotation: node.rotation()
+                      width: Math.max(
+                        5,
+                        (participants[participantId]?.width || 320) * scaleX
+                      ),
+                      height: Math.max(
+                        5,
+                        (participants[participantId]?.height || 240) * scaleY
+                      ),
+                      rotation: node.rotation(),
                     })
-                    
+
                     // Transform 완료 시 Yjs에 최종 상태 저장
                     if (roomName) {
                       const updatedParticipants = {
@@ -599,13 +663,22 @@ export default function PhotoCanvas({
                           x: node.x(),
                           y: node.y(),
                           rotation: node.rotation(),
-                          width: Math.max(5, (participants[participantId]?.width || 320) * scaleX),
-                          height: Math.max(5, (participants[participantId]?.height || 240) * scaleY),
-                          lastInteractionTime: Date.now()
-                        }
+                          width: Math.max(
+                            5,
+                            (participants[participantId]?.width || 320) * scaleX
+                          ),
+                          height: Math.max(
+                            5,
+                            (participants[participantId]?.height || 240) *
+                              scaleY
+                          ),
+                          lastInteractionTime: Date.now(),
+                        },
                       }
-                      updatePhotoCanvasState(roomName, { participants: updatedParticipants })
-                      
+                      updatePhotoCanvasState(roomName, {
+                        participants: updatedParticipants,
+                      })
+
                       // Transform 완료 후 스케일 리셋
                       node.scaleX(1)
                       node.scaleY(1)
@@ -640,8 +713,8 @@ export default function PhotoCanvas({
           {/* 참가자가 없을 때 */}
           {cameraTrackRefs.length === 0 && (
             <Text
-              x={CANVAS_CONFIG.width / 2}
-              y={CANVAS_CONFIG.height / 2}
+              x={canvasSize.width / 2}
+              y={canvasSize.height / 2}
               text="Waiting for camera tracks..."
               fontSize={24}
               fontFamily="Arial"
@@ -653,40 +726,21 @@ export default function PhotoCanvas({
         </Layer>
 
         {/* 프레임 레이어 */}
-        <Layer>
-          <Rect
-            x={10}
-            y={10}
-            width={CANVAS_CONFIG.width - 20}
-            height={CANVAS_CONFIG.height - 20}
-            stroke={frameColor || '#FFFFFF'}
-            strokeWidth={12}
-            cornerRadius={20}
-            fill="transparent"
-            listening={false}
-          />
-
-          {/* 컷 정보 */}
-          <Rect
-            x={CANVAS_CONFIG.width - 150}
-            y={20}
-            width={120}
-            height={40}
-            fill="rgba(0,0,0,0.7)"
-            cornerRadius={8}
-            listening={false}
-          />
-          <Text
-            x={CANVAS_CONFIG.width - 90}
-            y={35}
-            text={`${currentCutIndex + 1}/${cutCount} 컷`}
-            fontSize={16}
-            fontFamily="Arial"
-            fill="white"
-            align="center"
-            listening={false}
-          />
-        </Layer>
+        {frameVisible && (
+          <Layer>
+            <Rect
+              x={10}
+              y={10}
+              width={canvasSize.width - 20}
+              height={canvasSize.height - 20}
+              stroke={frameColor || '#FFFFFF'}
+              strokeWidth={12}
+              cornerRadius={20}
+              fill="transparent"
+              listening={false}
+            />
+          </Layer>
+        )}
 
         {/* 플래시 효과 레이어 */}
         {isFlashing && (
@@ -694,8 +748,8 @@ export default function PhotoCanvas({
             <Rect
               x={0}
               y={0}
-              width={CANVAS_CONFIG.width}
-              height={CANVAS_CONFIG.height}
+              width={canvasSize.width}
+              height={canvasSize.height}
               fill="white"
               opacity={1}
               listening={false}
@@ -709,14 +763,14 @@ export default function PhotoCanvas({
             <Rect
               x={0}
               y={0}
-              width={CANVAS_CONFIG.width}
-              height={CANVAS_CONFIG.height}
+              width={canvasSize.width}
+              height={canvasSize.height}
               fill="rgba(0,0,0,0.7)"
               listening={false}
             />
             <Text
-              x={CANVAS_CONFIG.width / 2}
-              y={CANVAS_CONFIG.height / 2}
+              x={canvasSize.width / 2}
+              y={canvasSize.height / 2}
               text="💾 저장 중..."
               fontSize={20}
               fontFamily="Arial"
