@@ -48,4 +48,9 @@ public interface FeedRepository extends JpaRepository<Feed, Long> {
 
     @Query(value = "select * from feed order by rand() limit :limit", nativeQuery = true)
     List<Feed> findRandom(int limit);
+
+    /**
+     * 특정 사용자의 피드 조회 (1명당 1개이므로 Optional)
+     */
+    Optional<Feed> findByUser_UserId(Long userId);
 }

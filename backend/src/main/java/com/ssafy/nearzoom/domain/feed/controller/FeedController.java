@@ -68,4 +68,27 @@ public class FeedController {
             feedService.randomFeed(authentication, size)
         );
     }
+
+
+    /**
+     * 🆔 계정명으로 피드 조회 (프로필 정보 포함)
+     */
+    @GetMapping("/user/{accountName}")  // 기존 경로와 구분하기 위해 /user/ 사용
+    public ResponseEntity<ApiResponse<FeedDetailResponse>> getFeedByAccountName(
+            Authentication authentication,
+            @PathVariable String accountName) {
+        return ApiResponse.ok(feedService.getFeedByAccountName(authentication, accountName));
+    }
+
+    /**
+     * 🔍 피드 검색 (= 사용자 검색)
+     */
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<List<FeedDetailResponse>>> searchFeeds(
+            Authentication authentication,
+            @RequestParam String query,
+            @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.ok(feedService.searchFeeds(authentication, query, size));
+    }
+
 }
