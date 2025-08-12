@@ -27,7 +27,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http)
-            throws Exception {
+        throws Exception {
 
         http.cors(cors -> cors.configurationSource(request -> {
             CorsConfiguration config = new CorsConfiguration();
@@ -45,36 +45,37 @@ public class SecurityConfig {
         http.formLogin(form -> form.disable());
         http.httpBasic(httpBasic -> httpBasic.disable());
         http.exceptionHandling(ex -> ex
-                .authenticationEntryPoint((request, response, authException) -> {
-                    response.setContentType("application/json");
-                    response.setCharacterEncoding("UTF-8");
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.getWriter().write("{\"error\":\"로그인 인증 실패!\"}");
-                })
-                .accessDeniedHandler((request, response, accessDeniedException) -> {
-                    response.setContentType("application/json");
-                    response.setCharacterEncoding("UTF-8");
-                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                    response.getWriter().write("{\"error\":\"접근 권한이 없음!\"}");
-                })
+            .authenticationEntryPoint((request, response, authException) -> {
+                response.setContentType("application/json");
+                response.setCharacterEncoding("UTF-8");
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("{\"error\":\"로그인 인증 실패!\"}");
+            })
+            .accessDeniedHandler((request, response, accessDeniedException) -> {
+                response.setContentType("application/json");
+                response.setCharacterEncoding("UTF-8");
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.getWriter().write("{\"error\":\"접근 권한이 없음!\"}");
+            })
         );
 
         http.addFilterAfter(new JWTFilter(jwtUtil),
-                OAuth2LoginAuthenticationFilter.class);
+            OAuth2LoginAuthenticationFilter.class);
 
         http.oauth2Login(oauth2 -> oauth2
-                .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
-                .successHandler(customSuccessHandler)
+            .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
+            .successHandler(customSuccessHandler)
         );
 
         http.authorizeHttpRequests(
-                (auth) -> auth
-                        .requestMatchers("/auth/refresh", "/user/logout", "/webhooks/**")
-                        .permitAll()
-                        .anyRequest().authenticated());
+            (auth) -> auth
+                .requestMatchers("/auth/refresh", "/user/logout", "/webhooks/**", "/oauth2/**",
+                    "/login/oauth2/**")
+                .permitAll()
+                .anyRequest().authenticated());
 
         http.sessionManagement(
-                session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
         return http.build();
     }
