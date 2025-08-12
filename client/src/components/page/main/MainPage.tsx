@@ -6,6 +6,7 @@ import CreativeSection from './CreativeSection'
 import AboutUsSection from './AboutUsSection'
 import Footer from './Footer'
 import { useEffect } from 'react'
+import Link from 'next/link'
 
 export default function CreativePage() {
   const router = useRouter() // 🔥 추가
@@ -60,7 +61,6 @@ export default function CreativePage() {
         user={user}
         isCreatingRoom={isCreatingRoom}
       />
-
       <AboutUsSection />
 
       <Footer />

@@ -1,11 +1,11 @@
 'use client'
 
 import { useParticipants, useLocalParticipant } from '@livekit/components-react'
-import ControlPanel from '@/components/page/groupcall/ControlPanel'
-import FrameColorSelector from '@/components/page/groupcall/photo-select/FrameColorSelector'
-import PhotoCutSelector from '@/components/page/groupcall/photo-select/PhotoCutSelector'
-import PhotoPicker from '@/components/page/groupcall/photo-select/PhotoPicker'
-import WebCam from '@/components/page/groupcall/photo-select/WebCam'
+import ControlPanel from '../ControlPanel'
+import FrameColorSelector from '../photo-select/FrameColorSelector'
+import PhotoCutSelector from '../photo-select/PhotoCutSelector'
+import PhotoPicker from '../photo-select/PhotoPicker'
+import WebCam from '../photo-select/WebCam'
 import { cn } from '@/lib/utils'
 import { usePhotoBoothStore } from '../../providers/PhotoBoothProvider'
 import { PhotoBoothState } from '../../stores/photoboothStore'
@@ -30,7 +30,9 @@ export default function PhotoSelectComponent({
   const setCutCount = usePhotoBoothStore(state => state.setCutCount)
   const setSelectedPhotos = usePhotoBoothStore(state => state.setSelectedPhotos)
   const setFrameColor = usePhotoBoothStore(state => state.setFrameColor)
-  const setPhotoBoothState = usePhotoBoothStore(state => state.setPhotoBoothState)
+  const setPhotoBoothState = usePhotoBoothStore(
+    state => state.setPhotoBoothState
+  )
 
   // 실제 촬영된 사진들 사용 (하드코딩된 사진 대신)
   const capturedPhotos =
