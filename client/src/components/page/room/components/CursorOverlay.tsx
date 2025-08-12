@@ -130,26 +130,6 @@ export const CursorOverlay: React.FC<CursorOverlayProps> = ({
           </div>
         )
       })}
-
-      {/* 디버깅용 정보 (하이브리드 시스템) */}
-      <div className="bg-opacity-75 absolute top-4 right-4 max-w-xs rounded bg-black p-3 text-xs text-white">
-        <div className="mb-1 font-semibold text-yellow-300">
-          Hybrid Cursor System
-        </div>
-        <div>Local (Realtime): {localCursor && isActive ? '✓' : '✗'}</div>
-        <div>Remote (DataChannel): {remoteCursors.size}</div>
-        {remoteCursors.size > 0 && (
-          <div className="mt-1 text-xs opacity-75">
-            Users:{' '}
-            {Array.from(remoteCursors.values())
-              .map(c => c.userName)
-              .join(', ')}
-          </div>
-        )}
-        <div className="mt-1 text-xs text-green-300">
-          Local: {localCursor ? `${localCursor.x},${localCursor.y}` : 'None'}
-        </div>
-      </div>
     </div>
   )
 }
