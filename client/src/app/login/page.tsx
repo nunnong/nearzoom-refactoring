@@ -98,17 +98,6 @@ const LoginPage = (): JSX.Element => {
     }, 1000)
   }
 
-  // 뒤로가기 처리 (브라우저 기록 고려)
-  // const handleGoBack = () => {
-  //   clearLoginData()
-    
-  //   if (window.history.length > 1) {
-  //     router.back()
-  //   } else {
-  //     router.push('/')
-  //   }
-  // }
-
   // 메인페이지로 강제 이동
   const handleGoToMain = () => {
     clearLoginData()
@@ -183,7 +172,7 @@ const LoginPage = (): JSX.Element => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-md mx-4 relative">
+      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-md mx-4 relative">
         {/* X 버튼 */}
         <button
           onClick={() => router.back()}
@@ -200,7 +189,6 @@ const LoginPage = (): JSX.Element => {
           </svg>
         </button>
 
-      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-md mx-4 relative">
         {/* 제목 */}
         <h3 className="text-center text-2xl font-bold text-black">로그인</h3>
         <p className="mt-2 text-center text-sm text-gray-600">
@@ -215,15 +203,6 @@ const LoginPage = (): JSX.Element => {
             </p>
           </div>
         )}
-
-        {/* {redirectUrl && (
-          <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
-            <p className="text-center text-sm text-green-700">
-              🔗 초대받은 방으로 입장합니다
-            </p>
-          </div>
-        )} */}
-
 
         {/* 소셜 로그인 버튼들 */}
         <div className="mt-6 flex flex-col gap-3">

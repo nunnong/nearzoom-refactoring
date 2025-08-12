@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { X, Edit } from 'lucide-react'
 import api from '@/lib/axios'
-import { API_BASE_URL } from '@/constants/api'
 
 interface UploadSelfieModalProps {
   isOpen: boolean
@@ -31,17 +30,29 @@ export default function UploadSelfieModal({
   const fetchUserProfile = async () => {
     try {
       const response = await api.get('/user/userInfo')
-      const profile = response.data.data
+      console.log('🔍 API 응답 전체:', response.data) // 디버깅용
       
-      if (profile.faceImageUrl) {
-        setCurrentReferenceImage(profile.faceImageUrl)
+      const profile = response.data.data
+      console.log('🔍 프로필 데이터:', profile) // 디버깅용
+      
+      // pretty_face 필드 확인
+      const faceImageUrl = profile.prettyFaceUrl || profile.faceImageUrl || profile.pretty_face
+      console.log('🔍 모든 프로필 키:', Object.keys(profile)) // 디버깅용
+      console.log('🔍 prettyFaceUrl:', profile.prettyFaceUrl) // 디버깅용
+      console.log('🔍 pretty_face:', profile.pretty_face) // 디버깅용
+      console.log('🔍 찾은 이미지 URL:', faceImageUrl) // 디버깅용
+      
+      if (faceImageUrl) {
+        setCurrentReferenceImage(faceImageUrl)
         setHasExistingImage(true)
+        console.log('✅ 기존 이미지 발견:', faceImageUrl)
       } else {
         setCurrentReferenceImage(null)
         setHasExistingImage(false)
+        console.log('❌ 기존 이미지 없음')
       }
     } catch (error) {
-      console.error('Failed to fetch user profile:', error)
+      console.error('❌ 사용자 프로필 가져오기 실패:', error)
     }
   }
 
@@ -49,8 +60,7 @@ export default function UploadSelfieModal({
     const file = event.target.files?.[0]
     if (file) {
       const reader = new FileReader()
-      reader.onload = e => {
-      reader.onload = e => {
+      reader.onload = (e) => {
         const result = e.target?.result as string
         setSelectedImage(result)
       }
@@ -64,7 +74,6 @@ export default function UploadSelfieModal({
 
   const handleSave = async () => {
     if (!selectedImage) return
-
 
     try {
       setIsUploading(true)
@@ -86,9 +95,13 @@ export default function UploadSelfieModal({
       const imageUrl = uploadResponse.data?.data?.file_url
       if (!imageUrl) throw new Error('이미지 URL을 받아올 수 없습니다.')
 
+      console.log('📤 이미지 저장 요청:', imageUrl)
+
       await api.put('/user/save-face-image', null, {
         params: { prettyFaceUrl: imageUrl }
       })
+
+      console.log('✅ 이미지 저장 완료')
 
       setCurrentReferenceImage(imageUrl)
       setHasExistingImage(true)
@@ -98,7 +111,7 @@ export default function UploadSelfieModal({
       onClose()
       
     } catch (error: any) {
-      console.error('프로필 이미지 저장 실패:', error)
+      console.error('❌ 프로필 이미지 저장 실패:', error)
       alert('프로필 이미지 저장에 실패했습니다.')
     } finally {
       setIsUploading(false)
@@ -141,6 +154,7 @@ export default function UploadSelfieModal({
               : '가장 잘 나온 사진 하나를 업로드해주세요. AI가 이를 참조하여 더 예쁘고 자연스러운 사진을 만들어 드립니다.'
             }
           </p>
+
 
           {/* AI 사진 합성용 태그 */}
           <div className="mb-6 flex items-center space-x-2 rounded-full border border-blue-200 px-4 py-2 text-blue-600 w-fit">

@@ -50,9 +50,16 @@ export default function RoomJoinPage() {
       setIsRefreshing(true)
       console.log('🔄 방 정보 실시간 갱신 중...', roomId)
       
-      // 🔥 수정: roomId를 숫자로 변환해서 전달
-      const numericRoomId = typeof roomId === 'string' ? parseInt(roomId, 10) : roomId
-      if (isNaN(numericRoomId)) {
+      // 🔥 수정: roomId가 string[]일 경우 처리
+      let numericRoomId: number | null = null
+      if (typeof roomId === 'string') {
+        numericRoomId = parseInt(roomId, 10)
+      } else if (Array.isArray(roomId) && typeof roomId[0] === 'string') {
+        numericRoomId = parseInt(roomId[0], 10)
+      } else if (typeof roomId === 'number') {
+        numericRoomId = roomId
+      }
+      if (numericRoomId === null || isNaN(numericRoomId)) {
         throw new Error('유효하지 않은 방 ID입니다')
       }
       
