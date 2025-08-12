@@ -47,7 +47,8 @@ public class FollowService {
             .map(user -> new UserInfoResponse(
                 user.getUserName(),
                 user.getUserEmail(),
-                user.getProfileImage()
+                user.getProfileImage(),
+                    user.getPrettyFace()
             ))
             .toList();
     }
@@ -58,7 +59,8 @@ public class FollowService {
             .map(user -> new UserInfoResponse(
                 user.getUserName(),
                 user.getUserEmail(),
-                user.getProfileImage()
+                user.getProfileImage(),
+                    user.getPrettyFace()
             ))
             .toList();
     }

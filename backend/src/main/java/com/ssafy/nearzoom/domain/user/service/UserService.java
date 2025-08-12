@@ -5,9 +5,9 @@ import com.ssafy.nearzoom.domain.user.dto.UserInfoResponse;
 import com.ssafy.nearzoom.domain.user.entity.Social;
 import com.ssafy.nearzoom.domain.user.entity.User;
 import com.ssafy.nearzoom.domain.user.repository.UserRepository;
+import com.ssafy.nearzoom.global.auth.jwt.JWTUtil;
 import com.ssafy.nearzoom.global.auth.jwt.service.RefreshTokenService;
 import com.ssafy.nearzoom.global.auth.util.AuthUtil;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -17,11 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UserService {
 
+    private final JWTUtil jwtUtil;
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
 
-    @Transactional
-    public void logOut(Authentication authentication) {
+    public void logout(Authentication authentication) {
 
         UserAuthInfoResponse userAuthInfo = AuthUtil.getUserAuthInfo(authentication);
 
@@ -30,7 +30,6 @@ public class UserService {
         refreshTokenService.delete(email);
     }
 
-    @Transactional(readOnly = true)
     public UserInfoResponse getUserInfo(Authentication authentication) {
 
         UserAuthInfoResponse userAuthInfo = AuthUtil.getUserAuthInfo(authentication);
@@ -42,23 +41,13 @@ public class UserService {
 
         String nickname = user.getUserName();
         String profileImage = user.getProfileImage();
+        String faceImageUrl = user.getPrettyFace();
 
-        return new UserInfoResponse(nickname, email, profileImage);
-    }
-
-    @Transactional(readOnly = true)
-    public List<UserInfoResponse> getFeedUserInfo(String email) {
-        return userRepository.findByUserEmail(email).stream()
-            .map(user -> new UserInfoResponse(
-                user.getUserName(),
-                user.getUserEmail(),
-                user.getProfileImage()
-            ))
-            .toList();
+        return new UserInfoResponse(nickname, email, profileImage, faceImageUrl);
     }
 
     @Transactional
-    public void signOut(Authentication authentication) {
+    public void signout(Authentication authentication) {
         UserAuthInfoResponse userAuthInfo = AuthUtil.getUserAuthInfo(authentication);
 
         String email = userAuthInfo.email();
@@ -67,8 +56,6 @@ public class UserService {
         User user = userRepository.getByEmailAndSocial(email, social);
 
         user.markDeleted();
-        userRepository.save(user);
-
         refreshTokenService.delete(email);
     }
 
@@ -76,6 +63,7 @@ public class UserService {
     public void updatePrettyFace(Authentication authentication, String prettyFaceUrl) {
         UserAuthInfoResponse userAuthInfo = AuthUtil.getUserAuthInfo(authentication);
 
+        System.out.println("prettyFaceUrl = " + prettyFaceUrl);
         String email = userAuthInfo.email();
         Social social = userAuthInfo.social();
 

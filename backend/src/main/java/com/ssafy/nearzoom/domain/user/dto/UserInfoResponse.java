@@ -1,9 +1,10 @@
 package com.ssafy.nearzoom.domain.user.dto;
 
 public record UserInfoResponse(
-    String userName,
-    String userEmail,
-    String userProfileImage
+        String userName,
+        String userEmail,
+        String userProfileImage,
+        String faceImageUrl
 ) {
 
 }

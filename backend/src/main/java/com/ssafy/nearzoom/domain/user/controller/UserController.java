@@ -8,7 +8,6 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,9 +29,9 @@ public class UserController {
 
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest request,
-        HttpServletResponse response, Authentication authentication) {
+                                                    HttpServletResponse response, Authentication authentication) {
 
-        userService.logOut(authentication);
+        userService.logout(authentication);
 
         HttpSession session = request.getSession(false);
         if (session != null) {
@@ -57,27 +56,16 @@ public class UserController {
 
     @GetMapping("/userInfo")
     public ResponseEntity<ApiResponse<UserInfoResponse>> getUserInfo(
-        Authentication authentication) {
+            Authentication authentication) {
         UserInfoResponse info = userService.getUserInfo(authentication);
         return ApiResponse.ok(info);
     }
 
-    @GetMapping("/email-user-info")
-    public ResponseEntity<ApiResponse<List<UserInfoResponse>>> getFeedUserInfo(
-        @RequestParam String email) {
-        List<UserInfoResponse> info = userService.getFeedUserInfo(email);
-
-        if (info.isEmpty()) {
-            return ApiResponse.ok("해당 이메일의 사용자가 없습니다.", null);
-        }
-        return ApiResponse.ok("사용자가 존재합니다.", info);
-    }
-
     @DeleteMapping("/signout")
     public ResponseEntity<ApiResponse<Void>> withdraw(HttpServletRequest request,
-        HttpServletResponse response, Authentication authentication) {
+                                                      HttpServletResponse response, Authentication authentication) {
 
-        userService.signOut(authentication);
+        userService.signout(authentication);
 
         HttpSession session = request.getSession(false);
         if (session != null) {
@@ -102,17 +90,48 @@ public class UserController {
 
     @PutMapping("/save-face-image")
     public ResponseEntity<ApiResponse<String>> updatePrettyFace(
-        Authentication authentication,
-        @RequestParam String prettyFaceUrl) {
+            Authentication authentication,
+            @RequestParam("prettyFaceUrl") String prettyFaceUrl) {
+
+        // 디버깅을 위한 로그 추가
+        System.out.println("=== UserController.updatePrettyFace 호출 ===");
+        System.out.println("Received prettyFaceUrl parameter: " + prettyFaceUrl);
+
         try {
+            // URL 유효성 검사
+            if (prettyFaceUrl == null || prettyFaceUrl.trim().isEmpty()) {
+                System.out.println("ERROR: URL이 비어있음");
+                return ApiResponse.failedOf(HttpStatus.BAD_REQUEST,
+                        "이미지 URL이 비어있습니다.");
+            }
+
+            // URL 형식 검사
+            if (!prettyFaceUrl.startsWith("http://") && !prettyFaceUrl.startsWith("https://")) {
+                System.out.println("ERROR: 잘못된 URL 형식: " + prettyFaceUrl);
+                return ApiResponse.failedOf(HttpStatus.BAD_REQUEST,
+                        "유효하지 않은 URL 형식입니다.");
+            }
+
+            // 사용자 인증 확인
+            if (authentication == null || !authentication.isAuthenticated()) {
+                System.out.println("ERROR: 인증되지 않은 사용자");
+                return ApiResponse.failedOf(HttpStatus.UNAUTHORIZED,
+                        "인증되지 않은 사용자입니다.");
+            }
+
+            System.out.println("UserService.updatePrettyFace 호출 시작");
             userService.updatePrettyFace(authentication, prettyFaceUrl);
+            System.out.println("UserService.updatePrettyFace 호출 완료");
 
             return ApiResponse.ok("예쁜 얼굴 이미지가 성공적으로 저장되었습니다.");
         } catch (ApiException e) {
+            System.err.println("ApiException 발생: " + e.getMessage());
             return ApiResponse.failedOf(e);
         } catch (Exception e) {
+            System.err.println("일반 Exception 발생: " + e.getMessage());
+            e.printStackTrace();
             return ApiResponse.failedOf(HttpStatus.INTERNAL_SERVER_ERROR,
-                "이미지 URL 저장 중 오류가 발생했습니다: " + e.getMessage());
+                    "이미지 URL 저장 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
 }
