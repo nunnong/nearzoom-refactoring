@@ -4,9 +4,8 @@ import { useRouter } from 'next/navigation'
 import React, { useEffect } from 'react'
 import { useState } from 'react'
 
-import api from '@/lib/axios'
 import { User } from '@/types/auth'
-import { API_ENDPOINTS } from '@/constants/api'
+import { myroomService, MyPhotoListCondition } from '@/services/myroomService'
 
 import ImageArchive from './ImageArchive'
 import SearchBox from './SearchBox'
@@ -35,17 +34,14 @@ interface Filter {
 interface DashboardProps {
   images?: ImageItem[]
   userProfile?: User | null
+  onRefresh?: (condition?: MyPhotoListCondition) => Promise<void>
+  onLoadMore?: () => Promise<void>
+  hasMore?: boolean
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
-  // ApiResponse 형태의 데이터인 경우 실제 데이터 추출
-  const actualUser = userProfile?.data ? {
-    name: userProfile.data.userName,
-    email: userProfile.data.userEmail,
-    profileImage: userProfile.data.userProfileImage,
-    faceImageUrl: userProfile.data.faceImageUrl, // 참조 사진 URL 추가
-    socialType: userProfile.data.socialType // 실제 소셜 타입 사용
-  } : userProfile
+const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefresh, onLoadMore, hasMore }) => {
+  // userProfile이 이미 User 타입이므로 직접 사용
+  const actualUser = userProfile
   
   const { handleLogout, handleDeleteAccount, isLoading } = useAuth()
   
@@ -102,8 +98,40 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
     }
   }, [imageList, activeFilters])
 
-  const handleFiltersChange = (filters: Filter[]) => {
+  const handleFiltersChange = async (filters: Filter[]) => {
     setActiveFilters(filters)
+
+    // 필터를 백엔드 API 파라미터로 변환
+    const condition: MyPhotoListCondition = {
+      limit: 20
+    }
+
+    filters.forEach(filter => {
+      switch (filter.type) {
+        case 'heart':
+          condition.heart = true
+          break
+        case 'name':
+          // partnerEmails로 전송 (쉼표로 구분)
+          condition.partnerEmails = filter.value
+          break
+        case 'date':
+          if (filter.value.includes('~')) {
+            const [start, end] = filter.value.split('~').map(d => d.trim().replace(/\./g, '-'))
+            condition.startDate = start
+            condition.endDate = end
+          } else {
+            condition.startDate = filter.value.replace(/\./g, '-')
+            condition.endDate = filter.value.replace(/\./g, '-')
+          }
+          break
+      }
+    })
+
+    // 백엔드에서 필터된 데이터 가져오기
+    if (onRefresh) {
+      await onRefresh(condition)
+    }
   }
 
   const handleUploadSelfie = (): void => {
@@ -130,9 +158,9 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
 
     try {
       // API 호출
-      await api.post(API_ENDPOINTS.LIKE, {
-        photoId: imageId,
-        isLiked: newIsLiked
+      await myroomService.updateHeart({
+        photoId: parseInt(imageId),
+        heart: newIsLiked
       })
 
       // 로컬 상태 업데이트
@@ -183,9 +211,38 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
   }
 }
 
-  const handleDelete = (imageId: string): void => {
-    // 로컬 상태 업데이트
-    setImageList(prevImages => prevImages.filter(img => img.id !== imageId))
+  const handleDelete = async (imageId: string): Promise<void> => {
+    try {
+      // API 호출
+      await myroomService.deletePhoto({
+        photoId: parseInt(imageId)
+      })
+
+      // 로컬 상태 업데이트
+      setImageList(prevImages => prevImages.filter(img => img.id !== imageId))
+    } catch (error) {
+      console.error('사진 삭제 실패:', error)
+    }
+  }
+
+  const handleSaveEdited = async (imageId: string): Promise<void> => {
+    try {
+      // API 호출로 편집본 저장 (원본을 수정 불가 상태로 전환)
+      await myroomService.saveEditedPhoto({
+        photoId: parseInt(imageId)
+      })
+
+      // 로컬 상태 업데이트 - 해당 이미지를 편집됨으로 표시
+      setImageList(prevImages =>
+        prevImages.map(img =>
+          img.id === imageId ? { ...img, isEdited: true } : img
+        )
+      )
+
+      console.log('편집본이 저장되었습니다.')
+    } catch (error) {
+      console.error('편집본 저장 실패:', error)
+    }
   }
 
   const handleEdit = (imageId: string): void => {
@@ -197,7 +254,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
       const currentPath = window.location.pathname
       const encodedReturnUrl = encodeURIComponent(currentPath)
       router.push(
-        `/drawing?id=${imageId}&src=${encodedSrc}&returnUrl=${encodedReturnUrl}`
+        `/drawing?id=${imageId}&src=${encodedSrc}&returnUrl=${encodedReturnUrl}&saveCallback=true`
       )
     }
   }
@@ -218,25 +275,6 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
         <header className="border-b bg-white shadow-sm">
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center space-x-4">
-              <button
-                onClick={toggleSidebar}
-                className="rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                aria-label="Toggle sidebar"
-              >
-                <svg
-                  className="h-6 w-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                </svg>
-              </button>
               <h1 className="text-2xl font-bold text-gray-900"></h1>
             </div>
             <div className="flex items-center space-x-3">
@@ -348,6 +386,8 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
             onShareKakao={handleShareKakao}
             onDelete={handleDelete}
             onEdit={handleEdit}
+            onLoadMore={onLoadMore}
+            hasMore={hasMore}
           />
         </main>
       </div>
@@ -392,10 +432,10 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
                   </div>
                   <div>
                     <h4 className="text-lg font-medium text-gray-900">
-                      {actualUser?.name || '사용자'}
+                      {actualUser?.name || '사용자 정보 로딩 중...'}
                     </h4>
                     <p className="text-sm text-gray-500">
-                      {actualUser?.email || 'user@example.com'}
+                      {actualUser?.email || '이메일 로딩 중...'}
                     </p>
                   </div>
                 </div>
@@ -406,11 +446,11 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
                     <dl className="space-y-3">
                       <div className="flex justify-between">
                         <dt className="text-sm font-medium text-gray-500">이메일</dt>
-                        <dd className="text-sm text-gray-900">{actualUser?.email || '이메일 정보 없음'}</dd>
+                        <dd className="text-sm text-gray-900">{actualUser?.email || '로딩 중...'}</dd>
                       </div>
                       <div className="flex justify-between">
                         <dt className="text-sm font-medium text-gray-500">사용자명</dt>
-                        <dd className="text-sm text-gray-900">{actualUser?.name || '사용자명 없음'}</dd>
+                        <dd className="text-sm text-gray-900">{actualUser?.name || '로딩 중...'}</dd>
                       </div>
                     </dl>
                   </div>
@@ -452,7 +492,10 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile }) => {
       <UploadSelfieModal
         isOpen={isUploadSelfieModalOpen}
         onClose={() => setIsUploadSelfieModalOpen(false)}
-        userProfile={actualUser}
+        onImageUpdated={() => {
+          // 참조 이미지 업데이트 후 추가 작업이 필요하면 여기에 작성
+          console.log('참조 이미지가 업데이트되었습니다.')
+        }}
       />
     </div>
   )

@@ -3,8 +3,7 @@
 import type { JSX } from "react"
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useAuth } from '@/hooks/auth'  // 수정: '@/hooks/auth' -> '@/hooks/useAuth'
-import { useAuthStore } from '@/stores/authStore'
+import { useAuth } from '@/hooks/auth/useAuth'
 
 const LoginContent = (): JSX.Element => {
   const router = useRouter()
@@ -14,72 +13,146 @@ const LoginContent = (): JSX.Element => {
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null)
   const [actionAfterLogin, setActionAfterLogin] = useState<string | null>(null)
 
-  // 🔥 URL 파라미터나 localStorage에서 리다이렉트 정보 확인
+  // 🔥 디버깅을 위한 로그 추가
   useEffect(() => {
-    // URL 파라미터에서 리다이렉트 URL 확인
-    const redirectParam = searchParams.get('redirect')
-    
-    // localStorage에서 리다이렉트 정보 확인
+    console.log('=== LoginPage 디버깅 ===')
+    console.log('URL 파라미터:', {
+      redirect: searchParams.get('redirect'),
+      returnUrl: searchParams.get('returnUrl'),
+      action: searchParams.get('action')
+    })
+    console.log('localStorage:', {
+      redirectAfterLogin: localStorage.getItem('redirectAfterLogin'),
+      actionAfterLogin: localStorage.getItem('actionAfterLogin')
+    })
+  }, [searchParams])
+
+  // URL 파라미터나 localStorage에서 리다이렉트 정보 확인
+  useEffect(() => {
+    // 🔥 더 많은 파라미터 확인
+    const redirectParam = searchParams.get('redirect') || searchParams.get('returnUrl')
+    const actionParam = searchParams.get('action')
     const storedRedirect = localStorage.getItem('redirectAfterLogin')
     const storedAction = localStorage.getItem('actionAfterLogin')
     
+    console.log('🔍 리다이렉트 정보 수집:', {
+      redirectParam,
+      actionParam,
+      storedRedirect,
+      storedAction
+    })
+    
     if (redirectParam) {
-      setRedirectUrl(decodeURIComponent(redirectParam))
+      const decodedUrl = decodeURIComponent(redirectParam)
+      setRedirectUrl(decodedUrl)
+      console.log('✅ redirectUrl 설정:', decodedUrl)
     } else if (storedRedirect) {
       setRedirectUrl(storedRedirect)
+      console.log('✅ redirectUrl 설정 (localStorage):', storedRedirect)
     }
     
-    if (storedAction) {
+    if (actionParam) {
+      setActionAfterLogin(actionParam)
+      console.log('✅ actionAfterLogin 설정:', actionParam)
+    } else if (storedAction) {
       setActionAfterLogin(storedAction)
+      console.log('✅ actionAfterLogin 설정 (localStorage):', storedAction)
     }
   }, [searchParams])
 
-  // 🔥 로그인 상태 확인 및 리다이렉트 처리
+  // 로그인 상태 확인 및 리다이렉트 처리
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
-      // 로그인이 완료된 경우 리다이렉트 처리
       handleLoginSuccess()
     }
   }, [isAuthenticated, isLoading])
 
-  // 🔥 로그인 성공 후 처리
-  const handleLoginSuccess = () => {
-    // 저장된 정보 정리
+  // 로그아웃 상태 정리 함수
+  const clearLoginData = () => {
     localStorage.removeItem('redirectAfterLogin')
     localStorage.removeItem('actionAfterLogin')
-    
-    if (redirectUrl) {
-      console.log('✅ 로그인 완료 - 저장된 URL로 리다이렉트:', redirectUrl)
-      router.push(redirectUrl)
-    } else if (actionAfterLogin === 'createRoom') {
-      console.log('✅ 로그인 완료 - 메인 페이지로 이동 (방 생성을 위해)')
-      router.push('/')
-    } else {
-      console.log('✅ 로그인 완료 - 메인 페이지로 이동')
-      router.push('/')
-    }
   }
 
-  // 🔥 소셜 로그인 시작 (리다이렉트 정보 유지)
-  const handleKakaoLogin = () => {
-    // 현재 리다이렉트 정보를 localStorage에 저장
+  // 🔥 수정된 로그인 성공 후 처리
+  const handleLoginSuccess = () => {
+    console.log('🎉 handleLoginSuccess 실행')
+    console.log('현재 상태:', { redirectUrl, actionAfterLogin })
+    
+    // 🔥 항상 참조사진 페이지를 거치도록 수정
     if (redirectUrl) {
-      localStorage.setItem('redirectAfterLogin', redirectUrl)
+      console.log('✅ 로그인 완료 - 참조사진 페이지로 이동 (공유 URL 보존)')
+      const encodedRedirectUrl = encodeURIComponent(redirectUrl)
+      router.push(`/upload-photo?returnUrl=${encodedRedirectUrl}`)
+    } else if (actionAfterLogin === 'createRoom') {
+      console.log('✅ 로그인 완료 - 참조사진 페이지로 이동 (방 생성 예정)')
+      router.push('/upload-photo?action=createRoom')
+    } else {
+      // 🔥 기본값도 참조사진 페이지로 변경 (사용자가 직접 로그인한 경우)
+      console.log('✅ 로그인 완료 - 참조사진 페이지로 이동 (기본)')
+      router.push('/upload-photo')
     }
-    if (actionAfterLogin) {
-      localStorage.setItem('actionAfterLogin', actionAfterLogin)
+    
+    // 🔥 이동 후에 localStorage 정리
+    setTimeout(() => {
+      clearLoginData()
+    }, 1000)
+  }
+
+  // 메인페이지로 강제 이동
+  const handleGoToMain = () => {
+    clearLoginData()
+    router.push('/')
+  }
+
+  // ESC 키로 닫기 기능
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        handleGoToMain()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
+
+  // 🔥 수정된 소셜 로그인 시작 (더 안전한 데이터 보존)
+  const handleKakaoLogin = () => {
+    console.log('🔥 카카오 로그인 시작')
+    console.log('보존할 데이터:', { redirectUrl, actionAfterLogin })
+    
+    // 🔥 URL 파라미터도 함께 저장
+    const currentRedirect = redirectUrl || searchParams.get('redirect') || searchParams.get('returnUrl')
+    const currentAction = actionAfterLogin || searchParams.get('action')
+    
+    if (currentRedirect) {
+      localStorage.setItem('redirectAfterLogin', currentRedirect)
+      console.log('💾 redirectAfterLogin 저장:', currentRedirect)
+    }
+    if (currentAction) {
+      localStorage.setItem('actionAfterLogin', currentAction)
+      console.log('💾 actionAfterLogin 저장:', currentAction)
     }
     
     startSocialLogin('KAKAO')
   }
 
   const handleGoogleLogin = () => {
-    // 현재 리다이렉트 정보를 localStorage에 저장
-    if (redirectUrl) {
-      localStorage.setItem('redirectAfterLogin', redirectUrl)
+    console.log('🔥 구글 로그인 시작')
+    console.log('보존할 데이터:', { redirectUrl, actionAfterLogin })
+    
+    const currentRedirect = redirectUrl || searchParams.get('redirect') || searchParams.get('returnUrl')
+    const currentAction = actionAfterLogin || searchParams.get('action')
+    
+    if (currentRedirect) {
+      localStorage.setItem('redirectAfterLogin', currentRedirect)
+      console.log('💾 redirectAfterLogin 저장:', currentRedirect)
     }
-    if (actionAfterLogin) {
-      localStorage.setItem('actionAfterLogin', actionAfterLogin)
+    if (currentAction) {
+      localStorage.setItem('actionAfterLogin', currentAction)
+      console.log('💾 actionAfterLogin 저장:', currentAction)
     }
     
     startSocialLogin('GOOGLE')
@@ -99,17 +172,33 @@ const LoginContent = (): JSX.Element => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-md mx-4">
+      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-md mx-4 relative">
+        {/* X 버튼 */}
+        <button
+          onClick={() => router.back()}
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors group"
+          aria-label="닫기"
+        >
+          <svg
+            className="w-4 h-4 text-gray-600 group-hover:text-gray-800"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
         {/* 제목 */}
         <h3 className="text-center text-2xl font-bold text-black">로그인</h3>
         <p className="mt-2 text-center text-sm text-gray-600">
-          {redirectUrl ? '로그인 후 요청하신 페이지로 이동합니다' : '소셜 계정으로 간편하게 로그인하세요'}
+          {redirectUrl ? '로그인 후 🔗초대된 방🔗으로 이동합니다' : '소셜 계정으로 간편하게 로그인하세요'}
         </p>
         
-        {/* 🔥 리다이렉트 정보 표시 */}
+        {/* 리다이렉트 정보 표시 */}
         {actionAfterLogin === 'createRoom' && (
-          <div className="mt-2 p-2 bg-blue-50 rounded-lg">
-            <p className="text-center text-sm text-blue-600">
+          <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <p className="text-center text-sm text-blue-700">
               ✨ 로그인 후 방을 생성합니다
             </p>
           </div>
@@ -165,27 +254,25 @@ const LoginContent = (): JSX.Element => {
         </div>
 
         {/* 구분선 */}
-        <div className="relative my-6">
+        <div className="relative my-4">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-300" />
           </div>
           <div className="relative flex justify-center bg-white px-2 text-xs text-gray-500">또는</div>
         </div>
 
-        {/* 🔥 취소 버튼 추가 (리다이렉트가 있는 경우) */}
-        {(redirectUrl || actionAfterLogin) && (
-          <div className="text-center mb-4">
-            <button
-              onClick={() => router.push('/')}
-              className="text-sm text-gray-500 hover:text-gray-700 underline"
-            >
-              메인으로 돌아가기
-            </button>
-          </div>
-        )}
+        {/* 여러 이동 옵션들 */}
+        <div className="space-y-2">
+          <button
+            onClick={handleGoToMain}
+            className="w-full text-sm text-gray-600 hover:text-gray-800 py-3 px-4 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            🏠 메인으로 돌아가기
+          </button>
+        </div>
 
         {/* 약관 */}
-        <p className="text-center text-xs text-gray-500">
+        <p className="mt-2 text-center text-xs text-gray-500">
           로그인 시{" "}
           <a href="#" className="font-medium text-gray-600 underline hover:text-gray-800">
             이용약관 및 개인정보처리방침
