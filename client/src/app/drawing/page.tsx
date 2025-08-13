@@ -141,12 +141,35 @@ const DrawingPage: React.FC = () => {
     const id = searchParams.get('id')
     const src = searchParams.get('src')
 
+    console.log('🔍 Drawing 페이지 파라미터:', { id, src })
+
     if (id) setImageId(id)
     if (src) {
       const imgSrc = decodeURIComponent(src)
+      console.log('📷 디코딩된 이미지 URL:', imgSrc)
+      
       const img = new Image()
-      img.crossOrigin = 'anonymous'
+      
+      // 이미지 URL이 같은 도메인인지 확인
+      const isCurrentDomain = imgSrc.startsWith(window.location.origin) || imgSrc.startsWith('/')
+      console.log('🌐 이미지 도메인 확인:', {
+        imgSrc,
+        currentOrigin: window.location.origin,
+        isCurrentDomain,
+        isDataUrl: imgSrc.startsWith('data:'),
+        isHttps: imgSrc.startsWith('https://'),
+        isHttp: imgSrc.startsWith('http://')
+      })
+      
+      // crossOrigin 설정 제거 (CORS 문제로 이미지 로드 실패)
+      
       img.onload = () => {
+        console.log('✅ 이미지 로드 성공:', {
+          width: img.width,
+          height: img.height,
+          src: img.src
+        })
+        
         setOriginalImage(img)
         // 원본 이미지 크기 저장
         setOriginalImageSize({
@@ -169,6 +192,35 @@ const DrawingPage: React.FC = () => {
         setHistory([initialState])
         setHistoryStep(0)
       }
+      
+      img.onerror = (error) => {
+        console.error('❌ 이미지 로드 실패:', {
+          error: error,
+          errorType: error?.type,
+          imgSrc: imgSrc,
+          originalSrc: src,
+          imgCurrentSrc: img.currentSrc,
+          imgComplete: img.complete,
+          imgNaturalWidth: img.naturalWidth,
+          imgNaturalHeight: img.naturalHeight
+        })
+        
+        // 이미지 URL 직접 테스트
+        console.log('🔗 이미지 URL 직접 테스트:', imgSrc)
+        fetch(imgSrc)
+          .then(response => {
+            console.log('📡 Fetch 응답:', {
+              status: response.status,
+              statusText: response.statusText,
+              headers: Object.fromEntries(response.headers.entries()),
+              url: response.url
+            })
+          })
+          .catch(fetchError => {
+            console.error('📡 Fetch 실패:', fetchError)
+          })
+      }
+      
       img.src = imgSrc
     }
   }, [searchParams])
@@ -503,40 +555,7 @@ const DrawingPage: React.FC = () => {
       console.log('💾 Starting save process...')
       console.log('📝 Original image ID:', imageId)
 
-      // 1단계: Konva 스테이지를 이미지로 변환
-      const dataURL = stageRef.current.toDataURL({
-        mimeType: 'image/png',
-        quality: 1,
-      })
-
-      // 2단계: dataURL을 Blob으로 변환
-      const response = await fetch(dataURL)
-      const blob = await response.blob()
-
-      // 3단계: FormData 생성하여 이미지 서버에 업로드
-      const formData = new FormData()
-      formData.append('file', blob, 'edited-image.png')
-
-      console.log('📤 Uploading edited image to image server...')
-      const uploadResponse = await fetch('https://image.nearzoom.store/upload', {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!uploadResponse.ok) {
-        throw new Error(`이미지 업로드 실패: ${uploadResponse.status} ${uploadResponse.statusText}`)
-      }
-
-      const uploadResult = await uploadResponse.json()
-      const imageUrl = uploadResult?.data?.file_url || uploadResult?.url || uploadResult?.imageUrl
-
-      if (!imageUrl) {
-        throw new Error('업로드된 이미지 URL을 받아올 수 없습니다.')
-      }
-
-      console.log('✅ Image uploaded successfully:', imageUrl)
-
-      // 4단계: 백엔드에 편집본 저장 요청 (myroomService 사용)
+      // 백엔드에 편집본 저장 요청 (상태만 변경)
       console.log('📤 Saving edited photo to backend...')
       await myroomService.saveEditedPhoto({
         photoId: parseInt(imageId!)

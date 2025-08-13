@@ -5,7 +5,6 @@ export const sessionManager = {
     try {
       const timestamp = Date.now()
       localStorage.setItem(AUTH_CONFIG.STORAGE_KEYS.SESSION_TIMESTAMP, timestamp.toString())
-      console.log('✅ Session timestamp saved:', new Date(timestamp).toLocaleString())
     } catch (error) {
       console.error('❌ Failed to save session timestamp:', error)
     }
@@ -38,7 +37,7 @@ export const sessionManager = {
     const isExpired = (now - timestamp) > AUTH_CONFIG.SESSION_TIMEOUT
     
     if (isExpired) {
-      console.log('🕐 Session expired:', {
+      console.log('Session expired:', {
         sessionStart: new Date(timestamp).toLocaleString(),
         now: new Date(now).toLocaleString(),
         elapsed: Math.floor((now - timestamp) / 1000 / 60) + ' minutes'

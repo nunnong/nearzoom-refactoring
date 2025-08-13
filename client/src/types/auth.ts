@@ -7,7 +7,7 @@ export interface User {
   name: string
   email: string
   profileImage?: string
-  faceImageUrl?: string
+  pretty_face?: string
   socialType: SocialType
   createdAt: string
   updatedAt: string

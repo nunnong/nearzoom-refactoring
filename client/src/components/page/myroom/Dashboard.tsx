@@ -46,7 +46,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefre
   const { handleLogout, handleDeleteAccount, isLoading } = useAuth()
   
   const router = useRouter()
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true) // 기본값을 true로 변경
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true) // 사이드바 계속 열어 놓기
   const [activeModal, setActiveModal] = useState<string | null>(null)
   const [imageList, setImageList] = useState<ImageItem[]>([])
   const [filteredImages, setFilteredImages] = useState<ImageItem[]>([])
@@ -112,8 +112,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefre
           condition.heart = true
           break
         case 'name':
-          // partnerEmails로 전송 (쉼표로 구분)
-          condition.partnerEmails = filter.value
+          condition.partnerEmails = [filter.value]
           break
         case 'date':
           if (filter.value.includes('~')) {
@@ -128,7 +127,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefre
       }
     })
 
-    // 백엔드에서 필터된 데이터 가져오기
+    // 백엔드에서 필터된 데이터 가져오기 
     if (onRefresh) {
       await onRefresh(condition)
     }
@@ -387,7 +386,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefre
             onDelete={handleDelete}
             onEdit={handleEdit}
             onLoadMore={onLoadMore}
-            hasMore={hasMore}
+            hasMoreProp={hasMore}
           />
         </main>
       </div>

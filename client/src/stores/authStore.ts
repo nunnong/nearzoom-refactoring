@@ -62,7 +62,6 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
   // 앱 시작 시 토큰 복원 및 검증
   initializeAuth: async () => {
-    console.log('initializeAuth 시작')
     if (typeof window === 'undefined') return
 
     // 먼저 세션이 만료되었는지 확인
@@ -73,32 +72,25 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     }
 
     const savedToken = tokenStorage.get()
-    console.log('저장된 토큰:', savedToken)
     if (!savedToken) {
-      console.log('저장된 토큰이 없음')
       set({ isLoading: false })
       return
     }
 
     set({ accessToken: savedToken, isLoading: true })
-    console.log('토큰 설정됨, 사용자 정보 검증 시작')
 
     try {
       // 토큰이 유효한지 사용자 정보로 검증
       const userResponse = await api.get(API_ENDPOINTS.USER_INFO)
-      console.log('사용자 정보 응답:', userResponse.data)
       
       const rawData = userResponse.data.data || userResponse.data
       const userData = userTransformer.fromBackend(rawData)
       
-      console.log('변환된 사용자 데이터:', userData)
       set({
         user: userData,
         isAuthenticated: true,
       })
-      console.log('로그인 상태로 설정됨')
     } catch (error) {
-      console.error('토큰 검증 실패:', error)
       get().clearTokens()
     } finally {
       set({ isLoading: false })
@@ -111,7 +103,6 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       // 서버에 로그아웃 요청 (refresh token 무효화)
       await api.post(API_ENDPOINTS.LOGOUT)
     } catch (error) {
-      console.error('로그아웃 요청 실패:', error)
     } finally {
       get().clearTokens()
       if (typeof window !== 'undefined') {

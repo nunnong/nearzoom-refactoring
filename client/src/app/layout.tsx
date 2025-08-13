@@ -13,35 +13,30 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// 깔끔한 폰트
 const notoSansKR = Noto_Sans_KR({
   variable: "--font-noto-sans-kr",
   subsets: ["latin"],
   weight: ["400", "500", "700"],
 });
 
-// 귀여운 폰트
 const jua = Jua({
   variable: "--font-jua",
   subsets: ["latin"],
   weight: ["400"],
 });
 
-// 힙한 폰트
 const blackHanSans = Black_Han_Sans({
   variable: "--font-black-han-sans",
   subsets: ["latin"],
   weight: ["400"],
 });
 
-// 손글씨 폰트
 const gamjaFlower = Gamja_Flower({
   variable: "--font-gamja-flower",
   subsets: ["latin"],
   weight: ["400"],
 });
 
-// 삐뚤빼뚤한 폰트
 const gaegu = Gaegu({
   variable: "--font-gaegu",
   subsets: ["latin"],

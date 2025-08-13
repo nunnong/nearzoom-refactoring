@@ -13,7 +13,6 @@ import Masonry from 'react-masonry-css'
 import DeleteConfirmModal from './DeleteConfirmModal'
 import EditConfirmModal from './EditConfirmModal'
 import ShareModal from './ShareModal'
-import AuthenticatedImage from './AuthenticatedImage'
 import { myroomService } from '@/services/myroomService'
 
 interface ImageItem {
@@ -23,6 +22,8 @@ interface ImageItem {
   isLiked?: boolean
   isEdited?: boolean
   hashtags?: string[]
+  createdAt?: string        // 원본 날짜 데이터
+  partnerEmails?: string    // 함께 찍은 사람들 이메일
 }
 
 interface ImageArchiveProps {
@@ -111,8 +112,8 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
       
       const formattedImages: ImageItem[] = photosData.map((photo: any) => ({
         id: photo.photoId.toString(),         // DB photo_id
-        // photoId만 저장 (AuthenticatedImage에서 /myroom/image/{photoId} 요청에 사용)
-        src: photo.photoId.toString(), // 숫자 photoId만 저장
+        // 직접 이미지 URL 사용 (API 프록시 불필요)
+        src: photo.imageUrl, // 실제 이미지 URL 사용
         alt: `Photo ${photo.photoId}`,        // 기본값
         isLiked: photo.heart === 1,          // DB heart (1: true, 0: false)
         isEdited: !photo.editable,           // DB editable (false면 편집됨)
@@ -370,10 +371,11 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
             data-image-id={image.id}
             className="group relative mb-4 overflow-hidden rounded-lg"
           >
-            <AuthenticatedImage
-              photoId={image.src} // src가 이제 photoId
+            <img
+              src={image.src} // 실제 이미지 URL
               alt={image.alt}
               className="w-full cursor-pointer rounded-lg shadow-md transition-all duration-300 ease-in-out group-hover:scale-105"
+              loading="lazy"
               onError={() => {
                 // 에러 처리
                 const parent = document.querySelector(`[data-image-id="${image.id}"]`) as HTMLElement
@@ -384,10 +386,8 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
               }}
             />
 
-            {/* Dark Overlay */}
             <div className="absolute inset-0 bg-black/0 transition-all duration-300 ease-in-out group-hover:bg-black/40" />
 
-            {/* Like Button - Top Right */}
             <div className="absolute top-3 right-3 opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100">
               <button
                 onClick={() => handleLikeClick(image.id)}
@@ -402,7 +402,6 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
               </button>
             </div>
 
-            {/* Bottom Action Buttons */}
             <div className="absolute right-3 bottom-3 left-3 flex justify-between opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100">
               {/* Share Button - Left */}
               <button
@@ -474,7 +473,15 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
                     )}
                   </div>
                 ) : (
-                  <p className="text-xs font-medium text-white">{image.alt}</p>
+                  <div className="text-xs font-medium text-white space-y-1">
+                    <p>ID: {image.id}</p>
+                    {image.createdAt && (
+                      <p>{new Date(image.createdAt).toLocaleDateString('ko-KR')}</p>
+                    )}
+                    {image.partnerEmails && (
+                      <p>👥 {image.partnerEmails}</p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -482,7 +489,6 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
         ))}
       </Masonry>
 
-      {/* 무한 스크롤 로딩 인디케이터 */}
       {hasMore && (
         <div 
           ref={loadMoreRef}
@@ -497,7 +503,6 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
         </div>
       )}
 
-      {/* 더 이상 불러올 사진이 없을 때 */}
       {!hasMore && images.length > 0 && (
         <div className="flex items-center justify-center py-8">
           <p className="text-sm text-gray-500">모든 사진을 불러왔습니다</p>
