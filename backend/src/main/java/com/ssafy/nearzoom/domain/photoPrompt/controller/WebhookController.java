@@ -63,7 +63,7 @@ public class WebhookController {
     log.info("개별 이미지 처리 완료 웹훅 수신 - JobId: {}", webhook.jobId());
 
     try {
-      webhookService.handleIndividualImageCompleted(webhook);
+      webhookService.webhookIndividualCompleted(webhook);
 
       Map<String, Object> responseData = new HashMap<>();
       responseData.put("jobId", webhook.jobId());
@@ -112,7 +112,7 @@ public class WebhookController {
     log.warn("개별 이미지 처리 실패 웹훅 수신 - JobId: {}", webhook.jobId());
 
     try {
-      webhookService.handleIndividualImageFailed(webhook);
+      webhookService.webhookIndividualFailed(webhook);
 
       Map<String, Object> responseData = new HashMap<>();
       responseData.put("jobId", webhook.jobId());
@@ -170,7 +170,7 @@ public class WebhookController {
     log.info("프레임 합성 완료 웹훅 수신 - JobId: {}", webhook.jobId());
 
     try {
-      webhookService.handleFrameCompositionCompleted(webhook);
+      webhookService.webhookFrameCompleted(webhook);
 
       Map<String, Object> responseData = new HashMap<>();
       responseData.put("jobId", webhook.jobId());
@@ -221,7 +221,7 @@ public class WebhookController {
     log.warn("프레임 합성 실패 웹훅 수신 - JobId: {}", webhook.jobId());
 
     try {
-      webhookService.handleFrameCompositionFailed(webhook);
+      webhookService.webhookFrameFailed(webhook);
 
       Map<String, Object> responseData = new HashMap<>();
       responseData.put("jobId", webhook.jobId());
@@ -274,7 +274,7 @@ public class WebhookController {
 
     try {
       // 기존 방식도 개별 처리로 처리 (하위 호환성)
-      webhookService.handleIndividualImageCompleted(webhook);
+      webhookService.webhookIndividualCompleted(webhook);
 
       Map<String, Object> responseData = new HashMap<>();
       responseData.put("jobId", webhook.jobId());
@@ -323,7 +323,7 @@ public class WebhookController {
 
     try {
       // 기존 방식도 개별 처리로 처리 (하위 호환성)
-      webhookService.handleIndividualImageFailed(webhook);
+      webhookService.webhookIndividualFailed(webhook);
 
       Map<String, Object> responseData = new HashMap<>();
       responseData.put("jobId", webhook.jobId());

@@ -10,7 +10,6 @@ import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingResult;
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PhotoPrompt;
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PromptStatus;
 import com.ssafy.nearzoom.domain.photoPrompt.repository.PhotoPromptRepository;
-import com.ssafy.nearzoom.domain.user.repository.UserRepository;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import java.time.Duration;
 import java.util.*;
@@ -36,17 +35,22 @@ public class ImageProcessingService {
   private final RedisTemplate<String, String> redisTemplate;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
-  // 개별 이미지 즉시 처리 (설정 완료되는 즉시 호출)
+  // 개별 이미지 즉시 처리
   public void processIndividualImageImmediately(Long roomId, int imageOrder,
       String imageUrl, List<String> personIds, ProcessingOptions options,
       String promptId) {
     try {
+      log.info("=== 개별 이미지 처리 시작 ===");
+      log.info("RoomId: {}, Order: {}, ImageUrl: {}", roomId, imageOrder, imageUrl);
+
       // 이미지 서버 요청 생성
       ImageServerRequest request = new ImageServerRequest(
           imageUrl,
           personIds,
           options
       );
+
+      log.info("이미지 서버 요청 전송 시작...");
 
       // 이미지 서버로 전송
       ImageServerResponse response = sendToImageServer("/jobs", request);
@@ -57,9 +61,19 @@ public class ImageProcessingService {
       }
 
       String jobId = response.data().jobId();
+      log.info("✅ 이미지 서버 응답 받음 - JobId: {}", jobId);
 
-      // Job 정보 Redis에 저장
+      // 🔍 Job 정보 Redis에 저장 (중요!)
+      log.info("Redis에 Job 정보 저장 시작...");
       saveIndividualJobInfo(jobId, roomId, imageOrder, imageUrl, options, promptId);
+      log.info("✅ Redis에 Job 정보 저장 완료 - JobId: {}", jobId);
+
+      // 🔍 저장 후 즉시 확인
+      Map<Object, Object> savedJobInfo = redisTemplate.opsForHash().entries("individual_job:" + jobId);
+      log.info("저장된 Job 정보 확인 - 필드 개수: {}", savedJobInfo.size());
+      for (Map.Entry<Object, Object> entry : savedJobInfo.entrySet()) {
+        log.info("  {}: {}", entry.getKey(), entry.getValue());
+      }
 
       log.info("개별 이미지 처리 요청 완료 - JobId: {}, RoomId: {}, Order: {}",
           jobId, roomId, imageOrder);
@@ -77,9 +91,49 @@ public class ImageProcessingService {
           "이미지 처리 중 오류가 발생했습니다: " + e.getMessage());
     }
   }
+//  public void processIndividualImageImmediately(Long roomId, int imageOrder,
+//      String imageUrl, List<String> personIds, ProcessingOptions options,
+//      String promptId) {
+//    try {
+//      // 이미지 서버 요청 생성
+//      ImageServerRequest request = new ImageServerRequest(
+//          imageUrl,
+//          personIds,
+//          options
+//      );
+//
+//      // 이미지 서버로 전송
+//      ImageServerResponse response = sendToImageServer("/jobs", request);
+//
+//      if (response == null || response.data() == null || response.data().jobId() == null) {
+//        throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
+//            "이미지 서버에서 올바른 응답을 받지 못했습니다.");
+//      }
+//
+//      String jobId = response.data().jobId();
+//
+//      // Job 정보 Redis에 저장
+//      saveIndividualJobInfo(jobId, roomId, imageOrder, imageUrl, options, promptId);
+//
+//      log.info("개별 이미지 처리 요청 완료 - JobId: {}, RoomId: {}, Order: {}",
+//          jobId, roomId, imageOrder);
+//
+//    } catch (Exception e) {
+//      log.error("개별 이미지 즉시 처리 실패 - RoomId: {}, Order: {}, Error: {}",
+//          roomId, imageOrder, e.getMessage());
+//
+//      // 프롬프트 상태 업데이트
+//      if (promptId != null) {
+//        updatePromptStatus(Long.valueOf(promptId), PromptStatus.FAIL);
+//      }
+//
+//      throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
+//          "이미지 처리 중 오류가 발생했습니다: " + e.getMessage());
+//    }
+//  }
 
   // 개별 이미지 처리 완료 시 호출 (웹훅에서 호출)
-  public void handleIndividualImageCompleted(String jobId, String processedImageUrl) {
+  public void IndividualCompleted(String jobId, String processedImageUrl) {
     Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries("individual_job:" + jobId);
 
     if (jobInfo.isEmpty()) {
