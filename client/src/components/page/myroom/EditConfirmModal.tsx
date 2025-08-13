@@ -10,6 +10,8 @@ interface ImageItem {
   isLiked?: boolean
   isEdited?: boolean
   hashtags?: string[]
+  createdAt?: string        // 원본 날짜 데이터
+  partnerEmails?: string    // 함께 찍은 사람들 이메일
 }
 
 interface EditConfirmModalProps {
@@ -50,22 +52,57 @@ const EditConfirmModal: React.FC<EditConfirmModalProps> = ({
           />
         </div>
 
-        {/* Hashtags */}
-        <div className="mb-6">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">태그 정보</h4>
-          <div className="flex flex-wrap gap-2">
-            {image.hashtags && image.hashtags.length > 0 ? (
-              image.hashtags.map((tag, index) => (
-                <span
-                  key={index}
-                  className="inline-block bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full"
-                >
-                  #{tag}
+        {/* 이미지 정보 */}
+        <div className="mb-6 space-y-4">
+          {/* 날짜 정보 */}
+          <div>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">생성 날짜</h4>
+            <div className="text-sm text-gray-600">
+              {image.createdAt ? (
+                new Date(image.createdAt).toLocaleDateString('ko-KR', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })
+              ) : (
+                '날짜 정보 없음'
+              )}
+            </div>
+          </div>
+
+          {/* 함께한 친구 정보 */}
+          <div>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">함께한 친구</h4>
+            <div className="text-sm text-gray-600">
+              {image.partnerEmails ? (
+                <span className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full">
+                  {image.partnerEmails}
                 </span>
-              ))
-            ) : (
-              <span className="text-gray-500 text-sm">태그가 없습니다</span>
-            )}
+              ) : (
+                '혼자 그린 작품'
+              )}
+            </div>
+          </div>
+
+          {/* 태그 정보 */}
+          <div>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">태그 정보</h4>
+            <div className="flex flex-wrap gap-2">
+              {image.hashtags && image.hashtags.length > 0 ? (
+                image.hashtags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="inline-block bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full"
+                  >
+                    #{tag}
+                  </span>
+                ))
+              ) : (
+                <span className="text-gray-500 text-sm">태그가 없습니다</span>
+              )}
+            </div>
           </div>
         </div>
 

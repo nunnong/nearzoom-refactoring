@@ -25,8 +25,8 @@ export default function UploadPhotoPage() {
       const response = await api.get('/user/userInfo')
       const profile = response.data.data
       
-      if (profile.faceImageUrl) {
-        setCurrentReferenceImage(profile.faceImageUrl)
+      if (profile.pretty_face) {
+        setCurrentReferenceImage(profile.pretty_face)
         setHasExistingImage(true)
       }
     } catch (error) {

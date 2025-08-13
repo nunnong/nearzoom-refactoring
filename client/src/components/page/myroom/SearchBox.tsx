@@ -53,7 +53,10 @@ const SearchBox: React.FC<SearchBoxProps> = ({
     const existingHeartFilter = filters.find(f => f.type === 'heart')
     
     if (existingHeartFilter) {
-      // 이미 있으면 추가하지 않음
+      // 이미 있으면 제거 (토글)
+      const updatedFilters = filters.filter(f => f.type !== 'heart')
+      setFilters(updatedFilters)
+      onFiltersChange?.(updatedFilters)
       return
     }
 

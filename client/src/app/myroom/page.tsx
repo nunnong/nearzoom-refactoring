@@ -13,6 +13,8 @@ interface ImageItem {
   isLiked?: boolean
   isEdited?: boolean
   hashtags?: string[]
+  createdAt?: string        // 원본 날짜 데이터
+  partnerEmails?: string    // 함께 찍은 사람들 이메일
 }
 
 export default function MyRoom() {
@@ -36,15 +38,21 @@ export default function MyRoom() {
       // 백엔드에서 사용자별 이미지 데이터 가져오기
       const response = await myroomService.getPhotos(params)
       
+      
       // API 응답을 ImageItem 형식으로 변환
-      const images = response.photos?.map((item) => ({
-        id: item.photoId.toString(),
-        src: item.imageUrl,
-        alt: item.title || `${user?.name}의 사진`,
-        isLiked: item.isLiked,
-        isEdited: item.isEdited,
-        hashtags: item.hashtags || []
-      })) || []
+      const images = response.photos?.map((item) => {
+        const converted = {
+          id: item.photoId.toString(),
+          src: item.imageUrl,
+          alt: `${user?.name}의 사진`,
+          isLiked: Boolean(item.heart), // 0/1 → false/true 변환
+          isEdited: (item.editable ?? true) === false,
+          hashtags: [],
+          createdAt: item.createdAt,
+          partnerEmails: item.partnerEmails
+        }
+        return converted
+      }) || []
 
       setUserImages(images)
       setNextCursor(response.nextCursor || null)
@@ -69,10 +77,12 @@ export default function MyRoom() {
       const newImages = response.photos?.map((item) => ({
         id: item.photoId.toString(),
         src: item.imageUrl,
-        alt: item.title || `${user?.name}의 사진`,
-        isLiked: item.isLiked,
-        isEdited: item.isEdited,
-        hashtags: item.hashtags || []
+        alt: `${user?.name}의 사진`,
+        isLiked: Boolean(item.heart), // 0/1 → false/true 변환
+        isEdited: (item.editable ?? true) === false,
+        hashtags: [],
+        createdAt: item.createdAt,
+        partnerEmails: item.partnerEmails
       })) || []
 
       setUserImages(prev => [...prev, ...newImages])
@@ -88,7 +98,7 @@ export default function MyRoom() {
     if (!authLoading && isAuthenticated && user) {
       fetchUserImages()
     }
-  }, [authLoading, isAuthenticated, user?.id])
+  }, [authLoading, isAuthenticated])
 
   // 인증 로딩 중이거나 사용자 정보가 없을 때
   if (authLoading || !user) {
