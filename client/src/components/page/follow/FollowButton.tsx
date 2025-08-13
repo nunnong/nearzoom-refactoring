@@ -4,73 +4,36 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { UserPlusIcon, UserMinusIcon, CheckIcon, HeartIcon } from '@heroicons/react/24/outline'
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid'
 
-// 🔥 백엔드 API 직접 연동
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api'
+// ✅ 인터셉터가 붙은 axios 인스턴스만 사용
+import api from '@/lib/axios'
+import { useAuthStore } from '@/stores/authStore'
 
-const getAuthToken = () => {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem('authToken')
+// 백엔드 ApiResponse 표준 타입
+interface ApiResponse<T> {
+  error: boolean
+  message: string | null
+  data: T
 }
 
-const createAuthHeaders = () => {
-  const token = getAuthToken()
-  if (!token) {
-    throw new Error('로그인이 필요합니다.')
-  }
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  }
+// 엔드포인트 베이스 (환경변수는 axios 인스턴스에서 처리하므로 여기선 상대경로 사용 권장)
+const ENDPOINTS = {
+  follow: (followeeId: number) => `/follows/${followeeId}`,
+  unfollow: (followeeId: number) => `/follows/${followeeId}`,
+  check: (followeeId: number) => `/follows/check/${followeeId}`,
 }
 
-// 🔥 백엔드 팔로우 API 서비스
-const followApiService = {
-  // 팔로우
+// 🔥 팔로우 API 서비스 (axios 인스턴스 사용)
+const followApi = {
   follow: async (followeeId: number): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/follows/${followeeId}`, {
-      method: 'POST',
-      headers: createAuthHeaders()
-    })
-    
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('로그인이 필요합니다.')
-      }
-      throw new Error('팔로우에 실패했습니다.')
-    }
+    await api.post<ApiResponse<boolean>>(ENDPOINTS.follow(followeeId))
   },
-
-  // 언팔로우
   unfollow: async (followeeId: number): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/follows/${followeeId}`, {
-      method: 'DELETE',
-      headers: createAuthHeaders()
-    })
-    
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('로그인이 필요합니다.')
-      }
-      throw new Error('언팔로우에 실패했습니다.')
-    }
+    await api.delete<ApiResponse<boolean>>(ENDPOINTS.unfollow(followeeId))
   },
-
-  // 팔로우 여부 확인
   isFollowing: async (followeeId: number): Promise<boolean> => {
-    const response = await fetch(`${API_BASE_URL}/follows/check/${followeeId}`, {
-      headers: createAuthHeaders()
-    })
-    
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('로그인이 필요합니다.')
-      }
-      throw new Error('팔로우 상태 확인에 실패했습니다.')
-    }
-    
-    const data = await response.json()
-    return data.data
-  }
+    const res = await api.get<ApiResponse<boolean>>(ENDPOINTS.check(followeeId))
+    return !!res.data.data
+  },
 }
 
 interface FollowButtonProps {
@@ -100,70 +63,80 @@ const FollowButton: React.FC<FollowButtonProps> = ({
   className = '',
   'aria-label': ariaLabel,
 }) => {
+  const { isAuthenticated } = useAuthStore()
   const [isHovered, setIsHovered] = useState(false)
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 🔥 컴포넌트 마운트시 실제 팔로우 상태 확인
+  // 마운트/변경 시 실제 팔로우 상태 확인 (로그인 시에만)
   useEffect(() => {
-    const checkFollowStatus = async () => {
+    let mounted = true
+    const run = async () => {
+      if (!isAuthenticated || disabled || !userId) return
       try {
-        const followStatus = await followApiService.isFollowing(userId)
-        setIsFollowing(followStatus)
-      } catch (error) {
-        console.error('팔로우 상태 확인 실패:', error)
-        // 에러가 발생해도 초기값 유지
+        const followStatus = await followApi.isFollowing(userId)
+        if (mounted) setIsFollowing(followStatus)
+      } catch (e: any) {
+        // 인터셉터가 401/토큰 갱신 등을 처리하므로 여기선 로깅 정도만
+        console.error('팔로우 상태 확인 실패:', e)
       }
     }
-
-    if (userId && !disabled) {
-      checkFollowStatus()
+    run()
+    return () => {
+      mounted = false
     }
-  }, [userId, disabled])
+  }, [userId, disabled, isAuthenticated])
 
-  // 🔥 클릭 핸들러 (백엔드 API 직접 호출)
-  const handleClick = useCallback(async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    if (disabled || isLoading) return
-
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      if (isFollowing) {
-        await followApiService.unfollow(userId)
-        setIsFollowing(false)
-        onFollowChange?.(false)
-      } else {
-        await followApiService.follow(userId)
-        setIsFollowing(true)
-        onFollowChange?.(true)
+  // 클릭 핸들러 (axios + 인터셉터 경유)
+  const handleClick = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (disabled || isLoading) return
+      if (!isAuthenticated) {
+        setError('로그인이 필요합니다.')
+        return
       }
-    } catch (error) {
-      console.error('팔로우/언팔로우 실패:', error)
-      setError(error instanceof Error ? error.message : '요청에 실패했습니다.')
-      
-      // 에러 발생시 토스트 알림 (선택적)
-      if (typeof window !== 'undefined') {
-        // TODO: 토스트 라이브러리 사용
-        console.warn('Follow error:', error)
+
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        if (isFollowing) {
+          await followApi.unfollow(userId)
+          setIsFollowing(false)
+          onFollowChange?.(false)
+        } else {
+          await followApi.follow(userId)
+          setIsFollowing(true)
+          onFollowChange?.(true)
+        }
+      } catch (err: any) {
+        console.error('팔로우/언팔로우 실패:', err)
+        const msg =
+          err?.response?.data?.message ||
+          err?.message ||
+          (isFollowing ? '언팔로우에 실패했습니다.' : '팔로우에 실패했습니다.')
+        setError(msg)
+      } finally {
+        setIsLoading(false)
       }
-    } finally {
-      setIsLoading(false)
-    }
-  }, [userId, isFollowing, disabled, isLoading, onFollowChange])
+    },
+    [userId, isFollowing, disabled, isLoading, isAuthenticated, onFollowChange],
+  )
 
-  // 🔥 크기 클래스를 useMemo로 최적화
-  const sizeClasses = useMemo(() => ({
-    sm: 'px-3 py-1.5 text-xs',
-    md: 'px-4 py-2 text-sm',
-    lg: 'px-6 py-3 text-base',
-  }), [])
+  // 크기 클래스
+  const sizeClasses = useMemo(
+    () => ({
+      sm: 'px-3 py-1.5 text-xs',
+      md: 'px-4 py-2 text-sm',
+      lg: 'px-6 py-3 text-base',
+    }),
+    [],
+  )
 
-  // 🔥 버튼 상태 결정
+  // 버튼 상태
   const buttonState = useMemo(() => {
     if (isLoading) return 'loading'
     if (isPending) return 'pending'
@@ -171,22 +144,26 @@ const FollowButton: React.FC<FollowButtonProps> = ({
     return 'follow'
   }, [isLoading, isPending, isFollowing, isHovered])
 
-  // 🔥 버튼 콘텐츠 최적화
+  // 버튼 콘텐츠
   const getButtonContent = useCallback(() => {
     const iconClass = size === 'lg' ? 'h-5 w-5' : 'h-4 w-4'
-    
+
     switch (buttonState) {
       case 'loading':
         return (
           <>
             <svg className={`animate-spin ${iconClass} mr-2`} fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
             </svg>
             <span>{isFollowing ? '언팔로우 중...' : '팔로우 중...'}</span>
           </>
         )
-      
+
       case 'pending':
         return (
           <>
@@ -196,7 +173,7 @@ const FollowButton: React.FC<FollowButtonProps> = ({
             <span>요청됨</span>
           </>
         )
-      
+
       case 'unfollow':
         return (
           <>
@@ -204,7 +181,7 @@ const FollowButton: React.FC<FollowButtonProps> = ({
             <span>언팔로우</span>
           </>
         )
-      
+
       case 'following':
         return (
           <>
@@ -212,7 +189,7 @@ const FollowButton: React.FC<FollowButtonProps> = ({
             <span>팔로잉</span>
           </>
         )
-      
+
       case 'follow':
       default:
         return (
@@ -224,30 +201,24 @@ const FollowButton: React.FC<FollowButtonProps> = ({
     }
   }, [buttonState, isFollowing, size])
 
-  // 🔥 버튼 스타일 최적화
+  // 버튼 스타일
   const getButtonClasses = useCallback(() => {
     const baseClasses = `inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed border-2 ${sizeClasses[size]}`
-    
     if (variant === 'minimal') {
       return `${baseClasses} bg-transparent hover:bg-gray-100 text-gray-600 hover:text-gray-800 border-transparent`
     }
-    
     switch (buttonState) {
       case 'loading':
         return `${baseClasses} bg-gray-400 text-white border-gray-400 cursor-not-allowed`
-      
       case 'pending':
         return `${baseClasses} bg-yellow-100 hover:bg-yellow-200 text-yellow-700 border-yellow-300`
-      
       case 'unfollow':
         return `${baseClasses} bg-red-600 hover:bg-red-700 text-white border-red-600`
-      
       case 'following':
         if (variant === 'primary') {
           return `${baseClasses} bg-gray-200 hover:bg-red-50 text-gray-800 hover:text-red-600 border-gray-200 hover:border-red-200`
         }
         return `${baseClasses} bg-white hover:bg-red-50 text-gray-700 hover:text-red-600 border-gray-300 hover:border-red-300`
-      
       case 'follow':
       default:
         if (variant === 'primary') {
@@ -257,30 +228,35 @@ const FollowButton: React.FC<FollowButtonProps> = ({
     }
   }, [buttonState, variant, sizeClasses, size])
 
-  // 🔥 툴팁 텍스트
+  // 툴팁 텍스트
   const tooltipText = useMemo(() => {
     if (ariaLabel) return ariaLabel
-    
     if (error) return `에러: ${error}`
-    
     switch (buttonState) {
-      case 'loading': return '처리 중...'
-      case 'pending': return '팔로우 요청이 대기 중입니다'
-      case 'unfollow': return '클릭해서 언팔로우'
-      case 'following': return '팔로잉 중 (클릭해서 언팔로우)'
-      case 'follow': return '클릭해서 팔로우'
-      default: return ''
+      case 'loading':
+        return '처리 중...'
+      case 'pending':
+        return '팔로우 요청이 대기 중입니다'
+      case 'unfollow':
+        return '클릭해서 언팔로우'
+      case 'following':
+        return '팔로잉 중 (클릭해서 언팔로우)'
+      case 'follow':
+        return '클릭해서 팔로우'
+      default:
+        return ''
     }
   }, [buttonState, ariaLabel, error])
 
-  // 🔥 로그인이 필요한 경우 처리
-  if (!getAuthToken()) {
+  // 비로그인 UI
+  if (!isAuthenticated) {
     return (
       <div className={className}>
         <button
           disabled
           className={`${sizeClasses[size]} inline-flex items-center justify-center font-medium rounded-lg bg-gray-200 text-gray-500 border-2 border-gray-200 cursor-not-allowed`}
           title="로그인이 필요합니다"
+          type="button"
         >
           <UserPlusIcon className={size === 'lg' ? 'h-5 w-5 mr-2' : 'h-4 w-4 mr-2'} />
           <span>로그인 필요</span>
@@ -306,17 +282,16 @@ const FollowButton: React.FC<FollowButtonProps> = ({
         {getButtonContent()}
       </button>
 
-      {/* 🔥 에러 메시지 표시 */}
+      {/* 에러 메시지 */}
       {error && (
         <div className="mt-1 text-center">
           <span className="text-xs text-red-600">{error}</span>
         </div>
       )}
 
-      {/* 🔥 관계 상태 표시 (showMutualIndicator가 true일 때만) */}
+      {/* 관계 상태 표시 */}
       {showMutualIndicator && !error && (
         <>
-          {/* 상호 팔로우 표시 */}
           {isFollowing && isFollowedBy && (
             <div className="mt-1 text-center">
               <span className="inline-flex items-center px-2 py-0.5 bg-pink-100 text-pink-700 text-xs rounded-full">
@@ -326,7 +301,6 @@ const FollowButton: React.FC<FollowButtonProps> = ({
             </div>
           )}
 
-          {/* 나를 팔로우하는 사람 표시 */}
           {!isFollowing && isFollowedBy && !isPending && (
             <div className="mt-1 text-center">
               <span className="inline-flex items-center text-xs text-gray-500">
@@ -336,7 +310,6 @@ const FollowButton: React.FC<FollowButtonProps> = ({
             </div>
           )}
 
-          {/* 팔로우 요청 대기 표시 */}
           {isPending && (
             <div className="mt-1 text-center">
               <span className="text-xs text-yellow-600">팔로우 요청 대기 중</span>

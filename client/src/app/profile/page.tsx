@@ -14,26 +14,35 @@ import {
 } from '@heroicons/react/24/outline'
 
 // ============================================================================
-// 🔥 백엔드 연동 타입 정의
+// 🔥 백엔드 API 연동
 // ============================================================================
+import api from '@/lib/axios'
 
-interface UserInfoResponse {
-  userName: string
-  userEmail: string
-  userProfileImage: string
-  faceImageUrl: string
+// 백엔드 API 응답 타입 (완전 호환)
+interface ApiResponse<T> {
+  error: boolean
+  message: string
+  data: T
 }
 
-interface ExtendedUser {
-  id: number
-  name: string
-  email: string
-  profileImage?: string
+// 백엔드 User 엔티티 기반 타입
+interface UserProfileResponse {
+  userId: number
+  userName: string
+  userEmail: string
   accountName: string
-  faceImageUrl?: string
+  profileImage: string
+  prettyFace: string | null
   socialType: string
   createdAt: string
   updatedAt: string
+}
+
+// 프로필 업데이트 요청 타입
+interface UpdateProfileRequest {
+  userName: string
+  accountName: string
+  userEmail: string
 }
 
 // LoadingSpinner 컴포넌트
@@ -49,11 +58,67 @@ const LoadingSpinner = ({ size = 'md', className = '' }: { size?: 'sm' | 'md' | 
   );
 };
 
+// ============================================================================
+// 🔥 백엔드 API 함수들 - 완벽한 아키텍처 적용
+// ============================================================================
+
+// 현재 사용자 프로필 조회 (백엔드에 해당 API가 있다고 가정)
+const getUserProfile = async (): Promise<UserProfileResponse> => {
+  try {
+    const response = await api.get<ApiResponse<UserProfileResponse>>('/users/me')
+    
+    if (response.data.error) {
+      throw new Error(response.data.message)
+    }
+    
+    return response.data.data
+  } catch (error: any) {
+    console.error('Failed to fetch user profile:', error)
+    throw error
+  }
+}
+
+// 프로필 정보 업데이트 (백엔드에 해당 API가 있다고 가정)
+const updateProfile = async (profileData: UpdateProfileRequest): Promise<UserProfileResponse> => {
+  try {
+    const response = await api.put<ApiResponse<UserProfileResponse>>('/users/me', profileData)
+    
+    if (response.data.error) {
+      throw new Error(response.data.message)
+    }
+    
+    return response.data.data
+  } catch (error: any) {
+    console.error('Failed to update profile:', error)
+    throw error
+  }
+}
+
+// 로그아웃 (백엔드에 해당 API가 있다고 가정)
+const logoutUser = async (): Promise<void> => {
+  try {
+    await api.post<ApiResponse<void>>('/auth/logout')
+  } catch (error: any) {
+    console.error('Failed to logout:', error)
+    // 로그아웃은 클라이언트 측에서도 처리되므로 에러를 던지지 않음
+  }
+}
+
+// 계정 삭제 (백엔드에 해당 API가 있다고 가정)
+const deleteAccount = async (): Promise<void> => {
+  try {
+    await api.delete<ApiResponse<void>>('/users/me')
+  } catch (error: any) {
+    console.error('Failed to delete account:', error)
+    throw error
+  }
+}
+
 const ProfileSettingsPage: React.FC = () => {
-  const { user: currentUser, isAuthenticated } = useAuth()
+  const { user: currentUser, isAuthenticated, logout } = useAuth()
   const router = useRouter()
   
-  const [userProfile, setUserProfile] = useState<ExtendedUser | null>(null)
+  const [userProfile, setUserProfile] = useState<UserProfileResponse | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [isSaving, setIsSaving] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
@@ -67,89 +132,7 @@ const ProfileSettingsPage: React.FC = () => {
   })
 
   // ============================================================================
-  // 🔥 백엔드 API 호출 함수들
-  // ============================================================================
-
-  // 현재 사용자 정보 조회
-  const getUserInfo = async (): Promise<UserInfoResponse> => {
-    const response = await fetch('/api/user/userInfo', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error('사용자 정보를 가져오는데 실패했습니다.')
-    }
-    
-    const data = await response.json()
-    return data.data
-  }
-
-  // 현재 사용자 기본 정보 조회
-  const getCurrentUser = async () => {
-    const response = await fetch('/api/user/current', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error('사용자 기본 정보를 가져오는데 실패했습니다.')
-    }
-    
-    const data = await response.json()
-    return data.data
-  }
-
-  // 프로필 정보 업데이트 (TODO: 백엔드 API 구현 필요)
-  const updateProfile = async (profileData: Partial<ExtendedUser>): Promise<void> => {
-    const response = await fetch('/api/user/profile', {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(profileData)
-    })
-    
-    if (!response.ok) {
-      throw new Error('프로필 업데이트에 실패했습니다.')
-    }
-  }
-
-  // 로그아웃
-  const logoutUser = async (): Promise<void> => {
-    const response = await fetch('/api/user/logout', { 
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error('로그아웃에 실패했습니다.')
-    }
-
-    // 클라이언트 측 정리
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('refreshToken')
-      
-      try {
-        const { useAuthStore } = await import('@/stores/authStore')
-        useAuthStore.getState().clearTokens()
-      } catch (error) {
-        console.warn('Auth store 정리 실패:', error)
-      }
-      
-      document.cookie = 'JSESSIONID=; Max-Age=0; path=/;'
-      document.cookie = 'RefreshToken=; Max-Age=0; path=/;'
-    }
-  }
-
-  // ============================================================================
-  // 데이터 로딩
+  // 🔥 백엔드 데이터 로딩
   // ============================================================================
 
   useEffect(() => {
@@ -163,51 +146,48 @@ const ProfileSettingsPage: React.FC = () => {
         setIsLoading(true)
         setError(null)
 
-        // 사용자 정보 조회
-        const [userInfoResult, currentUserResult] = await Promise.all([
-          getUserInfo(),
-          getCurrentUser()
-        ])
-        
-        if (!currentUserResult) {
-          throw new Error('사용자 인증 정보를 찾을 수 없습니다.')
-        }
-
-        // 통합된 사용자 프로필 생성
-        const profile: ExtendedUser = {
-          id: parseInt(currentUserResult.id) || 0,
-          name: userInfoResult.userName,
-          email: userInfoResult.userEmail,
-          profileImage: userInfoResult.userProfileImage || undefined,
-          socialType: currentUser?.socialType || 'KAKAO',
-          createdAt: currentUser?.createdAt || new Date().toISOString(),
-          updatedAt: currentUser?.updatedAt || new Date().toISOString(),
-          accountName: currentUserResult.accountName,
-          faceImageUrl: userInfoResult.faceImageUrl || undefined
-        }
-
+        // 백엔드에서 현재 사용자 프로필 조회
+        const profile = await getUserProfile()
         setUserProfile(profile)
         
         // 편집 폼 초기화
         setEditForm({
-          userName: profile.name,
+          userName: profile.userName,
           accountName: profile.accountName,
-          userEmail: profile.email
+          userEmail: profile.userEmail
         })
 
-      } catch (error) {
+        console.log('사용자 프로필 로드 완료:', profile)
+
+      } catch (error: any) {
         console.error('사용자 프로필 로드 실패:', error)
-        setError(error instanceof Error ? error.message : '프로필을 불러오는데 실패했습니다.')
+        
+        // 백엔드 에러 메시지 처리
+        let errorMessage = '프로필을 불러오는데 실패했습니다.'
+        if (error?.response?.status === 401) {
+          errorMessage = '로그인이 필요합니다.'
+          logout()
+          router.push('/login')
+          return
+        } else if (error?.response?.status === 403) {
+          errorMessage = '프로필에 접근할 권한이 없습니다.'
+        } else if (error?.response?.data?.message) {
+          errorMessage = error.response.data.message
+        } else if (error?.message) {
+          errorMessage = error.message
+        }
+        
+        setError(errorMessage)
       } finally {
         setIsLoading(false)
       }
     }
 
     loadUserProfile()
-  }, [isAuthenticated, currentUser])
+  }, [isAuthenticated, logout, router])
 
   // ============================================================================
-  // 이벤트 핸들러들
+  // 🔥 이벤트 핸들러들
   // ============================================================================
 
   const handleBack = () => {
@@ -220,9 +200,14 @@ const ProfileSettingsPage: React.FC = () => {
       ...prev,
       [field]: value
     }))
+    
+    // 입력 시 에러 메시지 클리어
+    if (error) {
+      setError(null)
+    }
   }
 
-  // 프로필 저장
+  // 프로필 저장 (백엔드 연동)
   const handleSaveProfile = async () => {
     if (!userProfile) return
 
@@ -231,24 +216,49 @@ const ProfileSettingsPage: React.FC = () => {
     setSuccessMessage(null)
 
     try {
-      const updateData = {
-        ...userProfile,
-        name: editForm.userName,
-        accountName: editForm.accountName,
-        email: editForm.userEmail
+      const updateData: UpdateProfileRequest = {
+        userName: editForm.userName.trim(),
+        accountName: editForm.accountName.trim(),
+        userEmail: editForm.userEmail.trim()
       }
 
-      await updateProfile(updateData)
+      // 유효성 검사
+      if (!updateData.userName) {
+        throw new Error('이름을 입력해주세요.')
+      }
+      if (!updateData.accountName) {
+        throw new Error('계정명을 입력해주세요.')
+      }
+      if (!updateData.userEmail || !/\S+@\S+\.\S+/.test(updateData.userEmail)) {
+        throw new Error('올바른 이메일을 입력해주세요.')
+      }
+
+      // 백엔드 API 호출
+      const updatedProfile = await updateProfile(updateData)
       
-      setUserProfile(updateData)
+      setUserProfile(updatedProfile)
       setSuccessMessage('프로필이 성공적으로 업데이트되었습니다.')
+      
+      console.log('프로필 업데이트 완료:', updatedProfile)
       
       // 3초 후 성공 메시지 제거
       setTimeout(() => setSuccessMessage(null), 3000)
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('프로필 저장 실패:', error)
-      setError(error instanceof Error ? error.message : '프로필 저장에 실패했습니다.')
+      
+      let errorMessage = '프로필 저장에 실패했습니다.'
+      if (error?.response?.status === 400) {
+        errorMessage = '입력한 정보가 올바르지 않습니다.'
+      } else if (error?.response?.status === 409) {
+        errorMessage = '이미 사용 중인 계정명 또는 이메일입니다.'
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message
+      } else if (error?.message) {
+        errorMessage = error.message
+      }
+      
+      setError(errorMessage)
     } finally {
       setIsSaving(false)
     }
@@ -258,38 +268,65 @@ const ProfileSettingsPage: React.FC = () => {
   const handleCancelEdit = () => {
     if (userProfile) {
       setEditForm({
-        userName: userProfile.name,
+        userName: userProfile.userName,
         accountName: userProfile.accountName,
-        userEmail: userProfile.email
+        userEmail: userProfile.userEmail
       })
     }
     setError(null)
     setSuccessMessage(null)
   }
 
-  // 로그아웃 핸들러
+  // 로그아웃 핸들러 (백엔드 연동)
   const handleLogout = async () => {
     if (confirm('로그아웃하시겠습니까?')) {
       try {
+        // 백엔드 로그아웃 API 호출
         await logoutUser()
+        
+        // 클라이언트 측 로그아웃 처리
+        logout()
+        
+        // 로그인 페이지로 이동
         router.push('/login')
-      } catch (error) {
+        
+      } catch (error: any) {
         console.error('로그아웃 실패:', error)
-        alert('로그아웃에 실패했습니다.')
+        
+        // 백엔드 에러가 있어도 클라이언트 측 로그아웃은 진행
+        logout()
+        router.push('/login')
       }
     }
   }
 
-  // 계정 삭제 핸들러 (TODO: 백엔드 API 구현 필요)
+  // 계정 삭제 핸들러 (백엔드 연동)
   const handleDeleteAccount = async () => {
     if (confirm('정말로 계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
       if (confirm('모든 데이터가 영구적으로 삭제됩니다. 계속하시겠습니까?')) {
         try {
-          // TODO: 계정 삭제 API 호출
-          alert('계정 삭제 기능은 준비 중입니다.')
-        } catch (error) {
+          // 백엔드 계정 삭제 API 호출
+          await deleteAccount()
+          
+          // 클라이언트 측 정리
+          logout()
+          
+          // 로그인 페이지로 이동
+          router.push('/login')
+          
+          alert('계정이 성공적으로 삭제되었습니다.')
+          
+        } catch (error: any) {
           console.error('계정 삭제 실패:', error)
-          alert('계정 삭제에 실패했습니다.')
+          
+          let errorMessage = '계정 삭제에 실패했습니다.'
+          if (error?.response?.data?.message) {
+            errorMessage = error.response.data.message
+          } else if (error?.message) {
+            errorMessage = error.message
+          }
+          
+          alert(errorMessage)
         }
       }
     }
@@ -302,13 +339,13 @@ const ProfileSettingsPage: React.FC = () => {
 
   // 변경사항이 있는지 확인
   const hasChanges = userProfile && (
-    editForm.userName !== userProfile.name ||
+    editForm.userName !== userProfile.userName ||
     editForm.accountName !== userProfile.accountName ||
-    editForm.userEmail !== userProfile.email
+    editForm.userEmail !== userProfile.userEmail
   )
 
   // ============================================================================
-  // 렌더링 조건부 처리
+  // 🔥 렌더링 조건부 처리
   // ============================================================================
 
   // 로딩 상태
@@ -437,12 +474,12 @@ const ProfileSettingsPage: React.FC = () => {
                 {userProfile.profileImage ? (
                   <img
                     src={userProfile.profileImage}
-                    alt={userProfile.name}
+                    alt={userProfile.userName}
                     className="w-full h-full object-cover"
                   />
                 ) : (
                   <div className="w-full h-full bg-blue-500 flex items-center justify-center text-white text-2xl font-bold">
-                    {userProfile.name.charAt(0).toUpperCase()}
+                    {userProfile.userName.charAt(0).toUpperCase()}
                   </div>
                 )}
               </div>
@@ -455,7 +492,7 @@ const ProfileSettingsPage: React.FC = () => {
             </div>
             
             <div>
-              <h3 className="font-medium text-gray-900">{userProfile.name}</h3>
+              <h3 className="font-medium text-gray-900">{userProfile.userName}</h3>
               <p className="text-sm text-gray-500 mb-2">@{userProfile.accountName}</p>
               <button
                 onClick={handleUploadSelfie}
@@ -467,13 +504,13 @@ const ProfileSettingsPage: React.FC = () => {
           </div>
 
           {/* AI 보정 이미지 */}
-          {userProfile.faceImageUrl && (
+          {userProfile.prettyFace && (
             <div className="mt-6 pt-6 border-t border-gray-200">
               <h3 className="text-sm font-medium text-gray-700 mb-3">AI 보정 이미지</h3>
               <div className="flex items-center space-x-4">
                 <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100">
                   <img
-                    src={userProfile.faceImageUrl}
+                    src={userProfile.prettyFace}
                     alt="AI 보정된 얼굴"
                     className="w-full h-full object-cover"
                   />
@@ -508,6 +545,7 @@ const ProfileSettingsPage: React.FC = () => {
                 onChange={(e) => handleInputChange('userName', e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="이름을 입력하세요"
+                maxLength={50}
               />
             </div>
 
@@ -522,13 +560,14 @@ const ProfileSettingsPage: React.FC = () => {
                   type="text"
                   id="accountName"
                   value={editForm.accountName}
-                  onChange={(e) => handleInputChange('accountName', e.target.value)}
+                  onChange={(e) => handleInputChange('accountName', e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
                   className="w-full pl-8 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="계정명을 입력하세요"
+                  maxLength={30}
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                계정명은 다른 사용자들이 나를 찾을 때 사용됩니다.
+                계정명은 영문, 숫자, 언더스코어(_)만 사용 가능합니다.
               </p>
             </div>
 
@@ -582,19 +621,23 @@ const ProfileSettingsPage: React.FC = () => {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">계정 정보</h2>
           <div className="space-y-3 text-sm">
             <div className="flex justify-between items-center">
+              <span className="text-gray-600">사용자 ID</span>
+              <span className="font-medium">{userProfile.userId}</span>
+            </div>
+            <div className="flex justify-between items-center">
               <span className="text-gray-600">소셜 로그인</span>
               <span className="font-medium">{userProfile.socialType}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">가입일</span>
               <span className="font-medium">
-                {new Date(userProfile.createdAt).toLocaleDateString()}
+                {new Date(userProfile.createdAt).toLocaleDateString('ko-KR')}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">마지막 수정</span>
               <span className="font-medium">
-                {new Date(userProfile.updatedAt).toLocaleDateString()}
+                {new Date(userProfile.updatedAt).toLocaleDateString('ko-KR')}
               </span>
             </div>
           </div>

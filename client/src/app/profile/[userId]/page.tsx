@@ -13,6 +13,11 @@ import {
 } from '@heroicons/react/24/outline'
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid'
 
+// ============================================================================
+// 🔥 백엔드 API 연동
+// ============================================================================
+import api from '@/lib/axios'
+
 // LoadingSpinner 컴포넌트
 const LoadingSpinner = ({ size = 'md', className = '' }: { size?: 'sm' | 'md' | 'lg', className?: string }) => {
   const sizeClasses = {
@@ -27,18 +32,27 @@ const LoadingSpinner = ({ size = 'md', className = '' }: { size?: 'sm' | 'md' | 
 };
 
 // ============================================================================
-// 타입 정의 (백엔드 API 연동)
+// 🔥 백엔드 API 응답 타입 (완전 호환)
 // ============================================================================
 
-interface UserProfileResponse {
-  userId: number
-  accountName: string
-  userName: string
-  userEmail: string
-  userProfileImage: string | null
-  faceImageUrl: string | null
+// API 응답 타입
+interface ApiResponse<T> {
+  error: boolean
+  message: string
+  data: T
 }
 
+// 백엔드 User 엔티티 기반 타입
+interface UserProfileResponse {
+  userId: number
+  userName: string
+  userEmail: string
+  accountName: string
+  profileImage: string
+  prettyFace: string | null
+}
+
+// 백엔드 FeedDetailResponse 타입
 interface FeedDetailResponse {
   feedId: number
   imgUrl: string
@@ -50,16 +64,120 @@ interface FeedDetailResponse {
   liked: boolean
 }
 
+// 백엔드 FollowCountsResponse 타입
 interface FollowCountsResponse {
   followerCount: number
   followingCount: number
 }
 
+// 프론트엔드에서 사용할 통합 타입
 interface UserProfileData extends UserProfileResponse {
   postsCount: number
   followersCount: number
   followingCount: number
   isFollowing?: boolean
+}
+
+// ============================================================================
+// 🔥 백엔드 API 함수들 - 완벽한 아키텍처 적용
+// ============================================================================
+
+// 사용자 프로필 조회 (백엔드에 해당 API가 있다고 가정)
+const getUserProfile = async (userId: number): Promise<UserProfileResponse> => {
+  try {
+    const response = await api.get<ApiResponse<UserProfileResponse>>(`/users/${userId}`)
+    
+    if (response.data.error) {
+      throw new Error(response.data.message)
+    }
+    
+    return response.data.data
+  } catch (error: any) {
+    console.error('Failed to fetch user profile:', error)
+    throw error
+  }
+}
+
+// 팔로우 통계 조회 (백엔드 FollowController.countFollow)
+const getFollowStats = async (userId: number): Promise<FollowCountsResponse> => {
+  try {
+    const response = await api.get<ApiResponse<FollowCountsResponse>>(`/follows/count/${userId}`)
+    
+    if (response.data.error) {
+      throw new Error(response.data.message)
+    }
+    
+    return response.data.data
+  } catch (error: any) {
+    console.error('Failed to fetch follow stats:', error)
+    throw error
+  }
+}
+
+// 팔로우 상태 확인 (백엔드 FollowController.isFollowing)
+const checkFollowStatus = async (followeeId: number): Promise<boolean> => {
+  try {
+    const response = await api.get<ApiResponse<boolean>>(`/follows/check/${followeeId}`)
+    
+    if (response.data.error) {
+      return false
+    }
+    
+    return response.data.data
+  } catch (error: any) {
+    console.error('Failed to check follow status:', error)
+    return false
+  }
+}
+
+// 사용자 피드 조회 (백엔드 FeedController.userFeeds)
+const getUserFeeds = async (userId: number, size: number = 20): Promise<FeedDetailResponse[]> => {
+  try {
+    const response = await api.get<ApiResponse<FeedDetailResponse[]>>(`/feeds/users/${userId}?size=${size}`)
+    
+    if (response.data.error) {
+      throw new Error(response.data.message)
+    }
+    
+    return response.data.data
+  } catch (error: any) {
+    console.error('Failed to fetch user feeds:', error)
+    throw error
+  }
+}
+
+// 팔로우 (백엔드 FollowController.follow)
+const followUser = async (followeeId: number): Promise<void> => {
+  try {
+    await api.post<ApiResponse<void>>(`/follows/${followeeId}`)
+  } catch (error: any) {
+    console.error('Failed to follow user:', error)
+    throw error
+  }
+}
+
+// 언팔로우 (백엔드 FollowController.unfollow)
+const unfollowUser = async (followeeId: number): Promise<void> => {
+  try {
+    await api.delete<ApiResponse<void>>(`/follows/${followeeId}`)
+  } catch (error: any) {
+    console.error('Failed to unfollow user:', error)
+    throw error
+  }
+}
+
+// 좋아요 토글 (백엔드 LikesController.like/unlike)
+const toggleLike = async (feedId: number, isCurrentlyLiked: boolean): Promise<void> => {
+  try {
+    if (isCurrentlyLiked) {
+      await api.delete<ApiResponse<void>>(`/likes/${feedId}`)
+    } else {
+      await api.post<ApiResponse<void>>(`/likes/${feedId}`)
+    }
+  } catch (error: any) {
+    console.error('Failed to toggle like:', error)
+    throw error
+  }
 }
 
 const UserProfilePage: React.FC = () => {
@@ -76,154 +194,49 @@ const UserProfilePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [postsError, setPostsError] = useState<string | null>(null)
   
-  // 🔥 URL에서 accountName 추출 (userId가 실제로는 accountName)
-  const accountName = params.userId as string
+  // 🔥 URL에서 userId 추출
+  const targetUserId = Number(params.userId)
 
   // ============================================================================
   // 🔥 본인 프로필 접근 시 /my로 리다이렉트
   // ============================================================================
   useEffect(() => {
-    if (isAuthenticated && currentUser && (currentUser as any)?.accountName === accountName) {
-      router.push('/my')
+    if (isAuthenticated && currentUser) {
+      const currentUserId = (currentUser as any)?.userId || (currentUser as any)?.id
+      if (currentUserId === targetUserId) {
+        router.push('/my')
+        return
+      }
+    }
+  }, [isAuthenticated, currentUser, targetUserId, router])
+
+  // ============================================================================
+  // 🔥 데이터 로딩 함수들
+  // ============================================================================
+
+  // 사용자 프로필 데이터 로드
+  const loadUserProfile = async () => {
+    if (!targetUserId || isNaN(targetUserId)) {
+      setError('잘못된 사용자 ID입니다.')
+      setIsLoading(false)
       return
     }
-  }, [isAuthenticated, currentUser, accountName, router])
-
-  // ============================================================================
-  // API 호출 함수들 (백엔드 연동)
-  // ============================================================================
-
-  // 🔥 백엔드 API: accountName으로 사용자 프로필 조회
-  const getUserProfile = async (accountName: string): Promise<UserProfileResponse> => {
-    const response = await fetch(`/api/users/profile/${accountName}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error('사용자 정보를 가져올 수 없습니다.')
-    }
-    
-    const data = await response.json()
-    return data.data
-  }
-
-  // 🔥 백엔드 API: GET /follows/count/{accountName}
-  const getFollowStats = async (accountName: string): Promise<FollowCountsResponse> => {
-    const response = await fetch(`/api/follows/count/${accountName}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error('팔로우 통계를 가져올 수 없습니다.')
-    }
-    
-    const data = await response.json()
-    return data.data
-  }
-
-  // 🔥 백엔드 API: GET /follows/check/{accountName}
-  const checkFollowStatus = async (accountName: string): Promise<boolean> => {
-    const response = await fetch(`/api/follows/check/${accountName}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
-    
-    if (!response.ok) {
-      return false
-    }
-    
-    const data = await response.json()
-    return data.data
-  }
-
-  // 🔥 백엔드 API: GET /feeds/users/{userId}
-  const getUserFeeds = async (userId: number): Promise<FeedDetailResponse[]> => {
-    const response = await fetch(`/api/feeds/users/${userId}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error('사용자 게시물을 가져올 수 없습니다.')
-    }
-    
-    const data = await response.json()
-    return data.data
-  }
-
-  // 🔥 백엔드 API: POST /follows/{accountName}
-  const followUser = async (accountName: string): Promise<void> => {
-    const response = await fetch(`/api/follows/${accountName}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error('팔로우에 실패했습니다.')
-    }
-  }
-
-  // 🔥 백엔드 API: DELETE /follows/{accountName}
-  const unfollowUser = async (accountName: string): Promise<void> => {
-    const response = await fetch(`/api/follows/${accountName}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error('언팔로우에 실패했습니다.')
-    }
-  }
-
-  // 🔥 백엔드 API: POST/DELETE /likes/{feedId}
-  const toggleLike = async (feedId: number, isLiked: boolean): Promise<void> => {
-    const method = isLiked ? 'DELETE' : 'POST'
-    const response = await fetch(`/api/likes/${feedId}`, {
-      method,
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error('좋아요 처리에 실패했습니다.')
-    }
-  }
-
-  // ============================================================================
-  // 데이터 로딩 함수들
-  // ============================================================================
-
-  // 🔥 사용자 프로필 데이터 로드
-  const loadUserProfile = async () => {
-    if (!accountName) return
 
     setIsLoading(true)
     setError(null)
 
     try {
       // 1. 사용자 기본 정보 조회
-      const userProfileResponse = await getUserProfile(accountName)
+      const userProfileResponse = await getUserProfile(targetUserId)
       
       // 2. 팔로우 통계 조회
-      const statsResult = await getFollowStats(accountName)
+      const statsResult = await getFollowStats(targetUserId)
       
       // 3. 팔로우 상태 확인 (로그인한 경우만)
       let isFollowing = false
       if (isAuthenticated) {
         try {
-          isFollowing = await checkFollowStatus(accountName)
+          isFollowing = await checkFollowStatus(targetUserId)
         } catch (e) {
           console.warn('팔로우 상태 확인 실패:', e)
         }
@@ -240,15 +253,28 @@ const UserProfilePage: React.FC = () => {
 
       setUserProfile(profileData)
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('사용자 프로필 로드 실패:', error)
-      setError(error instanceof Error ? error.message : '사용자 프로필을 불러오는데 실패했습니다.')
+      
+      // 백엔드 에러 메시지 처리
+      let errorMessage = '사용자 프로필을 불러오는데 실패했습니다.'
+      if (error?.response?.status === 404) {
+        errorMessage = '존재하지 않는 사용자입니다.'
+      } else if (error?.response?.status === 403) {
+        errorMessage = '이 사용자의 프로필을 볼 권한이 없습니다.'
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message
+      } else if (error?.message) {
+        errorMessage = error.message
+      }
+      
+      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }
   }
 
-  // 🔥 사용자 게시물 로드
+  // 사용자 게시물 로드
   const loadUserPosts = async () => {
     if (!userProfile) return
 
@@ -256,15 +282,25 @@ const UserProfilePage: React.FC = () => {
     setPostsError(null)
 
     try {
-      const feeds = await getUserFeeds(userProfile.userId)
+      const feeds = await getUserFeeds(userProfile.userId, 20)
       setUserPosts(feeds)
       
       // 게시물 수 업데이트
       setUserProfile(prev => prev ? { ...prev, postsCount: feeds.length } : null)
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('사용자 게시물 로드 실패:', error)
-      setPostsError(error instanceof Error ? error.message : '게시물을 불러오는데 실패했습니다.')
+      
+      let errorMessage = '게시물을 불러오는데 실패했습니다.'
+      if (error?.response?.status === 403) {
+        errorMessage = '이 사용자의 게시물을 볼 권한이 없습니다.'
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message
+      } else if (error?.message) {
+        errorMessage = error.message
+      }
+      
+      setPostsError(errorMessage)
     } finally {
       setPostsLoading(false)
     }
@@ -277,52 +313,63 @@ const UserProfilePage: React.FC = () => {
   // 프로필 데이터 로드
   useEffect(() => {
     // 본인 프로필인 경우 로딩하지 않음 (리다이렉트됨)
-    if (isAuthenticated && currentUser && (currentUser as any)?.accountName === accountName) {
-      return
+    if (isAuthenticated && currentUser) {
+      const currentUserId = (currentUser as any)?.userId || (currentUser as any)?.id
+      if (currentUserId === targetUserId) {
+        return
+      }
     }
 
     loadUserProfile()
-  }, [accountName, isAuthenticated])
+  }, [targetUserId, isAuthenticated])
 
   // 게시물 로드 (프로필 로드 후)
   useEffect(() => {
     if (userProfile) {
       loadUserPosts()
     }
-  }, [userProfile?.accountName])
+  }, [userProfile?.userId])
 
   // ============================================================================
-  // 이벤트 핸들러들
+  // 🔥 이벤트 핸들러들
   // ============================================================================
 
   const handleBack = () => {
     router.back()
   }
 
-  // 🔥 팔로우 토글 (백엔드 연동)
+  // 팔로우 토글 (백엔드 연동)
   const handleFollow = async () => {
     if (!userProfile || !isAuthenticated) return
 
     setFollowLoading(true)
     try {
       if (userProfile.isFollowing) {
-        await unfollowUser(accountName)
+        await unfollowUser(targetUserId)
         setUserProfile(prev => prev ? {
           ...prev,
           isFollowing: false,
           followersCount: Math.max(0, prev.followersCount - 1)
         } : null)
       } else {
-        await followUser(accountName)
+        await followUser(targetUserId)
         setUserProfile(prev => prev ? {
           ...prev,
           isFollowing: true,
           followersCount: prev.followersCount + 1
         } : null)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('팔로우 처리 실패:', error)
-      setError(error instanceof Error ? error.message : '팔로우 처리에 실패했습니다.')
+      
+      let errorMessage = '팔로우 처리에 실패했습니다.'
+      if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message
+      } else if (error?.message) {
+        errorMessage = error.message
+      }
+      
+      alert(errorMessage)
     } finally {
       setFollowLoading(false)
     }
@@ -341,12 +388,12 @@ const UserProfilePage: React.FC = () => {
     }
   }
 
-  // 🔥 게시물 클릭 - feedId 기반으로 상세 페이지로 이동
+  // 게시물 클릭 - feedId 기반으로 상세 페이지로 이동
   const handlePostClick = (post: FeedDetailResponse) => {
     router.push(`/feeds/${post.feedId}`)
   }
 
-  // 🔥 게시물 좋아요 (백엔드 연동) - 읽기 권한이지만 좋아요는 가능
+  // 게시물 좋아요 (백엔드 연동)
   const handlePostLike = async (post: FeedDetailResponse) => {
     if (!isAuthenticated) {
       alert('로그인이 필요합니다.')
@@ -354,16 +401,27 @@ const UserProfilePage: React.FC = () => {
     }
 
     try {
-      await toggleLike(post.feedId, post.liked)
-      
-      // 로컬 상태 업데이트
+      // 낙관적 업데이트
       setUserPosts(prev => prev.map(p => 
         p.feedId === post.feedId 
           ? { ...p, liked: !p.liked }
           : p
       ))
-    } catch (error) {
+
+      await toggleLike(post.feedId, post.liked)
+      
+    } catch (error: any) {
       console.error('좋아요 처리 실패:', error)
+      
+      // 실패 시 롤백
+      setUserPosts(prev => prev.map(p => 
+        p.feedId === post.feedId 
+          ? { ...p, liked: post.liked }
+          : p
+      ))
+      
+      const errorMessage = error?.response?.data?.message || '좋아요 처리에 실패했습니다.'
+      alert(errorMessage)
     }
   }
 
@@ -374,7 +432,7 @@ const UserProfilePage: React.FC = () => {
   }
 
   // ============================================================================
-  // 렌더링
+  // 🔥 렌더링
   // ============================================================================
 
   // 로딩 상태
@@ -393,19 +451,24 @@ const UserProfilePage: React.FC = () => {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center max-w-md mx-auto p-8">
+          <div className="mb-6">
+            <svg className="mx-auto h-16 w-16 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+          </div>
           <h2 className="text-xl font-semibold text-gray-700 mb-2">오류가 발생했습니다</h2>
           <p className="text-gray-500 mb-4">{error}</p>
-          <div className="space-x-3">
+          <div className="space-y-3">
             <button
               onClick={handleRetry}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+              className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
             >
               다시 시도
             </button>
             <button
               onClick={handleBack}
-              className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
+              className="w-full px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
             >
               뒤로가기
             </button>
@@ -433,7 +496,7 @@ const UserProfilePage: React.FC = () => {
     )
   }
 
-  // 🔥 로그인하지 않은 경우 (읽기 권한이므로 로그인 없이도 볼 수 있지만 인터랙션 제한)
+  // 로그인하지 않은 경우 (읽기 권한이므로 로그인 없이도 볼 수 있지만 인터랙션 제한)
   const canInteract = isAuthenticated && currentUser
 
   return (
@@ -474,9 +537,9 @@ const UserProfilePage: React.FC = () => {
           <div className="flex items-start space-x-4">
             {/* 프로필 이미지 */}
             <div className="w-20 h-20 rounded-full bg-gray-300 overflow-hidden flex-shrink-0">
-              {userProfile.userProfileImage ? (
+              {userProfile.profileImage ? (
                 <img
-                  src={userProfile.userProfileImage}
+                  src={userProfile.profileImage}
                   alt={userProfile.userName}
                   className="w-full h-full object-cover"
                 />
@@ -511,13 +574,13 @@ const UserProfilePage: React.FC = () => {
             </div>
           </div>
 
-          {/* 🔥 AI 보정 이미지 표시 (있는 경우) */}
-          {userProfile.faceImageUrl && (
+          {/* AI 보정 이미지 표시 (있는 경우) */}
+          {userProfile.prettyFace && (
             <div className="mt-4">
               <h3 className="text-sm font-medium text-gray-700 mb-2">AI 보정 이미지</h3>
               <div className="w-32 h-32 rounded-lg overflow-hidden bg-gray-100">
                 <img
-                  src={userProfile.faceImageUrl}
+                  src={userProfile.prettyFace}
                   alt="AI 보정된 얼굴"
                   className="w-full h-full object-cover"
                 />
@@ -603,9 +666,13 @@ const UserProfilePage: React.FC = () => {
                   {/* 게시물 이미지 */}
                   <div className="relative aspect-square overflow-hidden">
                     <img
-                      src={post.imgUrl || `https://picsum.photos/300/300?seed=${post.feedId}`}
+                      src={post.imgUrl}
                       alt={post.caption}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = `https://picsum.photos/300/300?seed=${post.feedId}`;
+                      }}
                     />
                     
                     {/* 좋아요 버튼 - 로그인한 경우만 표시 */}
@@ -639,7 +706,7 @@ const UserProfilePage: React.FC = () => {
                       <p className="text-sm text-gray-600 line-clamp-2 mb-2">{post.caption}</p>
                     )}
                     <div className="flex items-center justify-between text-xs text-gray-400">
-                      <span>{new Date(post.createdAt).toLocaleDateString()}</span>
+                      <span>{new Date(post.createdAt).toLocaleDateString('ko-KR')}</span>
                       {post.liked && (
                         <span className="flex items-center text-red-500">
                           <HeartSolidIcon className="h-3 w-3 mr-1" />

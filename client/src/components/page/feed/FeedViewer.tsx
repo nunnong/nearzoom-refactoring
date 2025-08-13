@@ -1,4 +1,3 @@
-// src/components/page/feed/FeedViewer.tsx
 'use client'
 
 import React, { useState, useRef, useCallback, useEffect } from 'react'
@@ -6,441 +5,310 @@ import { HeartIcon, ShareIcon, EllipsisHorizontalIcon } from '@heroicons/react/2
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
-// ✅ 백엔드 연동 API 사용
-import { 
-  getFeed, 
-  deleteFeed, 
-  toggleFeedLike,
-  getCurrentUser,
-  handleApiError
-} from '@/lib/api/feed'
+// 🔥 올바른 백엔드 연동 - api from '@/lib/axios' 사용
+import api from '@/lib/axios'
 
-import {
-  CanvasFeedItem
-} from '@/lib/types/feed'
+// ============================================================================
+// 백엔드 DTO 기반 타입 정의
+// ============================================================================
 
-import {
-  toggleFollow,
-  getUserProfile,
-  UserProfile
-} from '@/lib/api/follow'
-
-import {
-  getExploreFeeds,
-  getUserFeeds,
-  ExploreFeed
-} from '@/lib/api/explore'
-
-// ✅ Feed 아이템 타입 (CanvasFeedItem 또는 ExploreFeed)
-type FeedItem = CanvasFeedItem | ExploreFeed
-
-interface FeedViewerProps {
-  userId?: string // 특정 사용자의 피드를 볼 때
-  isMyFeed?: boolean // 내 피드인지 여부
-  feedId?: string // 단일 피드 조회
-  className?: string
+// FeedDetailResponse.java 기반
+interface FeedDetailResponse {
+  feedId: number;
+  imgUrl: string;
+  caption: string;
+  authorId: number;
+  accountName: string;
+  profileImage: string;
+  createdAt: string;
+  liked: boolean;
 }
 
+// 백엔드 ApiResponse 표준 형식
+interface ApiResponse<T> {
+  error: boolean;
+  message: string;
+  data: T;
+}
+
+interface FeedViewerProps {
+  userId?: number;          // 특정 사용자의 피드를 볼 때 (백엔드 userId)
+  accountName?: string;     // 계정명으로 조회
+  isMyFeed?: boolean;       // 내 피드인지 여부
+  feedId?: number;          // 단일 피드 조회
+  searchQuery?: string;     // 검색 쿼리
+  type?: 'following' | 'random' | 'user' | 'search';  // 피드 타입
+  className?: string;
+}
+
+// ============================================================================
+// 백엔드 API 함수들
+// ============================================================================
+
+const feedViewerAPI = {
+  // GET /feeds/users/{userId} - 특정 사용자 피드 목록
+  getUserFeeds: async (userId: number, size: number = 20): Promise<FeedDetailResponse[]> => {
+    const response = await api.get<ApiResponse<FeedDetailResponse[]>>(
+      `/feeds/users/${userId}?size=${size}`
+    );
+    return response.data.data;
+  },
+
+  // GET /feeds/following - 팔로잉 피드 목록
+  getFollowingFeeds: async (size: number = 20): Promise<FeedDetailResponse[]> => {
+    const response = await api.get<ApiResponse<FeedDetailResponse[]>>(
+      `/feeds/following?size=${size}`
+    );
+    return response.data.data;
+  },
+
+  // GET /feeds/random - 랜덤 피드 목록
+  getRandomFeeds: async (size: number = 20): Promise<FeedDetailResponse[]> => {
+    const response = await api.get<ApiResponse<FeedDetailResponse[]>>(
+      `/feeds/random?size=${size}`
+    );
+    return response.data.data;
+  },
+
+  // GET /feeds/search - 피드 검색
+  searchFeeds: async (query: string, size: number = 20): Promise<FeedDetailResponse[]> => {
+    const response = await api.get<ApiResponse<FeedDetailResponse[]>>(
+      `/feeds/search?query=${encodeURIComponent(query)}&size=${size}`
+    );
+    return response.data.data;
+  },
+
+  // GET /feeds/{feedId} - 단일 피드 조회
+  getFeedDetail: async (feedId: number): Promise<FeedDetailResponse> => {
+    const response = await api.get<ApiResponse<FeedDetailResponse>>(`/feeds/${feedId}`);
+    return response.data.data;
+  },
+
+  // POST/DELETE /likes/{feedId} - 좋아요 토글
+  toggleLike: async (feedId: number, isCurrentlyLiked: boolean): Promise<void> => {
+    if (isCurrentlyLiked) {
+      await api.delete(`/likes/${feedId}`);
+    } else {
+      await api.post(`/likes/${feedId}`);
+    }
+  },
+
+  // POST/DELETE /follows/{followeeId} - 팔로우 토글
+  toggleFollow: async (userId: number, isCurrentlyFollowing: boolean): Promise<void> => {
+    if (isCurrentlyFollowing) {
+      await api.delete(`/follows/${userId}`);
+    } else {
+      await api.post(`/follows/${userId}`);
+    }
+  },
+
+  // GET /feeds/search - accountName으로 userId 찾기
+  findUserIdByAccountName: async (accountName: string): Promise<number | null> => {
+    try {
+      const feeds = await feedViewerAPI.searchFeeds(accountName, 1);
+      return feeds.length > 0 ? feeds[0].authorId : null;
+    } catch (error) {
+      console.error('Failed to find userId by accountName:', error);
+      return null;
+    }
+  },
+};
+
+// ============================================================================
+// FeedViewer 컴포넌트
+// ============================================================================
+
 const FeedViewer: React.FC<FeedViewerProps> = ({ 
-  userId, 
+  userId,
+  accountName, 
   isMyFeed = false,
   feedId,
+  searchQuery,
+  type = 'following',
   className = ''
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [selectedFeedItem, setSelectedFeedItem] = useState<FeedItem | null>(null)
-  const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null)
   
-  // ✅ 상태 관리
-  const [feedItems, setFeedItems] = useState<FeedItem[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
+  // ============================================================================
+  // 상태 관리
+  // ============================================================================
+  
+  const [feedItems, setFeedItems] = useState<FeedDetailResponse[]>([])
+  const [selectedFeed, setSelectedFeed] = useState<FeedDetailResponse | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [nextCursor, setNextCursor] = useState<string | undefined>()
+  const [hasMore, setHasMore] = useState(true)
 
-  // 현재 사용자 정보 로드
-  useEffect(() => {
-    const loadCurrentUser = async () => {
-      try {
-        const user = await getCurrentUser()
-        setCurrentUser(user)
-      } catch (error) {
-        console.error('현재 사용자 정보 로드 실패:', error)
-      }
-    }
-    loadCurrentUser()
-  }, [])
+  // ============================================================================
+  // 데이터 로드 함수들
+  // ============================================================================
 
-  // ✅ 단일 피드 로드 (백엔드 API 사용)
-  const loadSingleFeed = useCallback(async (targetFeedId: string) => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const result = await getFeed(targetFeedId)
-      
-      if (result.success && result.data) {
-        setFeedItems([result.data])
-        setHasMore(false)
-      } else {
-        setError(result.error || '피드를 불러오는데 실패했습니다.')
-        setFeedItems([])
-      }
-    } catch (error) {
-      console.error('피드 로드 실패:', error)
-      setError(handleApiError(error))
-      setFeedItems([])
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  // ✅ 사용자별 피드 목록 로드 (백엔드 API 사용)
-  const loadUserFeeds = useCallback(async (targetUserId: string, cursor?: string) => {
-    setIsLoading(true)
-    if (!cursor) {
-      setError(null)
-      setFeedItems([])
-    }
-
-    try {
-      const result = await getUserFeeds(targetUserId, cursor, 20)
-      
-      if (result.success && result.data) {
-        const newFeeds = result.data.feeds
-        
-        if (cursor) {
-          // 페이지네이션 - 기존 피드에 추가
-          setFeedItems(prev => [...prev, ...newFeeds])
-        } else {
-          // 첫 로드 - 새로운 피드 설정
-          setFeedItems(newFeeds)
-        }
-        
-        setHasMore(result.data.hasMore)
-        setNextCursor(result.data.nextCursor)
-      } else {
-        setError(result.error || '피드를 불러오는데 실패했습니다.')
-        if (!cursor) setFeedItems([])
-      }
-    } catch (error) {
-      console.error('사용자 피드 로드 실패:', error)
-      setError(handleApiError(error))
-      if (!cursor) setFeedItems([])
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  // ✅ 탐색 피드 목록 로드 (백엔드 API 사용)
-  const loadExploreFeed = useCallback(async (cursor?: string) => {
-    setIsLoading(true)
-    if (!cursor) {
-      setError(null)
-      setFeedItems([])
-    }
-
-    try {
-      const result = await getExploreFeeds('recent', cursor, 20)
-      
-      if (result.success && result.data) {
-        const newFeeds = result.data.feeds
-        
-        if (cursor) {
-          // 페이지네이션 - 기존 피드에 추가
-          setFeedItems(prev => [...prev, ...newFeeds])
-        } else {
-          // 첫 로드 - 새로운 피드 설정
-          setFeedItems(newFeeds)
-        }
-        
-        setHasMore(result.data.hasMore)
-        setNextCursor(result.data.nextCursor)
-      } else {
-        setError(result.error || '피드를 불러오는데 실패했습니다.')
-        if (!cursor) setFeedItems([])
-      }
-    } catch (error) {
-      console.error('탐색 피드 로드 실패:', error)
-      setError(handleApiError(error))
-      if (!cursor) setFeedItems([])
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  // ✅ 더 많은 피드 로드 (무한 스크롤)
-  const loadMoreFeeds = useCallback(() => {
-    if (!hasMore || isLoading || !nextCursor) return
-
-    if (userId) {
-      loadUserFeeds(userId, nextCursor)
+  // 피드 목록 로드
+  const loadFeeds = useCallback(async (refresh: boolean = false) => {
+    if (refresh) {
+      setIsRefreshing(true);
     } else {
-      loadExploreFeed(nextCursor)
+      setIsLoading(true);
     }
-  }, [hasMore, isLoading, nextCursor, userId, loadUserFeeds, loadExploreFeed])
+    setError(null);
+
+    try {
+      let feeds: FeedDetailResponse[] = [];
+
+      if (feedId) {
+        // 단일 피드 조회
+        const feed = await feedViewerAPI.getFeedDetail(feedId);
+        feeds = [feed];
+      } else if (type === 'user' && userId) {
+        // 특정 사용자 피드
+        feeds = await feedViewerAPI.getUserFeeds(userId);
+      } else if (type === 'user' && accountName) {
+        // accountName으로 사용자 찾기
+        const foundUserId = await feedViewerAPI.findUserIdByAccountName(accountName);
+        if (foundUserId) {
+          feeds = await feedViewerAPI.getUserFeeds(foundUserId);
+        } else {
+          throw new Error('사용자를 찾을 수 없습니다.');
+        }
+      } else if (type === 'following') {
+        feeds = await feedViewerAPI.getFollowingFeeds();
+      } else if (type === 'random') {
+        feeds = await feedViewerAPI.getRandomFeeds();
+      } else if (type === 'search' && searchQuery) {
+        feeds = await feedViewerAPI.searchFeeds(searchQuery);
+      }
+
+      if (refresh) {
+        setFeedItems(feeds);
+      } else {
+        setFeedItems(prev => [...prev, ...feeds]);
+      }
+
+      // 더 이상 로드할 피드가 없으면 hasMore를 false로 설정
+      if (feeds.length < 20) {
+        setHasMore(false);
+      }
+
+    } catch (err) {
+      console.error('Failed to load feeds:', err);
+      const errorMessage = err instanceof Error ? err.message : '피드를 불러오는데 실패했습니다.';
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [feedId, type, userId, accountName, searchQuery]);
 
   // 초기 로드
   useEffect(() => {
-    if (feedId) {
-      // 단일 피드 조회
-      loadSingleFeed(feedId)
-    } else if (userId) {
-      // 특정 사용자 피드 목록 조회
-      loadUserFeeds(userId)
-    } else {
-      // 전체 탐색 피드 조회
-      loadExploreFeed()
-    }
-  }, [feedId, userId, loadSingleFeed, loadUserFeeds, loadExploreFeed])
+    loadFeeds();
+  }, [loadFeeds]);
 
-  // ✅ 스크롤 이벤트 처리 (무한 스크롤)
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!containerRef.current || !hasMore || isLoading) return
+  // ============================================================================
+  // 이벤트 핸들러들
+  // ============================================================================
 
-      const { scrollTop, scrollHeight, clientHeight } = containerRef.current
-      const scrollPercentage = (scrollTop + clientHeight) / scrollHeight
+  // 피드 클릭 핸들러
+  const handleFeedClick = useCallback((feed: FeedDetailResponse) => {
+    setSelectedFeed(feed);
+  }, []);
 
-      // 80% 지점에서 다음 페이지 로드
-      if (scrollPercentage > 0.8) {
-        loadMoreFeeds()
-      }
-    }
-
-    const container = containerRef.current
-    if (container) {
-      container.addEventListener('scroll', handleScroll)
-      return () => container.removeEventListener('scroll', handleScroll)
-    }
-  }, [hasMore, isLoading, loadMoreFeeds])
-
-  // ✅ 피드 아이템 클릭 핸들러 (최신 데이터로 업데이트)
-  const handleFeedClick = useCallback(async (feedItem: FeedItem) => {
-    try {
-      const result = await getFeed(feedItem.id)
-      
-      if (result.success && result.data) {
-        setSelectedFeedItem(result.data)
-      } else {
-        setSelectedFeedItem(feedItem) // 실패시 기존 데이터로 표시
-      }
-    } catch (error) {
-      console.error('피드 상세 조회 실패:', error)
-      setSelectedFeedItem(feedItem)
-    }
-  }, [])
-
-  // ✅ 좋아요 토글 (백엔드 API 사용)
-  const handleLikeToggle = useCallback(async (feedItem: FeedItem, e: React.MouseEvent) => {
-    e.stopPropagation()
-    
-    if (!feedItem.photoId) {
-      console.error('PhotoId가 없습니다.')
-      return
-    }
-
-    const feedIndex = feedItems.findIndex(item => item.id === feedItem.id)
-    if (feedIndex === -1) return
-
-    const currentFeed = feedItems[feedIndex]
-    const wasLiked = currentFeed.isLiked
-
-    // 낙관적 업데이트
-    setFeedItems(prev => prev.map(item => 
-      item.id === feedItem.id 
-        ? { 
-            ...item, 
-            isLiked: !wasLiked,
-            likesCount: wasLiked ? Math.max(0, item.likesCount - 1) : item.likesCount + 1
-          }
-        : item
-    ))
-
-    // 선택된 피드도 업데이트
-    if (selectedFeedItem?.id === feedItem.id) {
-      setSelectedFeedItem(prev => prev ? {
-        ...prev,
-        isLiked: !wasLiked,
-        likesCount: wasLiked ? Math.max(0, prev.likesCount - 1) : prev.likesCount + 1
-      } : null)
-    }
+  // 🔥 백엔드 연동 - 좋아요 토글
+  const handleLikeToggle = useCallback(async (feed: FeedDetailResponse, e: React.MouseEvent) => {
+    e.stopPropagation();
 
     try {
-      const result = await toggleFeedLike(Number(feedItem.photoId))
+      await feedViewerAPI.toggleLike(feed.feedId, feed.liked);
       
-      if (result.success && result.data) {
-        // 실제 결과로 업데이트
-        setFeedItems(prev => prev.map(item => 
-          item.id === feedItem.id 
-            ? { 
-                ...item, 
-                isLiked: result.data!.isLiked,
-                likesCount: result.data!.likesCount
-              }
-            : item
-        ))
-
-        // 선택된 피드도 업데이트
-        if (selectedFeedItem?.id === feedItem.id) {
-          setSelectedFeedItem(prev => prev ? {
-            ...prev,
-            isLiked: result.data!.isLiked,
-            likesCount: result.data!.likesCount
-          } : null)
-        }
-      } else {
-        throw new Error(result.error || '좋아요 처리에 실패했습니다.')
-      }
-    } catch (error) {
-      console.error('좋아요 처리 실패:', error)
-      
-      // 실패시 롤백
+      // 로컬 상태 즉시 업데이트 (낙관적 업데이트)
       setFeedItems(prev => prev.map(item => 
-        item.id === feedItem.id 
-          ? { 
-              ...item, 
-              isLiked: wasLiked,
-              likesCount: wasLiked ? item.likesCount + 1 : Math.max(0, item.likesCount - 1)
-            }
+        item.feedId === feed.feedId 
+          ? { ...item, liked: !item.liked }
           : item
-      ))
+      ));
 
-      if (selectedFeedItem?.id === feedItem.id) {
-        setSelectedFeedItem(prev => prev ? {
-          ...prev,
-          isLiked: wasLiked,
-          likesCount: wasLiked ? prev.likesCount + 1 : Math.max(0, prev.likesCount - 1)
-        } : null)
+      // 선택된 피드도 업데이트
+      if (selectedFeed?.feedId === feed.feedId) {
+        setSelectedFeed(prev => prev ? { ...prev, liked: !prev.liked } : null);
       }
+
+    } catch (error) {
+      console.error('Failed to toggle like:', error);
+      // TODO: 에러 토스트 메시지 표시
     }
-  }, [feedItems, selectedFeedItem])
+  }, [selectedFeed]);
 
-  // ✅ 팔로우 토글 (백엔드 API 사용)
-  const handleFollowToggle = useCallback(async (feedItem: FeedItem, e: React.MouseEvent) => {
-    e.stopPropagation()
-    
-    if (!currentUser || feedItem.authorId === currentUser.id) return
-
-    const feedIndex = feedItems.findIndex(item => item.authorId === feedItem.authorId)
-    if (feedIndex === -1) return
-
-    const currentFeed = feedItems[feedIndex]
-    const wasFollowing = currentFeed.isFollowing
-
-    // 낙관적 업데이트 (해당 작성자의 모든 피드)
-    setFeedItems(prev => prev.map(item => 
-      item.authorId === feedItem.authorId 
-        ? { ...item, isFollowing: !wasFollowing }
-        : item
-    ))
-
-    // 선택된 피드도 업데이트
-    if (selectedFeedItem?.authorId === feedItem.authorId) {
-      setSelectedFeedItem(prev => prev ? {
-        ...prev,
-        isFollowing: !wasFollowing
-      } : null)
-    }
+  // 🔥 백엔드 연동 - 팔로우 토글 (authorId 사용)
+  const handleFollowToggle = useCallback(async (feed: FeedDetailResponse, e: React.MouseEvent) => {
+    e.stopPropagation();
 
     try {
-      const result = await toggleFollow(feedItem.authorId)
+      // TODO: 현재 팔로우 상태를 확인하는 API 필요
+      // 임시로 false로 가정
+      await feedViewerAPI.toggleFollow(feed.authorId, false);
       
-      if (result.success && typeof result.data?.isFollowing === 'boolean') {
-        // 실제 결과로 업데이트
-        setFeedItems(prev => prev.map(item => 
-          item.authorId === feedItem.authorId 
-            ? { ...item, isFollowing: result.data!.isFollowing }
-            : item
-        ))
+      console.log('팔로우 토글 성공:', feed.accountName);
+      // TODO: 팔로우 상태 업데이트 로직 필요
 
-        // 선택된 피드도 업데이트
-        if (selectedFeedItem?.authorId === feedItem.authorId) {
-          setSelectedFeedItem(prev => prev ? {
-            ...prev,
-            isFollowing: result.data!.isFollowing
-          } : null)
-        }
-      } else {
-        throw new Error(result.error || '팔로우 처리에 실패했습니다.')
-      }
     } catch (error) {
-      console.error('팔로우 처리 실패:', error)
-      
-      // 실패시 롤백
-      setFeedItems(prev => prev.map(item => 
-        item.authorId === feedItem.authorId 
-          ? { ...item, isFollowing: wasFollowing }
-          : item
-      ))
-
-      if (selectedFeedItem?.authorId === feedItem.authorId) {
-        setSelectedFeedItem(prev => prev ? {
-          ...prev,
-          isFollowing: wasFollowing
-        } : null)
-      }
+      console.error('Failed to toggle follow:', error);
+      // TODO: 에러 토스트 메시지 표시
     }
-  }, [feedItems, selectedFeedItem, currentUser])
+  }, []);
 
-  // ✅ 피드 삭제 (백엔드 API 사용)
-  const handleDelete = useCallback(async (feedItem: FeedItem, e: React.MouseEvent) => {
-    e.stopPropagation()
-    
-    if (!confirm('정말 삭제하시겠습니까?')) return
-
-    try {
-      const result = await deleteFeed(feedItem.id)
-      
-      if (result.success) {
-        setFeedItems(prev => prev.filter(item => item.id !== feedItem.id))
-        
-        if (selectedFeedItem?.id === feedItem.id) {
-          setSelectedFeedItem(null)
-        }
-      } else {
-        throw new Error(result.error || '피드 삭제에 실패했습니다.')
-      }
-    } catch (error) {
-      console.error('피드 삭제 실패:', error)
-      alert(handleApiError(error))
-    }
-  }, [selectedFeedItem])
-
-  // ✅ 새로고침
+  // 새로고침
   const handleRefresh = useCallback(() => {
-    setNextCursor(undefined)
-    setHasMore(true)
+    setHasMore(true);
+    loadFeeds(true);
+  }, [loadFeeds]);
+
+  // 공유 핸들러
+  const handleShare = useCallback((feed: FeedDetailResponse, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    const url = `${window.location.origin}/feed/${feed.feedId}`;
     
-    if (feedId) {
-      loadSingleFeed(feedId)
-    } else if (userId) {
-      loadUserFeeds(userId)
+    if (navigator.share) {
+      navigator.share({
+        title: feed.caption || '피드',
+        text: `${feed.accountName}의 피드`,
+        url: url,
+      }).catch(() => {
+        // 공유 취소됨
+      });
     } else {
-      loadExploreFeed()
+      navigator.clipboard.writeText(url).then(() => {
+        alert('링크가 클립보드에 복사되었습니다!');
+      }).catch(() => {
+        alert('링크 복사에 실패했습니다.');
+      });
     }
-  }, [feedId, userId, loadSingleFeed, loadUserFeeds, loadExploreFeed])
+  }, []);
 
-  // 가상화된 피드 아이템 렌더러
-  const renderFeedItem = useCallback((item: FeedItem, index: number) => {
-    const isOwnFeed = currentUser?.id === item.authorId
+  // ============================================================================
+  // 렌더링 함수들
+  // ============================================================================
 
+  // 피드 아이템 렌더러
+  const renderFeedItem = useCallback((feed: FeedDetailResponse, index: number) => {
     return (
       <div
-        key={item.id}
+        key={feed.feedId}
         className="relative group cursor-pointer bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200"
-        onClick={() => handleFeedClick(item)}
+        onClick={() => handleFeedClick(feed)}
       >
-        {/* 피드 프리뷰 이미지 */}
+        {/* 피드 이미지 */}
         <div className="aspect-square relative overflow-hidden rounded-t-lg">
           <img
-            src={item.photoUrl || '/api/placeholder/400/400'}
-            alt={item.name || '피드 이미지'}
+            src={feed.imgUrl || '/api/placeholder/400/400'}
+            alt={feed.caption || '피드 이미지'}
             className="w-full h-full object-cover"
             loading="lazy"
             onError={(e) => {
-              const target = e.target as HTMLImageElement
-              target.src = '/api/placeholder/400/400?text=Feed+Image'
+              const target = e.target as HTMLImageElement;
+              target.src = '/api/placeholder/400/400?text=Feed+Image';
             }}
           />
           
@@ -448,103 +316,92 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
           <div className="absolute inset-0 bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
             <div className="flex space-x-4 text-white">
               <div className="flex items-center space-x-1">
-                <HeartIcon className="h-6 w-6" />
-                <span>{item.likesCount || 0}</span>
+                {feed.liked ? (
+                  <HeartSolidIcon className="h-6 w-6 text-red-500" />
+                ) : (
+                  <HeartIcon className="h-6 w-6" />
+                )}
+                <span>{feed.liked ? '좋아요' : '좋아요'}</span>
               </div>
             </div>
           </div>
 
-          {/* 피드 타입 배지 (ExploreFeed인 경우) */}
-          {'source' in item && (
-            <div className="absolute top-2 left-2">
-              <span className="bg-black/50 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
-                {item.source === 'popular' ? '🔥 인기' : 
-                 item.source === 'recent' ? '🆕 최신' : 
-                 item.source === 'recommended' ? '⭐ 추천' : '🎲 랜덤'}
-              </span>
-            </div>
-          )}
+          {/* 피드 타입 배지 */}
+          <div className="absolute top-2 left-2">
+            <span className="bg-black/50 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
+              {type === 'following' ? '👥 팔로잉' : 
+               type === 'random' ? '🎲 랜덤' : 
+               type === 'user' ? '👤 사용자' : '🔍 검색'}
+            </span>
+          </div>
         </div>
 
         {/* 피드 정보 */}
         <div className="p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center space-x-2 flex-1">
-              <img
-                src={item.authorAvatar || '/api/placeholder/32/32'}
-                alt={item.authorName || 'User'}
-                className="w-8 h-8 rounded-full"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement
-                  target.src = '/api/placeholder/32/32?text=U'
-                }}
-              />
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200">
+                {feed.profileImage ? (
+                  <img
+                    src={feed.profileImage}
+                    alt={feed.accountName}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                    {feed.accountName.charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
               <span className="text-sm font-medium text-gray-900 truncate">
-                {item.authorName || 'Unknown User'}
+                {feed.accountName}
               </span>
-              
-              {/* 팔로우 버튼 */}
-              {!isOwnFeed && (
-                <button
-                  onClick={(e) => handleFollowToggle(item, e)}
-                  className={`text-xs px-2 py-1 rounded-full transition-colors flex-shrink-0 ${
-                    item.isFollowing
-                      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      : 'bg-blue-500 text-white hover:bg-blue-600'
-                  }`}
-                >
-                  {item.isFollowing ? '팔로잉' : '팔로우'}
-                </button>
-              )}
             </div>
             <span className="text-xs text-gray-500 flex-shrink-0">
-              {new Date(item.createdAt).toLocaleDateString('ko-KR')}
+              {new Date(feed.createdAt).toLocaleDateString('ko-KR')}
             </span>
           </div>
           
-          <h3 className="text-sm font-medium text-gray-900 mb-1 line-clamp-2">
-            {item.name}
-          </h3>
-          
-          {item.description && (
-            <p className="text-xs text-gray-600 line-clamp-3 mb-2">
-              {item.description}
-            </p>
-          )}
+          <p className="text-sm text-gray-800 line-clamp-2 mb-2">
+            {feed.caption || '캡션이 없습니다'}
+          </p>
         </div>
 
         {/* 액션 버튼들 */}
         <div className="flex items-center justify-between p-4 pt-0">
           <div className="flex items-center space-x-4">
             <button
-              onClick={(e) => handleLikeToggle(item, e)}
+              onClick={(e) => handleLikeToggle(feed, e)}
               className="flex items-center space-x-1 text-gray-600 hover:text-red-500 transition-colors"
             >
-              {item.isLiked ? (
+              {feed.liked ? (
                 <HeartSolidIcon className="h-5 w-5 text-red-500" />
               ) : (
                 <HeartIcon className="h-5 w-5" />
               )}
-              <span className="text-sm">{item.likesCount || 0}</span>
+              <span className="text-sm">좋아요</span>
             </button>
             
-            <button className="flex items-center space-x-1 text-gray-600 hover:text-green-500 transition-colors">
+            <button 
+              onClick={(e) => handleShare(feed, e)}
+              className="flex items-center space-x-1 text-gray-600 hover:text-green-500 transition-colors"
+            >
               <ShareIcon className="h-5 w-5" />
+              <span className="text-sm">공유</span>
             </button>
           </div>
-
-          {isOwnFeed && (
-            <button
-              onClick={(e) => handleDelete(item, e)}
-              className="text-xs text-red-600 hover:text-red-800 transition-colors"
-            >
-              삭제
-            </button>
-          )}
         </div>
       </div>
-    )
-  }, [handleFeedClick, handleLikeToggle, handleFollowToggle, handleDelete, currentUser])
+    );
+  }, [handleFeedClick, handleLikeToggle, handleShare, type]);
+
+  // ============================================================================
+  // 렌더링
+  // ============================================================================
 
   // 로딩 상태 (첫 로드)
   if (isLoading && feedItems.length === 0) {
@@ -552,7 +409,7 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
       <div className={`flex items-center justify-center h-64 ${className}`}>
         <LoadingSpinner size="lg" />
       </div>
-    )
+    );
   }
 
   // 에러 상태 (첫 로드)
@@ -562,13 +419,13 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
         <div className="text-red-500 text-lg font-medium mb-2">오류가 발생했습니다</div>
         <p className="text-gray-600 mb-4">{error}</p>
         <button 
-          onClick={handleRefresh}
+          onClick={() => loadFeeds(true)}
           className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
         >
           다시 시도
         </button>
       </div>
-    )
+    );
   }
 
   // 피드가 없는 경우
@@ -591,11 +448,35 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
           새로고침
         </button>
       </div>
-    )
+    );
   }
 
   return (
     <div ref={containerRef} className={`h-full overflow-y-auto ${className}`}>
+      {/* 헤더 정보 */}
+      <div className="p-4 bg-white border-b">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">
+              {type === 'following' ? '팔로잉 피드' : 
+               type === 'random' ? '랜덤 피드' : 
+               type === 'user' ? `${accountName || '사용자'}의 피드` : 
+               type === 'search' ? `"${searchQuery}" 검색 결과` : '피드'}
+            </h1>
+            <p className="text-sm text-gray-500">
+              총 {feedItems.length}개의 피드
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="bg-blue-500 text-white px-3 py-1 text-sm rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
+          >
+            {isRefreshing ? '새로고침...' : '새로고침'}
+          </button>
+        </div>
+      </div>
+
       {/* 에러 경고 메시지 (부분 로드 성공) */}
       {error && feedItems.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 mx-4">
@@ -607,6 +488,12 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
             </div>
             <div className="ml-3">
               <p className="text-sm text-yellow-800">{error}</p>
+              <button
+                onClick={() => setError(null)}
+                className="text-sm text-yellow-700 underline hover:text-yellow-900"
+              >
+                닫기
+              </button>
             </div>
           </div>
         </div>
@@ -614,105 +501,90 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
 
       {/* 피드 그리드 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
-        {feedItems.map((item, index) => renderFeedItem(item, index))}
+        {feedItems.map((feed, index) => renderFeedItem(feed, index))}
       </div>
 
-      {/* 무한 스크롤 로딩 */}
-      {isLoading && feedItems.length > 0 && (
-        <div className="flex justify-center py-8">
-          <LoadingSpinner />
-        </div>
-      )}
-
-      {/* 더 이상 로드할 피드가 없는 경우 */}
-      {!hasMore && feedItems.length > 0 && (
-        <div className="text-center py-8 text-gray-500">
-          모든 피드를 불러왔습니다
-        </div>
-      )}
-
       {/* 피드 상세 모달 */}
-      {selectedFeedItem && (
+      {selectedFeed && (
         <FeedDetailModal
-          feedItem={selectedFeedItem}
-          onClose={() => setSelectedFeedItem(null)}
-          onLike={(item) => handleLikeToggle(item, { stopPropagation: () => {} } as React.MouseEvent)}
-          onFollow={(item) => handleFollowToggle(item, { stopPropagation: () => {} } as React.MouseEvent)}
-          onDelete={selectedFeedItem.authorId === currentUser?.id ? (item) => handleDelete(item, { stopPropagation: () => {} } as React.MouseEvent) : undefined}
-          currentUserId={currentUser?.id}
+          feed={selectedFeed}
+          onClose={() => setSelectedFeed(null)}
+          onLike={handleLikeToggle}
+          onShare={handleShare}
         />
       )}
     </div>
-  )
-}
+  );
+};
 
-// ✅ 피드 상세 모달 컴포넌트
+// ============================================================================
+// 피드 상세 모달 컴포넌트
+// ============================================================================
+
 interface FeedDetailModalProps {
-  feedItem: FeedItem
-  onClose: () => void
-  onLike: (item: FeedItem) => void
-  onFollow: (item: FeedItem) => void
-  onDelete?: (item: FeedItem) => void
-  currentUserId?: string
+  feed: FeedDetailResponse;
+  onClose: () => void;
+  onLike: (feed: FeedDetailResponse, e: React.MouseEvent) => void;
+  onShare: (feed: FeedDetailResponse, e: React.MouseEvent) => void;
 }
 
 const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
-  feedItem,
+  feed,
   onClose,
   onLike,
-  onFollow,
-  onDelete,
-  currentUserId
+  onShare
 }) => {
-  const isOwnFeed = currentUserId === feedItem.authorId
-
   // ESC 키로 모달 닫기
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose()
+        onClose();
       }
-    }
+    };
 
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex">
-          {/* 피드 이미지/캔버스 영역 */}
+          {/* 피드 이미지 영역 */}
           <div className="flex-1 bg-black flex items-center justify-center min-h-[500px]">
             <img
-              src={feedItem.photoUrl || '/api/placeholder/600/600'}
-              alt={feedItem.name || '피드 이미지'}
+              src={feed.imgUrl || '/api/placeholder/600/600'}
+              alt={feed.caption || '피드 이미지'}
               className="max-w-full max-h-[80vh] object-contain"
               onError={(e) => {
-                const target = e.target as HTMLImageElement
-                target.src = '/api/placeholder/600/600?text=Feed+Image'
+                const target = e.target as HTMLImageElement;
+                target.src = '/api/placeholder/600/600?text=Feed+Image';
               }}
             />
           </div>
           
-          {/* 피드 정보 및 댓글 영역 */}
+          {/* 피드 정보 영역 */}
           <div className="w-80 flex flex-col">
             {/* 헤더 */}
             <div className="flex items-center justify-between p-4 border-b">
               <div className="flex items-center space-x-3 flex-1">
-                <img
-                  src={feedItem.authorAvatar || '/api/placeholder/40/40'}
-                  alt={feedItem.authorName || 'User'}
-                  className="w-10 h-10 rounded-full"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement
-                    target.src = '/api/placeholder/40/40?text=U'
-                  }}
-                />
+                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
+                  {feed.profileImage ? (
+                    <img
+                      src={feed.profileImage}
+                      alt={feed.accountName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                      {feed.accountName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{feedItem.authorName || 'Unknown User'}</div>
+                  <div className="font-medium truncate">{feed.accountName}</div>
                   <div className="text-sm text-gray-500">
-                    {new Date(feedItem.createdAt).toLocaleDateString('ko-KR', {
+                    {new Date(feed.createdAt).toLocaleDateString('ko-KR', {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
@@ -721,20 +593,6 @@ const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
                     })}
                   </div>
                 </div>
-                
-                {/* 팔로우 버튼 */}
-                {!isOwnFeed && (
-                  <button
-                    onClick={() => onFollow(feedItem)}
-                    className={`text-sm px-3 py-1 rounded-full transition-colors flex-shrink-0 ${
-                      feedItem.isFollowing
-                        ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        : 'bg-blue-500 text-white hover:bg-blue-600'
-                    }`}
-                  >
-                    {feedItem.isFollowing ? '팔로잉' : '팔로우'}
-                  </button>
-                )}
               </div>
               <button
                 onClick={onClose}
@@ -748,107 +606,54 @@ const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
 
             {/* 피드 내용 */}
             <div className="flex-1 overflow-y-auto p-4">
-              <h2 className="font-medium mb-2">{feedItem.name}</h2>
-              {feedItem.description && (
-                <p className="text-gray-700 mb-4 whitespace-pre-wrap">{feedItem.description}</p>
-              )}
+              <p className="text-gray-700 whitespace-pre-wrap">
+                {feed.caption || '캡션이 없습니다'}
+              </p>
 
-              {/* 피드 통계 정보 */}
-              <div className="grid grid-cols-2 gap-4 p-3 bg-gray-50 rounded-lg mb-4">
-                <div className="text-center">
-                  <div className="text-lg font-semibold text-gray-900">{feedItem.likesCount || 0}</div>
-                  <div className="text-sm text-gray-500">좋아요</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-semibold text-gray-900">{feedItem.followersCount || 0}</div>
-                  <div className="text-sm text-gray-500">팔로워</div>
-                </div>
-              </div>
-
-              {/* 피드 설정 정보 */}
-              <div className="space-y-2 text-sm">
+              {/* 피드 정보 */}
+              <div className="mt-6 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">공개 설정:</span>
-                  <span className={feedItem.isPublic ? 'text-green-600' : 'text-orange-600'}>
-                    {feedItem.isPublic ? '공개' : '비공개'}
+                  <span className="text-gray-500">계정:</span>
+                  <span className="text-gray-700">@{feed.accountName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">작성일:</span>
+                  <span className="text-gray-700">
+                    {new Date(feed.createdAt).toLocaleDateString('ko-KR')}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">배경색:</span>
-                  <div className="flex items-center space-x-2">
-                    <div 
-                      className="w-4 h-4 rounded border border-gray-300"
-                      style={{ backgroundColor: feedItem.backgroundColor }}
-                    />
-                    <span className="text-xs font-mono">{feedItem.backgroundColor}</span>
-                  </div>
-                </div>
-                {'source' in feedItem && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">소스:</span>
-                    <span className="text-gray-700 capitalize">{feedItem.source}</span>
-                  </div>
-                )}
-                {'discoverScore' in feedItem && feedItem.discoverScore && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">발견 점수:</span>
-                    <span className="text-gray-700">{Math.round(feedItem.discoverScore)}/100</span>
-                  </div>
-                )}
               </div>
             </div>
 
             {/* 액션 버튼들 */}
             <div className="border-t p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <button
-                    onClick={() => onLike(feedItem)}
-                    className="flex items-center space-x-1 text-gray-600 hover:text-red-500 transition-colors"
-                  >
-                    {feedItem.isLiked ? (
-                      <HeartSolidIcon className="h-6 w-6 text-red-500" />
-                    ) : (
-                      <HeartIcon className="h-6 w-6" />
-                    )}
-                    <span>{feedItem.likesCount || 0}</span>
-                  </button>
-                  
-                  <button 
-                    onClick={() => {
-                      if (navigator.share) {
-                        navigator.share({
-                          title: feedItem.name,
-                          text: feedItem.description,
-                          url: window.location.href
-                        })
-                      } else {
-                        navigator.clipboard.writeText(window.location.href)
-                        alert('링크가 클립보드에 복사되었습니다!')
-                      }
-                    }}
-                    className="flex items-center space-x-1 text-gray-600 hover:text-green-500 transition-colors"
-                  >
-                    <ShareIcon className="h-6 w-6" />
-                    <span className="text-sm">공유</span>
-                  </button>
-                </div>
-
-                {onDelete && (
-                  <button
-                    onClick={() => onDelete(feedItem)}
-                    className="text-red-600 hover:text-red-800 text-sm transition-colors"
-                  >
-                    삭제
-                  </button>
-                )}
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={(e) => onLike(feed, e)}
+                  className="flex items-center space-x-1 text-gray-600 hover:text-red-500 transition-colors"
+                >
+                  {feed.liked ? (
+                    <HeartSolidIcon className="h-6 w-6 text-red-500" />
+                  ) : (
+                    <HeartIcon className="h-6 w-6" />
+                  )}
+                  <span>좋아요</span>
+                </button>
+                
+                <button 
+                  onClick={(e) => onShare(feed, e)}
+                  className="flex items-center space-x-1 text-gray-600 hover:text-green-500 transition-colors"
+                >
+                  <ShareIcon className="h-6 w-6" />
+                  <span>공유</span>
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
 export default FeedViewer

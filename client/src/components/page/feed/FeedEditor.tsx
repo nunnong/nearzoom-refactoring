@@ -1,393 +1,242 @@
+'use client'
+
 import React, { useState, useEffect, useCallback } from 'react'
-import FeedCanvas from './FeedCanvas'
-import EditToolbar from './EditToolbar'
-import BackgroundColorPicker from './BackgroundColorPicker'
-// 기존 drawing 컴포넌트들 재사용 (로컬 데모용)
-import StickerModal from '@/components/page/drawing/StickerModal'
-import TextModal from '@/components/page/drawing/TextModal'
-import PhotoUploadModal from './PhotoUploadModal'
-import { useFeedEditor } from '@/hooks/useFeedEditor'
-import { FeedElement, StickerElement, TextElement, PhotoElement } from '@/lib/types/feed'
+import { PhotoIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline'
+import { useAuth } from '@/hooks/auth/useAuth'
 
-// ✅ 백엔드 API 연동
-import { 
-  createFeed, 
-  getFeed, 
-  getCurrentUser,
-  handleApiError 
-} from '@/lib/api/feed'
+// 🔥 올바른 백엔드 연동 - api from '@/lib/axios' 사용
+import api from '@/lib/axios'
 
-interface FeedEditorProps {
-  userId?: string
-  feedId?: string | null  // 기존 피드 편집용
-  photoId?: number        // ✅ 선택된 photoId
-  mode?: 'create' | 'edit' // 생성 모드 vs 편집 모드
-  className?: string
-  onSave?: (caption: string) => Promise<void> // ✅ 부모에서 처리
-  onComplete?: () => void // ✅ 편집 완료 시 콜백 (/my로 이동)
-  onCancel?: () => void   // 취소 콜백
+// ============================================================================
+// 백엔드 DTO 기반 타입 정의
+// ============================================================================
+
+// CreateFeedRequest.java 기반
+interface CreateFeedRequest {
+  photoId: number;
+  caption: string;
 }
 
-// 🔥 EditToolbar와 일치하는 타입 사용 (save 추가)
-export type EditTool = 'select' | 'photo' | 'sticker' | 'text' | 'draw' | 'background' | 'save'
+// 백엔드 ApiResponse 표준 형식
+interface ApiResponse<T> {
+  error: boolean;
+  message: string;
+  data: T;
+}
+
+// Photo 정보 타입
+interface PhotoInfo {
+  photoId: number;
+  imgUrl: string;
+  fileName?: string;
+  createdAt?: string;
+}
+
+interface FeedEditorProps {
+  userId?: string;         // 사용자 ID
+  feedId?: number;         // 기존 피드 편집용 (현재 미지원)
+  photoId?: number;        // 선택된 photoId (필수)
+  mode?: 'create' | 'edit'; // 생성 모드만 지원
+  className?: string;
+  onSave?: (caption: string) => Promise<void>; // 부모에서 처리
+  onComplete?: () => void;  // 완료 시 콜백
+  onCancel?: () => void;    // 취소 콜백
+}
+
+// ============================================================================
+// 백엔드 API 함수들
+// ============================================================================
+
+const feedEditorAPI = {
+  // POST /feeds - 새 피드 생성
+  createFeed: async (request: CreateFeedRequest): Promise<number> => {
+    const response = await api.post<ApiResponse<number>>('/feeds', request);
+    return response.data.data;
+  },
+
+  // GET /photos/{photoId} - 사진 정보 조회 (필요시)
+  getPhotoInfo: async (photoId: number): Promise<PhotoInfo> => {
+    try {
+      // TODO: 실제 사진 정보 API가 있다면 사용
+      // const response = await api.get<ApiResponse<PhotoInfo>>(`/photos/${photoId}`);
+      // return response.data.data;
+      
+      // 임시 Mock 데이터
+      return {
+        photoId,
+        imgUrl: `/api/placeholder/400/300?photoId=${photoId}`,
+        fileName: `photo_${photoId}.jpg`,
+        createdAt: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Failed to get photo info:', error);
+      throw new Error('사진 정보를 불러올 수 없습니다.');
+    }
+  },
+};
+
+// ============================================================================
+// FeedEditor 컴포넌트
+// ============================================================================
 
 const FeedEditor: React.FC<FeedEditorProps> = ({
   userId,
   feedId,
-  photoId, // ✅ 선택된 photoId
+  photoId,
   mode = 'create',
   className = '',
-  onSave, // ✅ 부모에서 처리하는 저장 함수
+  onSave,
   onComplete,
   onCancel
 }) => {
-  const [activeTool, setActiveTool] = useState<EditTool>('select')
-  const [selectedElement, setSelectedElement] = useState<string | null>(null)
-  const [showStickerModal, setShowStickerModal] = useState(false)
-  const [showTextModal, setShowTextModal] = useState(false)
-  const [showColorPicker, setShowColorPicker] = useState(false)
-  const [showPhotoModal, setShowPhotoModal] = useState(false)
-  const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const { user, isAuthenticated } = useAuth()
   
-  // ✅ 백엔드 연동 상태
+  // ============================================================================
+  // 상태 관리
+  // ============================================================================
+  
+  const [caption, setCaption] = useState<string>('')
+  const [photoInfo, setPhotoInfo] = useState<PhotoInfo | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null)
-  const [currentFeedId, setCurrentFeedId] = useState<string | null>(feedId || null)
-  const [caption, setCaption] = useState<string>('') // ✅ 피드 설명
+  const [error, setError] = useState<string | null>(null)
+  const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
-  const {
-    elements,
-    viewport,
-    isDragging,
-    isLoading,
-    containerRef,
-    feedData,
-    addElement,
-    updateElement,
-    removeElement,
-    handleWheel,
-    handleMouseDown,
-    handleMouseMove,
-    handleMouseUp,
-    zoomIn,
-    zoomOut,
-    resetZoom,
-    panTo,
-  } = useFeedEditor({ userId: userId || currentUser?.id || '' })
+  // ============================================================================
+  // 유틸리티 함수들
+  // ============================================================================
 
-  // 🔥 배경색 상태 관리 (로컬에서만 사용)
-  const [selectedBgColor, setSelectedBgColor] = useState(feedData?.backgroundColor || '#fef7f0')
-
-  // ✅ 현재 사용자 정보 로드
-  useEffect(() => {
-    const loadCurrentUser = async () => {
-      try {
-        const user = await getCurrentUser()
-        setCurrentUser(user)
-      } catch (error) {
-        console.error('현재 사용자 정보 로드 실패:', error)
-        showToast('사용자 정보를 불러올 수 없습니다', 'error')
-      }
-    }
-    
-    if (!userId) {
-      loadCurrentUser()
-    }
-  }, [userId])
-
-  // ✅ photoId 확인 및 알림
-  useEffect(() => {
-    if (photoId) {
-      showToast('사진이 선택되었습니다. 설명을 입력하고 저장해주세요!')
-    } else if (mode === 'create') {
-      showToast('사진을 먼저 선택해주세요', 'error')
-    }
-  }, [photoId, mode])
-
-  // ✅ 기존 피드 데이터 로드 (편집 모드)
-  useEffect(() => {
-    const loadExistingFeed = async () => {
-      if (mode === 'edit' && feedId) {
-        try {
-          const result = await getFeed(feedId)
-          if (result.success && result.data) {
-            setSelectedBgColor(result.data.backgroundColor)
-            setCaption(result.data.description || '')
-            setCurrentFeedId(feedId)
-          }
-        } catch (error) {
-          console.error('피드 로드 실패:', error)
-          showToast('피드를 불러올 수 없습니다', 'error')
-        }
-      }
-    }
-
-    loadExistingFeed()
-  }, [mode, feedId])
-
-  // feedData 변경 시 배경색 동기화
-  useEffect(() => {
-    if (feedData?.backgroundColor) {
-      setSelectedBgColor(feedData.backgroundColor)
-    }
-  }, [feedData?.backgroundColor])
-
-  // 🔥 토스트 메시지 표시 함수
+  // 토스트 메시지 표시
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     setToastMessage({ message, type })
     setTimeout(() => setToastMessage(null), 3000)
   }, [])
 
-  // ✅ 피드 저장 처리 (부모 컴포넌트의 onSave 사용)
+  // ============================================================================
+  // 초기화
+  // ============================================================================
+
+  // 사진 정보 로드
+  useEffect(() => {
+    const loadPhotoInfo = async () => {
+      if (!photoId) {
+        setError('사진이 선택되지 않았습니다.')
+        return
+      }
+
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        const info = await feedEditorAPI.getPhotoInfo(photoId)
+        setPhotoInfo(info)
+        showToast('사진이 로드되었습니다!')
+      } catch (err) {
+        console.error('Failed to load photo info:', err)
+        const errorMessage = err instanceof Error ? err.message : '사진 정보를 불러오는데 실패했습니다.'
+        setError(errorMessage)
+        showToast(errorMessage, 'error')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadPhotoInfo()
+  }, [photoId])
+
+  // 인증 확인
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      setError('로그인이 필요합니다.')
+    }
+  }, [isAuthenticated, user])
+
+  // ============================================================================
+  // 이벤트 핸들러들
+  // ============================================================================
+
+  // 🔥 백엔드 연동 - 피드 저장
   const handleSaveFeed = useCallback(async () => {
-    if (!photoId && mode === 'create') {
-      showToast('사진을 먼저 선택해주세요', 'error')
+    if (!photoId) {
+      showToast('사진이 선택되지 않았습니다.', 'error')
       return
     }
 
     if (!caption.trim()) {
-      showToast('피드 설명을 입력해주세요', 'error')
+      showToast('캡션을 입력해주세요.', 'error')
+      return
+    }
+
+    if (!isAuthenticated || !user) {
+      showToast('로그인이 필요합니다.', 'error')
       return
     }
 
     setIsSaving(true)
-    
+    setError(null)
+
     try {
       if (onSave) {
-        await onSave(caption)
+        // 부모 컴포넌트에서 저장 처리
+        await onSave(caption.trim())
       } else {
-        // 기본 저장 로직 (onSave가 없는 경우)
-        if (mode === 'create' && photoId) {
-          const result = await createFeed(photoId, caption)
-          
-          if (result.success && result.data) {
-            setCurrentFeedId(result.data.id)
-            showToast('피드가 성공적으로 생성되었습니다!')
-            
-            if (onComplete) {
-              setTimeout(() => {
-                onComplete()
-              }, 1500)
-            }
-          } else {
-            throw new Error(result.error || '피드 생성에 실패했습니다')
-          }
-        } else {
-          showToast('피드 업데이트 기능은 현재 지원되지 않습니다', 'error')
+        // 직접 백엔드 API 호출
+        const request: CreateFeedRequest = {
+          photoId,
+          caption: caption.trim()
         }
+
+        const feedId = await feedEditorAPI.createFeed(request)
+        console.log('새 피드 생성 완료:', feedId)
       }
-    } catch (error) {
-      console.error('피드 저장 실패:', error)
-      showToast(handleApiError(error), 'error')
+
+      showToast('피드가 성공적으로 생성되었습니다!')
+      
+      // 완료 콜백 호출 (페이지 이동 등)
+      if (onComplete) {
+        setTimeout(() => {
+          onComplete()
+        }, 1500)
+      }
+      
+    } catch (err) {
+      console.error('Failed to save feed:', err)
+      const errorMessage = err instanceof Error ? err.message : '피드 저장에 실패했습니다.'
+      setError(errorMessage)
+      showToast(errorMessage, 'error')
     } finally {
       setIsSaving(false)
     }
-  }, [photoId, caption, mode, onSave, onComplete])
+  }, [photoId, caption, isAuthenticated, user, onSave, onComplete])
 
-  // 🔥 배경색 변경 핸들러 - 로컬에서만 사용 (백엔드 미지원)
-  const handleBackgroundColorChange = async (color: string) => {
-    setSelectedBgColor(color)
-    showToast('배경색이 변경되었습니다 (로컬 표시용)')
-  }
-
-  // 도구 변경 핸들러
-  const handleToolChange = (tool: EditTool) => {
-    // 저장 도구 처리
-    if (tool === 'save') {
-      handleSaveFeed()
-      return
-    }
-
-    setActiveTool(tool)
-    
-    // 기존 패널들 닫기
-    setShowStickerModal(false)
-    setShowTextModal(false)
-    setShowColorPicker(false)
-    setShowPhotoModal(false)
-    
-    // 새로운 패널 열기
-    switch (tool) {
-      case 'sticker':
-        setShowStickerModal(true)
-        break
-      case 'text':
-        setShowTextModal(true)
-        break
-      case 'background':
-        setShowColorPicker(true)
-        break
-      case 'photo':
-        setShowPhotoModal(true)
-        break
-    }
-  }
-
-  // 요소 선택
-  const handleElementSelect = (elementId: string | null) => {
-    setSelectedElement(elementId)
-  }
-
-  // 요소 삭제
-  const handleElementDelete = (elementId: string) => {
-    try {
-      removeElement(elementId)
-      if (selectedElement === elementId) {
-        setSelectedElement(null)
+  // 취소 핸들러
+  const handleCancel = useCallback(() => {
+    if (caption.trim() && !isSaving) {
+      if (window.confirm('작성 중인 내용이 저장되지 않습니다. 정말 나가시겠습니까?')) {
+        onCancel?.()
       }
-      showToast('요소가 삭제되었습니다 (로컬에서만)')
-    } catch (error) {
-      console.error('Failed to delete element:', error)
-      showToast('요소 삭제에 실패했습니다', 'error')
-    }
-  }
-
-  // 🔥 캔버스 크기 기반 랜덤 위치 생성
-  const getRandomPosition = useCallback(() => {
-    const canvasWidth = containerRef.current?.clientWidth || 800
-    const canvasHeight = containerRef.current?.clientHeight || 600
-    
-    return {
-      x: Math.random() * Math.max(canvasWidth - 300, 100) + 100,
-      y: Math.random() * Math.max(canvasHeight - 300, 100) + 100,
-    }
-  }, [containerRef])
-
-  // ⚠️ 스티커 추가 - 로컬 데모용 (백엔드 미지원)
-  const handleStickerAdd = (stickerUrl: string) => {
-    showToast('스티커는 로컬에서만 표시됩니다 (백엔드 미지원)', 'error')
-    setShowStickerModal(false)
-    
-    try {
-      const { x, y } = getRandomPosition()
-      
-      const stickerData = {
-        x,
-        y,
-        width: 80,
-        height: 80,
-        rotation: 0,
-        zIndex: elements.length + 1,
-        stickerUrl,
-        stickerType: 'custom' as any,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }
-      
-      const newElement = addElement('STICKER', stickerData)
-      
-      if (newElement && newElement.id) {
-        setSelectedElement(newElement.id)
-      }
-      setActiveTool('select')
-    } catch (error) {
-      console.error('Failed to add sticker:', error)
-    }
-  }
-
-  // ⚠️ 텍스트 추가 - 로컬 데모용 (백엔드 미지원)
-  const handleTextAdd = (text: string, fontFamily: string, fontSize: number, color: string) => {
-    showToast('텍스트는 로컬에서만 표시됩니다 (백엔드 미지원)', 'error')
-    setShowTextModal(false)
-
-    try {
-      const { x, y } = getRandomPosition()
-      
-      const textData = {
-        x,
-        y,
-        width: Math.max(200, text.length * fontSize * 0.6),
-        height: fontSize * 1.5,
-        rotation: 0,
-        zIndex: elements.length + 1,
-        content: text,
-        fontSize,
-        fontFamily,
-        color,
-        textAlign: 'left' as any,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }
-      
-      const newElement = addElement('TEXT', textData)
-      
-      if (newElement && newElement.id) {
-        setSelectedElement(newElement.id)
-      }
-      setActiveTool('select')
-    } catch (error) {
-      console.error('Failed to add text:', error)
-    }
-  }
-
-  // 사진 추가 - 현재는 기본 사진만 지원
-  const handlePhotoAdd = () => {
-    if (photoId) {
-      showToast('이미 사진이 선택되어 있습니다', 'error')
-      return
-    }
-    setShowPhotoModal(true)
-  }
-
-  // ✅ 사진 선택 처리 (PhotoUploadModal의 ImageInfo 타입에 맞춤)
-  const handlePhotoSelect = (imageData: string, imageInfo?: any) => {
-    if (imageInfo?.photoId) {
-      // 실제 업로드된 사진의 photoId 사용
-      showToast('새 사진이 선택되었습니다. 이제 설명을 입력하고 저장해주세요.')
     } else {
-      showToast('로컬 이미지는 데모용으로만 표시됩니다', 'error')
-      
-      // 로컬 이미지 캔버스에 추가 (데모용)
-      try {
-        const { x, y } = getRandomPosition()
-        
-        const photoData = {
-          x,
-          y,
-          width: 300,
-          height: 200,
-          rotation: 0,
-          zIndex: elements.length + 1,
-          photoId: `photo_${Date.now()}`,
-          src: imageData,
-          alt: 'Uploaded photo',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-        
-        const newElement = addElement('PHOTO', photoData)
-        
-        if (newElement && newElement.id) {
-          setSelectedElement(newElement.id)
-        }
-      } catch (error) {
-        console.error('Failed to add photo:', error)
-      }
+      onCancel?.()
     }
-    
-    setShowPhotoModal(false)
-    setActiveTool('select')
-  }
+  }, [caption, isSaving, onCancel])
 
-  // 🔥 키보드 단축키 핸들러
+  // 키보드 단축키
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // 입력 필드에 포커스가 있을 때는 단축키 무시
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      // 입력 필드에 포커스가 있을 때는 저장 단축키만 처리
+      if (e.target instanceof HTMLTextAreaElement) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+          e.preventDefault()
+          handleSaveFeed()
+        }
         return
       }
 
       switch (e.key) {
-        case 'Delete':
-        case 'Backspace':
-          if (selectedElement) {
-            e.preventDefault()
-            handleElementDelete(selectedElement)
-          }
-          break
         case 'Escape':
-          setSelectedElement(null)
-          setActiveTool('select')
+          if (!isSaving) {
+            handleCancel()
+          }
           break
         case 's':
           if (e.ctrlKey || e.metaKey) {
@@ -400,182 +249,242 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedElement, handleSaveFeed])
+  }, [handleSaveFeed, handleCancel, isSaving])
+
+  // ============================================================================
+  // 유효성 검사
+  // ============================================================================
+
+  const canSave = !!(photoId && caption.trim() && !isSaving && !isLoading && isAuthenticated)
+
+  // ============================================================================
+  // 렌더링
+  // ============================================================================
 
   return (
-    <div className={`relative w-full h-full overflow-hidden bg-gray-100 ${className}`}>
-      {/* 상단 도구 모음 */}
-      <div className="absolute top-0 left-0 right-0 z-30">
-        <EditToolbar
-          activeTool={activeTool}
-          onToolChange={handleToolChange}
-          selectedElement={selectedElement}
-          onElementDelete={handleElementDelete}
-          onPhotoAdd={handlePhotoAdd}
-          onZoomIn={zoomIn}
-          onZoomOut={zoomOut}
-          onResetZoom={resetZoom}
-          zoomLevel={viewport.scale}
-          // ✅ 추가 프롭스
-          onSave={handleSaveFeed}
-          onCancel={onCancel}
-          isSaving={isSaving}
-          canSave={!!photoId && !!caption.trim()}
-          mode={mode}
-        />
+    <div className={`relative w-full h-full bg-gray-50 ${className}`}>
+      {/* 헤더 */}
+      <div className="bg-white border-b border-gray-200 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            {onCancel && (
+              <button
+                onClick={handleCancel}
+                disabled={isSaving}
+                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                aria-label="취소"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            )}
+            <div>
+              <h1 className="text-lg font-semibold text-gray-900">
+                {mode === 'edit' ? '피드 편집' : '새 피드 만들기'}
+              </h1>
+              <p className="text-sm text-gray-500">
+                사진에 캡션을 추가하여 피드를 만들어보세요
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleSaveFeed}
+            disabled={!canSave}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors disabled:cursor-not-allowed"
+          >
+            {isSaving ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                저장 중...
+              </>
+            ) : (
+              <>
+                <CheckIcon className="h-4 w-4 mr-2" />
+                저장
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* 백엔드 제약사항 안내 */}
-      <div className="absolute top-16 left-4 right-4 z-30">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      {/* 에러 메시지 */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 m-4">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
             </div>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">현재 백엔드 지원 기능</h3>
-              <div className="mt-2 text-sm text-blue-700">
-                <ul className="list-disc list-inside space-y-1">
-                  <li>✅ 사진 기반 피드 생성 (photoId + caption)</li>
-                  <li>⚠️ 스티커, 텍스트는 로컬 데모용 (저장되지 않음)</li>
-                  <li>⚠️ 캔버스 편집 요소들은 추후 구현 예정</li>
-                </ul>
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 메인 컨텐츠 */}
+      <div className="max-w-2xl mx-auto p-4 space-y-6">
+        {/* 사진 미리보기 */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-4 border-b border-gray-200">
+            <h2 className="text-lg font-medium text-gray-900">선택된 사진</h2>
+          </div>
+          
+          <div className="p-4">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-64 bg-gray-100 rounded-lg">
+                <div className="text-center">
+                  <svg className="animate-spin h-8 w-8 text-gray-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <p className="text-sm text-gray-500">사진 로딩 중...</p>
+                </div>
+              </div>
+            ) : photoInfo ? (
+              <div className="space-y-3">
+                <div className="relative">
+                  <img
+                    src={photoInfo.imgUrl}
+                    alt="선택된 사진"
+                    className="w-full h-64 object-cover rounded-lg"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = '/api/placeholder/400/300?text=Image+Not+Found';
+                    }}
+                  />
+                  <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs">
+                    ID: {photoInfo.photoId}
+                  </div>
+                </div>
+                <div className="text-sm text-gray-500">
+                  <p>파일명: {photoInfo.fileName}</p>
+                  {photoInfo.createdAt && (
+                    <p>업로드: {new Date(photoInfo.createdAt).toLocaleString()}</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-64 bg-gray-100 rounded-lg">
+                <div className="text-center">
+                  <PhotoIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">사진을 불러올 수 없습니다</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 캡션 입력 */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-4 border-b border-gray-200">
+            <h2 className="text-lg font-medium text-gray-900">캡션 작성</h2>
+          </div>
+          
+          <div className="p-4">
+            <textarea
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder="이 사진에 대한 이야기를 들려주세요..."
+              className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              maxLength={200}
+              disabled={isSaving}
+            />
+            <div className="flex justify-between items-center mt-2">
+              <p className="text-xs text-gray-500">
+                Ctrl+S로 빠른 저장
+              </p>
+              <p className="text-xs text-gray-500">
+                {caption.length}/200자
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 미리보기 */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-4 border-b border-gray-200">
+            <h2 className="text-lg font-medium text-gray-900">피드 미리보기</h2>
+          </div>
+          
+          <div className="p-4">
+            <div className="flex items-start space-x-3">
+              <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden flex-shrink-0">
+                {user?.profileImage ? (
+                  <img 
+                    src={user.profileImage} 
+                    alt={user.name} 
+                    className="w-full h-full object-cover" 
+                  />
+                ) : (
+                  <div className="w-full h-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                    {user?.name?.charAt(0) || 'U'}
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center space-x-2 mb-2">
+                  <p className="font-medium text-gray-900">{user?.name || '사용자'}</p>
+                  <p className="text-sm text-gray-500">
+                    @{(user as any)?.accountName || 'user'}
+                  </p>
+                </div>
+                {photoInfo && (
+                  <div className="mb-3">
+                    <img
+                      src={photoInfo.imgUrl}
+                      alt="피드 사진"
+                      className="w-full max-w-sm h-48 object-cover rounded-lg"
+                    />
+                  </div>
+                )}
+                <p className="text-gray-800 whitespace-pre-wrap">
+                  {caption || '(캡션을 입력하세요)'}
+                </p>
+                <p className="text-xs text-gray-500 mt-2">방금 전</p>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 피드 설명 입력 */}
-      <div className="absolute top-36 left-4 right-4 z-30">
-        <div className="bg-white rounded-lg shadow-sm border p-4">
-          <label htmlFor="caption" className="block text-sm font-medium text-gray-700 mb-2">
-            피드 설명 (필수)
-          </label>
-          <textarea
-            id="caption"
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            placeholder="이 피드에 대한 설명을 입력해주세요..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            rows={2}
-            maxLength={200}
-          />
-          <div className="mt-1 text-xs text-gray-500">
-            {caption.length}/200 글자
-          </div>
-        </div>
-      </div>
-
-      {/* 메인 캔버스 영역 */}
-      <div className="absolute inset-0 pt-64">
-        <FeedCanvas
-          userId={userId || currentUser?.id || ''}
-          elements={elements as any}
-          viewport={viewport}
-          selectedElement={selectedElement}
-          activeTool={activeTool}
-          isDragging={isDragging}
-          containerRef={containerRef}
-          feedData={feedData}
-          backgroundColor={selectedBgColor}
-          onElementSelect={handleElementSelect}
-          onElementUpdate={updateElement}
-          onWheel={handleWheel}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-        />
-      </div>
-
-      {/* 🔥 우측 사이드 패널 - 색상 팔레트 */}
-      {showColorPicker && (
-        <div className="absolute top-64 right-0 bottom-0 w-80 z-20">
-          <BackgroundColorPicker
-            selectedColor={selectedBgColor}
-            onColorChange={handleBackgroundColorChange}
-            onClose={() => setShowColorPicker(false)}
-          />
-        </div>
-      )}
-
-      {/* 로컬 데모용 모달들 */}
-      <StickerModal
-        isOpen={showStickerModal}
-        onClose={() => setShowStickerModal(false)}
-        onStickerSelect={handleStickerAdd}
-      />
-
-      <TextModal
-        isOpen={showTextModal}
-        onClose={() => setShowTextModal(false)}
-        onTextAdd={handleTextAdd}
-        fontOptions={[
-          { name: '깔끔', family: 'Noto Sans KR, sans-serif', displayName: 'Noto Sans KR' },
-          { name: '귀여움', family: 'Jua, cursive', displayName: 'Jua' },
-          { name: '힙함', family: 'Black Han Sans, sans-serif', displayName: 'Black Han Sans' },
-          { name: '손글씨', family: 'Gamja Flower, cursive', displayName: 'Gamja Flower' },
-        ]}
-        colors={[
-          '#000000', '#FFFFFF', '#DC2626', '#EA580C', '#CA8A04', '#16A34A',
-          '#0EA5E9', '#7C3AED', '#DB2777', '#0D9488', '#BE123C', '#6366F1',
-        ]}
-        defaultFontSize={24}
-        minFontSize={12}
-        maxFontSize={96}
-      />
-
-      <PhotoUploadModal
-        isOpen={showPhotoModal}
-        onClose={() => setShowPhotoModal(false)}
-        onPhotoSelect={handlePhotoSelect}
-        onPhotoUpload={(file: File, uploadedImageInfo?: any) => {
-          // PhotoUploadModal에서 실제 업로드 처리
-          if (uploadedImageInfo?.photoId) {
-            showToast('사진이 업로드되었습니다!')
-            setShowPhotoModal(false)
-          }
-        }}
-      />
-
-      {/* 🔥 토스트 알림 */}
+      {/* 토스트 메시지 */}
       {toastMessage && (
-        <div className={`absolute top-32 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-white font-medium transition-all duration-300 ${
-          toastMessage.type === 'success' ? 'bg-green-500' : 'bg-red-500'
-        }`}>
-          {toastMessage.message}
-        </div>
-      )}
-
-      {/* 로딩 오버레이 */}
-      {(isLoading || isSaving) && (
-        <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-40">
-          <div className="bg-white rounded-lg p-6 shadow-xl">
-            <div className="flex items-center space-x-3">
-              <svg className="animate-spin h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span className="text-gray-700 font-medium">
-                {isSaving ? '피드 저장 중...' : '로딩 중...'}
-              </span>
-            </div>
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
+          <div className={`px-4 py-2 rounded-lg text-white font-medium shadow-lg transition-all duration-300 ${
+            toastMessage.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+          }`}>
+            {toastMessage.message}
           </div>
         </div>
       )}
 
-      {/* 피드 정보 표시 (개발용) */}
+      {/* 전체 로딩 오버레이 */}
+      {(isLoading && !photoInfo) && (
+        <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center z-40">
+          <div className="text-center">
+            <svg className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p className="text-gray-700 font-medium">피드 에디터 준비 중...</p>
+          </div>
+        </div>
+      )}
+
+      {/* 개발 정보 (개발 모드에서만) */}
       {process.env.NODE_ENV === 'development' && (
-        <div className="absolute bottom-4 right-4 bg-black/70 text-white text-xs rounded p-3 z-30">
-          <div className="font-semibold mb-1">디버그 정보</div>
+        <div className="fixed bottom-4 right-4 bg-black bg-opacity-70 text-white text-xs rounded p-3 z-30">
+          <div className="font-semibold mb-1">개발 정보</div>
           <div>모드: {mode}</div>
-          <div>사용자: {currentUser?.name || 'Unknown'}</div>
-          <div>피드 ID: {currentFeedId || 'None'}</div>
-          <div>사진 ID: {photoId || 'None'}</div>
-          <div>설명: {caption.length > 0 ? '입력됨' : '미입력'}</div>
-          <div>요소 수: {elements.length} (로컬)</div>
+          <div>사용자: {user?.name || 'Unknown'}</div>
+          <div>Photo ID: {photoId || 'None'}</div>
+          <div>캡션 길이: {caption.length}</div>
+          <div>저장 가능: {canSave ? 'Yes' : 'No'}</div>
         </div>
       )}
     </div>

@@ -3,99 +3,188 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 
-// 🔥 백엔드 API 및 타입 import
-import {
-  getFollowingFeeds,
-  getRandomFeeds,
-  getCurrentUser,
-  handleApiError
-} from '@/lib/api/feed'
-
-import {
-  getFeedDetail,
-  refreshTimeline,
-  loadMoreTimeline
-} from '@/lib/api/timeline'
-
-import {
-  toggleLike
-} from '@/lib/api/likes' // 좋아요 API (별도 파일 필요)
-
-import {
-  TimelinePost,
-  transformBackendFeedToTimelinePost
-} from '@/lib/types/timeline'
-
-import {
-  BackendFeedDetailResponse,
-  CanvasFeedItem
-} from '@/lib/types/feed'
+// 🔥 올바른 백엔드 연동 - api from '@/lib/axios' 사용
+import api from '@/lib/axios'
 
 // ============================================================================
-// 타입 정의 (백엔드 연동 단순화)
+// 백엔드 DTO 기반 타입 정의 (단순화)
 // ============================================================================
 
-interface FeedAuthor {
-  id: string          // accountName
-  username: string    // accountName
-  avatar?: string     // profileImage
+// 백엔드 ApiResponse 표준 형식
+interface ApiResponse<T> {
+  error: boolean;
+  message: string;
+  data: T;
 }
 
+// FeedDetailResponse.java 기반 (백엔드 실제 응답)
+interface BackendFeedDetailResponse {
+  feedId: number;
+  imgUrl: string;
+  caption: string;
+  authorId: number;
+  accountName: string;
+  profileImage: string;
+  createdAt: string;
+  liked: boolean;
+}
+
+// 프론트엔드에서 사용할 간단한 피드 아이템
 interface FeedItem {
-  id: string          // feedId (문자열)
-  feedId: number      // feedId (숫자)
-  accountName: string // 계정명 (핵심 식별자)
-  title: string       // caption 기반
-  description: string // caption
-  imageUrl: string    // imgUrl
-  isLiked: boolean    // liked
-  createdAt: string   // createdAt
-  author: FeedAuthor  // 작성자 정보
+  id: string;          // feedId를 문자열로 변환
+  feedId: number;      // 백엔드 API 호출용 숫자 ID
+  accountName: string; // 계정명
+  caption: string;     // 캡션 (제목 + 설명으로 사용)
+  imageUrl: string;    // 🔥 단순 이미지 URL만 사용
+  isLiked: boolean;    // 좋아요 상태
+  createdAt: string;   // 생성일
+  author: {
+    id: string;        // accountName
+    username: string;  // accountName
+    avatar?: string;   // profileImage
+  };
+}
+
+interface FeedAuthor {
+  id: string;          // accountName
+  username: string;    // accountName
+  avatar?: string;     // profileImage
 }
 
 interface UseFeedViewerOptions {
-  type?: 'timeline' | 'explore' | 'user'  // 피드 타입
-  accountName?: string                     // 특정 사용자 피드 (user 타입일 때)
-  limit?: number
-  initialLoad?: boolean
+  type?: 'following' | 'random' | 'user' | 'search';
+  accountName?: string;     // 특정 사용자 피드
+  userId?: number;          // 백엔드 userId 직접 지정
+  searchQuery?: string;     // 검색 쿼리
+  limit?: number;
+  initialLoad?: boolean;
 }
 
 interface LoadingStates {
-  initial: boolean
-  loadMore: boolean
-  refresh: boolean
-  action: boolean // 좋아요 등의 액션
+  initial: boolean;
+  loadMore: boolean;
+  refresh: boolean;
+  action: boolean; // 좋아요 등의 액션
 }
 
 interface UseFeedViewerReturn {
-  feedItems: FeedItem[]
-  loading: LoadingStates
-  error: string | null
-  hasMore: boolean
-  totalCount: number
+  feedItems: FeedItem[];
+  loading: LoadingStates;
+  error: string | null;
+  hasMore: boolean;
+  totalCount: number;
   
   // 데이터 로딩
-  loadMore: () => void
-  refreshFeed: () => void
-  retryLoad: () => void
+  loadMore: () => void;
+  refreshFeed: () => void;
+  retryLoad: () => void;
   
-  // 피드 액션 (단순화)
-  likeFeed: (feedId: number) => Promise<void>
+  // 피드 액션
+  toggleLike: (feedId: number) => Promise<void>;
   
-  // 네비게이션
-  goToFeed: (accountName: string) => void
+  // 네비게이션 (실제 구현 필요)
+  goToFeed: (feedId: number) => void;
   
   // 유틸리티
-  clearError: () => void
+  clearError: () => void;
 }
 
 // ============================================================================
-// 메인 훅
+// 백엔드 API 함수들 (단순화)
+// ============================================================================
+
+const feedViewerAPI = {
+  // GET /feeds/users/{userId} - 특정 사용자 피드
+  getUserFeeds: async (userId: number, size: number = 20, cursorCreatedAt?: string, cursorId?: number): Promise<BackendFeedDetailResponse[]> => {
+    let url = `/feeds/users/${userId}?size=${size}`;
+    if (cursorCreatedAt && cursorId) {
+      url += `&cursorCreatedAt=${encodeURIComponent(cursorCreatedAt)}&cursorId=${cursorId}`;
+    }
+    
+    const response = await api.get<ApiResponse<BackendFeedDetailResponse[]>>(url);
+    
+    if (response.data.error) {
+      throw new Error(response.data.message);
+    }
+    
+    return response.data.data;
+  },
+
+  // GET /feeds/following - 팔로잉 피드
+  getFollowingFeeds: async (size: number = 20, cursorCreatedAt?: string, cursorId?: number): Promise<BackendFeedDetailResponse[]> => {
+    let url = `/feeds/following?size=${size}`;
+    if (cursorCreatedAt && cursorId) {
+      url += `&cursorCreatedAt=${encodeURIComponent(cursorCreatedAt)}&cursorId=${cursorId}`;
+    }
+    
+    const response = await api.get<ApiResponse<BackendFeedDetailResponse[]>>(url);
+    
+    if (response.data.error) {
+      throw new Error(response.data.message);
+    }
+    
+    return response.data.data;
+  },
+
+  // GET /feeds/random - 랜덤 피드
+  getRandomFeeds: async (size: number = 20): Promise<BackendFeedDetailResponse[]> => {
+    const response = await api.get<ApiResponse<BackendFeedDetailResponse[]>>(
+      `/feeds/random?size=${size}`
+    );
+    
+    if (response.data.error) {
+      throw new Error(response.data.message);
+    }
+    
+    return response.data.data;
+  },
+
+  // GET /feeds/search - 피드 검색
+  searchFeeds: async (query: string, size: number = 20): Promise<BackendFeedDetailResponse[]> => {
+    const response = await api.get<ApiResponse<BackendFeedDetailResponse[]>>(
+      `/feeds/search?query=${encodeURIComponent(query)}&size=${size}`
+    );
+    
+    if (response.data.error) {
+      throw new Error(response.data.message);
+    }
+    
+    return response.data.data;
+  },
+
+  // accountName으로 userId 찾기 (검색 API 활용)
+  findUserIdByAccountName: async (accountName: string): Promise<number | null> => {
+    try {
+      const feeds = await feedViewerAPI.searchFeeds(accountName, 1);
+      if (feeds.length > 0 && typeof feeds[0].authorId === 'number') {
+        return feeds[0].authorId;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to find userId by accountName:', error);
+      return null;
+    }
+  },
+
+  // POST/DELETE /likes/{feedId} - 좋아요 토글
+  toggleLike: async (feedId: number, isCurrentlyLiked: boolean): Promise<void> => {
+    if (isCurrentlyLiked) {
+      await api.delete(`/likes/${feedId}`);
+    } else {
+      await api.post(`/likes/${feedId}`);
+    }
+  },
+};
+
+// ============================================================================
+// 메인 훅 (단순화)
 // ============================================================================
 
 export const useFeedViewer = ({ 
-  type = 'timeline',
+  type = 'following',
   accountName,
+  userId: propUserId,
+  searchQuery,
   limit = 20,
   initialLoad = true 
 }: UseFeedViewerOptions = {}): UseFeedViewerReturn => {
@@ -104,27 +193,27 @@ export const useFeedViewer = ({
   // 상태 관리
   // ============================================================================
   
-  const [feedItems, setFeedItems] = useState<FeedItem[]>([])
+  const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState<LoadingStates>({
     initial: false,
     loadMore: false,
     refresh: false,
     action: false
-  })
-  const [hasMore, setHasMore] = useState(true)
-  const [totalCount, setTotalCount] = useState(0)
-  const [error, setError] = useState<string | null>(null)
+  });
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<{
-    createdAt: string
-    feedId: number
-  } | null>(null)
+    createdAt: string;
+    feedId: number;
+  } | null>(null);
   
   // 중복 요청 방지를 위한 ref
-  const abortControllerRef = useRef<AbortController | null>(null)
-  const loadingRef = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const loadingRef = useRef(false);
 
   // 인증 상태
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated } = useAuthStore();
 
   // ============================================================================
   // 유틸리티 함수들
@@ -132,25 +221,24 @@ export const useFeedViewer = ({
 
   // 로딩 상태 업데이트 헬퍼
   const updateLoading = useCallback((key: keyof LoadingStates, value: boolean) => {
-    setLoading(prev => ({ ...prev, [key]: value }))
-  }, [])
+    setLoading(prev => ({ ...prev, [key]: value }));
+  }, []);
 
   // 에러 처리 헬퍼
   const handleErrorLocal = useCallback((err: unknown, context: string) => {
-    const message = err instanceof Error ? err.message : `${context} 중 오류가 발생했습니다`
-    console.error(`Error in ${context}:`, err)
-    setError(message)
-  }, [])
+    console.error(`Error in ${context}:`, err);
+    const message = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
+    setError(message);
+  }, []);
 
-  // 🔥 백엔드 데이터를 FeedItem으로 변환
+  // 🔥 백엔드 응답을 FeedItem으로 변환 (단순화)
   const transformBackendToFeedItem = useCallback((backendFeed: BackendFeedDetailResponse): FeedItem => {
     return {
       id: backendFeed.feedId.toString(),
       feedId: backendFeed.feedId,
       accountName: backendFeed.accountName,
-      title: backendFeed.caption || `${backendFeed.accountName}의 피드`,
-      description: backendFeed.caption || '',
-      imageUrl: backendFeed.imgUrl,
+      caption: backendFeed.caption || '',
+      imageUrl: backendFeed.imgUrl, // 🔥 단순 이미지 URL만 사용
       isLiked: backendFeed.liked,
       createdAt: backendFeed.createdAt,
       author: {
@@ -158,11 +246,11 @@ export const useFeedViewer = ({
         username: backendFeed.accountName,
         avatar: backendFeed.profileImage
       }
-    }
-  }, [])
+    };
+  }, []);
 
   // ============================================================================
-  // 백엔드 API 연동 - 피드 데이터 로드
+  // 백엔드 API 연동 - 피드 데이터 로드 (단순화)
   // ============================================================================
 
   const loadFeedItems = useCallback(async (
@@ -171,86 +259,113 @@ export const useFeedViewer = ({
   ) => {
     // 인증 확인
     if (!isAuthenticated) {
-      setError('로그인이 필요합니다.')
-      return
+      setError('로그인이 필요합니다.');
+      return;
     }
 
     // 중복 요청 방지
-    if (loadingRef.current) return
-    loadingRef.current = true
+    if (loadingRef.current) return;
+    loadingRef.current = true;
 
     // 이전 요청 취소
     if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
+      abortControllerRef.current.abort();
     }
-    abortControllerRef.current = new AbortController()
+    abortControllerRef.current = new AbortController();
 
-    updateLoading(loadingKey, true)
-    setError(null)
+    updateLoading(loadingKey, true);
+    setError(null);
 
     try {
-      let result: any
+      let backendFeeds: BackendFeedDetailResponse[] = [];
 
-      // 🔥 백엔드 API 호출 (타입에 따라)
-      if (type === 'timeline') {
+      console.log(`=== ${type} 피드 로딩 시작 ===`, { reset, nextCursor });
+
+      // 🔥 백엔드 API 호출 (타입에 따라 단순하게 매핑)
+      if (type === 'following') {
         // 팔로잉 피드 (GET /feeds/following)
-        result = await getFollowingFeeds(
+        backendFeeds = await feedViewerAPI.getFollowingFeeds(
+          limit,
           reset ? undefined : nextCursor?.createdAt,
-          reset ? undefined : nextCursor?.feedId,
-          limit
-        )
-      } else if (type === 'explore') {
+          reset ? undefined : nextCursor?.feedId
+        );
+      } else if (type === 'random') {
         // 랜덤 피드 (GET /feeds/random)
-        result = await getRandomFeeds(limit)
-      } else if (type === 'user' && accountName) {
-        // 특정 사용자 피드 (구현 필요 - 현재는 검색 API 활용)
-        // TODO: GET /feeds/{accountName} API 추가 후 사용
-        result = await getRandomFeeds(limit) // 임시로 랜덤 피드 사용
-      } else {
-        throw new Error('유효하지 않은 피드 타입입니다.')
-      }
-
-      if (result.success && result.data) {
-        // CanvasFeedItem을 FeedItem으로 변환
-        const newFeedItems = result.data.items.map((item: CanvasFeedItem) => 
-          transformBackendToFeedItem({
-            feedId: item.photoId as number,
-            imgUrl: item.photoUrl,
-            caption: item.description,
-            authorId: parseInt(item.userId),
-            accountName: item.authorId,
-            profileImage: item.authorAvatar || '',
-            createdAt: item.createdAt,
-            liked: item.isLiked
-          })
-        )
-
-        if (reset) {
-          setFeedItems(newFeedItems)
-        } else {
-          setFeedItems(prev => [...prev, ...newFeedItems])
+        backendFeeds = await feedViewerAPI.getRandomFeeds(limit);
+      } else if (type === 'user') {
+        // 특정 사용자 피드 (GET /feeds/users/{userId})
+        let targetUserId: number | null = propUserId || null;
+        
+        if (!targetUserId && accountName) {
+          targetUserId = await feedViewerAPI.findUserIdByAccountName(accountName);
+          if (!targetUserId) {
+            throw new Error(`사용자 '${accountName}'을 찾을 수 없습니다.`);
+          }
         }
-
-        setHasMore(result.data.hasMore)
-        setNextCursor(result.data.nextCursor || null)
-        setTotalCount(newFeedItems.length)
-
+        
+        if (!targetUserId || typeof targetUserId !== 'number') {
+          throw new Error('사용자 ID가 필요합니다.');
+        }
+        
+        backendFeeds = await feedViewerAPI.getUserFeeds(
+          targetUserId,
+          limit,
+          reset ? undefined : nextCursor?.createdAt,
+          reset ? undefined : nextCursor?.feedId
+        );
+      } else if (type === 'search' && searchQuery) {
+        // 피드 검색 (GET /feeds/search)
+        backendFeeds = await feedViewerAPI.searchFeeds(searchQuery, limit);
       } else {
-        throw new Error(result.error || '피드를 불러오는데 실패했습니다.')
+        throw new Error('유효하지 않은 피드 타입이거나 필수 파라미터가 누락되었습니다.');
       }
+
+      console.log(`=== ${type} 피드 로딩 결과 ===`, { count: backendFeeds.length });
+
+      // 🔥 백엔드 응답을 FeedItem으로 변환
+      const newFeedItems = backendFeeds.map(transformBackendToFeedItem);
+
+      if (reset) {
+        setFeedItems(newFeedItems);
+        setTotalCount(newFeedItems.length);
+      } else {
+        setFeedItems(prev => {
+          const combined = [...prev, ...newFeedItems];
+          setTotalCount(combined.length);
+          return combined;
+        });
+      }
+
+      // 🔥 페이징 정보 업데이트 (단순화)
+      if (backendFeeds.length < limit) {
+        setHasMore(false);
+        setNextCursor(null);
+      } else if (backendFeeds.length > 0) {
+        const lastFeed = backendFeeds[backendFeeds.length - 1];
+        setNextCursor({
+          createdAt: lastFeed.createdAt,
+          feedId: lastFeed.feedId
+        });
+        setHasMore(true);
+      }
+
+      console.log(`=== 피드 아이템 업데이트 완료 ===`, {
+        count: newFeedItems.length,
+        hasMore: backendFeeds.length >= limit
+      });
 
     } catch (err) {
       // 요청이 취소된 경우는 에러로 처리하지 않음
       if (err instanceof Error && err.name === 'AbortError') {
-        return
+        return;
       }
 
-      handleErrorLocal(err, '피드 로딩')
+      handleErrorLocal(err, `${type} 피드 로딩`);
     } finally {
-      updateLoading(loadingKey, false)
-      loadingRef.current = false
+      updateLoading(loadingKey, false);
+      loadingRef.current = false;
     }
-  }, [type, accountName, limit, isAuthenticated, nextCursor, updateLoading, handleErrorLocal, transformBackendToFeedItem])
+  }, [type, accountName, propUserId, searchQuery, limit, isAuthenticated, nextCursor, updateLoading, handleErrorLocal, transformBackendToFeedItem]);
 
   // ============================================================================
   // 공개 API 함수들
@@ -258,85 +373,91 @@ export const useFeedViewer = ({
 
   // 더 많은 피드 로드
   const loadMore = useCallback(() => {
-    if (!hasMore || loading.loadMore || loadingRef.current) return
-    loadFeedItems(false, 'loadMore')
-  }, [hasMore, loading.loadMore, loadFeedItems])
+    if (!hasMore || loading.loadMore || loadingRef.current) return;
+    console.log('=== loadMore 호출 ===', { hasMore, loading: loading.loadMore });
+    loadFeedItems(false, 'loadMore');
+  }, [hasMore, loading.loadMore, loadFeedItems]);
 
   // 피드 새로고침
   const refreshFeed = useCallback(() => {
-    setNextCursor(null)
-    setHasMore(true)
-    setError(null)
-    loadFeedItems(true, 'refresh')
-  }, [loadFeedItems])
+    console.log('=== refreshFeed 호출 ===');
+    setNextCursor(null);
+    setHasMore(true);
+    setError(null);
+    loadFeedItems(true, 'refresh');
+  }, [loadFeedItems]);
 
   // 재시도
   const retryLoad = useCallback(() => {
+    console.log('=== retryLoad 호출 ===', { feedItemsCount: feedItems.length });
     if (feedItems.length === 0) {
-      refreshFeed()
+      refreshFeed();
     } else {
-      loadFeedItems(false, 'initial')
+      loadFeedItems(false, 'initial');
     }
-  }, [feedItems.length, refreshFeed, loadFeedItems])
+  }, [feedItems.length, refreshFeed, loadFeedItems]);
 
   // 에러 클리어
   const clearError = useCallback(() => {
-    setError(null)
-  }, [])
+    setError(null);
+  }, []);
 
   // ============================================================================
-  // 피드 상호작용 (단순화)
+  // 피드 상호작용 (백엔드 완벽 연동)
   // ============================================================================
 
-  // 🔥 좋아요 토글 (백엔드 연동)
-  const likeFeed = useCallback(async (feedId: number) => {
-    const feed = feedItems.find(item => item.feedId === feedId)
-    if (!feed) return
+  // 🔥 좋아요 토글 (백엔드 API 완벽 연동)
+  const toggleLike = useCallback(async (feedId: number) => {
+    const feed = feedItems.find(item => item.feedId === feedId);
+    if (!feed) {
+      console.warn('Feed not found:', feedId);
+      return;
+    }
 
-    updateLoading('action', true)
+    console.log(`=== 좋아요 토글 시작 ===`, { feedId, currentLiked: feed.isLiked });
+
+    updateLoading('action', true);
 
     // 낙관적 업데이트
-    const originalIsLiked = feed.isLiked
+    const originalIsLiked = feed.isLiked;
     setFeedItems(prev => prev.map(item => 
       item.feedId === feedId 
         ? { ...item, isLiked: !item.isLiked }
         : item
-    ))
+    ));
 
     try {
-      // TODO: 실제 좋아요 API 호출 (POST/DELETE /likes/{feedId})
-      // 현재는 시뮬레이션
-      await new Promise(resolve => setTimeout(resolve, 300))
-      
-      // 5% 확률로 실패 시뮬레이션
-      if (Math.random() < 0.05) {
-        throw new Error('좋아요 처리에 실패했습니다')
-      }
+      // 🔥 실제 백엔드 API 호출
+      await feedViewerAPI.toggleLike(feedId, originalIsLiked);
 
-      // 성공 시 상태 유지 (이미 낙관적 업데이트됨)
+      console.log(`=== 좋아요 토글 성공 ===`, { feedId, newLiked: !originalIsLiked });
+
     } catch (err) {
+      console.error('좋아요 토글 실패:', err);
+      
       // 실패 시 롤백
       setFeedItems(prev => prev.map(item => 
         item.feedId === feedId 
           ? { ...item, isLiked: originalIsLiked }
           : item
-      ))
-      handleErrorLocal(err, '좋아요')
+      ));
+      
+      handleErrorLocal(err, '좋아요');
     } finally {
-      updateLoading('action', false)
+      updateLoading('action', false);
     }
-  }, [feedItems, updateLoading, handleErrorLocal])
+  }, [feedItems, updateLoading, handleErrorLocal]);
 
   // ============================================================================
-  // 네비게이션
+  // 네비게이션 (단순화)
   // ============================================================================
 
-  // 🔥 피드로 이동 (accountName 기반)
-  const goToFeed = useCallback((accountName: string) => {
-    // TODO: Next.js router를 사용해서 피드 페이지로 이동
-    // router.push(`/feed/${accountName}`)
-    console.log(`Navigate to feed: ${accountName}`)
-  }, [])
+  // 🔥 피드로 이동 (feedId 기반으로 단순화)
+  const goToFeed = useCallback((feedId: number) => {
+    // TODO: Next.js router를 사용해서 피드 상세 페이지로 이동
+    // router.push(`/feed/${feedId}`)
+    console.log(`Navigate to feed: ${feedId}`);
+  }, []);
 
   // ============================================================================
   // 초기 로드 실행
@@ -344,9 +465,15 @@ export const useFeedViewer = ({
 
   useEffect(() => {
     if (initialLoad) {
-      loadFeedItems(true, 'initial')
+      console.log('=== 초기 로드 실행 ===', { type, accountName, userId: propUserId, searchQuery });
+      // 상태 초기화
+      setFeedItems([]);
+      setNextCursor(null);
+      setHasMore(true);
+      setError(null);
+      loadFeedItems(true, 'initial');
     }
-  }, [type, accountName, initialLoad]) // type이나 accountName이 변경될 때마다 새로 로드
+  }, [type, accountName, propUserId, searchQuery, initialLoad, loadFeedItems]);
 
   // ============================================================================
   // Cleanup
@@ -355,10 +482,10 @@ export const useFeedViewer = ({
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
+        abortControllerRef.current.abort();
       }
-    }
-  }, [])
+    };
+  }, []);
 
   // ============================================================================
   // 반환 값
@@ -376,13 +503,13 @@ export const useFeedViewer = ({
     refreshFeed,
     retryLoad,
     
-    // 피드 액션 (단순화)
-    likeFeed,
+    // 피드 액션
+    toggleLike,
     
     // 네비게이션
     goToFeed,
     
     // 유틸리티
     clearError,
-  }
-}
+  };
+};

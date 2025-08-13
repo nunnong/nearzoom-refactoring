@@ -50,6 +50,7 @@ export interface TextElement extends BaseFeedElement {
   fontSize: number
   fontFamily: string
   color: string
+  backgroundColor?: string
   textAlign: 'left' | 'center' | 'right'
 }
 

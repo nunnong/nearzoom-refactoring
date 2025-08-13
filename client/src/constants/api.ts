@@ -30,25 +30,43 @@ export const API_ENDPOINTS = {
   PHOTO_SELECTION: '/photoprompt/selection',
   PHOTO_BACKGROUND: '/photoprompt/background',
 
-  // Follow System(피드 쪽)
-  FOLLOW: '/follows',
-  UNFOLLOW: '/follows',
-  FOLLOWING_LIST: '/follows/following',
-  FOLLOWERS_LIST: '/follows/followers',
-  FOLLOW_CHECK: '/follows/check',
-
-  // Likes (피드 쪽)
-  LIKE_PHOTO: '/likes',
-  UNLIKE_PHOTO: '/likes',
-  LIKE_COUNT: '/likes',
-
-  // Feeds
+  // 🔥 백엔드 FeedController - @RequestMapping("/feeds")
   FEEDS: '/feeds',
-  FEED_DETAIL: '/feeds',
+  FEED_DETAIL: '/feeds',  // GET /feeds/{feedId}
+  USER_FEEDS: '/feeds/users',  // GET /feeds/users/{userId}
+  FOLLOWING_FEEDS: '/feeds/following',  // GET /feeds/following
+  RANDOM_FEEDS: '/feeds/random',  // GET /feeds/random
+  SEARCH_FEEDS: '/feeds/search',  // GET /feeds/search
 
-  // User Management
-  USER_INFO: '/user/userInfo',
+  // 🔥 백엔드 FollowController - @RequestMapping("follows") (주의: "follows"임)
+  FOLLOWS: '/follows',  // POST/DELETE /follows/{followeeId}
+  FOLLOW_FOLLOWING: '/follows/following',  // GET /follows/following/{userId}
+  FOLLOW_FOLLOWERS: '/follows/followers',  // GET /follows/followers/{userId}
+  FOLLOW_COUNT: '/follows/count',  // GET /follows/count/{userId}
+  FOLLOW_CHECK: '/follows/check',  // GET /follows/check/{followeeId}
+
+  // 🔥 백엔드 LikesController - @RequestMapping("/likes")
+  LIKES: '/likes',  // POST/DELETE /likes/{feedId}
+  LIKE_CHECK: '/likes/check',  // GET /likes/check/{feedId}
+
+  // 🔥 백엔드 UserController - @RequestMapping("user")
+  USER: '/user',
+  USER_INFO: '/user/userInfo',  // GET /user/userInfo
+  USER_LOGOUT: '/user/logout',  // POST /user/logout
+  USER_SIGNOUT: '/user/signout',  // DELETE /user/signout
+
+  // 기존 호환성 유지용 (기존 코드에서 사용 중인 것들)
+  FOLLOW: '/follows',  // FOLLOWS와 동일
+  UNFOLLOW: '/follows',  // FOLLOWS와 동일
+  FOLLOWING_LIST: '/follows/following',  // FOLLOW_FOLLOWING과 동일
+  FOLLOWERS_LIST: '/follows/followers',  // FOLLOW_FOLLOWERS와 동일
+  LIKE_PHOTO: '/likes',  // LIKES와 동일
+  UNLIKE_PHOTO: '/likes',  // LIKES와 동일
+  LIKE_COUNT: '/likes',  // LIKES와 동일
   EMAIL_USER_INFO: '/user/email-user-info',
   LOGOUT: '/user/logout',
   SIGNOUT: '/user/signout',
 }
+
+// 🔥 타입 안전성을 위한 타입 export
+export type ApiEndpoint = typeof API_ENDPOINTS[keyof typeof API_ENDPOINTS]
