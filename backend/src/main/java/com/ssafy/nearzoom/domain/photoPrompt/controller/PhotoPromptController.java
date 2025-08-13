@@ -13,17 +13,19 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
 @RequestMapping("/photoprompt")
 @RequiredArgsConstructor
 @Tag(name = "PhotoPrompt API", description = "개별 이미지 처리 및 프레임 합성")
 public class PhotoPromptController {
 
-  private final PhotoPromptService photoService;
+  private final PhotoPromptService photoPromptService;
 
   @PostMapping("/selection")
   @Operation(summary = "기본 설정 저장 (선택적)",
@@ -47,7 +49,7 @@ public class PhotoPromptController {
       Long roomId = Long.valueOf(body.get("roomId").toString());
       String frameColor = body.get("frameColor").toString();
 
-      photoService.saveBasicSettings(request, roomId, frameColor);
+      photoPromptService.saveBasicSettings(request, roomId, frameColor);
 
       Map<String, Object> responseData = new HashMap<>();
       responseData.put("roomId", roomId);
@@ -119,7 +121,7 @@ public class PhotoPromptController {
       @RequestBody IndividualBackgroundRequest imageRequest) {
 
     try {
-      photoService.saveIndividualImageBackground(request, imageRequest);
+      photoPromptService.saveIndividualImageBackground(request, imageRequest);
 
       Map<String, Object> responseData = new HashMap<>();
       responseData.put("roomId", imageRequest.roomId());
@@ -183,7 +185,7 @@ public class PhotoPromptController {
       @PathVariable Long roomId) {
 
     try {
-      Map<String, Object> status = photoService.getRoomStatus(roomId);
+      Map<String, Object> status = photoPromptService.getRoomStatus(roomId);
 
       return ResponseEntity.ok(new ApiResponse<>(false,
           "방 상태 조회에 성공했습니다.", status));
@@ -218,7 +220,7 @@ public class PhotoPromptController {
       @PathVariable Long roomId) {
 
     try {
-      Map<String, Object> progress = photoService.getProcessingProgress(roomId);
+      Map<String, Object> progress = photoPromptService.getProcessingProgress(roomId);
 
       return ResponseEntity.ok(new ApiResponse<>(false,
           "처리 진행률 조회에 성공했습니다.", progress));
@@ -253,7 +255,7 @@ public class PhotoPromptController {
       @PathVariable String roomId) {
 
     try {
-      ImageProcessingResult result = photoService.getProcessingResult(roomId);
+      ImageProcessingResult result = photoPromptService.getProcessingResult(roomId);
 
       Map<String, Object> responseData = new HashMap<>();
       responseData.put("roomId", roomId);
@@ -300,7 +302,7 @@ public class PhotoPromptController {
       @PathVariable Long roomId) {
 
     try {
-      photoService.resetRoom(request, roomId);
+      photoPromptService.resetRoom(request, roomId);
 
       Map<String, Object> responseData = new HashMap<>();
       responseData.put("roomId", roomId);
