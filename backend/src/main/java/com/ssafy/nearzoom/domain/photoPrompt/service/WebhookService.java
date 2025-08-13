@@ -11,7 +11,9 @@ import com.ssafy.nearzoom.domain.photoPrompt.repository.PhotoPromptRepository;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -29,7 +31,7 @@ public class WebhookService {
   private final ImageProcessingService imageProcessingService;
 
   // 개별 이미지 처리 완료 웹훅
-  public void handleIndividualImageCompleted(ImageProcessingCompletedWebhook webhook) {
+  public void webhookIndividualCompleted(ImageProcessingCompletedWebhook webhook) {
     String jobId = webhook.jobId();
     log.info("개별 이미지 처리 완료 웹훅 수신 - JobId: {}", jobId);
 
@@ -46,18 +48,15 @@ public class WebhookService {
         updatePromptStatus(Long.valueOf(promptId), PromptStatus.SUCCESS);
       }
 
-      // 개별 처리 결과 저장
-      saveIndividualProcessingResult(webhook);
+      // 개별 처리 결과 Redis에 저장
+      saveIndividualCompletedResult(webhook);
 
       // PhotoService에 개별 이미지 저장 (Photo 테이블에 저장)
       photoService.saveIndividualProcessedPhoto(webhook);
 
       // ImageProcessingService에 완료 알림
       if (webhook.data() != null && webhook.data().processedImageUrl() != null) {
-        imageProcessingService.handleIndividualImageCompleted(
-            jobId,
-            webhook.data().processedImageUrl()
-        );
+        imageProcessingService.IndividualCompleted(jobId, webhook.data().processedImageUrl());
       }
 
       log.info("개별 이미지 처리 완료 처리 성공 - JobId: {}", jobId);
@@ -82,7 +81,7 @@ public class WebhookService {
   }
 
   // 개별 이미지 처리 실패 웹훅
-  public void handleIndividualImageFailed(ImageProcessingFailedWebhook webhook) {
+  public void webhookIndividualFailed(ImageProcessingFailedWebhook webhook) {
     String jobId = webhook.jobId();
     log.error("개별 이미지 처리 실패 웹훅 수신 - JobId: {}", jobId);
 
@@ -106,7 +105,7 @@ public class WebhookService {
         updatePromptStatus(Long.valueOf(promptId), PromptStatus.FAIL);
       }
 
-      // 실패 결과 저장
+      // 실패 결과 Redis에 저장
       saveIndividualFailureResult(webhook);
 
       // 배치 전체를 실패로 마킹
@@ -125,7 +124,7 @@ public class WebhookService {
   }
 
   // 프레임 합성 완료 웹훅
-  public void handleFrameCompositionCompleted(FrameCompositionCompletedWebhook webhook) {
+  public void webhookFrameCompleted(FrameCompositionCompletedWebhook webhook) {
     String jobId = webhook.jobId();
     log.info("프레임 합성 완료 웹훅 수신 - JobId: {}", jobId);
 
@@ -138,7 +137,7 @@ public class WebhookService {
       }
 
       // 합성 결과 저장
-      saveFrameCompositionResult(webhook);
+      saveFrameCompletedResult(webhook);
 
       // PhotoService에 최종 결과 저장 (Photo 테이블에 저장)
       photoService.saveFinalComposedPhoto(webhook);
@@ -160,9 +159,82 @@ public class WebhookService {
           "프레임 합성 완료 웹훅 처리 중 오류가 발생했습니다: " + e.getMessage());
     }
   }
+//  //디버깅용
+//  public void webhookFrameCompleted(FrameCompositionCompletedWebhook webhook) {
+//    String jobId = webhook.jobId();
+//    log.info("프레임 합성 완료 웹훅 수신 - JobId: {}", jobId);
+//
+//    // 🔍 1. 웹훅 전체 데이터 구조 확인
+//    log.info("=== 웹훅 데이터 구조 분석 ===");
+//    log.info("Event: {}", webhook.event());
+//    log.info("JobId: {}", webhook.jobId());
+//    log.info("Timestamp: {}", webhook.timestamp());
+//
+//    // 🔍 2. data 객체 존재 여부 확인
+//    if (webhook.data() == null) {
+//      log.error("❌ webhook.data()가 null입니다!");
+//      return;
+//    } else {
+//      log.info("✅ webhook.data() 존재함");
+//    }
+//
+//    // 🔍 3. data 객체 내부 필드들 하나씩 확인
+//    log.info("=== Data 객체 내부 필드 분석 ===");
+//
+//    try {
+//      // finalImageUrl 확인
+//      String finalImageUrl = webhook.data().finalImageUrl();
+//      log.info("finalImageUrl: {}", finalImageUrl);
+//      if (finalImageUrl == null) {
+//        log.warn("❌ finalImageUrl이 null입니다");
+//      }
+//    } catch (Exception e) {
+//      log.error("❌ finalImageUrl 필드 접근 실패: {}", e.getMessage());
+//    }
+//
+//    try {
+//      // processedImageUrl 확인 (혹시 이 필드가 있는지)
+//      String processedImageUrl = webhook.data().finalImageUrl();
+//      log.info("processedImageUrl: {}", processedImageUrl);
+//      if (processedImageUrl != null) {
+//        log.info("✅ processedImageUrl 존재 - 이걸 finalImageUrl 대신 사용할 수 있음");
+//      }
+//    } catch (Exception e) {
+//      log.error("❌ processedImageUrl 필드도 없음: {}", e.getMessage());
+//    }
+//
+//    try {
+//      // individualImageUrls 확인
+//      List<String> individualUrls = webhook.data().individualImageUrls();
+//      log.info("individualImageUrls: {}", individualUrls);
+//    } catch (Exception e) {
+//      log.error("❌ individualImageUrls 필드 접근 실패: {}", e.getMessage());
+//    }
+//
+//    try {
+//      // frameInfo 확인
+//      var frameInfo = webhook.data().frameInfo();
+//      log.info("frameInfo: {}", frameInfo);
+//    } catch (Exception e) {
+//      log.error("❌ frameInfo 필드 접근 실패: {}", e.getMessage());
+//    }
+//
+//    log.info("=== 데이터 구조 분석 완료 ===");
+//
+//    // 🔍 4. Redis 키 존재 여부도 함께 확인
+//    String frameJobKey = "frame_job:" + jobId;
+//    Boolean keyExists = redisTemplate.hasKey(frameJobKey);
+//    log.info("Redis 키 존재 여부 - {}: {}", frameJobKey, keyExists);
+//
+//    if (!keyExists) {
+//      // 다른 패턴의 키들도 확인
+//      Set<String> allKeys = redisTemplate.keys("*" + jobId + "*");
+//      log.info("JobId 포함된 모든 Redis 키들: {}", allKeys);
+//    }
+//  }
 
   // 프레임 합성 실패 웹훅
-  public void handleFrameCompositionFailed(FrameCompositionFailedWebhook webhook) {
+  public void webhookFrameFailed(FrameCompositionFailedWebhook webhook) {
     String jobId = webhook.jobId();
     log.error("프레임 합성 실패 웹훅 수신 - JobId: {}", jobId);
 
@@ -180,8 +252,8 @@ public class WebhookService {
         return;
       }
 
-      // 실패 결과 저장
-      saveFrameCompositionFailureResult(webhook);
+      // 실패 결과 Redis에 저장
+      saveFrameFailureResult(webhook);
 
       // 배치를 실패로 마킹
       String batchId = (String) jobInfo.get("batch_id");
@@ -198,7 +270,8 @@ public class WebhookService {
     }
   }
 
-  private void saveIndividualProcessingResult(ImageProcessingCompletedWebhook webhook) {
+  //======= Redis에 저장 =======
+  private void saveIndividualCompletedResult(ImageProcessingCompletedWebhook webhook) {
     String resultKey = "individual_result:" + webhook.jobId();
     Map<String, String> resultData = new HashMap<>();
 
@@ -238,7 +311,7 @@ public class WebhookService {
     redisTemplate.expire(resultKey, Duration.ofHours(24));
   }
 
-  private void saveFrameCompositionResult(FrameCompositionCompletedWebhook webhook) {
+  private void saveFrameCompletedResult(FrameCompositionCompletedWebhook webhook) {
     String resultKey = "compose_result:" + webhook.jobId();
     Map<String, String> resultData = new HashMap<>();
 
@@ -264,7 +337,7 @@ public class WebhookService {
     redisTemplate.expire(resultKey, Duration.ofHours(24));
   }
 
-  private void saveFrameCompositionFailureResult(FrameCompositionFailedWebhook webhook) {
+  private void saveFrameFailureResult(FrameCompositionFailedWebhook webhook) {
     String resultKey = "compose_result:" + webhook.jobId();
     Map<String, String> resultData = new HashMap<>();
 
@@ -291,7 +364,7 @@ public class WebhookService {
 
     if (webhook.error() != null) {
       batchUpdate.put("error_message",
-          String.format("개별 이미지 처리 실패: %s - %s",
+          String.format("개별 이미지 중 처리 실패: %s - %s",
               webhook.error().code(), webhook.error().message()));
     }
 
@@ -331,13 +404,13 @@ public class WebhookService {
   public void handleImageProcessingCompleted(ImageProcessingCompletedWebhook webhook) {
     log.warn("Deprecated 메소드 호출 - handleImageProcessingCompleted: {}", webhook.jobId());
     // 기존 로직과의 호환성을 위해 개별 처리로 리다이렉트
-    handleIndividualImageCompleted(webhook);
+    webhookIndividualCompleted(webhook);
   }
 
   @Deprecated
   public void handleImageProcessingFailed(ImageProcessingFailedWebhook webhook) {
     log.warn("Deprecated 메소드 호출 - handleImageProcessingFailed: {}", webhook.jobId());
     // 기존 로직과의 호환성을 위해 개별 처리로 리다이렉트
-    handleIndividualImageFailed(webhook);
+    webhookIndividualFailed(webhook);
   }
 }
