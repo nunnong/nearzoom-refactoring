@@ -14,10 +14,10 @@ export interface MyPhotoListCondition {
 export interface MyPhotoResponse {
   photoId: number
   imageUrl: string
-  createdAt: string          // "2025-01-12T10:30:00" 형식
-  heart: number              // 0 또는 1 (백엔드에서 숫자로 옴)
+  createdAt: string
+  heart: number              // 0 또는 1
   editable: boolean          // true: 편집 가능, false: 편집됨
-  partnerEmails: string      // "juyy99@gmail.com" 형식
+  partnerEmails?: string     // 콤마로 구분된 이메일 문자열
 }
 
 export interface MyPhotoListResponse {
@@ -44,10 +44,12 @@ export const myroomService = {
   getPhotos: async (condition: MyPhotoListCondition = {}): Promise<MyPhotoListResponse> => {
     const params = new URLSearchParams()
     
+    // 하트
     if (condition.heart !== undefined) {
       params.append('heart', condition.heart.toString())
     }
     
+    // 친구 이메일
     if (condition.partnerEmails && condition.partnerEmails.length > 0) {
       condition.partnerEmails.forEach(email => {
         params.append('partnerEmails', email)
@@ -60,6 +62,7 @@ export const myroomService = {
     if (condition.endDate) {
       params.append('endDate', condition.endDate)
     }
+    
     if (condition.cursor) {
       params.append('cursor', condition.cursor.toString())
     }
@@ -81,7 +84,7 @@ export const myroomService = {
     await api.delete(API_ENDPOINTS.DELETE_PHOTO, { data: request })
   },
 
-  // 편집본 저장 (상태만 변경)
+  // 편집본 저장
   saveEditedPhoto: async (request: PhotoEditSaveRequest): Promise<void> => {
     await api.post(API_ENDPOINTS.SAVE_EDITED, request)
   },

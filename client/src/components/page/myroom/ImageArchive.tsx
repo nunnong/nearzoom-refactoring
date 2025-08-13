@@ -22,8 +22,6 @@ interface ImageItem {
   isLiked?: boolean
   isEdited?: boolean
   hashtags?: string[]
-  createdAt?: string        // 원본 날짜 데이터
-  partnerEmails?: string    // 함께 찍은 사람들 이메일
 }
 
 interface ImageArchiveProps {
@@ -78,7 +76,7 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
     return 36 // 매우 큰 화면: 6열 × 6개
   }, [])
 
-  // 초기 사진 데이터 가져오기 (커서 기반)
+  // 초기 사진 데이터 가져오기
   const fetchPhotos = useCallback(async (cursor: number | null = null, isReset: boolean = false) => {
     if (propImages && propImages.length > 0) {
       return
@@ -473,15 +471,7 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
                     )}
                   </div>
                 ) : (
-                  <div className="text-xs font-medium text-white space-y-1">
-                    <p>ID: {image.id}</p>
-                    {image.createdAt && (
-                      <p>{new Date(image.createdAt).toLocaleDateString('ko-KR')}</p>
-                    )}
-                    {image.partnerEmails && (
-                      <p>👥 {image.partnerEmails}</p>
-                    )}
-                  </div>
+                  <p className="text-xs font-medium text-white">{image.alt}</p>
                 )}
               </div>
             </div>
