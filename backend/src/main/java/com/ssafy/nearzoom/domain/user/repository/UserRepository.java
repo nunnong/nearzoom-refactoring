@@ -28,6 +28,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 .orElseThrow(UserNotFoundException::new);
     }
 
+    //조회 단일 계정명(accountName)으로 사용자 조회
+    Optional<User> findByAccountName(String accountName);
+
     // 조회 (accountName 계정명)
     @Query("""
         SELECT u FROM User u 
