@@ -1,6 +1,5 @@
 package com.ssafy.nearzoom.domain.feed.entity;
 
-import com.ssafy.nearzoom.domain.photo.entity.Photo;
 import com.ssafy.nearzoom.domain.user.entity.User;
 import com.ssafy.nearzoom.global.common.BaseEntity;
 import jakarta.persistence.Column;
@@ -10,11 +9,15 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Comment;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -26,25 +29,36 @@ public class Feed extends BaseEntity {
     @Column(name = "feed_id")
     private Long feedId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "photo_id", nullable = false)
-    private Photo photo;
+    @Column(length = 100)
+    @Comment("피드 제목")
+    private String title;
 
-    @Column(length = 200)
-    @Comment("본문")
-    private String caption;
+    @Column(length = 500)
+    @Comment("피드 설명")
+    private String description;
 
-    private Feed(User user, Photo photo, String caption) {
+    @OneToMany(mappedBy = "feed", fetch = FetchType.LAZY)
+    private List<Post> posts = new ArrayList<>();
+
+    private Feed(User user, String title, String description) {
         this.user = user;
-        this.photo = photo;
-        this.caption = caption;
+        this.title = title;
+        this.description = description;
     }
 
-    public static Feed of(User user, Photo photo, String caption) {
-        return new Feed(user, photo, caption);
+    public static Feed of(User user, String title, String description) {
+        return new Feed(user, title, description);
+    }
+
+    public void updateTitle(String title) {
+        this.title = title;
+    }
+
+    public void updateDescription(String description) {
+        this.description = description;
     }
 }

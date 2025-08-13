@@ -2,7 +2,7 @@ package com.ssafy.nearzoom.domain.feed.controller;
 
 import com.ssafy.nearzoom.domain.feed.dto.FollowCountsResponse;
 import com.ssafy.nearzoom.domain.feed.service.FollowService;
-import com.ssafy.nearzoom.domain.user.dto.UserInfoResponse;
+import com.ssafy.nearzoom.domain.user.dto.UserProfileResponse;  // 🔥 User 도메인의 DTO 사용
 import com.ssafy.nearzoom.global.response.ApiResponse;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -22,42 +22,59 @@ public class FollowController {
 
     private final FollowService followService;
 
-    @PostMapping("/{followeeId}")
+    /**
+     * 🔥 accountName으로 팔로우
+     */
+    @PostMapping("/{accountName}")
     public ResponseEntity<ApiResponse<Void>> follow(Authentication authentication,
-        @PathVariable Long followeeId) {
-        followService.follow(authentication, followeeId);
+                                                    @PathVariable String accountName) {
+        followService.followByAccountName(authentication, accountName);
         return ApiResponse.ok();
     }
 
-    @DeleteMapping("/{followeeId}")
+    /**
+     * 🔥 accountName으로 언팔로우
+     */
+    @DeleteMapping("/{accountName}")
     public ResponseEntity<ApiResponse<Void>> unfollow(Authentication authentication,
-        @PathVariable Long followeeId) {
-        followService.unfollow(authentication, followeeId);
+                                                      @PathVariable String accountName) {
+        followService.unfollowByAccountName(authentication, accountName);
         return ApiResponse.ok();
     }
 
-    @GetMapping("/following/{userId}")
-    public ResponseEntity<ApiResponse<List<UserInfoResponse>>> getFollowing(
-        @PathVariable Long userId) {
-        return ApiResponse.ok(followService.getFollowing(userId));
+    /**
+     * 🔥 accountName으로 팔로잉 목록 조회 - UserProfileResponse 반환
+     */
+    @GetMapping("/following/{accountName}")
+    public ResponseEntity<ApiResponse<List<UserProfileResponse>>> getFollowing(
+            @PathVariable String accountName) {
+        return ApiResponse.ok(followService.getFollowingByAccountName(accountName));
     }
 
-    @GetMapping("/followers/{userId}")
-    public ResponseEntity<ApiResponse<List<UserInfoResponse>>> getFollowers(
-        @PathVariable Long userId) {
-        return ApiResponse.ok(followService.getFollowers(userId));
+    /**
+     * 🔥 accountName으로 팔로워 목록 조회 - UserProfileResponse 반환
+     */
+    @GetMapping("/followers/{accountName}")
+    public ResponseEntity<ApiResponse<List<UserProfileResponse>>> getFollowers(
+            @PathVariable String accountName) {
+        return ApiResponse.ok(followService.getFollowersByAccountName(accountName));
     }
 
-    @GetMapping("/count/{userId}")
+    /**
+     * 🔥 accountName으로 팔로우 수 조회
+     */
+    @GetMapping("/count/{accountName}")
     public ResponseEntity<ApiResponse<FollowCountsResponse>> countFollow(
-        @PathVariable Long userId) {
-        return ApiResponse.ok(followService.getCounts(userId));
+            @PathVariable String accountName) {
+        return ApiResponse.ok(followService.getCountsByAccountName(accountName));
     }
 
-    @GetMapping("/check/{followeeId}")
+    /**
+     * 🔥 accountName으로 팔로우 상태 확인
+     */
+    @GetMapping("/check/{accountName}")
     public ResponseEntity<ApiResponse<Boolean>> isFollowing(Authentication authentication,
-        @PathVariable Long followeeId) {
-        return ApiResponse.ok(followService.isFollowing(authentication, followeeId));
+                                                            @PathVariable String accountName) {
+        return ApiResponse.ok(followService.isFollowingByAccountName(authentication, accountName));
     }
-
 }

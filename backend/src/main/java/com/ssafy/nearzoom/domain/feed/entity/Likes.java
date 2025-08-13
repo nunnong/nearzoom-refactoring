@@ -19,23 +19,23 @@ public class Likes {
     @EmbeddedId
     private LikesId likesId;
 
-    @MapsId("feedId")
+    @MapsId("postId")  // feedId → postId로 변경
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "feed_id", nullable = false)
-    private Feed feed;
+    @JoinColumn(name = "post_id", nullable = false)  // feed_id → post_id로 변경
+    private Post post;  // Feed → Post로 변경
 
     @MapsId("userId")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    private Likes(Feed feed, User user) {
-        this.feed = feed;
+    private Likes(Post post, User user) {
+        this.post = post;
         this.user = user;
-        this.likesId = LikesId.of(feed.getFeedId(), user.getUserId());
+        this.likesId = LikesId.of(post.getPostId(), user.getUserId());
     }
 
-    public static Likes of(Feed feed, User user) {
-        return new Likes(feed, user);
+    public static Likes of(Post post, User user) {
+        return new Likes(post, user);
     }
 }

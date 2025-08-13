@@ -1,21 +1,14 @@
 package com.ssafy.nearzoom.domain.feed.controller;
 
-import com.ssafy.nearzoom.domain.feed.dto.CreateFeedRequest;
-import com.ssafy.nearzoom.domain.feed.dto.FeedDetailResponse;
+import com.ssafy.nearzoom.domain.feed.dto.*;
 import com.ssafy.nearzoom.domain.feed.service.FeedService;
 import com.ssafy.nearzoom.global.response.ApiResponse;
-import java.time.LocalDateTime;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -24,48 +17,117 @@ public class FeedController {
 
     private final FeedService feedService;
 
-    @PostMapping
-    public ResponseEntity<ApiResponse<Long>> create(Authentication authentication,
-        @RequestBody CreateFeedRequest req) {
-        return ApiResponse.create(feedService.create(authentication, req));
-    }
+    // =========================================
+    // 📱 EXPLORE: 모든 게시물 탐색
+    // =========================================
 
-    @GetMapping("/{feedId}")
-    public ResponseEntity<ApiResponse<FeedDetailResponse>> detailFeeds(
+    /**
+     * 🌍 Explore: 모든 사용자의 게시물 랜덤 조회
+     */
+    @GetMapping("/explore")
+    public ResponseEntity<ApiResponse<List<PostResponse>>> getExplorePosts(
         Authentication authentication,
-        @PathVariable Long feedId) {
-        return ApiResponse.ok(feedService.detailFeeds(authentication, feedId));
+        @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok(feedService.getRandomPosts(authentication, size));
     }
 
+    // =========================================
+    // 📰 TIMELINE: 팔로잉 피드
+    // =========================================
+
+    /**
+     * 📰 Timeline: 팔로잉하는 사용자들의 최신 게시물들 조회
+     */
+    @GetMapping("/timeline")
+    public ResponseEntity<ApiResponse<List<PostResponse>>> getTimelinePosts(
+        Authentication authentication,
+        @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok(feedService.getFollowingLatestPosts(authentication, size));
+    }
+
+    // =========================================
+    // 👤 USER FEED: 특정 사용자 피드 조회
+    // =========================================
+
+    /**
+     * 👤 특정 사용자의 피드 조회 (게시물 포함) - 읽기 권한
+     */
     @GetMapping("/users/{userId}")
-    public ResponseEntity<ApiResponse<List<FeedDetailResponse>>> userFeeds(
+    public ResponseEntity<ApiResponse<FeedWithPostsResponse>> getUserFeed(
         Authentication authentication,
-        @PathVariable Long userId,
-        @RequestParam(required = false) LocalDateTime cursorCreatedAt,
-        @RequestParam(required = false) Long cursorId,
-        @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok(
-            feedService.userFeed(authentication, userId, cursorCreatedAt, cursorId, size)
-        );
+        @PathVariable Long userId) {
+        return ApiResponse.ok(feedService.getUserFeedWithPosts(authentication, userId));
     }
 
-    @GetMapping("/following")
-    public ResponseEntity<ApiResponse<List<FeedDetailResponse>>> followingFeeds(
+    /**
+     * 👤 계정명으로 사용자 피드 조회 (게시물 포함) - 읽기 권한
+     */
+    @GetMapping("/users/account/{accountName}")
+    public ResponseEntity<ApiResponse<FeedWithPostsResponse>> getUserFeedByAccountName(
         Authentication authentication,
-        @RequestParam(required = false) LocalDateTime cursorCreatedAt,
-        @RequestParam(required = false) Long cursorId,
-        @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok(
-            feedService.followingFeed(authentication, cursorCreatedAt, cursorId, size)
-        );
+        @PathVariable String accountName) {
+        return ApiResponse.ok(feedService.getUserFeedByAccountName(authentication, accountName));
     }
 
-    @GetMapping("/random")
-    public ResponseEntity<ApiResponse<List<FeedDetailResponse>>> random(
+    // =========================================
+    // 📝 POST MANAGEMENT: 게시물 관리
+    // =========================================
+
+    /**
+     * 📝 마이룸 사진으로 피드에 게시물 추가
+     */
+    @PostMapping("/posts/from-myroom")
+    public ResponseEntity<ApiResponse<Long>> createPostFromMyRoom(
         Authentication authentication,
-        @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok(
-            feedService.randomFeed(authentication, size)
-        );
+        @RequestBody CreatePostFromMyRoomRequest req) {
+        return ApiResponse.create(feedService.createPostFromMyRoom(authentication, req));
+    }
+
+    /**
+     * 📄 게시물 상세 조회 (단일 게시물)
+     */
+    @GetMapping("/posts/{postId}")
+    public ResponseEntity<ApiResponse<PostDetailResponse>> getPostDetail(
+        Authentication authentication,
+        @PathVariable Long postId) {
+        return ApiResponse.ok(feedService.getPostDetail(authentication, postId));
+    }
+
+    /**
+     * ✏️ 게시물 수정 (캡션)
+     */
+    @PutMapping("/posts/{postId}")
+    public ResponseEntity<ApiResponse<Void>> updatePost(
+        Authentication authentication,
+        @PathVariable Long postId,
+        @RequestBody UpdatePostRequest req) {
+        feedService.updatePost(authentication, postId, req);
+        return ApiResponse.ok();
+    }
+
+    /**
+     * 🗑️ 게시물 삭제
+     */
+    @DeleteMapping("/posts/{postId}")
+    public ResponseEntity<ApiResponse<Void>> deletePost(
+        Authentication authentication,
+        @PathVariable Long postId) {
+        feedService.deletePost(authentication, postId);
+        return ApiResponse.ok();
+    }
+
+    // =========================================
+    // 🔍 SEARCH: 피드/사용자 검색
+    // =========================================
+
+    /**
+     * 🔍 피드 검색 (사용자 검색)
+     */
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<List<FeedWithPostsResponse>>> searchFeeds(
+        Authentication authentication,
+        @RequestParam String query,
+        @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.ok(feedService.searchFeeds(authentication, query, size));
     }
 }
