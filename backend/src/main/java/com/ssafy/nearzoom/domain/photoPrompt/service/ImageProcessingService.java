@@ -34,18 +34,17 @@ public class ImageProcessingService {
   private final WebClient imageServerWebClient;
   private final PhotoPromptRepository photoPromptRepository;
   private final RedisTemplate<String, String> redisTemplate;
-  private final UserRepository userRepository;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   // 개별 이미지 즉시 처리 (설정 완료되는 즉시 호출)
   public void processIndividualImageImmediately(Long roomId, int imageOrder,
-      String imageUrl, List<String> personImageUrls, ProcessingOptions options,
+      String imageUrl, List<String> personIds, ProcessingOptions options,
       String promptId) {
     try {
       // 이미지 서버 요청 생성
       ImageServerRequest request = new ImageServerRequest(
           imageUrl,
-          personImageUrls, // 프론트에서 받은 person_ids 사용
+          personIds,
           options
       );
 
