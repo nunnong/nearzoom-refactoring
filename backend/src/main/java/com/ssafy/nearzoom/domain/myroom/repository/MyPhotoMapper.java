@@ -27,4 +27,10 @@ public interface MyPhotoMapper {
 
     void markAsEdited(@Param("userId") Long userId, @Param("photoId") Long photoId);
 
+    // Photo에서 MyPhoto로 데이터 이동을 위한 메서드
+    void savePhotoToMyPhoto(@Param("userId") Long userId, @Param("imageUrl") String imageUrl, @Param("userList") String userList);
+
+    // 편집 권한 확인
+    boolean checkEditPermission(@Param("userId") Long userId, @Param("photoId") Long photoId);
+
 }

@@ -10,7 +10,6 @@ import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingResult;
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PhotoPrompt;
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PromptStatus;
 import com.ssafy.nearzoom.domain.photoPrompt.repository.PhotoPromptRepository;
-import com.ssafy.nearzoom.domain.user.repository.UserRepository;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import java.time.Duration;
 import java.util.*;
@@ -34,18 +33,17 @@ public class ImageProcessingService {
   private final WebClient imageServerWebClient;
   private final PhotoPromptRepository photoPromptRepository;
   private final RedisTemplate<String, String> redisTemplate;
-  private final UserRepository userRepository;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
-  // 개별 이미지 즉시 처리 (설정 완료되는 즉시 호출)
+  // 개별 이미지 즉시 처리
   public void processIndividualImageImmediately(Long roomId, int imageOrder,
-      String imageUrl, List<String> personImageUrls, ProcessingOptions options,
+      String imageUrl, List<String> personIds, ProcessingOptions options,
       String promptId) {
     try {
       // 이미지 서버 요청 생성
       ImageServerRequest request = new ImageServerRequest(
           imageUrl,
-          personImageUrls, // 프론트에서 받은 person_ids 사용
+          personIds,
           options
       );
 
@@ -80,7 +78,7 @@ public class ImageProcessingService {
   }
 
   // 개별 이미지 처리 완료 시 호출 (웹훅에서 호출)
-  public void handleIndividualImageCompleted(String jobId, String processedImageUrl) {
+  public void IndividualCompleted(String jobId, String processedImageUrl) {
     Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries("individual_job:" + jobId);
 
     if (jobInfo.isEmpty()) {
@@ -313,29 +311,116 @@ public class ImageProcessingService {
   }
 
   // 개별 Job 정보 저장
+//  private void saveIndividualJobInfo(String jobId, Long roomId, int imageOrder,
+//      String imageUrl, ProcessingOptions options, String promptId) {
+//    Map<String, String> jobInfo = new HashMap<>();
+//    jobInfo.put("room_id", String.valueOf(roomId));
+//    jobInfo.put("image_order", String.valueOf(imageOrder));
+//    jobInfo.put("image_url", imageUrl);
+//    jobInfo.put("background_type", options.backgroundType());
+//    jobInfo.put("job_type", "individual");
+//    jobInfo.put("status", "processing");
+//    jobInfo.put("created_at", String.valueOf(System.currentTimeMillis()));
+//
+//    if (promptId != null) {
+//      jobInfo.put("prompt_id", promptId);
+//    }
+//    if (options.promptText() != null) {
+//      jobInfo.put("prompt_text", options.promptText());
+//    }
+//    if (options.backgroundColor() != null) {
+//      jobInfo.put("background_color", options.backgroundColor());
+//    }
+//
+//    redisTemplate.opsForHash().putAll("individual_job:" + jobId, jobInfo);
+//    redisTemplate.expire("individual_job:" + jobId, Duration.ofHours(2));
+//  }
+
   private void saveIndividualJobInfo(String jobId, Long roomId, int imageOrder,
       String imageUrl, ProcessingOptions options, String promptId) {
-    Map<String, String> jobInfo = new HashMap<>();
-    jobInfo.put("room_id", String.valueOf(roomId));
-    jobInfo.put("image_order", String.valueOf(imageOrder));
-    jobInfo.put("image_url", imageUrl);
-    jobInfo.put("background_type", options.backgroundType());
-    jobInfo.put("job_type", "individual");
-    jobInfo.put("status", "processing");
-    jobInfo.put("created_at", String.valueOf(System.currentTimeMillis()));
 
-    if (promptId != null) {
-      jobInfo.put("prompt_id", promptId);
-    }
-    if (options.promptText() != null) {
-      jobInfo.put("prompt_text", options.promptText());
-    }
-    if (options.backgroundColor() != null) {
-      jobInfo.put("background_color", options.backgroundColor());
-    }
+    long saveStartTime = System.currentTimeMillis();
+    log.info("=== 🔍 Job 정보 저장 시작 ===");
+    log.info("JobId: {}, RoomId: {}, ImageOrder: {}", jobId, roomId, imageOrder);
+    log.info("PromptId: {}, BackgroundType: {}", promptId, options.backgroundType());
 
-    redisTemplate.opsForHash().putAll("individual_job:" + jobId, jobInfo);
-    redisTemplate.expire("individual_job:" + jobId, Duration.ofHours(2));
+    try {
+      // 1️⃣ Job 데이터 준비
+      log.info("1️⃣ Job 데이터 준비 중...");
+      Map<String, String> jobInfo = new HashMap<>();
+      jobInfo.put("room_id", String.valueOf(roomId));
+      jobInfo.put("image_order", String.valueOf(imageOrder));
+      jobInfo.put("image_url", imageUrl);
+      jobInfo.put("background_type", options.backgroundType());
+      jobInfo.put("job_type", "individual");
+      jobInfo.put("status", "processing");
+      jobInfo.put("created_at", String.valueOf(saveStartTime));
+
+      if (promptId != null) {
+        jobInfo.put("prompt_id", promptId);
+      }
+      if (options.promptText() != null) {
+        jobInfo.put("prompt_text", options.promptText());
+      }
+      if (options.backgroundColor() != null) {
+        jobInfo.put("background_color", options.backgroundColor());
+      }
+
+      log.info("준비된 Job 데이터 필드 개수: {}", jobInfo.size());
+      for (Map.Entry<String, String> entry : jobInfo.entrySet()) {
+        log.info("  {}: {}", entry.getKey(), entry.getValue());
+      }
+
+      // 2️⃣ Redis 저장
+      String redisKey = "individual_job:" + jobId;
+      log.info("2️⃣ Redis 저장 시작 - Key: {}", redisKey);
+
+      redisTemplate.opsForHash().putAll(redisKey, jobInfo);
+      log.info("✅ Redis putAll 완료");
+
+      // 3️⃣ TTL 설정
+      log.info("3️⃣ TTL 설정 중...");
+      Boolean expireResult = redisTemplate.expire(redisKey, Duration.ofHours(2));
+      log.info("TTL 설정 결과: {} (2시간)", expireResult);
+
+      // 4️⃣ 저장 확인
+      log.info("4️⃣ 저장 결과 확인 중...");
+      Boolean keyExists = redisTemplate.hasKey(redisKey);
+      Map<Object, Object> savedData = redisTemplate.opsForHash().entries(redisKey);
+      Long ttl = redisTemplate.getExpire(redisKey);
+
+      log.info("저장 확인 - 키 존재: {}, 필드 개수: {}, TTL: {}초", keyExists, savedData.size(), ttl);
+
+      if (savedData.size() != jobInfo.size()) {
+        log.error("❌ 저장된 필드 개수 불일치! 예상: {}, 실제: {}", jobInfo.size(), savedData.size());
+      }
+
+      for (Map.Entry<Object, Object> entry : savedData.entrySet()) {
+        log.info("  저장된 데이터: {} = {}", entry.getKey(), entry.getValue());
+      }
+
+      long saveEndTime = System.currentTimeMillis();
+      log.info("=== ✅ Job 정보 저장 완료 ===");
+      log.info("JobId: {}, 저장 소요시간: {}ms", jobId, (saveEndTime - saveStartTime));
+
+    } catch (Exception e) {
+      long saveEndTime = System.currentTimeMillis();
+      log.error("=== ❌ Job 정보 저장 실패 ===");
+      log.error("JobId: {}, 저장 소요시간: {}ms", jobId, (saveEndTime - saveStartTime));
+      log.error("오류 타입: {}", e.getClass().getSimpleName());
+      log.error("오류 메시지: {}", e.getMessage());
+      log.error("스택 트레이스: ", e);
+
+      // Redis 연결 상태 확인
+      try {
+        String pingResult = redisTemplate.getConnectionFactory().getConnection().ping();
+        log.info("Redis 연결 상태: {}", pingResult);
+      } catch (Exception redisEx) {
+        log.error("Redis 연결 확인 실패: {}", redisEx.getMessage());
+      }
+
+      throw new RuntimeException("Job 정보 저장 실패: " + e.getMessage(), e);
+    }
   }
 
   // 프레임 합성 Job 정보 저장

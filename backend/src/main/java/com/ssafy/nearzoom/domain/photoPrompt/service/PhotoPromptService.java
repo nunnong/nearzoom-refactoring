@@ -1,9 +1,6 @@
 package com.ssafy.nearzoom.domain.photoPrompt.service;
 
-import com.ssafy.nearzoom.domain.photo.service.PhotoService;
-import com.ssafy.nearzoom.domain.photoPrompt.dto.imageInfo.BackgroundInfoRequest;
-import com.ssafy.nearzoom.domain.photoPrompt.dto.imageInfo.PhotoSelectionRequest;
-import com.ssafy.nearzoom.domain.photoPrompt.dto.imageInfo.IndividualImageRequest;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.IndividualBackgroundRequest;
 import com.ssafy.nearzoom.domain.photoPrompt.dto.imageServer.ProcessingOptions;
 import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingResult;
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PhotoPrompt;
@@ -17,7 +14,6 @@ import com.ssafy.nearzoom.global.exception.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +21,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -39,58 +34,61 @@ public class PhotoPromptService {
   private final ImageProcessingService imageProcessingService;
 
   // 1단계: 기본 설정 저장 (프레임 색상만)
-  public void saveBasicSettings(HttpServletRequest request, PhotoSelectionRequest selectionRequest) {
+  public void saveBasicSettings(HttpServletRequest request, Long roomId, String frameColor) {
     validateUser(request);
 
-    String roomKey = "room:" + selectionRequest.roomId();
+    String roomKey = "room:" + roomId;
 
     Map<String, String> basicData = new HashMap<>();
-    basicData.put("frame_color", selectionRequest.frameColor());
+    basicData.put("frame_color", frameColor);
     basicData.put("status", "basic_settings_saved");
 
     redisTemplate.opsForHash().putAll(roomKey, basicData);
     redisTemplate.expire(roomKey, Duration.ofHours(2));
 
-    log.info("기본 설정 저장 완료 - RoomId: {}, FrameColor: {}",
-        selectionRequest.roomId(), selectionRequest.frameColor());
+    log.info("기본 설정 저장 완료 - RoomId: {}, FrameColor: {}", roomId, frameColor);
   }
 
   // 2단계: 개별 이미지별 배경 설정 저장 및 즉시 처리
-  public void saveIndividualImageBackground(HttpServletRequest request,
-      IndividualImageRequest imageRequest) {
+  public void saveIndividualImageBackground(HttpServletRequest request, IndividualBackgroundRequest backgroundRequest) {
     validateUser(request);
 
-    String roomKey = "room:" + imageRequest.roomId();
+    Long roomId = backgroundRequest.roomId();
+    String roomKey = "room:" + roomId;
     Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
 
     if (roomData.isEmpty()) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "방 정보를 찾을 수 없습니다.");
     }
 
-    int imageOrder = imageRequest.imageOrder();
-    String backgroundType = imageRequest.backgroundType();
+    int imageOrder = backgroundRequest.imageOrder();
+    String backgroundType = backgroundRequest.backgroundType();
 
     // ProcessingOptions 생성
     ProcessingOptions processingOptions;
     String promptId = null;
-
+    System.out.println("backgroundType = " + backgroundType);
     if ("prompt".equals(backgroundType)) {
-      String promptText = imageRequest.promptText();
+      String promptText = backgroundRequest.promptText();
 
       // 프롬프트 테이블에 저장
       PhotoPrompt photoPrompt = new PhotoPrompt(promptText);
       photoPromptRepository.save(photoPrompt);
       promptId = String.valueOf(photoPrompt.getPromptId());
 
+//      PhotoPrompt photoPrompt = new PhotoPrompt(promptText);
+//      PhotoPrompt savedPhotoPrompt = photoPromptRepository.save(photoPrompt);  // 반환값 받기
+//      promptId = String.valueOf(savedPhotoPrompt.getPromptId());  // 이제 ID가 있음!
+
       processingOptions = new ProcessingOptions("prompt", promptText, null);
     } else { // solid
-      String color = imageRequest.colorValue();
+      String color = backgroundRequest.colorValue();
       processingOptions = new ProcessingOptions("color", null, color);
     }
 
     // 설정 정보를 Redis에 저장 (상태 추적용)
     Map<String, String> imageData = new HashMap<>();
-    imageData.put("image_url_" + imageOrder, imageRequest.imageUrl());
+    imageData.put("image_url_" + imageOrder, backgroundRequest.imageUrl());
     imageData.put("background_type_" + imageOrder, backgroundType);
     if (promptId != null) {
       imageData.put("prompt_id_" + imageOrder, promptId);
@@ -109,20 +107,18 @@ public class PhotoPromptService {
     // 즉시 이미지 서버로 전송
     try {
       imageProcessingService.processIndividualImageImmediately(
-          imageRequest.roomId(),
+          roomId,
           imageOrder,
-          imageRequest.imageUrl(),
-          imageRequest.personIds(),
+          backgroundRequest.imageUrl(),
+          backgroundRequest.personIds(),
           processingOptions,
           promptId
       );
 
-      log.info("이미지 서버 전송 완료 - RoomId: {}, Order: {}",
-          imageRequest.roomId(), imageOrder);
+      log.info("이미지 서버 전송 완료 - RoomId: {}, Order: {}", roomId, imageOrder);
 
     } catch (Exception e) {
-      log.error("이미지 서버 전송 실패 - RoomId: {}, Order: {}, Error: {}",
-          imageRequest.roomId(), imageOrder, e.getMessage());
+      log.error("이미지 서버 전송 실패 - RoomId: {}, Order: {}, Error: {}", roomId, imageOrder, e.getMessage());
 
       // 프롬프트 상태를 실패로 업데이트
       if (promptId != null) {
@@ -139,23 +135,6 @@ public class PhotoPromptService {
 
       throw e;
     }
-  }
-
-  // 설정 완료된 이미지 개수 카운트
-  private int countConfiguredImages(Map<Object, Object> roomData) {
-    String totalImagesStr = (String) roomData.get("total_images");
-    if (totalImagesStr == null) return 0;
-
-    int totalImages = Integer.parseInt(totalImagesStr);
-    int count = 0;
-
-    for (int i = 0; i < totalImages; i++) {
-      if (roomData.containsKey("image_url_" + i) &&
-          roomData.containsKey("background_type_" + i)) {
-        count++;
-      }
-    }
-    return count;
   }
 
   // 3단계: 처리 결과 조회
@@ -218,28 +197,21 @@ public class PhotoPromptService {
     return status;
   }
 
-  // 방 초기화 (재시작용)
-  public void resetRoom(HttpServletRequest request, Long roomId) {
-    validateUser(request);
+  // 설정 완료된 이미지 개수 카운트
+  private int countConfiguredImages(Map<Object, Object> roomData) {
+    String totalImagesStr = (String) roomData.get("total_images");
+    if (totalImagesStr == null) return 0;
 
-    String roomKey = "room:" + roomId;
+    int totalImages = Integer.parseInt(totalImagesStr);
+    int count = 0;
 
-    // 기존 배치 작업들 정리
-    String batchPattern = "batch:" + roomId + ":*";
-    Set<String> batchKeys = redisTemplate.keys(batchPattern);
-    if (batchKeys != null) {
-      for (String batchKey : batchKeys) {
-        redisTemplate.delete(batchKey);
+    for (int i = 0; i < totalImages; i++) {
+      if (roomData.containsKey("image_url_" + i) &&
+          roomData.containsKey("background_type_" + i)) {
+        count++;
       }
     }
-
-    // 최종 결과 삭제
-    redisTemplate.delete("final_result:" + roomId);
-
-    // 방 데이터 초기화
-    redisTemplate.delete(roomKey);
-
-    log.info("방 초기화 완료 - RoomId: {}", roomId);
+    return count;
   }
 
   // 처리 진행률 조회
@@ -248,10 +220,7 @@ public class PhotoPromptService {
     Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
 
     if (roomData.isEmpty()) {
-      return Map.of(
-          "status", "not_found",
-          "message", "방 정보를 찾을 수 없습니다."
-      );
+      throw new ApiException(HttpStatus.BAD_REQUEST, "방 정보를 찾을 수 없습니다.");
     }
 
     String status = (String) roomData.get("status");
@@ -277,6 +246,27 @@ public class PhotoPromptService {
     }
 
     return progress;
+  }
+
+  // 방 초기화
+  public void resetRoom(HttpServletRequest request, Long roomId) {
+    validateUser(request);
+
+    String roomKey = "room:" + roomId;
+
+    // 기존 배치 작업들 정리
+    Set<String> batchKeys = redisTemplate.keys("batch:" + roomId + ":*");
+    for (String batchKey : batchKeys) {
+      redisTemplate.delete(batchKey);
+    }
+
+    // 최종 결과 삭제
+    redisTemplate.delete("final_result:" + roomId);
+
+    // 방 데이터 초기화
+    redisTemplate.delete(roomKey);
+
+    log.info("방 초기화 완료 - RoomId: {}", roomId);
   }
 
   // 사용자 검증
