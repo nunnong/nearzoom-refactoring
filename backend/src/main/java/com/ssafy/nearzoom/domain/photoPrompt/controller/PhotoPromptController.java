@@ -1,8 +1,6 @@
 package com.ssafy.nearzoom.domain.photoPrompt.controller;
 
-import com.ssafy.nearzoom.domain.photoPrompt.dto.imageInfo.BackgroundInfoRequest;
-import com.ssafy.nearzoom.domain.photoPrompt.dto.imageInfo.IndividualImageRequest;
-import com.ssafy.nearzoom.domain.photoPrompt.dto.imageInfo.PhotoSelectionRequest;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.IndividualBackgroundRequest;
 import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingResult;
 import com.ssafy.nearzoom.domain.photoPrompt.service.PhotoPromptService;
 import com.ssafy.nearzoom.global.exception.ApiException;
@@ -13,7 +11,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -44,14 +41,17 @@ public class PhotoPromptController {
   @PostApiResponses
   public ResponseEntity<ApiResponse<Map<String, Object>>> saveBasicSettings(
       HttpServletRequest request,
-      @RequestBody PhotoSelectionRequest selectionRequest) {
+      @RequestBody Map<String, Object> body) {
 
     try {
-      photoService.saveBasicSettings(request, selectionRequest);
+      Long roomId = Long.valueOf(body.get("roomId").toString());
+      String frameColor = body.get("frameColor").toString();
+
+      photoService.saveBasicSettings(request, roomId, frameColor);
 
       Map<String, Object> responseData = new HashMap<>();
-      responseData.put("roomId", selectionRequest.roomId());
-      responseData.put("frameColor", selectionRequest.frameColor());
+      responseData.put("roomId", roomId);
+      responseData.put("frameColor", frameColor);
       responseData.put("savedAt", LocalDateTime.now().toString());
       responseData.put("nextStep", "각 이미지별로 배경을 설정해주세요");
 
@@ -116,7 +116,7 @@ public class PhotoPromptController {
   @PostApiResponses
   public ResponseEntity<ApiResponse<Map<String, Object>>> saveIndividualImageBackground(
       HttpServletRequest request,
-      @RequestBody IndividualImageRequest imageRequest) {
+      @RequestBody IndividualBackgroundRequest imageRequest) {
 
     try {
       photoService.saveIndividualImageBackground(request, imageRequest);
@@ -316,152 +316,4 @@ public class PhotoPromptController {
           "방 초기화 중 오류가 발생했습니다: " + e.getMessage());
     }
   }
-
-//  // === 기존 호환성을 위한 엔드포인트들 ===
-//
-//  @PostMapping("/selection")
-//  @Operation(summary = "사진 선택 및 순서 저장 (호환성)",
-//      description = """
-//      **⚠️ DEPRECATED**: 기존 방식의 엔드포인트입니다.
-//
-//      selectedCutIds와 cutCount는 무시되고, frameColor만 처리됩니다.
-//      새로운 워크플로우에서는 `/basic-settings` 엔드포인트 사용을 권장합니다.
-//
-//      **요청 예시:**
-//      ```json
-//      {
-//        "roomId": 123,
-//        "selectedCutIds": [1, 3],  // 무시됨
-//        "cutCount": 2,             // 무시됨
-//        "frameColor": "#FFFFFF"
-//      }
-//      ```
-//      """)
-//  @PostApiResponses
-//  public ResponseEntity<ApiResponse<Map<String, Object>>> savePhotoSelection(
-//      HttpServletRequest request,
-//      @RequestBody PhotoSelectionRequest selectionRequest) {
-//
-//    try {
-//      // 기존 호환성: frameColor만 기본 설정으로 저장
-//      photoService.saveBasicSettings(request, selectionRequest);
-//
-//      Map<String, Object> responseData = new HashMap<>();
-//      responseData.put("roomId", selectionRequest.roomId());
-//      responseData.put("frameColor", selectionRequest.frameColor());
-//      responseData.put("savedAt", LocalDateTime.now().toString());
-//      responseData.put("nextStep", "각 이미지별로 배경을 설정해주세요");
-//      responseData.put("note", "기존 방식으로 처리됨. selectedCutIds와 cutCount는 무시됨");
-//
-//      return ResponseEntity.ok(new ApiResponse<>(false,
-//          "기본 설정이 성공적으로 저장되었습니다. 이제 각 이미지의 배경을 설정해주세요.", responseData));
-//
-//    } catch (ApiException e) {
-//      return ApiResponse.failedOf(e);
-//    } catch (Exception e) {
-//      return ApiResponse.failedOf(HttpStatus.INTERNAL_SERVER_ERROR,
-//          "기본 설정 저장 중 오류가 발생했습니다: " + e.getMessage());
-//    }
-//  }
-//
-//  @PostMapping("/background")
-//  @Operation(summary = "배경 정보 저장 (호환성)",
-//      description = """
-//      **⚠️ DEPRECATED**: 기존 BackgroundInfoRequest를 새로운 IndividualImageRequest로 변환해서 처리합니다.
-//
-//      imageOrder는 0으로 고정되고, personIds는 빈 리스트로 설정됩니다.
-//      새로운 `/image/background` 엔드포인트 사용을 권장합니다.
-//
-//      **요청 예시:**
-//      ```json
-//      {
-//        "roomId": 123,
-//        "imageUrl": "https://example.com/image.jpg",
-//        "backgroundType": "solid",
-//        "colorValue": "#FF5733"
-//      }
-//      ```
-//      """)
-//  @PostApiResponses
-//  public ResponseEntity<ApiResponse<Map<String, Object>>> saveBackgroundInfo(
-//      HttpServletRequest request,
-//      @RequestBody BackgroundInfoRequest backgroundRequest) {
-//
-//    try {
-//      // BackgroundInfoRequest를 IndividualImageRequest로 변환
-//      IndividualImageRequest individualRequest = new IndividualImageRequest(
-//          backgroundRequest.roomId(),
-//          0, // 기존 방식에서는 순서가 없으므로 0으로 고정
-//          backgroundRequest.imageUrl(),
-//          List.of(), // 기존 방식에서는 personIds가 없으므로 빈 리스트
-//          backgroundRequest.backgroundType(),
-//          backgroundRequest.colorValue(),
-//          backgroundRequest.promptText()
-//      );
-//
-//      photoService.saveIndividualImageBackground(request, individualRequest);
-//
-//      Map<String, Object> responseData = new HashMap<>();
-//      responseData.put("roomId", backgroundRequest.roomId());
-//      responseData.put("backgroundType", backgroundRequest.backgroundType());
-//      responseData.put("imageUrl", backgroundRequest.imageUrl());
-//      responseData.put("savedAt", LocalDateTime.now().toString());
-//      responseData.put("note", "기존 방식으로 처리되었습니다. imageOrder=0, personIds=빈리스트로 설정됨");
-//
-//      return ResponseEntity.ok(new ApiResponse<>(false,
-//          "배경 정보가 저장되고 처리가 시작되었습니다.", responseData));
-//
-//    } catch (ApiException e) {
-//      return ApiResponse.failedOf(e);
-//    } catch (Exception e) {
-//      return ApiResponse.failedOf(HttpStatus.INTERNAL_SERVER_ERROR,
-//          "배경 정보 저장 중 오류가 발생했습니다: " + e.getMessage());
-//    }
-//  }
-//
-//  @GetMapping("/result/job/{jobId}")
-//  @Operation(summary = "Job ID로 결과 조회 (호환성)",
-//      description = """
-//      **⚠️ DEPRECATED**: 기존 jobId 방식의 결과 조회입니다.
-//
-//      roomId 방식 사용을 권장합니다: `/result/{roomId}`
-//
-//      **응답 예시:**
-//      ```json
-//      {
-//        "jobId": "job_12345",
-//        "status": "SUCCESS|PROCESSING|FAILED",
-//        "processedImageUrl": "처리된 이미지 URL",
-//        "note": "기존 jobId 방식으로 조회됨. roomId 방식 사용을 권장합니다."
-//      }
-//      ```
-//      """)
-//  @GetApiResponses
-//  public ResponseEntity<ApiResponse<Map<String, Object>>> getProcessingResultByJobId(
-//      @PathVariable String jobId) {
-//
-//    try {
-//      // 기존 방식으로 시도 (하위 호환성)
-//      ImageProcessingResult result = photoService.getProcessingResult(jobId);
-//
-//      Map<String, Object> responseData = new HashMap<>();
-//      responseData.put("jobId", result.jobId());
-//      responseData.put("status", result.status());
-//      responseData.put("processedImageUrl", result.processedImageUrl());
-//      responseData.put("personIds", result.personIds());
-//      responseData.put("errorCode", result.errorCode());
-//      responseData.put("errorMessage", result.errorMessage());
-//      responseData.put("retrievedAt", LocalDateTime.now().toString());
-//      responseData.put("note", "기존 jobId 방식으로 조회됨. roomId 방식 사용을 권장합니다.");
-//
-//      return ResponseEntity.ok(new ApiResponse<>(false,
-//          "처리 결과 조회에 성공했습니다.", responseData));
-//
-//    } catch (ApiException e) {
-//      return ApiResponse.failedOf(e);
-//    } catch (Exception e) {
-//      return ApiResponse.failedOf(HttpStatus.INTERNAL_SERVER_ERROR,
-//          "처리 결과 조회 중 오류가 발생했습니다: " + e.getMessage());
-//    }
-//  }
 }
