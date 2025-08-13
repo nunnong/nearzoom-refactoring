@@ -86,7 +86,8 @@ public class WebhookService {
     log.error("개별 이미지 처리 실패 웹훅 수신 - JobId: {}", jobId);
 
     try {
-      Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries("job:" + jobId);
+      //Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries("job:" + jobId);
+      Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries("individual_job:" + jobId);
 
       if (jobInfo.isEmpty()) {
         log.error("Job 정보를 찾을 수 없습니다 - JobId: {}", jobId);
@@ -239,7 +240,8 @@ public class WebhookService {
     log.error("프레임 합성 실패 웹훅 수신 - JobId: {}", jobId);
 
     try {
-      Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries("job:" + jobId);
+      //Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries("job:" + jobId);
+      Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries("frame_job:" + jobId);
 
       if (jobInfo.isEmpty()) {
         log.error("Compose Job 정보를 찾을 수 없습니다 - JobId: {}", jobId);
