@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
-import { UserProfile, searchUsers } from '@/lib/api/follow'
+import { UserProfile, searchUsers } from '@/lib/api/explore' // 🔥 올바른 경로로 수정
 
 interface UserSearchBoxProps {
   onUserFound: (userId: string) => void
@@ -34,18 +34,24 @@ const UserSearchBox: React.FC<UserSearchBoxProps> = ({
     setError(null)
 
     try {
+      console.log('🔍 사용자 검색 시작:', searchQuery) // 디버깅용
+
       const result = await searchUsers(searchQuery, undefined, 10)
+
+      console.log('🔍 검색 결과:', result) // 디버깅용
 
       if (result.success && result.data) {
         setSearchResults(result.data.users)
         setShowResults(true)
+        console.log('✅ 검색 성공:', result.data.users.length, '명 발견')
       } else {
         setError(result.error || '검색 중 오류가 발생했습니다.')
         setSearchResults([])
         setShowResults(true)
+        console.error('❌ 검색 실패:', result.error)
       }
     } catch (err) {
-      console.error('Failed to search users:', err)
+      console.error('❌ 검색 API 호출 실패:', err)
       setError('네트워크 오류가 발생했습니다.')
       setSearchResults([])
       setShowResults(true)
@@ -105,6 +111,7 @@ const UserSearchBox: React.FC<UserSearchBoxProps> = ({
   }
 
   const handleUserSelect = (user: UserProfile) => {
+    console.log('👤 사용자 선택:', user.id, user.username) // 디버깅용
     onUserFound(user.id)
     setQuery('')
     setShowResults(false)
@@ -154,7 +161,7 @@ const UserSearchBox: React.FC<UserSearchBoxProps> = ({
             onFocus={() => query.length >= 2 && searchResults.length > 0 && setShowResults(true)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            placeholder="사용자명 또는 이메일로 검색... (최소 2글자)"
+            placeholder="사용자명(accountName)으로 검색... (최소 2글자)"
             className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 placeholder-gray-500 transition-colors"
             autoComplete="off"
           />
@@ -228,20 +235,22 @@ const UserSearchBox: React.FC<UserSearchBoxProps> = ({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2">
                             <p className="font-semibold text-gray-900 truncate">
-                              {getUserDisplayName(user)}
+                              @{getUserDisplayName(user)}
                             </p>
                             {user.isFollowing && (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                 팔로잉
                               </span>
                             )}
-                            {user.isFollowedBy && (
+                            {user.isMe && (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                팔로워
+                                나
                               </span>
                             )}
                           </div>
-                          <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                          {user.bio && (
+                            <p className="text-sm text-gray-500 truncate">{user.bio}</p>
+                          )}
                           <div className="flex items-center space-x-3 text-xs text-gray-400 mt-1">
                             <span>팔로워 {formatFollowerCount(user.followersCount)}명</span>
                             <span>•</span>
@@ -275,7 +284,7 @@ const UserSearchBox: React.FC<UserSearchBoxProps> = ({
                 "{query}"와 일치하는 사용자를 찾을 수 없습니다
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                사용자명이나 이메일을 정확히 입력해보세요
+                정확한 accountName을 입력해보세요
               </p>
             </div>
           ) : null}
@@ -288,9 +297,18 @@ const UserSearchBox: React.FC<UserSearchBoxProps> = ({
           <h4 className="text-sm font-medium text-gray-900 mb-2">검색 팁</h4>
           <ul className="text-xs text-gray-500 space-y-1">
             <li>• 최소 2글자 이상 입력해주세요</li>
-            <li>• 사용자명이나 이메일로 검색할 수 있습니다</li>
+            <li>• 사용자의 accountName으로 검색됩니다</li>
             <li>• ESC 키를 누르면 검색창이 닫힙니다</li>
           </ul>
+        </div>
+      )}
+
+      {/* 개발 환경에서만 디버그 정보 표시 */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-2 text-xs text-gray-400">
+          검색어: "{query}" | 결과: {searchResults.length}개 | 
+          {isSearching ? ' 검색 중...' : ' 대기 중'} |
+          API: /feeds/search
         </div>
       )}
     </div>
