@@ -67,18 +67,18 @@ public class PhotoPromptService {
     // ProcessingOptions 생성
     ProcessingOptions processingOptions;
     String promptId = null;
-
+    System.out.println("backgroundType = " + backgroundType);
     if ("prompt".equals(backgroundType)) {
       String promptText = backgroundRequest.promptText();
 
-//      // 프롬프트 테이블에 저장
-//      PhotoPrompt photoPrompt = new PhotoPrompt(promptText);
-//      photoPromptRepository.save(photoPrompt);
-//      promptId = String.valueOf(photoPrompt.getPromptId());
-
+      // 프롬프트 테이블에 저장
       PhotoPrompt photoPrompt = new PhotoPrompt(promptText);
-      PhotoPrompt savedPhotoPrompt = photoPromptRepository.save(photoPrompt);  // 반환값 받기
-      promptId = String.valueOf(savedPhotoPrompt.getPromptId());  // 이제 ID가 있음!
+      photoPromptRepository.save(photoPrompt);
+      promptId = String.valueOf(photoPrompt.getPromptId());
+
+//      PhotoPrompt photoPrompt = new PhotoPrompt(promptText);
+//      PhotoPrompt savedPhotoPrompt = photoPromptRepository.save(photoPrompt);  // 반환값 받기
+//      promptId = String.valueOf(savedPhotoPrompt.getPromptId());  // 이제 ID가 있음!
 
       processingOptions = new ProcessingOptions("prompt", promptText, null);
     } else { // solid
