@@ -110,52 +110,6 @@ public class ImageProcessingService {
             "이미지 서버에서 올바른 응답을 받지 못했습니다.");
       }
 
-      /// ///////////////////////////////////////////////////////////////////////////
-      log.info("=== 이미지 서버 응답 상세 분석 ===");
-
-      if (response == null) {
-        log.error("❌ ImageServerResponse가 null입니다!");
-        throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
-            "이미지 서버에서 응답을 받지 못했습니다.");
-      } else {
-        log.info("✅ ImageServerResponse 존재함");
-      }
-
-// 응답 객체의 모든 필드 확인
-      try {
-        log.info("Response 객체 타입: {}", response.getClass().getSimpleName());
-        log.info("Response toString: {}", response.toString());
-      } catch (Exception e) {
-        log.warn("Response 기본 정보 로깅 실패: {}", e.getMessage());
-      }
-
-      // data 필드 확인
-      if (response.data() == null) {
-        log.error("❌ response.data()가 null입니다!");
-        log.info("Response 전체 구조를 JSON으로 변환 시도...");
-
-        try {
-          String responseJson = objectMapper.writeValueAsString(response);
-          log.info("Response JSON: {}", responseJson);
-        } catch (Exception e) {
-          log.error("Response JSON 변환 실패: {}", e.getMessage());
-        }
-
-        throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
-            "이미지 서버 응답에 data 필드가 없습니다.");
-      } else {
-        log.info("✅ response.data() 존재함");
-        log.info("Data 객체 타입: {}", response.data().getClass().getSimpleName());
-
-        try {
-          String dataJson = objectMapper.writeValueAsString(response.data());
-          log.info("Data JSON: {}", dataJson);
-        } catch (Exception e) {
-          log.warn("Data JSON 변환 실패: {}", e.getMessage());
-        }
-      }
-      /// ///////////////////////////////////////////////////////////////////////////
-
       String jobId = response.data().jobId();
 
       // Job 정보 Redis에 저장
