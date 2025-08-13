@@ -1,20 +1,22 @@
 package com.ssafy.nearzoom.domain.myroom.service;
 
-import com.ssafy.nearzoom.domain.myroom.dto.HeartUpdateRequest;
-import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoListCondition;
-import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoListResponse;
-import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoResponse;
-import com.ssafy.nearzoom.domain.myroom.dto.PhotoDeleteRequest;
-import com.ssafy.nearzoom.domain.myroom.dto.PhotoEditSaveRequest;
+import com.ssafy.nearzoom.domain.feed.repository.PostRepository;
+import com.ssafy.nearzoom.domain.myroom.dto.*;
 import com.ssafy.nearzoom.domain.myroom.repository.MyPhotoMapper;
-import com.ssafy.nearzoom.domain.user.repository.UserRepository;
-import com.ssafy.nearzoom.domain.user.dto.UserAuthInfoResponse;
+import com.ssafy.nearzoom.domain.photo.entity.Photo;
+import com.ssafy.nearzoom.domain.photo.repository.PhotoRepository;
 import com.ssafy.nearzoom.domain.photo.service.ImageUploadService;
+import com.ssafy.nearzoom.domain.user.dto.UserAuthInfoResponse;
+import com.ssafy.nearzoom.domain.user.entity.User;
+import com.ssafy.nearzoom.domain.user.repository.UserRepository;
 import com.ssafy.nearzoom.global.auth.util.AuthUtil;
+import com.ssafy.nearzoom.global.exception.ApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -24,14 +26,20 @@ import java.util.List;
 @Slf4j
 public class MyRoomServiceImpl implements MyRoomService {
 
-    private final MyPhotoMapper photoRepository;
+    private final MyPhotoMapper myPhotoMapper;
     private final UserRepository userRepository;
-    private final AuthUtil authUtil;
+    private final PhotoRepository photoRepository;
+    private final PostRepository postRepository;
     private final ImageUploadService imageUploadService;
+
+    private User getLoginUser(Authentication authentication) {
+        UserAuthInfoResponse loginUserInfo = AuthUtil.getUserAuthInfo(authentication);
+        return userRepository.getByEmailAndSocial(loginUserInfo.email(), loginUserInfo.social());
+    }
 
     @Override
     public MyPhotoListResponse getMyPhotos(Authentication authentication, MyPhotoListCondition cond) {
-        UserAuthInfoResponse userInfo = authUtil.getUserAuthInfo(authentication);
+        UserAuthInfoResponse userInfo = AuthUtil.getUserAuthInfo(authentication);
         System.out.println(">>> [DEBUG] 👤 UserInfo - Email: " + userInfo.email() + ", Social: " + userInfo.social());
 
         Long userId = userRepository.getByEmailAndSocial(userInfo.email(), userInfo.social()).getUserId();
@@ -44,7 +52,7 @@ public class MyRoomServiceImpl implements MyRoomService {
             ", startDate: " + cond.startDate() +
             ", endDate: " + cond.endDate());
 
-        List<MyPhotoResponse> photos = photoRepository.findPhotosByCondition(userId, cond);
+        List<MyPhotoResponse> photos = myPhotoMapper.findPhotosByCondition(userId, cond);
         System.out.println(">>> [DEBUG] 📸 MyBatis 쿼리 결과: " + photos.size() + "개");
 
         if (photos.isEmpty()) {
@@ -66,26 +74,26 @@ public class MyRoomServiceImpl implements MyRoomService {
 
     @Override
     public void updateHeart(Authentication authentication, HeartUpdateRequest request) {
-        UserAuthInfoResponse userInfo = authUtil.getUserAuthInfo(authentication);
+        UserAuthInfoResponse userInfo = AuthUtil.getUserAuthInfo(authentication);
         Long userId = userRepository.getByEmailAndSocial(userInfo.email(), userInfo.social()).getUserId();
 
-        photoRepository.updateHeart(userId, request.photoId(), request.heart());
+        myPhotoMapper.updateHeart(userId, request.photoId(), request.heart());
     }
 
     @Override
     public void deletePhoto(Authentication authentication, PhotoDeleteRequest request) {
-        UserAuthInfoResponse userInfo = authUtil.getUserAuthInfo(authentication);
+        UserAuthInfoResponse userInfo = AuthUtil.getUserAuthInfo(authentication);
         Long userId = userRepository.getByEmailAndSocial(userInfo.email(), userInfo.social()).getUserId();
 
-        photoRepository.softDeletePhoto(userId, request.photoId());
+        myPhotoMapper.softDeletePhoto(userId, request.photoId());
     }
 
     @Override
     public void saveEditedPhoto(Authentication authentication, PhotoEditSaveRequest request) {
-        UserAuthInfoResponse userInfo = authUtil.getUserAuthInfo(authentication);
+        UserAuthInfoResponse userInfo = AuthUtil.getUserAuthInfo(authentication);
         Long userId = userRepository.getByEmailAndSocial(userInfo.email(), userInfo.social()).getUserId();
 
-        photoRepository.markAsEdited(userId, request.photoId());
+        myPhotoMapper.markAsEdited(userId, request.photoId());
     }
 
     @Override
@@ -94,34 +102,59 @@ public class MyRoomServiceImpl implements MyRoomService {
 
         try {
             // 1. 사용자 정보 조회
-            UserAuthInfoResponse userInfo = authUtil.getUserAuthInfo(authentication);
+            UserAuthInfoResponse userInfo = AuthUtil.getUserAuthInfo(authentication);
             Long userId = userRepository.getByEmailAndSocial(userInfo.email(), userInfo.social()).getUserId();
             String userEmail = userInfo.email();
-            
+
             // 2. 편집 권한 확인 (원본 사진이 편집 가능한지 확인)
-            boolean canEdit = photoRepository.checkEditPermission(userId, originalPhotoId);
+            boolean canEdit = myPhotoMapper.checkEditPermission(userId, originalPhotoId);
             if (!canEdit) {
                 throw new RuntimeException("해당 사진은 편집할 수 없습니다.");
             }
-            
+
             // 3. 이미지 서버에 업로드
             String uploadedImageUrl = imageUploadService.uploadEditedImage(file, originalPhotoId, userEmail);
             log.debug(">>> 이미지 업로드 완료 - URL: {}", uploadedImageUrl);
-            
+
             // 4. my_photo 테이블에 편집본 저장 (편집 불가 상태로)
-            photoRepository.savePhotoToMyPhoto(userId, uploadedImageUrl, null);
+            myPhotoMapper.savePhotoToMyPhoto(userId, uploadedImageUrl, null);
             log.debug(">>> my_photo 테이블에 편집본 저장 완료");
-            
+
             // 5. 원본 사진을 편집 불가 상태로 변경
-            photoRepository.markAsEdited(userId, originalPhotoId);
+            myPhotoMapper.markAsEdited(userId, originalPhotoId);
             log.debug(">>> 원본 사진을 편집 불가 상태로 변경 완료");
-            
+
             log.info("편집된 이미지 처리 완료 - originalPhotoId: {}, uploadedUrl: {}", originalPhotoId, uploadedImageUrl);
             return uploadedImageUrl;
-            
+
         } catch (Exception e) {
             log.error("편집된 이미지 업로드 처리 실패 - originalPhotoId: {}", originalPhotoId, e);
             throw new RuntimeException("편집된 이미지 처리 중 오류가 발생했습니다: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 🆕 마이룸 사진을 피드 게시물로 업로드하기 위한 정보 조회
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public PhotoForFeedUploadResponse getPhotoForFeedUpload(Long photoId, Authentication authentication) {
+        User loginUser = getLoginUser(authentication);
+
+        // 사진 존재 확인 및 소유권 검증
+        Photo photo = photoRepository.findById(photoId)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사진이 존재하지 않습니다."));
+
+        // 이미 피드에 올렸는지 확인
+        boolean alreadyInFeed = postRepository.existsByFeed_User_UserIdAndPhoto_PhotoId(
+            loginUser.getUserId(), photoId);
+
+        // 🔥 DTO와 일치하도록 4개 필드만 반환
+        return new PhotoForFeedUploadResponse(
+            photo.getPhotoId(),
+            photo.getImgUrl(),      // ✅ 존재하는 필드
+            photo.getCreatedAt(),   // ✅ BaseEntity에서 상속받은 필드
+            alreadyInFeed
+        );
     }
 }

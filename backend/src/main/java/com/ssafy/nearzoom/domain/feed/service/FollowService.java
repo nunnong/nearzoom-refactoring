@@ -1,16 +1,15 @@
 package com.ssafy.nearzoom.domain.feed.service;
 
-import com.ssafy.nearzoom.domain.feed.dto.FollowCountsResponse;
+import com.ssafy.nearzoom.domain.feed.dto.FollowCountsResponse; // 🔥 추가
 import com.ssafy.nearzoom.domain.feed.entity.Follow;
 import com.ssafy.nearzoom.domain.feed.repository.FollowRepository;
 import com.ssafy.nearzoom.domain.user.dto.UserAuthInfoResponse;
-import com.ssafy.nearzoom.domain.user.dto.UserProfileResponse;  // 🔥 User 도메인의 DTO 사용
+import com.ssafy.nearzoom.domain.user.dto.UserProfileResponse;
 import com.ssafy.nearzoom.domain.user.entity.User;
 import com.ssafy.nearzoom.domain.user.repository.UserRepository;
 import com.ssafy.nearzoom.global.auth.util.AuthUtil;
-import java.util.List;
-
 import com.ssafy.nearzoom.global.exception.ApiException;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;

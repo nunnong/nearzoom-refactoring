@@ -1,8 +1,6 @@
 package com.ssafy.nearzoom.domain.feed.dto;
 
-public record CreateFeedRequest(
-    Long photoId,
+public record UpdatePostRequest(
     String caption
 ) {
-
 }
