@@ -21,7 +21,9 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/myroom")
@@ -46,11 +48,8 @@ public class MyRoomController {
         Authentication authentication,
         @ModelAttribute MyPhotoListCondition condition
     ) {
-        System.out.println(">>> [MyRoomController] partnerEmails = " + condition.partnerEmails());
-
         return myRoomService.getMyPhotos(authentication, condition);
     }
-
     @PostMapping("/photos/heart")
     @Operation(
         summary = "사진 좋아요 토글",
@@ -91,5 +90,21 @@ public class MyRoomController {
     ) {
         myRoomService.saveEditedPhoto(authentication, request);
         return ApiResponse.ok("수정본이 저장되었습니다.");
+    }
+
+    @PostMapping("/photos/upload-edited")
+    @Operation(
+        summary = "편집된 이미지 업로드",
+        description = "편집된 이미지를 업로드하고 my_photo 테이블에 저장"
+    )
+    @PostApiResponses
+    public ResponseEntity<ApiResponse<String>> uploadEditedImage(
+        @RequestParam("file") MultipartFile file,
+        @RequestParam("originalPhotoId") Long originalPhotoId,
+        @RequestParam(value = "description", required = false) String description,
+        Authentication authentication
+    ) {
+        String uploadedUrl = myRoomService.uploadEditedImage(file, originalPhotoId, authentication, description);
+        return ApiResponse.ok("편집된 이미지가 업로드되었습니다. URL: " + uploadedUrl);
     }
 }

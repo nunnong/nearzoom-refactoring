@@ -8,51 +8,49 @@
   <select id="findPhotosByCondition"
     resultType="com.ssafy.nearzoom.domain.myroom.dto.MyPhotoResponse">
     SELECT
-    p.photo_id AS photoId,
-    p.img_url AS imageUrl,
-    p.created_at AS createdAt,
-    a.heart AS heart,
-    a.editable AS editable,
-    p.user_list AS partnerEmails
-    FROM photo p
-    JOIN archive a ON p.photo_id = a.photo_id
-    WHERE a.user_id = #{userId}
-    AND a.deleted_at IS NULL
+    mp.photo_id AS photoId,
+    mp.image_url AS imageUrl,
+    mp.created_at AS createdAt,
+    mp.liked AS heart,
+    mp.editable AS editable,
+    mp.user_list AS partnerEmails
+    FROM my_photo mp
+    WHERE mp.user_id = #{userId}
 
     <if test="cond.startDate != null">
-      AND DATE(a.created_at) &gt;= #{cond.startDate}
+      AND DATE(mp.created_at) &gt;= #{cond.startDate}
     </if>
     <if test="cond.endDate != null">
-      AND DATE(a.created_at) &lt;= #{cond.endDate}
+      AND DATE(mp.created_at) &lt;= #{cond.endDate}
     </if>
     <if test="cond.heart != null">
       <choose>
         <when test="cond.heart">
-          AND a.heart = 1
+          AND mp.liked = 1
         </when>
         <otherwise>
-          AND a.heart = 0
+          AND mp.liked = 0
         </otherwise>
       </choose>
     </if>
 
     <if test="cond.partnerEmails != null and cond.partnerEmails.size() > 0">
       <foreach item="email" collection="cond.partnerEmails" open="AND (" separator=" OR " close=")">
-        p.user_list LIKE CONCAT('%', #{email}, '%')
+        mp.user_list LIKE CONCAT('%', #{email}, '%')
       </foreach>
     </if>
 
     <if test="cond.cursor != null">
-      AND p.photo_id &lt; #{cond.cursor}
+      AND mp.photo_id &lt; #{cond.cursor}
     </if>
 
-    ORDER BY p.photo_id DESC
+    ORDER BY mp.photo_id DESC
     LIMIT #{cond.limit}
   </select>
 
   <update id="updateHeart">
-    UPDATE archive
-    SET heart =
+    UPDATE my_photo
+    SET liked =
     <choose>
       <when test="heart == true">1</when>
       <otherwise>0</otherwise>
@@ -62,20 +60,39 @@
   </update>
 
   <update id="softDeletePhoto">
-    UPDATE archive
-    SET deleted_at = NOW()
+    DELETE FROM my_photo
     WHERE user_id = #{userId}
       AND photo_id = #{photoId}
   </update>
 
   <update id="markAsEdited">
-    UPDATE archive
-    SET editable = false,
-        updated_at = NOW()
+    UPDATE my_photo
+    SET editable = 0
     WHERE user_id = #{userId}
       AND photo_id = #{photoId}
-      AND editable = true
+      AND editable = 1
   </update>
 
+  <!-- Photo에서 MyPhoto로 데이터 저장 -->
+  <insert id="savePhotoToMyPhoto">
+    INSERT INTO my_photo (user_id, image_url, user_list, liked, editable, created_at)
+    VALUES (
+      #{userId},
+      #{imageUrl},
+      #{userList},
+      0,  -- 기본값: 좋아요 안함
+      0,  -- 편집본은 편집 불가
+      NOW()
+    )
+  </insert>
+
+  <!-- 편집 권한 확인 -->
+  <select id="checkEditPermission" resultType="boolean">
+    SELECT COUNT(*) > 0
+    FROM my_photo
+    WHERE user_id = #{userId}
+      AND photo_id = #{photoId}
+      AND editable = 1
+  </select>
 
 </mapper>
