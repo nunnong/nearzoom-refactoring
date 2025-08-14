@@ -1,8 +1,12 @@
+// =============================================================================
+// 📁 RandomPhotoGrid.tsx - 백엔드 연동 버전
+// =============================================================================
+
 'use client'
 
 import React from 'react'
 import Masonry from 'react-masonry-css'
-import { ExploreFeed } from '@/lib/api/explore'
+import { ExploreFeed } from './ExploreRandom' // 🔥 위에서 정의한 타입 사용
 
 // ✅ 백엔드 연동된 타입 정의
 interface RandomPhotoGridProps {

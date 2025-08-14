@@ -1,24 +1,63 @@
+// src/components/ui/EnhancedHeader.tsx - 백엔드 연동 완료
+
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/auth/useAuth'
 import HomeButton from '@/components/page/myroom/HomeButton'
-import LogoutButton from '@/components/page/myroom/LogoutButton'
 import MainNavigation from './MainNavigation'
+import axios from 'axios'
 
-// 🔥 올바른 백엔드 연동 - api from '@/lib/axios' 사용
-import api from '@/lib/axios'
+// ============================================================================
+// 백엔드 연동 설정
+// ============================================================================
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080'
+
+// Axios 인스턴스 생성
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// 인증 토큰 인터셉터
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('accessToken')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
+// 응답 인터셉터 (에러 처리)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('accessToken')
+      // 401 에러 시 자동 로그아웃하지 않고 에러만 전파 (헤더에서는)
+    }
+    return Promise.reject(error)
+  }
+)
 
 // ============================================================================
 // 백엔드 연동 타입 정의
 // ============================================================================
 
-// 백엔드 ApiResponse 표준 형식
+// 백엔드 ApiResponse 표준 형식 (기존 타입 시스템과 일치)
 interface ApiResponse<T> {
   error: boolean;
-  message: string;
-  data: T;
+  message: string | null;
+  data: T | null;
 }
 
 // 백엔드 User 정보 (실제 사용자 데이터)
@@ -28,7 +67,8 @@ interface BackendUserProfile {
   userEmail: string;
   accountName: string;
   profileImage?: string;
-  socialType: string;
+  socialType?: string;
+  prettyFace?: string;
 }
 
 // 헤더에서 사용할 사용자 타입 (간소화)
@@ -56,18 +96,37 @@ interface EnhancedHeaderProps {
 // ============================================================================
 
 const headerAPI = {
-  // GET /users/me - 현재 사용자 정보 조회
+  // 🔥 GET /users/me - 현재 사용자 정보 조회 (백엔드 API 확인 필요)
   getCurrentUser: async (): Promise<BackendUserProfile> => {
-    const response = await api.get<ApiResponse<BackendUserProfile>>('/users/me');
-    
-    if (response.data.error) {
-      throw new Error(response.data.message);
+    try {
+      // 먼저 /users/me 시도, 없으면 다른 엔드포인트 시도
+      const response = await api.get<ApiResponse<BackendUserProfile>>('/users/me');
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '사용자 정보를 가져올 수 없습니다.');
+      }
+      
+      if (!response.data.data) {
+        throw new Error('사용자 데이터가 없습니다.');
+      }
+      
+      return response.data.data;
+    } catch (error) {
+      // /users/me가 없으면 /auth/me 또는 다른 엔드포인트 시도
+      try {
+        const fallbackResponse = await api.get<ApiResponse<BackendUserProfile>>('/auth/me');
+        if (fallbackResponse.data.error) {
+          throw new Error(fallbackResponse.data.message || '사용자 정보를 가져올 수 없습니다.');
+        }
+        return fallbackResponse.data.data!;
+      } catch (fallbackError) {
+        console.error('Failed to get current user from both endpoints:', error, fallbackError);
+        throw error;
+      }
     }
-    
-    return response.data.data;
   },
 
-  // POST /auth/logout - 로그아웃 (필요시)
+  // 🔥 POST /auth/logout - 로그아웃
   logout: async (): Promise<void> => {
     try {
       await api.post<ApiResponse<void>>('/auth/logout');
@@ -114,6 +173,12 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
       return;
     }
 
+    // 이미 외부에서 사용자 정보가 제공된 경우 스킵
+    if (externalUserProfile) {
+      setCurrentUser(externalUserProfile);
+      return;
+    }
+
     setIsLoadingUser(true);
     setUserError(null);
 
@@ -134,34 +199,40 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
 
       setCurrentUser(headerUser);
       
-      console.log('=== 헤더 사용자 정보 로드 완료 ===', headerUser);
+      console.log('✅ 헤더 사용자 정보 로드 완료:', headerUser);
 
     } catch (error) {
-      console.error('Failed to load current user in header:', error);
+      console.error('❌ 헤더 사용자 정보 로드 실패:', error);
       const errorMessage = error instanceof Error ? error.message : '사용자 정보를 불러올 수 없습니다.';
       setUserError(errorMessage);
       
-      // 인증 오류인 경우 로그아웃 처리
-      if (error instanceof Error && error.message.includes('401')) {
+      // 심각한 인증 오류인 경우에만 로그아웃 (401 등)
+      if (error instanceof Error && (
+        error.message.includes('401') || 
+        error.message.includes('Unauthorized') ||
+        error.message.includes('토큰')
+      )) {
+        console.log('🔓 인증 오류로 인한 자동 로그아웃');
         authLogout();
       }
     } finally {
       setIsLoadingUser(false);
     }
-  }, [isAuthenticated, authLogout]);
+  }, [isAuthenticated, externalUserProfile, authLogout]);
 
   // ============================================================================
   // 초기 로드 및 인증 상태 변경 감지
   // ============================================================================
 
   useEffect(() => {
-    if (isAuthenticated && !externalUserProfile) {
+    if (isAuthenticated) {
       loadCurrentUser();
-    } else if (!isAuthenticated) {
+    } else {
       setCurrentUser(null);
       setUserError(null);
+      setIsLoadingUser(false);
     }
-  }, [isAuthenticated, externalUserProfile, loadCurrentUser]);
+  }, [isAuthenticated, loadCurrentUser]);
 
   // ============================================================================
   // 이벤트 핸들러들
@@ -179,27 +250,33 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
       // 백엔드 로그아웃 API 호출
       await headerAPI.logout();
       
+      console.log('✅ 백엔드 로그아웃 완료');
+      
+    } catch (error) {
+      console.error('❌ 백엔드 로그아웃 실패:', error);
+      // 실패해도 로컬 상태는 클리어
+    } finally {
       // 로컬 인증 상태 클리어
       authLogout();
+      
+      // 사용자 상태 초기화
+      setCurrentUser(null);
+      setUserError(null);
       
       // 홈으로 리다이렉트
       router.push('/');
       
-      console.log('=== 로그아웃 완료 ===');
-      
-    } catch (error) {
-      console.error('Logout failed:', error);
-      // 실패해도 로컬 상태는 클리어
-      authLogout();
-      router.push('/');
+      console.log('✅ 로그아웃 완료');
     }
   }, [authLogout, router]);
 
   const handleProfileClick = useCallback(() => {
-    if (currentUser || externalUserProfile) {
-      router.push('/profile');
+    const user = displayUser;
+    if (user) {
+      // 사용자 프로필 페이지로 이동 (accountName 기반)
+      router.push(`/profile/${user.accountName}`);
     }
-  }, [currentUser, externalUserProfile, router]);
+  }, [router]);
 
   const handleRetryUserLoad = useCallback(() => {
     setUserError(null);
@@ -207,7 +284,7 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
   }, [loadCurrentUser]);
 
   // ============================================================================
-  // 사용자 정보 결정 (외부 전달 > 로드된 사용자 > 인증 사용자)
+  // 사용자 정보 결정 (우선순위: 외부 전달 > 로드된 사용자 > 인증 사용자)
   // ============================================================================
 
   const displayUser = externalUserProfile || currentUser || (authUser ? {
@@ -277,10 +354,11 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
           {showUserInfo && isAuthenticated && (
             <div className="flex items-center space-x-3">
               {/* 사용자 프로필 */}
-              {displayUser && (
+              {displayUser && !isLoadingUser && (
                 <div 
                   className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 rounded-lg px-2 py-1 transition-colors"
                   onClick={handleProfileClick}
+                  title={`${displayUser.name} 프로필 보기`}
                 >
                   {/* 프로필 이미지 */}
                   <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
@@ -292,6 +370,11 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           target.style.display = 'none';
+                          target.parentElement!.innerHTML = `
+                            <div class="w-full h-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold">
+                              ${displayUser.name.charAt(0).toUpperCase()}
+                            </div>
+                          `;
                         }}
                       />
                     ) : (
@@ -314,7 +397,7 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
               )}
 
               {/* 로딩 상태 */}
-              {isLoadingUser && !displayUser && (
+              {isLoadingUser && (
                 <div className="flex items-center space-x-2">
                   <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse"></div>
                   <div className="hidden md:block">
@@ -325,7 +408,7 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
               )}
 
               {/* 에러 상태 */}
-              {userError && !displayUser && (
+              {userError && !displayUser && !isLoadingUser && (
                 <div className="flex items-center space-x-2">
                   <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
                     <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -335,6 +418,7 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
                   <button
                     onClick={handleRetryUserLoad}
                     className="hidden md:block text-xs text-red-600 hover:text-red-800 underline"
+                    title={userError}
                   >
                     다시 시도
                   </button>
@@ -347,16 +431,31 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
           <HomeButton />
           
           {/* 🔥 백엔드 연동 로그아웃 버튼 */}
-          <button
-            onClick={handleLogout}
-            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-            aria-label="로그아웃"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            <span className="hidden sm:inline">로그아웃</span>
-          </button>
+          {isAuthenticated && (
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+              aria-label="로그아웃"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              <span className="hidden sm:inline">로그아웃</span>
+            </button>
+          )}
+
+          {/* 로그인되지 않은 경우 로그인 버튼 */}
+          {!isAuthenticated && (
+            <button
+              onClick={() => router.push('/login')}
+              className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+              </svg>
+              <span className="hidden sm:inline">로그인</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -368,19 +467,28 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
       )}
 
       {/* 개발 모드에서 사용자 정보 디버깅 */}
-      {process.env.NODE_ENV === 'development' && displayUser && (
+      {process.env.NODE_ENV === 'development' && (
         <div className="bg-yellow-50 border-t border-yellow-200 px-4 py-2 text-xs">
           <details>
             <summary className="cursor-pointer text-yellow-800 font-medium">
-              🔧 사용자 정보 (개발용)
+              🔧 헤더 상태 (개발용)
             </summary>
             <div className="mt-2 text-yellow-700 space-y-1">
-              <div>ID: {displayUser.id}</div>
-              <div>이름: {displayUser.name}</div>
-              <div>계정명: {displayUser.accountName}</div>
-              <div>이메일: {displayUser.email}</div>
-              <div>인증됨: {isAuthenticated ? 'Yes' : 'No'}</div>
-              <div>소스: {externalUserProfile ? 'External' : currentUser ? 'Backend' : 'Auth'}</div>
+              <div><strong>인증 상태:</strong> {isAuthenticated ? 'Yes' : 'No'}</div>
+              <div><strong>로딩 중:</strong> {isLoadingUser ? 'Yes' : 'No'}</div>
+              <div><strong>에러:</strong> {userError || 'None'}</div>
+              {displayUser && (
+                <>
+                  <div><strong>표시 사용자:</strong></div>
+                  <div className="ml-4">
+                    <div>ID: {displayUser.id}</div>
+                    <div>이름: {displayUser.name}</div>
+                    <div>계정명: {displayUser.accountName}</div>
+                    <div>이메일: {displayUser.email}</div>
+                    <div>소스: {externalUserProfile ? 'External' : currentUser ? 'Backend' : 'Auth'}</div>
+                  </div>
+                </>
+              )}
             </div>
           </details>
         </div>

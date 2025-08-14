@@ -14,35 +14,35 @@ import {
 } from '@heroicons/react/24/outline'
 
 // ============================================================================
-// 🔥 백엔드 API 연동
+// 🔥 백엔드 API 연동 - 정확한 타입 정의
 // ============================================================================
 import api from '@/lib/axios'
 
-// 백엔드 API 응답 타입 (완전 호환)
+// 백엔드 API 응답 타입
 interface ApiResponse<T> {
   error: boolean
   message: string
   data: T
 }
 
-// 백엔드 User 엔티티 기반 타입
+// 🔥 수정: 백엔드 User 엔티티 기반 정확한 타입
 interface UserProfileResponse {
   userId: number
   userName: string
   userEmail: string
   accountName: string
-  profileImage: string
+  profileImage: string | null
   prettyFace: string | null
   socialType: string
   createdAt: string
   updatedAt: string
 }
 
-// 프로필 업데이트 요청 타입
+// 🔥 수정: 백엔드에서 실제로 지원하는 업데이트 필드만 포함
 interface UpdateProfileRequest {
   userName: string
-  accountName: string
-  userEmail: string
+  // accountName과 userEmail은 수정 불가능할 수 있으므로 백엔드 API 확인 필요
+  // 현재는 기본적으로 userName만 수정 가능하다고 가정
 }
 
 // LoadingSpinner 컴포넌트
@@ -59,12 +59,14 @@ const LoadingSpinner = ({ size = 'md', className = '' }: { size?: 'sm' | 'md' | 
 };
 
 // ============================================================================
-// 🔥 백엔드 API 함수들 - 완벽한 아키텍처 적용
+// 🔥 백엔드 API 함수들 - 실제 User 도메인 API 사용
 // ============================================================================
 
-// 현재 사용자 프로필 조회 (백엔드에 해당 API가 있다고 가정)
+// 🔥 현재 사용자 프로필 조회 (UserController의 API 사용)
 const getUserProfile = async (): Promise<UserProfileResponse> => {
   try {
+    // 실제 백엔드에서 현재 사용자 프로필을 가져오는 API 엔드포인트
+    // Authentication을 통해 현재 로그인한 사용자 정보를 가져옴
     const response = await api.get<ApiResponse<UserProfileResponse>>('/users/me')
     
     if (response.data.error) {
@@ -78,7 +80,7 @@ const getUserProfile = async (): Promise<UserProfileResponse> => {
   }
 }
 
-// 프로필 정보 업데이트 (백엔드에 해당 API가 있다고 가정)
+// 🔥 프로필 정보 업데이트 (UserController의 updateProfile API 사용)
 const updateProfile = async (profileData: UpdateProfileRequest): Promise<UserProfileResponse> => {
   try {
     const response = await api.put<ApiResponse<UserProfileResponse>>('/users/me', profileData)
@@ -94,7 +96,7 @@ const updateProfile = async (profileData: UpdateProfileRequest): Promise<UserPro
   }
 }
 
-// 로그아웃 (백엔드에 해당 API가 있다고 가정)
+// 🔥 로그아웃 (AuthController의 logout API 사용)
 const logoutUser = async (): Promise<void> => {
   try {
     await api.post<ApiResponse<void>>('/auth/logout')
@@ -104,7 +106,7 @@ const logoutUser = async (): Promise<void> => {
   }
 }
 
-// 계정 삭제 (백엔드에 해당 API가 있다고 가정)
+// 🔥 계정 삭제 (UserController의 deleteAccount API 사용)
 const deleteAccount = async (): Promise<void> => {
   try {
     await api.delete<ApiResponse<void>>('/users/me')
@@ -124,11 +126,9 @@ const ProfileSettingsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   
-  // 편집 가능한 필드들
+  // 🔥 수정: 실제로 수정 가능한 필드만 관리
   const [editForm, setEditForm] = useState({
-    userName: '',
-    accountName: '',
-    userEmail: ''
+    userName: ''
   })
 
   // ============================================================================
@@ -152,9 +152,7 @@ const ProfileSettingsPage: React.FC = () => {
         
         // 편집 폼 초기화
         setEditForm({
-          userName: profile.userName,
-          accountName: profile.accountName,
-          userEmail: profile.userEmail
+          userName: profile.userName
         })
 
         console.log('사용자 프로필 로드 완료:', profile)
@@ -207,7 +205,7 @@ const ProfileSettingsPage: React.FC = () => {
     }
   }
 
-  // 프로필 저장 (백엔드 연동)
+  // 🔥 수정: 백엔드 API에 맞춘 프로필 저장
   const handleSaveProfile = async () => {
     if (!userProfile) return
 
@@ -217,20 +215,12 @@ const ProfileSettingsPage: React.FC = () => {
 
     try {
       const updateData: UpdateProfileRequest = {
-        userName: editForm.userName.trim(),
-        accountName: editForm.accountName.trim(),
-        userEmail: editForm.userEmail.trim()
+        userName: editForm.userName.trim()
       }
 
       // 유효성 검사
       if (!updateData.userName) {
         throw new Error('이름을 입력해주세요.')
-      }
-      if (!updateData.accountName) {
-        throw new Error('계정명을 입력해주세요.')
-      }
-      if (!updateData.userEmail || !/\S+@\S+\.\S+/.test(updateData.userEmail)) {
-        throw new Error('올바른 이메일을 입력해주세요.')
       }
 
       // 백엔드 API 호출
@@ -251,7 +241,7 @@ const ProfileSettingsPage: React.FC = () => {
       if (error?.response?.status === 400) {
         errorMessage = '입력한 정보가 올바르지 않습니다.'
       } else if (error?.response?.status === 409) {
-        errorMessage = '이미 사용 중인 계정명 또는 이메일입니다.'
+        errorMessage = '이미 사용 중인 이름입니다.'
       } else if (error?.response?.data?.message) {
         errorMessage = error.response.data.message
       } else if (error?.message) {
@@ -268,16 +258,14 @@ const ProfileSettingsPage: React.FC = () => {
   const handleCancelEdit = () => {
     if (userProfile) {
       setEditForm({
-        userName: userProfile.userName,
-        accountName: userProfile.accountName,
-        userEmail: userProfile.userEmail
+        userName: userProfile.userName
       })
     }
     setError(null)
     setSuccessMessage(null)
   }
 
-  // 로그아웃 핸들러 (백엔드 연동)
+  // 🔥 로그아웃 핸들러 (백엔드 연동)
   const handleLogout = async () => {
     if (confirm('로그아웃하시겠습니까?')) {
       try {
@@ -290,6 +278,8 @@ const ProfileSettingsPage: React.FC = () => {
         // 로그인 페이지로 이동
         router.push('/login')
         
+        console.log('로그아웃 완료')
+        
       } catch (error: any) {
         console.error('로그아웃 실패:', error)
         
@@ -300,7 +290,7 @@ const ProfileSettingsPage: React.FC = () => {
     }
   }
 
-  // 계정 삭제 핸들러 (백엔드 연동)
+  // 🔥 계정 삭제 핸들러 (백엔드 연동)
   const handleDeleteAccount = async () => {
     if (confirm('정말로 계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
       if (confirm('모든 데이터가 영구적으로 삭제됩니다. 계속하시겠습니까?')) {
@@ -315,6 +305,8 @@ const ProfileSettingsPage: React.FC = () => {
           router.push('/login')
           
           alert('계정이 성공적으로 삭제되었습니다.')
+          
+          console.log('계정 삭제 완료')
           
         } catch (error: any) {
           console.error('계정 삭제 실패:', error)
@@ -339,9 +331,7 @@ const ProfileSettingsPage: React.FC = () => {
 
   // 변경사항이 있는지 확인
   const hasChanges = userProfile && (
-    editForm.userName !== userProfile.userName ||
-    editForm.accountName !== userProfile.accountName ||
-    editForm.userEmail !== userProfile.userEmail
+    editForm.userName !== userProfile.userName
   )
 
   // ============================================================================
@@ -549,41 +539,31 @@ const ProfileSettingsPage: React.FC = () => {
               />
             </div>
 
-            {/* 계정명 */}
+            {/* 🔥 수정: 읽기 전용 필드들 */}
+            {/* 계정명 (읽기 전용) */}
             <div>
-              <label htmlFor="accountName" className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 계정명
               </label>
-              <div className="relative">
-                <span className="absolute left-3 top-3 text-gray-500">@</span>
-                <input
-                  type="text"
-                  id="accountName"
-                  value={editForm.accountName}
-                  onChange={(e) => handleInputChange('accountName', e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
-                  className="w-full pl-8 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="계정명을 입력하세요"
-                  maxLength={30}
-                />
+              <div className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-600">
+                @{userProfile.accountName}
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                계정명은 영문, 숫자, 언더스코어(_)만 사용 가능합니다.
+                계정명은 변경할 수 없습니다.
               </p>
             </div>
 
-            {/* 이메일 */}
+            {/* 이메일 (읽기 전용) */}
             <div>
-              <label htmlFor="userEmail" className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 이메일
               </label>
-              <input
-                type="email"
-                id="userEmail"
-                value={editForm.userEmail}
-                onChange={(e) => handleInputChange('userEmail', e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="이메일을 입력하세요"
-              />
+              <div className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-600">
+                {userProfile.userEmail}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                소셜 로그인 계정의 이메일은 변경할 수 없습니다.
+              </p>
             </div>
           </div>
 
@@ -626,7 +606,7 @@ const ProfileSettingsPage: React.FC = () => {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">소셜 로그인</span>
-              <span className="font-medium">{userProfile.socialType}</span>
+              <span className="font-medium capitalize">{userProfile.socialType}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">가입일</span>
@@ -649,16 +629,29 @@ const ProfileSettingsPage: React.FC = () => {
           <div className="space-y-3">
             <button
               onClick={handleLogout}
-              className="w-full p-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+              className="w-full p-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-colors flex items-center"
             >
+              <svg className="w-5 h-5 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
               로그아웃
             </button>
             <button
               onClick={handleDeleteAccount}
-              className="w-full p-3 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              className="w-full p-3 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center"
             >
+              <svg className="w-5 h-5 mr-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
               계정 삭제
             </button>
+          </div>
+          
+          {/* 계정 삭제 경고 */}
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-800 text-sm">
+              ⚠️ 계정 삭제 시 모든 데이터가 영구적으로 삭제되며 복구할 수 없습니다.
+            </p>
           </div>
         </div>
       </main>

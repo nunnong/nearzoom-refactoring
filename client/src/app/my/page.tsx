@@ -23,27 +23,41 @@ import {
 import { HeartIcon } from '@heroicons/react/24/outline';
 
 // ============================================================================
-// 🔥 백엔드 API 연동
+// 🔥 백엔드 API 연동 - 정확한 타입 정의
 // ============================================================================
 import api from '@/lib/axios'
 
-// 백엔드 API 응답 타입 (완전 호환)
+// 백엔드 API 응답 타입
 interface ApiResponse<T> {
   error: boolean
   message: string
   data: T
 }
 
-// 백엔드 FeedDetailResponse 타입
-interface FeedDetailResponse {
-  feedId: number
+// 🔥 수정: 백엔드 PostResponse 타입에 맞춤
+interface PostResponse {
+  postId: number
+  photoId: number
   imgUrl: string
   caption: string
+  displayOrder: number
+  createdAt: string
+  likeCount: number
+  isLikedByMe: boolean
   authorId: number
+  authorAccountName: string
+  authorProfileImage: string
+}
+
+// 🔥 수정: 백엔드 FeedWithPostsResponse 타입에 맞춤
+interface FeedWithPostsResponse {
+  feedId: number
+  userId: number
   accountName: string
   profileImage: string
   createdAt: string
-  liked: boolean
+  posts: PostResponse[]
+  isFollowing: boolean
 }
 
 // 백엔드 FollowCountsResponse 타입
@@ -52,12 +66,12 @@ interface FollowCountsResponse {
   followingCount: number
 }
 
-// 백엔드 UserInfoResponse 타입 (추정)
-interface UserInfoResponse {
-  userName: string
-  userEmail: string
-  profileImage: string
-  prettyFace: string
+// 🔥 새로 추가: 내 피드 통계 타입
+interface MyFeedStatsResponse {
+  postCount: number
+  totalLikes: number
+  followerCount: number
+  followingCount: number
 }
 
 // LoadingSpinner 컴포넌트
@@ -74,20 +88,13 @@ const LoadingSpinner = ({ size = 'md', className = '' }: { size?: 'sm' | 'md' | 
 };
 
 // ============================================================================
-// 🔥 백엔드 API 함수들 - 완벽한 아키텍처 적용
+// 🔥 백엔드 API 함수들 - 정확한 엔드포인트 사용
 // ============================================================================
 
-// 내 피드 목록 조회 (백엔드 FeedController.userFeeds)
-const getMyFeeds = async (userId: number, cursorCreatedAt?: string, cursorId?: number, size: number = 20): Promise<FeedDetailResponse[]> => {
+// 🔥 수정: 현재 사용자의 피드 조회 (FeedController.getUserFeedByAccountName)
+const getMyFeedWithPosts = async (accountName: string): Promise<FeedWithPostsResponse> => {
   try {
-    const params = new URLSearchParams({
-      size: size.toString()
-    })
-    
-    if (cursorCreatedAt) params.append('cursorCreatedAt', cursorCreatedAt)
-    if (cursorId) params.append('cursorId', cursorId.toString())
-    
-    const response = await api.get<ApiResponse<FeedDetailResponse[]>>(`/feeds/users/${userId}?${params}`)
+    const response = await api.get<ApiResponse<FeedWithPostsResponse>>(`/feeds/users/account/${accountName}`)
     
     if (response.data.error) {
       throw new Error(response.data.message)
@@ -95,15 +102,15 @@ const getMyFeeds = async (userId: number, cursorCreatedAt?: string, cursorId?: n
     
     return response.data.data
   } catch (error: any) {
-    console.error('Failed to fetch my feeds:', error)
+    console.error('Failed to fetch my feed:', error)
     throw error
   }
 }
 
-// 팔로우 통계 조회 (백엔드 FollowController.countFollow)
-const getFollowStats = async (userId: number): Promise<FollowCountsResponse> => {
+// 🔥 수정: 계정명으로 팔로우 통계 조회 (FollowController.countFollow)
+const getFollowStats = async (accountName: string): Promise<FollowCountsResponse> => {
   try {
-    const response = await api.get<ApiResponse<FollowCountsResponse>>(`/follows/count/${userId}`)
+    const response = await api.get<ApiResponse<FollowCountsResponse>>(`/follows/count/${accountName}`)
     
     if (response.data.error) {
       throw new Error(response.data.message)
@@ -116,15 +123,15 @@ const getFollowStats = async (userId: number): Promise<FollowCountsResponse> => 
   }
 }
 
-// 좋아요 토글 (백엔드 LikesController.like/unlike)
-const toggleLike = async (feedId: number, isCurrentlyLiked: boolean): Promise<void> => {
+// 🔥 수정: 게시물 좋아요 토글 (LikesController.likePost/unlikePost)
+const togglePostLike = async (postId: number, isCurrentlyLiked: boolean): Promise<void> => {
   try {
     if (isCurrentlyLiked) {
       // 좋아요 취소
-      await api.delete<ApiResponse<void>>(`/likes/${feedId}`)
+      await api.delete<ApiResponse<void>>(`/likes/posts/${postId}`)
     } else {
       // 좋아요 추가
-      await api.post<ApiResponse<void>>(`/likes/${feedId}`)
+      await api.post<ApiResponse<void>>(`/likes/posts/${postId}`)
     }
   } catch (error: any) {
     console.error('Failed to toggle like:', error)
@@ -132,10 +139,10 @@ const toggleLike = async (feedId: number, isCurrentlyLiked: boolean): Promise<vo
   }
 }
 
-// 피드 상세 조회 (백엔드 FeedController.detailFeeds) - 좋아요 상태 갱신용
-const getFeedDetail = async (feedId: number): Promise<FeedDetailResponse> => {
+// 🔥 수정: 게시물 상세 조회 (FeedController.getPostDetail)
+const getPostDetail = async (postId: number): Promise<any> => {
   try {
-    const response = await api.get<ApiResponse<FeedDetailResponse>>(`/feeds/${feedId}`)
+    const response = await api.get<ApiResponse<any>>(`/feeds/posts/${postId}`)
     
     if (response.data.error) {
       throw new Error(response.data.message)
@@ -143,7 +150,7 @@ const getFeedDetail = async (feedId: number): Promise<FeedDetailResponse> => {
     
     return response.data.data
   } catch (error: any) {
-    console.error('Failed to fetch feed detail:', error)
+    console.error('Failed to fetch post detail:', error)
     throw error
   }
 }
@@ -153,14 +160,14 @@ export default function MyPage() {
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  const [feeds, setFeeds] = useState<FeedDetailResponse[]>([]);
+  // 🔥 수정: 상태 타입 변경
+  const [myFeed, setMyFeed] = useState<FeedWithPostsResponse | null>(null);
   const [followStats, setFollowStats] = useState({ followerCount: 0, followingCount: 0 });
   const [loading, setLoading] = useState({ initial: true, loadMore: false });
   const [error, setError] = useState<string | null>(null);
-  const [hasMoreFeeds, setHasMoreFeeds] = useState(true);
 
   // ============================================================================
-  // 🔥 백엔드 데이터 로딩
+  // 🔥 백엔드 데이터 로딩 - 수정된 API 사용
   // ============================================================================
 
   useEffect(() => {
@@ -171,29 +178,23 @@ export default function MyPage() {
         setLoading({ initial: true, loadMore: false });
         setError(null);
 
-        // 현재 사용자 ID 추출
-        const userId = (user as any)?.userId || (user as any)?.id;
-        if (!userId) {
-          throw new Error('사용자 ID를 찾을 수 없습니다.');
-        }
+        // 🔥 수정: accountName 사용
+        const accountName = (user as any)?.accountName || user.email?.split('@')[0] || 'user';
 
         // 병렬로 데이터 로드
-        const [feedsResult, statsResult] = await Promise.all([
-          getMyFeeds(userId, undefined, undefined, 20),
-          getFollowStats(userId)
+        const [feedResult, statsResult] = await Promise.all([
+          getMyFeedWithPosts(accountName),
+          getFollowStats(accountName)
         ]);
 
-        setFeeds(feedsResult);
+        setMyFeed(feedResult);
         setFollowStats({
           followerCount: statsResult.followerCount,
           followingCount: statsResult.followingCount
         });
-        
-        // 더 많은 피드가 있는지 확인 (20개 미만이면 마지막)
-        setHasMoreFeeds(feedsResult.length >= 20);
 
         console.log('내 데이터 로드 완료:', {
-          feedsCount: feedsResult.length,
+          postsCount: feedResult.posts.length,
           stats: statsResult
         });
 
@@ -209,7 +210,7 @@ export default function MyPage() {
         } else if (error?.response?.status === 403) {
           errorMessage = '접근 권한이 없습니다.';
         } else if (error?.response?.status === 404) {
-          errorMessage = '사용자를 찾을 수 없습니다.';
+          errorMessage = '피드를 찾을 수 없습니다. 첫 게시물을 만들어보세요!';
         } else if (error?.response?.data?.message) {
           errorMessage = error.response.data.message;
         } else if (error?.message) {
@@ -226,72 +227,51 @@ export default function MyPage() {
   }, [isAuthenticated, user, router]);
 
   // ============================================================================
-  // 🔥 더 많은 피드 로드 (cursor pagination)
-  // ============================================================================
-  
-  const loadMoreFeeds = async () => {
-    if (!user || !hasMoreFeeds || loading.loadMore) return;
-
-    try {
-      setLoading(prev => ({ ...prev, loadMore: true }));
-      
-      const userId = (user as any)?.userId || (user as any)?.id;
-      const lastFeed = feeds[feeds.length - 1];
-      
-      if (!lastFeed) return;
-      
-      // cursor 기반 페이징
-      const moreFeeds = await getMyFeeds(
-        userId,
-        lastFeed.createdAt,
-        lastFeed.feedId,
-        20
-      );
-      
-      if (moreFeeds.length > 0) {
-        setFeeds(prev => [...prev, ...moreFeeds]);
-        setHasMoreFeeds(moreFeeds.length >= 20);
-      } else {
-        setHasMoreFeeds(false);
-      }
-      
-    } catch (error: any) {
-      console.error('추가 피드 로드 실패:', error);
-    } finally {
-      setLoading(prev => ({ ...prev, loadMore: false }));
-    }
-  };
-
-  // ============================================================================
-  // 🔥 이벤트 핸들러들
+  // 🔥 이벤트 핸들러들 - 수정된 API 사용
   // ============================================================================
 
-  // 게시물 좋아요 토글
-  const handleLike = async (post: FeedDetailResponse) => {
+  // 🔥 수정: 게시물 좋아요 토글
+  const handleLike = async (post: PostResponse) => {
+    if (!myFeed) return;
+
     try {
       // 낙관적 업데이트
-      setFeeds(prev => prev.map(p => 
-        p.feedId === post.feedId 
-          ? { ...p, liked: !p.liked }
+      const updatedPosts = myFeed.posts.map(p => 
+        p.postId === post.postId 
+          ? { 
+              ...p, 
+              isLikedByMe: !p.isLikedByMe,
+              likeCount: p.isLikedByMe ? p.likeCount - 1 : p.likeCount + 1
+            }
           : p
-      ));
+      );
+      
+      setMyFeed({
+        ...myFeed,
+        posts: updatedPosts
+      });
 
       // 백엔드 API 호출
-      await toggleLike(post.feedId, post.liked);
+      await togglePostLike(post.postId, post.isLikedByMe);
       
-      console.log(`좋아요 ${post.liked ? '취소' : '추가'} 완료:`, post.feedId);
+      console.log(`좋아요 ${post.isLikedByMe ? '취소' : '추가'} 완료:`, post.postId);
       
     } catch (error: any) {
       console.error('좋아요 처리 실패:', error);
       
       // 실패 시 롤백
-      setFeeds(prev => prev.map(p => 
-        p.feedId === post.feedId 
-          ? { ...p, liked: post.liked }
+      const revertedPosts = myFeed.posts.map(p => 
+        p.postId === post.postId 
+          ? post  // 원래 상태로 복원
           : p
-      ));
+      );
       
-      // 에러 메시지 표시 (선택적)
+      setMyFeed({
+        ...myFeed,
+        posts: revertedPosts
+      });
+      
+      // 에러 메시지 표시
       const errorMessage = error?.response?.data?.message || '좋아요 처리에 실패했습니다.';
       alert(errorMessage);
     }
@@ -303,9 +283,9 @@ export default function MyPage() {
     setIsMobileMenuOpen(false);
   };
 
-  // 게시물 상세로 이동
-  const handlePostClick = (post: FeedDetailResponse) => {
-    router.push(`/feeds/${post.feedId}`);
+  // 🔥 수정: 게시물 상세로 이동
+  const handlePostClick = (post: PostResponse) => {
+    router.push(`/feeds/posts/${post.postId}`);
   };
 
   // 새 게시물 만들기
@@ -524,7 +504,7 @@ export default function MyPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <img
-                src={(user as any)?.profileImage || user.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&size=80&background=random`}
+                src={myFeed?.profileImage || (user as any)?.profileImage || user.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&size=80&background=random`}
                 alt={user.name || 'User'}
                 className="h-20 w-20 rounded-full"
               />
@@ -533,11 +513,11 @@ export default function MyPage() {
                   {(user as any)?.userName || user.name || 'User'}의 피드
                 </h1>
                 <p className="text-gray-500">
-                  @{(user as any)?.accountName || 'user'}
+                  @{myFeed?.accountName || (user as any)?.accountName || 'user'}
                 </p>
                 <div className="flex items-center space-x-4 mt-2">
                   <span className="text-sm text-gray-600">
-                    <strong>{feeds.length}</strong> 게시물
+                    <strong>{myFeed?.posts?.length || 0}</strong> 게시물
                   </span>
                   <span className="text-sm text-gray-600">
                     <strong>{followStats.followerCount}</strong> 팔로워
@@ -597,7 +577,7 @@ export default function MyPage() {
         )}
 
         {/* 게시물 목록 */}
-        {feeds.length === 0 && !loading.initial ? (
+        {!myFeed || myFeed.posts.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-24 h-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
               <UserIcon className="h-12 w-12 text-gray-400" />
@@ -613,79 +593,62 @@ export default function MyPage() {
             </button>
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {feeds.map((post) => (
-                <div
-                  key={post.feedId}
-                  className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => handlePostClick(post)}
-                >
-                  {/* 게시물 이미지 */}
-                  <div className="aspect-square relative overflow-hidden">
-                    <img
-                      src={post.imgUrl}
-                      alt={post.caption}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = `https://picsum.photos/300/300?seed=${post.feedId}`;
-                      }}
-                    />
-                    
-                    {/* 좋아요 버튼 */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleLike(post);
-                      }}
-                      className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white/90 transition-colors"
-                    >
-                      {post.liked ? (
-                        <HeartSolidIcon className="h-5 w-5 text-red-500" />
-                      ) : (
-                        <HeartIcon className="h-5 w-5 text-gray-600" />
-                      )}
-                    </button>
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {myFeed.posts.map((post) => (
+              <div
+                key={post.postId}
+                className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => handlePostClick(post)}
+              >
+                {/* 게시물 이미지 */}
+                <div className="aspect-square relative overflow-hidden">
+                  <img
+                    src={post.imgUrl}
+                    alt={post.caption || '게시물 이미지'}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = `https://picsum.photos/300/300?seed=${post.postId}`;
+                    }}
+                  />
+                  
+                  {/* 좋아요 버튼 */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLike(post);
+                    }}
+                    className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white/90 transition-colors"
+                  >
+                    {post.isLikedByMe ? (
+                      <HeartSolidIcon className="h-5 w-5 text-red-500" />
+                    ) : (
+                      <HeartIcon className="h-5 w-5 text-gray-600" />
+                    )}
+                  </button>
+                </div>
 
-                  {/* 게시물 정보 */}
-                  <div className="p-4">
-                    <p className="text-sm text-gray-600 mb-2 line-clamp-2">{post.caption}</p>
-                    <div className="flex items-center justify-between text-xs text-gray-400">
-                      <span>{new Date(post.createdAt).toLocaleDateString('ko-KR')}</span>
-                      {post.liked && (
+                {/* 게시물 정보 */}
+                <div className="p-4">
+                  <p className="text-sm text-gray-600 mb-2 line-clamp-2">{post.caption || '캡션 없음'}</p>
+                  <div className="flex items-center justify-between text-xs text-gray-400">
+                    <span>{new Date(post.createdAt).toLocaleDateString('ko-KR')}</span>
+                    <div className="flex items-center space-x-2">
+                      {post.likeCount > 0 && (
                         <span className="flex items-center text-red-500">
                           <HeartSolidIcon className="h-3 w-3 mr-1" />
-                          좋아요
+                          {post.likeCount}
                         </span>
+                      )}
+                      {post.isLikedByMe && (
+                        <span className="text-blue-600 text-xs">내가 좋아함</span>
                       )}
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            {/* 더보기 버튼 */}
-            {hasMoreFeeds && (
-              <div className="text-center mt-8">
-                <button
-                  onClick={loadMoreFeeds}
-                  disabled={loading.loadMore}
-                  className="inline-flex items-center px-6 py-3 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
-                >
-                  {loading.loadMore ? (
-                    <>
-                      <LoadingSpinner size="sm" className="mr-2" />
-                      로딩 중...
-                    </>
-                  ) : (
-                    '더 보기'
-                  )}
-                </button>
               </div>
-            )}
-          </>
+            ))}
+          </div>
         )}
       </main>
 

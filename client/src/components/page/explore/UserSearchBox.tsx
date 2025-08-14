@@ -1,154 +1,241 @@
+// =============================================================================
+// 📁 UserSearchBox.tsx - 백엔드 완벽 연동 버전
+// =============================================================================
+
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
-import { UserProfile, searchUsers } from '@/lib/api/explore' // 🔥 올바른 경로로 수정
+
+// 🔥 백엔드 연동 - api from '@/lib/axios' 사용
+import api from '@/lib/axios'
+
+// 🔥 timeline.ts에서 타입 가져오기
+import { FeedWithPostsResponse } from '@/lib/types/timeline'
+
+// ============================================================================
+// 백엔드 API 응답 타입 정의
+// ============================================================================
+
+// 백엔드 ApiResponse 표준 형식
+interface ApiResponse<T> {
+  error: boolean;
+  message: string | null;
+  data: T;
+}
+
+// 프론트엔드에서 사용할 UserProfile 타입 (FeedWithPostsResponse 기반)
+export interface UserProfile {
+  id: string;              // accountName을 id로 사용
+  username: string;        // accountName
+  email: string;           // 백엔드에서 제공하지 않으므로 username@example.com 형태로 생성
+  bio?: string;            // 백엔드에서 제공하지 않음
+  avatar?: string;         // profileImage
+  followersCount: number;  // 기본값 0 (백엔드에서 별도 조회 필요)
+  feedsCount: number;      // posts.length
+  isFollowing: boolean;    // isFollowing
+  isMe: boolean;           // 현재 사용자 여부 (클라이언트에서 판단)
+}
 
 interface UserSearchBoxProps {
-  onUserFound: (userId: string) => void
-  className?: string
+  onUserFound: (accountName: string) => void; // 🔥 accountName 기반으로 변경
+  className?: string;
 }
+
+// ============================================================================
+// 백엔드 API 함수들
+// ============================================================================
+
+const userSearchAPI = {
+  // 🔥 GET /feeds/search - 피드/사용자 검색
+  searchUsers: async (query: string, size: number = 10): Promise<FeedWithPostsResponse[]> => {
+    const response = await api.get<ApiResponse<FeedWithPostsResponse[]>>(
+      '/feeds/search',
+      { params: { query, size } }
+    );
+    
+    if (response.data.error) {
+      throw new Error(response.data.message || '사용자 검색에 실패했습니다.');
+    }
+    
+    return response.data.data;
+  },
+};
+
+// ============================================================================
+// 유틸리티 함수들
+// ============================================================================
+
+// 🔥 FeedWithPostsResponse를 UserProfile로 변환
+const transformFeedToUserProfile = (feed: FeedWithPostsResponse, currentUserAccountName?: string): UserProfile => {
+  return {
+    id: feed.accountName,
+    username: feed.accountName,
+    email: `${feed.accountName}@example.com`, // 임시 이메일 생성
+    bio: undefined, // 백엔드에서 제공하지 않음
+    avatar: feed.profileImage || undefined,
+    followersCount: 0, // 백엔드에서 별도 조회 필요
+    feedsCount: feed.posts.length,
+    isFollowing: feed.isFollowing,
+    isMe: currentUserAccountName === feed.accountName,
+  };
+};
+
+// ============================================================================
+// 메인 컴포넌트 (백엔드 완벽 연동)
+// ============================================================================
 
 const UserSearchBox: React.FC<UserSearchBoxProps> = ({
   onUserFound,
   className = '',
 }) => {
-  const [query, setQuery] = useState('')
-  const [isSearching, setIsSearching] = useState(false)
-  const [searchResults, setSearchResults] = useState<UserProfile[]>([])
-  const [showResults, setShowResults] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [query, setQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+  const [showResults, setShowResults] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // ✅ 백엔드 API를 사용한 사용자 검색 함수
   const performSearch = useCallback(async (searchQuery: string) => {
     if (searchQuery.trim().length < 2) {
-      setSearchResults([])
-      setShowResults(false)
-      setError(null)
-      return
+      setSearchResults([]);
+      setShowResults(false);
+      setError(null);
+      return;
     }
 
-    setIsSearching(true)
-    setError(null)
+    setIsSearching(true);
+    setError(null);
 
     try {
-      console.log('🔍 사용자 검색 시작:', searchQuery) // 디버깅용
+      console.log('🔍 사용자 검색 시작:', searchQuery);
 
-      const result = await searchUsers(searchQuery, undefined, 10)
+      // 🔥 백엔드 API 호출 (GET /feeds/search)
+      const feedResults = await userSearchAPI.searchUsers(searchQuery, 10);
 
-      console.log('🔍 검색 결과:', result) // 디버깅용
+      // 🔥 FeedWithPostsResponse를 UserProfile로 변환
+      const userProfiles = feedResults.map(feed => 
+        transformFeedToUserProfile(feed)
+      );
 
-      if (result.success && result.data) {
-        setSearchResults(result.data.users)
-        setShowResults(true)
-        console.log('✅ 검색 성공:', result.data.users.length, '명 발견')
-      } else {
-        setError(result.error || '검색 중 오류가 발생했습니다.')
-        setSearchResults([])
-        setShowResults(true)
-        console.error('❌ 검색 실패:', result.error)
-      }
+      setSearchResults(userProfiles);
+      setShowResults(true);
+      
+      console.log('✅ 검색 성공:', userProfiles.length, '명 발견');
+
     } catch (err) {
-      console.error('❌ 검색 API 호출 실패:', err)
-      setError('네트워크 오류가 발생했습니다.')
-      setSearchResults([])
-      setShowResults(true)
+      console.error('❌ 검색 API 호출 실패:', err);
+      
+      let errorMessage = '네트워크 오류가 발생했습니다.';
+      if (err instanceof Error) {
+        if (err.message.includes('401') || err.message.includes('로그인이 필요')) {
+          errorMessage = '로그인이 필요합니다.';
+        } else if (err.message.includes('403') || err.message.includes('권한이 없습니다')) {
+          errorMessage = '권한이 없습니다.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
+      setError(errorMessage);
+      setSearchResults([]);
+      setShowResults(true);
     } finally {
-      setIsSearching(false)
+      setIsSearching(false);
     }
-  }, [])
+  }, []);
 
   // ✅ 디바운싱된 검색 실행
   const debouncedSearch = useCallback((searchQuery: string) => {
     // 이전 타이머 클리어
     if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current)
+      clearTimeout(searchTimeoutRef.current);
     }
 
     // 새로운 타이머 설정 (500ms 지연 - API 호출이므로 조금 더 길게)
     searchTimeoutRef.current = setTimeout(() => {
-      performSearch(searchQuery)
-    }, 500)
-  }, [performSearch])
+      performSearch(searchQuery);
+    }, 500);
+  }, [performSearch]);
 
   // ✅ 컴포넌트 언마운트 시 타이머 클리어
   useEffect(() => {
     return () => {
       if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current)
+        clearTimeout(searchTimeoutRef.current);
       }
-    }
-  }, [])
+    };
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     // 즉시 검색 (폼 제출 시)
     if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current)
+      clearTimeout(searchTimeoutRef.current);
     }
-    performSearch(query)
-  }
+    performSearch(query);
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    setQuery(value)
+    const value = e.target.value;
+    setQuery(value);
     
     // 디바운싱된 실시간 검색
     if (value.length >= 2) {
-      debouncedSearch(value)
+      debouncedSearch(value);
     } else {
       // 타이머 클리어
       if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current)
+        clearTimeout(searchTimeoutRef.current);
       }
-      setSearchResults([])
-      setShowResults(false)
-      setIsSearching(false)
-      setError(null)
+      setSearchResults([]);
+      setShowResults(false);
+      setIsSearching(false);
+      setError(null);
     }
-  }
+  };
 
   const handleUserSelect = (user: UserProfile) => {
-    console.log('👤 사용자 선택:', user.id, user.username) // 디버깅용
-    onUserFound(user.id)
-    setQuery('')
-    setShowResults(false)
-    setSearchResults([])
-    setError(null)
-  }
+    console.log('👤 사용자 선택:', user.id, user.username);
+    onUserFound(user.id); // accountName 전달
+    setQuery('');
+    setShowResults(false);
+    setSearchResults([]);
+    setError(null);
+  };
 
   const handleBlur = () => {
     // 약간의 지연을 주어 클릭 이벤트가 먼저 처리되도록 함
     setTimeout(() => {
-      setShowResults(false)
-    }, 150)
-  }
+      setShowResults(false);
+    }, 150);
+  };
 
   // ✅ 키보드 네비게이션 지원
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
-      setShowResults(false)
-      setQuery('')
-      setError(null)
+      setShowResults(false);
+      setQuery('');
+      setError(null);
     }
-  }
+  };
 
   // ✅ 사용자 표시명 생성 (username 우선, 없으면 email에서 추출)
   const getUserDisplayName = (user: UserProfile) => {
-    return user.username || user.email.split('@')[0]
-  }
+    return user.username || user.email.split('@')[0];
+  };
 
   // ✅ 팔로워 수 포맷팅
   const formatFollowerCount = (count: number) => {
     if (count >= 1000000) {
-      return `${(count / 1000000).toFixed(1)}M`
+      return `${(count / 1000000).toFixed(1)}M`;
     } else if (count >= 1000) {
-      return `${(count / 1000).toFixed(1)}K`
+      return `${(count / 1000).toFixed(1)}K`;
     }
-    return count.toLocaleString()
-  }
+    return count.toLocaleString();
+  };
 
   return (
     <div className={`relative ${className}`}>
@@ -216,11 +303,11 @@ const UserSearchBox: React.FC<UserSearchBoxProps> = ({
                               className="w-full h-full object-cover"
                               loading="lazy"
                               onError={(e) => {
-                                const target = e.target as HTMLImageElement
-                                target.style.display = 'none'
-                                const parent = target.parentElement
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
                                 if (parent) {
-                                  parent.innerHTML = `<span class="text-sm font-medium text-gray-600">${getUserDisplayName(user).charAt(0).toUpperCase()}</span>`
+                                  parent.innerHTML = `<span class="text-sm font-medium text-gray-600">${getUserDisplayName(user).charAt(0).toUpperCase()}</span>`;
                                 }
                               }}
                             />
@@ -308,11 +395,11 @@ const UserSearchBox: React.FC<UserSearchBoxProps> = ({
         <div className="mt-2 text-xs text-gray-400">
           검색어: "{query}" | 결과: {searchResults.length}개 | 
           {isSearching ? ' 검색 중...' : ' 대기 중'} |
-          API: /feeds/search
+          API: GET /feeds/search
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
-export default UserSearchBox
+export default UserSearchBox;

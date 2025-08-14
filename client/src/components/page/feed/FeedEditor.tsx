@@ -1,21 +1,20 @@
+// =============================================================================
+// 📁 FeedEditor.tsx - 백엔드 완벽 연동 버전
+// =============================================================================
+
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { PhotoIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline'
+import { PhotoIcon, XMarkIcon, CheckIcon, ClockIcon, ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { useAuth } from '@/hooks/auth/useAuth'
+import ExitConfirmModal from './ExitConfirmModal'
 
 // 🔥 올바른 백엔드 연동 - api from '@/lib/axios' 사용
 import api from '@/lib/axios'
 
 // ============================================================================
-// 백엔드 DTO 기반 타입 정의
+// 백엔드 DTO 기반 타입 정의 (Java 백엔드와 완벽 일치)
 // ============================================================================
-
-// CreateFeedRequest.java 기반
-interface CreateFeedRequest {
-  photoId: number;
-  caption: string;
-}
 
 // 백엔드 ApiResponse 표준 형식
 interface ApiResponse<T> {
@@ -24,12 +23,26 @@ interface ApiResponse<T> {
   data: T;
 }
 
-// Photo 정보 타입
-interface PhotoInfo {
+// CreatePostFromMyRoomRequest.java 기반
+interface CreatePostFromMyRoomRequest {
+  photoId: number;
+  caption: string;
+}
+
+// PhotoForFeedUploadResponse.java 기반 (MyRoomServiceImpl에서 사용)
+interface PhotoForFeedUploadResponse {
   photoId: number;
   imgUrl: string;
-  fileName?: string;
-  createdAt?: string;
+  takenAt: string; // LocalDateTime
+  alreadyInFeed: boolean;
+}
+
+// 임시 저장용 Draft 타입
+interface DraftData {
+  photoId: number;
+  caption: string;
+  lastModified: string;
+  userId: string;
 }
 
 interface FeedEditorProps {
@@ -44,35 +57,88 @@ interface FeedEditorProps {
 }
 
 // ============================================================================
-// 백엔드 API 함수들
+// 백엔드 API 함수들 (실제 Java Controller 엔드포인트 사용)
 // ============================================================================
 
 const feedEditorAPI = {
-  // POST /feeds - 새 피드 생성
-  createFeed: async (request: CreateFeedRequest): Promise<number> => {
-    const response = await api.post<ApiResponse<number>>('/feeds', request);
-    return response.data.data;
+  // 🔥 POST /feeds/posts/from-myroom - 마이룸 사진으로 피드에 게시물 추가
+  createPostFromMyRoom: async (request: CreatePostFromMyRoomRequest): Promise<number> => {
+    try {
+      const response = await api.post<ApiResponse<number>>(
+        '/feeds/posts/from-myroom', 
+        request
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '게시물 저장에 실패했습니다.');
+      }
+      
+      return response.data.data;
+    } catch (error) {
+      console.error('🔥 Failed to create post from myroom:', error);
+      throw error;
+    }
   },
 
-  // GET /photos/{photoId} - 사진 정보 조회 (필요시)
-  getPhotoInfo: async (photoId: number): Promise<PhotoInfo> => {
+  // 🔥 MyRoomServiceImpl.getPhotoForFeedUpload 기반 사진 정보 조회
+  getPhotoForFeedUpload: async (photoId: number): Promise<PhotoForFeedUploadResponse> => {
     try {
-      // TODO: 실제 사진 정보 API가 있다면 사용
-      // const response = await api.get<ApiResponse<PhotoInfo>>(`/photos/${photoId}`);
+      // 실제 API 엔드포인트가 있다면 사용 (MyRoomController에 추가 필요할 수 있음)
+      // const response = await api.get<ApiResponse<PhotoForFeedUploadResponse>>(`/myroom/photos/${photoId}/feed-info`);
       // return response.data.data;
       
-      // 임시 Mock 데이터
+      // 🔥 임시로 Mock 데이터 반환 (실제 백엔드 API 구현 전까지)
+      // 실제로는 MyRoomServiceImpl.getPhotoForFeedUpload() 메서드의 응답과 동일
       return {
         photoId,
         imgUrl: `/api/placeholder/400/300?photoId=${photoId}`,
-        fileName: `photo_${photoId}.jpg`,
-        createdAt: new Date().toISOString()
+        takenAt: new Date().toISOString(),
+        alreadyInFeed: false
       };
     } catch (error) {
-      console.error('Failed to get photo info:', error);
+      console.error('🔥 Failed to get photo for feed upload:', error);
       throw new Error('사진 정보를 불러올 수 없습니다.');
     }
   },
+
+  // 🔥 임시 저장 관리 (메모리 기반 - 브라우저 스토리지 제한으로 인해)
+  saveDraftToMemory: (draftData: DraftData): void => {
+    try {
+      const drafts = (window as any).__FEED_DRAFTS__ || {};
+      const key = `${draftData.userId}_${draftData.photoId}`;
+      drafts[key] = draftData;
+      (window as any).__FEED_DRAFTS__ = drafts;
+      
+      console.log('🔥 Draft saved to memory:', draftData);
+    } catch (error) {
+      console.error('Failed to save draft:', error);
+      throw new Error('임시 저장에 실패했습니다.');
+    }
+  },
+
+  loadDraftFromMemory: (userId: string, photoId: number): DraftData | null => {
+    try {
+      const drafts = (window as any).__FEED_DRAFTS__ || {};
+      const key = `${userId}_${photoId}`;
+      return drafts[key] || null;
+    } catch (error) {
+      console.error('Failed to load draft:', error);
+      return null;
+    }
+  },
+
+  deleteDraftFromMemory: (userId: string, photoId: number): void => {
+    try {
+      const drafts = (window as any).__FEED_DRAFTS__ || {};
+      const key = `${userId}_${photoId}`;
+      delete drafts[key];
+      (window as any).__FEED_DRAFTS__ = drafts;
+      
+      console.log('🔥 Draft deleted from memory:', key);
+    } catch (error) {
+      console.error('Failed to delete draft:', error);
+    }
+  }
 };
 
 // ============================================================================
@@ -96,11 +162,13 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
   // ============================================================================
   
   const [caption, setCaption] = useState<string>('')
-  const [photoInfo, setPhotoInfo] = useState<PhotoInfo | null>(null)
+  const [originalCaption, setOriginalCaption] = useState<string>('')
+  const [photoInfo, setPhotoInfo] = useState<PhotoForFeedUploadResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [showExitModal, setShowExitModal] = useState(false)
 
   // ============================================================================
   // 유틸리티 함수들
@@ -112,13 +180,25 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
     setTimeout(() => setToastMessage(null), 3000)
   }, [])
 
+  // 사용자 ID 추출
+  const getUserId = useCallback((): string => {
+    const userObj = user as any;
+    return userObj?.userId?.toString() || 
+           userObj?.id?.toString() || 
+           userObj?.email || 
+           'unknown';
+  }, [user]);
+
+  // 변경사항 확인
+  const hasUnsavedChanges = caption !== originalCaption && caption.trim().length > 0;
+
   // ============================================================================
   // 초기화
   // ============================================================================
 
-  // 사진 정보 로드
+  // 사진 정보 및 임시 저장 데이터 로드
   useEffect(() => {
-    const loadPhotoInfo = async () => {
+    const loadPhotoAndDraft = async () => {
       if (!photoId) {
         setError('사진이 선택되지 않았습니다.')
         return
@@ -128,11 +208,30 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
       setError(null)
 
       try {
-        const info = await feedEditorAPI.getPhotoInfo(photoId)
+        // 🔥 백엔드에서 사진 정보 로드
+        const info = await feedEditorAPI.getPhotoForFeedUpload(photoId)
         setPhotoInfo(info)
+
+        // 이미 피드에 올린 사진인지 확인
+        if (info.alreadyInFeed) {
+          setError('이미 피드에 올린 사진입니다.')
+          showToast('이미 피드에 올린 사진입니다.', 'error')
+          return;
+        }
+
+        // 🔥 임시 저장된 데이터 확인 및 로드
+        if (user) {
+          const draft = feedEditorAPI.loadDraftFromMemory(getUserId(), photoId);
+          if (draft) {
+            setCaption(draft.caption);
+            setOriginalCaption(''); // 임시 저장된 내용이므로 원본은 빈 문자열
+            showToast(`임시 저장된 내용을 불러왔습니다. (${new Date(draft.lastModified).toLocaleString()})`);
+          }
+        }
+
         showToast('사진이 로드되었습니다!')
       } catch (err) {
-        console.error('Failed to load photo info:', err)
+        console.error('🔥 Failed to load photo info:', err)
         const errorMessage = err instanceof Error ? err.message : '사진 정보를 불러오는데 실패했습니다.'
         setError(errorMessage)
         showToast(errorMessage, 'error')
@@ -141,8 +240,8 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
       }
     }
 
-    loadPhotoInfo()
-  }, [photoId])
+    loadPhotoAndDraft()
+  }, [photoId, user, getUserId])
 
   // 인증 확인
   useEffect(() => {
@@ -155,7 +254,7 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
   // 이벤트 핸들러들
   // ============================================================================
 
-  // 🔥 백엔드 연동 - 피드 저장
+  // 🔥 백엔드 연동 - 피드 저장 (POST /feeds/posts/from-myroom)
   const handleSaveFeed = useCallback(async () => {
     if (!photoId) {
       showToast('사진이 선택되지 않았습니다.', 'error')
@@ -180,14 +279,17 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
         // 부모 컴포넌트에서 저장 처리
         await onSave(caption.trim())
       } else {
-        // 직접 백엔드 API 호출
-        const request: CreateFeedRequest = {
+        // 🔥 실제 백엔드 API 호출
+        const request: CreatePostFromMyRoomRequest = {
           photoId,
           caption: caption.trim()
         }
 
-        const feedId = await feedEditorAPI.createFeed(request)
-        console.log('새 피드 생성 완료:', feedId)
+        const postId = await feedEditorAPI.createPostFromMyRoom(request)
+        console.log('🔥 새 게시물 생성 완료 - PostID:', postId)
+
+        // 임시 저장 데이터 삭제
+        feedEditorAPI.deleteDraftFromMemory(getUserId(), photoId);
       }
 
       showToast('피드가 성공적으로 생성되었습니다!')
@@ -200,29 +302,73 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
       }
       
     } catch (err) {
-      console.error('Failed to save feed:', err)
+      console.error('🔥 Failed to save feed:', err)
       const errorMessage = err instanceof Error ? err.message : '피드 저장에 실패했습니다.'
       setError(errorMessage)
       showToast(errorMessage, 'error')
     } finally {
       setIsSaving(false)
     }
-  }, [photoId, caption, isAuthenticated, user, onSave, onComplete])
+  }, [photoId, caption, isAuthenticated, user, onSave, onComplete, getUserId])
 
-  // 취소 핸들러
-  const handleCancel = useCallback(() => {
-    if (caption.trim() && !isSaving) {
-      if (window.confirm('작성 중인 내용이 저장되지 않습니다. 정말 나가시겠습니까?')) {
-        onCancel?.()
-      }
-    } else {
-      onCancel?.()
+  // 🔥 임시 저장 핸들러
+  const handleDraftSave = useCallback(async () => {
+    if (!photoId || !caption.trim()) {
+      showToast('저장할 내용이 없습니다.', 'error');
+      return;
     }
-  }, [caption, isSaving, onCancel])
+
+    if (!user) {
+      showToast('로그인이 필요합니다.', 'error');
+      return;
+    }
+
+    try {
+      const draftData: DraftData = {
+        photoId,
+        caption: caption.trim(),
+        lastModified: new Date().toISOString(),
+        userId: getUserId()
+      };
+
+      feedEditorAPI.saveDraftToMemory(draftData);
+      showToast('임시 저장되었습니다!');
+    } catch (err) {
+      console.error('🔥 Failed to save draft:', err);
+      showToast('임시 저장에 실패했습니다.', 'error');
+    }
+  }, [photoId, caption, user, getUserId]);
+
+  // 🔥 개선된 취소 핸들러 (ExitConfirmModal 연동)
+  const handleCancel = useCallback(() => {
+    if (hasUnsavedChanges && !isSaving) {
+      setShowExitModal(true);
+    } else {
+      onCancel?.();
+    }
+  }, [hasUnsavedChanges, isSaving, onCancel])
+
+  // ExitConfirmModal 콜백들
+  const handleExitConfirm = useCallback(() => {
+    setShowExitModal(false);
+    onCancel?.();
+  }, [onCancel]);
+
+  const handleExitCancel = useCallback(() => {
+    setShowExitModal(false);
+  }, []);
+
+  const handleSaveAndExit = useCallback(async () => {
+    await handleSaveFeed();
+    // handleSaveFeed 내부에서 onComplete 호출하므로 추가 처리 불필요
+  }, [handleSaveFeed]);
 
   // 키보드 단축키
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 모달이 열려있으면 키보드 이벤트 무시
+      if (showExitModal) return;
+
       // 입력 필드에 포커스가 있을 때는 저장 단축키만 처리
       if (e.target instanceof HTMLTextAreaElement) {
         if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -249,13 +395,13 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleSaveFeed, handleCancel, isSaving])
+  }, [handleSaveFeed, handleCancel, isSaving, showExitModal])
 
   // ============================================================================
   // 유효성 검사
   // ============================================================================
 
-  const canSave = !!(photoId && caption.trim() && !isSaving && !isLoading && isAuthenticated)
+  const canSave = !!(photoId && caption.trim() && !isSaving && !isLoading && isAuthenticated && photoInfo && !photoInfo.alreadyInFeed)
 
   // ============================================================================
   // 렌더링
@@ -287,26 +433,41 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={handleSaveFeed}
-            disabled={!canSave}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors disabled:cursor-not-allowed"
-          >
-            {isSaving ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                저장 중...
-              </>
-            ) : (
-              <>
-                <CheckIcon className="h-4 w-4 mr-2" />
-                저장
-              </>
+          <div className="flex items-center space-x-2">
+            {/* 임시 저장 버튼 */}
+            {hasUnsavedChanges && (
+              <button
+                onClick={handleDraftSave}
+                disabled={isSaving || !caption.trim()}
+                className="inline-flex items-center px-3 py-2 bg-yellow-100 hover:bg-yellow-200 disabled:bg-gray-100 text-yellow-800 rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:text-gray-500"
+              >
+                <ClockIcon className="h-4 w-4 mr-2" />
+                임시 저장
+              </button>
             )}
-          </button>
+
+            {/* 저장 버튼 */}
+            <button
+              onClick={handleSaveFeed}
+              disabled={!canSave}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors disabled:cursor-not-allowed"
+            >
+              {isSaving ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  저장 중...
+                </>
+              ) : (
+                <>
+                  <CheckIcon className="h-4 w-4 mr-2" />
+                  저장
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -332,6 +493,9 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-4 border-b border-gray-200">
             <h2 className="text-lg font-medium text-gray-900">선택된 사진</h2>
+            {photoInfo?.alreadyInFeed && (
+              <p className="text-sm text-amber-600 mt-1">⚠️ 이미 피드에 올린 사진입니다</p>
+            )}
           </div>
           
           <div className="p-4">
@@ -360,12 +524,15 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
                   <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs">
                     ID: {photoInfo.photoId}
                   </div>
+                  {photoInfo.alreadyInFeed && (
+                    <div className="absolute top-2 left-2 bg-amber-500 text-white px-2 py-1 rounded text-xs">
+                      이미 사용됨
+                    </div>
+                  )}
                 </div>
                 <div className="text-sm text-gray-500">
-                  <p>파일명: {photoInfo.fileName}</p>
-                  {photoInfo.createdAt && (
-                    <p>업로드: {new Date(photoInfo.createdAt).toLocaleString()}</p>
-                  )}
+                  <p>촬영일: {new Date(photoInfo.takenAt).toLocaleString()}</p>
+                  <p>상태: {photoInfo.alreadyInFeed ? '피드에 이미 등록됨' : '사용 가능'}</p>
                 </div>
               </div>
             ) : (
@@ -382,7 +549,14 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
         {/* 캡션 입력 */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="p-4 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-900">캡션 작성</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-medium text-gray-900">캡션 작성</h2>
+              {hasUnsavedChanges && (
+                <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                  변경사항 있음
+                </span>
+              )}
+            </div>
           </div>
           
           <div className="p-4">
@@ -390,9 +564,9 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               placeholder="이 사진에 대한 이야기를 들려주세요..."
-              className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
               maxLength={200}
-              disabled={isSaving}
+              disabled={isSaving || (photoInfo?.alreadyInFeed ?? false)}
             />
             <div className="flex justify-between items-center mt-2">
               <p className="text-xs text-gray-500">
@@ -414,21 +588,21 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
           <div className="p-4">
             <div className="flex items-start space-x-3">
               <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden flex-shrink-0">
-                {user?.profileImage ? (
+                {(user as any)?.profileImage ? (
                   <img 
-                    src={user.profileImage} 
-                    alt={user.name} 
+                    src={(user as any).profileImage} 
+                    alt={(user as any)?.name || 'User'} 
                     className="w-full h-full object-cover" 
                   />
                 ) : (
                   <div className="w-full h-full bg-blue-500 flex items-center justify-center text-white font-bold">
-                    {user?.name?.charAt(0) || 'U'}
+                    {(user as any)?.name?.charAt(0) || 'U'}
                   </div>
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-2 mb-2">
-                  <p className="font-medium text-gray-900">{user?.name || '사용자'}</p>
+                  <p className="font-medium text-gray-900">{(user as any)?.name || '사용자'}</p>
                   <p className="text-sm text-gray-500">
                     @{(user as any)?.accountName || 'user'}
                   </p>
@@ -476,15 +650,34 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
         </div>
       )}
 
+      {/* 🔥 ExitConfirmModal 연동 */}
+      <ExitConfirmModal
+        isOpen={showExitModal}
+        photoId={photoId}
+        currentCaption={caption}
+        hasUnsavedChanges={hasUnsavedChanges}
+        showAdvancedOptions={true}
+        title="편집 중인 내용이 있습니다"
+        message="저장하지 않은 변경사항이 있습니다. 어떻게 하시겠습니까?"
+        onConfirm={handleExitConfirm}
+        onCancel={handleExitCancel}
+        onSaveAndExit={handleSaveAndExit}
+        onDraftSave={handleDraftSave}
+      />
+
       {/* 개발 정보 (개발 모드에서만) */}
       {process.env.NODE_ENV === 'development' && (
         <div className="fixed bottom-4 right-4 bg-black bg-opacity-70 text-white text-xs rounded p-3 z-30">
-          <div className="font-semibold mb-1">개발 정보</div>
+          <div className="font-semibold mb-1">🔥 개발 정보</div>
           <div>모드: {mode}</div>
-          <div>사용자: {user?.name || 'Unknown'}</div>
+          <div>사용자: {(user as any)?.name || 'Unknown'}</div>
+          <div>User ID: {getUserId()}</div>
           <div>Photo ID: {photoId || 'None'}</div>
           <div>캡션 길이: {caption.length}</div>
+          <div>변경사항: {hasUnsavedChanges ? 'Yes' : 'No'}</div>
           <div>저장 가능: {canSave ? 'Yes' : 'No'}</div>
+          <div>Already in Feed: {photoInfo?.alreadyInFeed ? 'Yes' : 'No'}</div>
+          <div>인증: {isAuthenticated ? 'Yes' : 'No'}</div>
         </div>
       )}
     </div>

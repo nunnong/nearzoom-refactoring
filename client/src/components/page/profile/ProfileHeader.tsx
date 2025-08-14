@@ -1,15 +1,21 @@
+// =============================================================================
+// 📁 ProfileHeader.tsx - 백엔드 완벽 연동 버전 (상호 팔로우 API 포함)
+// =============================================================================
+
 'use client'
 
-import React, { useState, useCallback } from 'react'
-import { CalendarDaysIcon, MapPinIcon, UserIcon } from '@heroicons/react/24/outline'
+import React, { useState, useCallback, useEffect } from 'react'
+import { CalendarDaysIcon, MapPinIcon, UserIcon, CogIcon } from '@heroicons/react/24/outline'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/auth/useAuth'
 import { useFollowModal } from '@/hooks/useFollowModal'
 import FollowListModal from '@/components/ui/FollowListModal'
 
-// 🔥 올바른 백엔드 연동 - api from '@/lib/axios' 사용
+// 🔥 백엔드 연동 - axios 인스턴스 사용
 import api from '@/lib/axios'
 
 // ============================================================================
-// 백엔드 DTO 기반 타입 정의
+// 백엔드 DTO 기반 타입 정의 (Java 백엔드와 완벽 일치)
 // ============================================================================
 
 // 백엔드 ApiResponse 표준 형식
@@ -19,58 +25,219 @@ interface ApiResponse<T> {
   data: T;
 }
 
-// 백엔드 연동을 위한 UserProfile 타입 (실제 백엔드 데이터 기반)
+// FollowCountsResponse.java 기반
+interface FollowCountsResponse {
+  followerCount: number;
+  followingCount: number;
+}
+
+// UserProfileResponse.java 기반 (User 도메인)
+interface UserProfileResponse {
+  userId: number;
+  accountName: string;
+  userName: string;
+  userEmail: string;
+  profileImage: string | null;
+  prettyFace: string | null;
+}
+
+// 프론트엔드 통합 UserProfile 타입
 interface UserProfile {
-  id: number               // 백엔드 userId (Long)
-  name: string            // 사용자 이름
-  email: string           // 이메일
-  accountName: string     // 계정명 (추가)
-  profileImage?: string   // 프로필 이미지 URL
-  followersCount: number  // 팔로워 수
-  followingCount: number  // 팔로잉 수
-  isFollowing: boolean    // 현재 사용자가 이 사용자를 팔로우하는지
-  isFollowedBy: boolean   // 이 사용자가 현재 사용자를 팔로우하는지
+  id: number;               // 백엔드 userId (Long)
+  name: string;            // userName
+  email: string;           // userEmail
+  accountName: string;     // accountName
+  profileImage?: string;   // profileImage
+  followersCount: number;  // 팔로워 수
+  followingCount: number;  // 팔로잉 수
+  isFollowing: boolean;    // 현재 사용자가 이 사용자를 팔로우하는지
+  isFollowedBy: boolean;   // 이 사용자가 현재 사용자를 팔로우하는지 (향후 구현)
   feed: {
-    id: string
-    name: string
-    description: string
-    isPublic: boolean
-    backgroundColor: string
-    backgroundImageUrl?: string
-    likesCount: number
-    createdAt: string
-    updatedAt: string
-  }
+    id: string;
+    name: string;
+    description: string;
+    isPublic: boolean;
+    backgroundColor: string;
+    backgroundImageUrl?: string;
+    likesCount: number;
+    createdAt: string;
+    updatedAt: string;
+  };
 }
 
 interface ProfileHeaderProps {
-  user: UserProfile
-  isOwnProfile: boolean
-  onEditClick?: () => void
-  onFollowClick?: () => void  // 팔로우/언팔로우 핸들러 추가
-  className?: string
-  currentUserId?: string | number
+  user: UserProfile;
+  isOwnProfile: boolean;
+  onEditClick?: () => void;
+  onFollowClick?: () => void;
+  className?: string;
+  currentUserId?: string | number;
 }
 
 // ============================================================================
-// 백엔드 API 함수들 (ProfileHeader에서 사용)
+// 백엔드 API 엔드포인트 상수
+// ============================================================================
+
+const PROFILE_HEADER_ENDPOINTS = {
+  // FollowController 엔드포인트들
+  FOLLOW_BY_ACCOUNT: (accountName: string) => `/follows/${accountName}`,
+  UNFOLLOW_BY_ACCOUNT: (accountName: string) => `/follows/${accountName}`,
+  CHECK_FOLLOW_BY_ACCOUNT: (accountName: string) => `/follows/check/${accountName}`,
+  FOLLOW_COUNTS_BY_ACCOUNT: (accountName: string) => `/follows/count/${accountName}`,
+  FOLLOWERS_BY_ACCOUNT: (accountName: string) => `/follows/followers/${accountName}`,
+  FOLLOWING_BY_ACCOUNT: (accountName: string) => `/follows/following/${accountName}`,
+  
+  // 🔥 새로 추가된 상호 팔로우 API
+  MUTUAL_FOLLOWS_BY_ACCOUNT: (accountName: string) => `/follows/mutual/${accountName}`,
+  
+  // User 관련 엔드포인트들 (향후 구현)
+  USER_PROFILE: (userId: number) => `/users/${userId}`,
+};
+
+// ============================================================================
+// 백엔드 API 함수들 (실제 구현된 API만 사용)
 // ============================================================================
 
 const profileHeaderAPI = {
-  // 팔로우/언팔로우 (POST/DELETE /follows/{followeeId})
-  toggleFollow: async (userId: number, isCurrentlyFollowing: boolean): Promise<void> => {
-    if (isCurrentlyFollowing) {
-      await api.delete(`/follows/${userId}`);
-    } else {
-      await api.post(`/follows/${userId}`);
+  // 🔥 POST /follows/{accountName} - 팔로우
+  followUser: async (accountName: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await api.post<ApiResponse<void>>(
+        PROFILE_HEADER_ENDPOINTS.FOLLOW_BY_ACCOUNT(accountName)
+      );
+      
+      if (response.data.error) {
+        return {
+          success: false,
+          error: response.data.message || '팔로우에 실패했습니다.'
+        };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('🔥 Failed to follow user:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '팔로우에 실패했습니다.'
+      };
     }
   },
 
-  // 팔로우 상태 확인 (GET /follows/check/{followeeId})
-  checkFollowStatus: async (userId: number): Promise<boolean> => {
-    const response = await api.get<ApiResponse<boolean>>(`/follows/check/${userId}`);
-    return response.data.data;
+  // 🔥 DELETE /follows/{accountName} - 언팔로우
+  unfollowUser: async (accountName: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await api.delete<ApiResponse<void>>(
+        PROFILE_HEADER_ENDPOINTS.UNFOLLOW_BY_ACCOUNT(accountName)
+      );
+      
+      if (response.data.error) {
+        return {
+          success: false,
+          error: response.data.message || '언팔로우에 실패했습니다.'
+        };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('🔥 Failed to unfollow user:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '언팔로우에 실패했습니다.'
+      };
+    }
   },
+
+  // 🔥 팔로우 토글 (기존 상태에 따라 팔로우/언팔로우)
+  toggleFollowByAccountName: async (accountName: string, isCurrentlyFollowing: boolean): Promise<void> => {
+    try {
+      console.log('=== 팔로우 토글 시작 ===', { accountName, isCurrentlyFollowing });
+      
+      const result = isCurrentlyFollowing
+        ? await profileHeaderAPI.unfollowUser(accountName)
+        : await profileHeaderAPI.followUser(accountName);
+
+      if (!result.success) {
+        throw new Error(result.error || '팔로우 처리에 실패했습니다.');
+      }
+      
+      console.log('=== 팔로우 토글 성공 ===', { accountName, newFollowing: !isCurrentlyFollowing });
+      
+    } catch (error) {
+      console.error('🔥 Failed to toggle follow:', error);
+      throw error;
+    }
+  },
+
+  // 🔥 GET /follows/check/{accountName} - 계정명으로 팔로우 상태 확인
+  checkFollowStatusByAccountName: async (accountName: string): Promise<boolean> => {
+    try {
+      const response = await api.get<ApiResponse<boolean>>(
+        PROFILE_HEADER_ENDPOINTS.CHECK_FOLLOW_BY_ACCOUNT(accountName)
+      );
+      
+      if (response.data.error) {
+        console.warn('Failed to check follow status:', response.data.message);
+        return false;
+      }
+      
+      return response.data.data;
+      
+    } catch (error) {
+      console.error('🔥 Failed to check follow status:', error);
+      return false;
+    }
+  },
+
+  // 🔥 GET /follows/count/{accountName} - 계정명으로 팔로우 수 조회
+  getFollowCountsByAccountName: async (accountName: string): Promise<FollowCountsResponse> => {
+    try {
+      const response = await api.get<ApiResponse<FollowCountsResponse>>(
+        PROFILE_HEADER_ENDPOINTS.FOLLOW_COUNTS_BY_ACCOUNT(accountName)
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '팔로우 수 조회에 실패했습니다.');
+      }
+      
+      return response.data.data;
+      
+    } catch (error) {
+      console.error('🔥 Failed to get follow counts:', error);
+      return { followerCount: 0, followingCount: 0 };
+    }
+  },
+
+  // 🔥 GET /follows/mutual/{accountName} - 상호 팔로우 목록 조회 (새로 구현됨!)
+  getMutualFollowsByAccountName: async (accountName: string): Promise<UserProfileResponse[]> => {
+    try {
+      const response = await api.get<ApiResponse<UserProfileResponse[]>>(
+        PROFILE_HEADER_ENDPOINTS.MUTUAL_FOLLOWS_BY_ACCOUNT(accountName)
+      );
+      
+      if (response.data.error) {
+        console.warn('Failed to get mutual follows:', response.data.message);
+        return [];
+      }
+      
+      return response.data.data;
+      
+    } catch (error) {
+      console.error('🔥 Failed to get mutual follows:', error);
+      return [];
+    }
+  },
+
+  // 🔥 상호 팔로우 여부 확인 (상호 팔로우 목록이 비어있지 않은지 체크)
+  checkMutualFollowByAccountName: async (accountName: string): Promise<boolean> => {
+    try {
+      const mutualFollows = await profileHeaderAPI.getMutualFollowsByAccountName(accountName);
+      return mutualFollows.length > 0;
+      
+    } catch (error) {
+      console.error('🔥 Failed to check mutual follow:', error);
+      return false;
+    }
+  }
 };
 
 // ============================================================================
@@ -85,76 +252,199 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   className = '',
   currentUserId,
 }) => {
+  const router = useRouter();
+  const { isAuthenticated } = useAuth();
+  
+  // ============================================================================
+  // 상태 관리
+  // ============================================================================
+  
   const [isFollowLoading, setIsFollowLoading] = useState(false);
   const [localFollowState, setLocalFollowState] = useState({
     isFollowing: user.isFollowing,
     followersCount: user.followersCount,
+    followingCount: user.followingCount,
   });
+  const [isMutualFollow, setIsMutualFollow] = useState(false);
+  const [mutualFollowCount, setMutualFollowCount] = useState(0);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // 팔로우 모달 훅 사용
+  // 팔로우 모달 훅 사용 (accountName 기반)
   const {
     isOpen,
     modalType,
-    targetUserId,
+    targetAccountName,
     openFollowerModal,
     openFollowingModal,
     closeModal,
   } = useFollowModal();
 
-  // ============================================================================
-  // 백엔드 연동 - 팔로우 토글 핸들러
-  // ============================================================================
-
-  const handleFollowToggle = useCallback(async () => {
-    if (isOwnProfile || isFollowLoading) return;
-
-    setIsFollowLoading(true);
-    try {
-      // 백엔드 API 호출
-      await profileHeaderAPI.toggleFollow(user.id, localFollowState.isFollowing);
-      
-      // 로컬 상태 즉시 업데이트 (낙관적 업데이트)
-      setLocalFollowState(prev => ({
-        isFollowing: !prev.isFollowing,
-        followersCount: prev.isFollowing 
-          ? prev.followersCount - 1 
-          : prev.followersCount + 1
-      }));
-
-      // 부모 컴포넌트에 알림 (선택사항)
-      onFollowClick?.();
-
-    } catch (error) {
-      console.error('Failed to toggle follow:', error);
-      // 에러 발생시 상태 되돌리기는 하지 않음 (사용자 경험상 혼란)
-      // 대신 에러 토스트 메시지 표시 등을 고려
-    } finally {
-      setIsFollowLoading(false);
-    }
-  }, [user.id, localFollowState.isFollowing, isOwnProfile, isFollowLoading, onFollowClick]);
+  // 모달용 타겟 사용자 ID는 targetAccountName에서 추출
+  const modalTargetUserId = targetAccountName;
 
   // ============================================================================
   // 유틸리티 함수들
   // ============================================================================
 
+  // 토스트 메시지 표시
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(null), 3000);
+  }, []);
+
   // 안전한 날짜 처리
-  const getFormattedDate = (dateString: string) => {
+  const getFormattedDate = useCallback((dateString: string) => {
     try {
-      return new Date(dateString).toLocaleDateString('ko-KR')
+      return new Date(dateString).toLocaleDateString('ko-KR');
     } catch {
-      return '알 수 없음'
+      return '알 수 없음';
     }
-  }
+  }, []);
 
-  // 팔로워 버튼 클릭 핸들러
-  const handleFollowersClick = () => {
-    openFollowerModal(String(user.id));
-  };
+  // ============================================================================
+  // 초기화 및 데이터 로드
+  // ============================================================================
 
-  // 팔로잉 버튼 클릭 핸들러
-  const handleFollowingClick = () => {
-    openFollowingModal(String(user.id));
-  };
+  // 팔로우 상태 및 상호 팔로우 확인
+  useEffect(() => {
+    if (!isOwnProfile && isAuthenticated && user.accountName) {
+      const loadFollowData = async () => {
+        try {
+          const [followCounts, mutualFollows] = await Promise.allSettled([
+            profileHeaderAPI.getFollowCountsByAccountName(user.accountName),
+            profileHeaderAPI.getMutualFollowsByAccountName(user.accountName)
+          ]);
+
+          // 팔로우 수 업데이트
+          if (followCounts.status === 'fulfilled') {
+            setLocalFollowState(prev => ({
+              ...prev,
+              followersCount: followCounts.value.followerCount,
+              followingCount: followCounts.value.followingCount,
+            }));
+          }
+
+          // 🔥 상호 팔로우 데이터 업데이트 (실제 백엔드 API 사용)
+          if (mutualFollows.status === 'fulfilled') {
+            const mutualFollowsList = mutualFollows.value;
+            setMutualFollowCount(mutualFollowsList.length);
+            setIsMutualFollow(mutualFollowsList.length > 0);
+            
+            console.log('🔥 상호 팔로우 데이터 로드:', {
+              accountName: user.accountName,
+              mutualCount: mutualFollowsList.length,
+              hasMutualFollows: mutualFollowsList.length > 0
+            });
+          }
+
+        } catch (error) {
+          console.error('Failed to load follow data:', error);
+        }
+      };
+
+      loadFollowData();
+    }
+  }, [user.accountName, isOwnProfile, isAuthenticated]);
+
+  // ============================================================================
+  // 이벤트 핸들러들
+  // ============================================================================
+
+  // 🔥 백엔드 연동 - 팔로우 토글 핸들러
+  const handleFollowToggle = useCallback(async () => {
+    if (isOwnProfile || isFollowLoading || !isAuthenticated) {
+      if (!isAuthenticated) {
+        showToast('로그인이 필요합니다.');
+      }
+      return;
+    }
+
+    const originalFollowing = localFollowState.isFollowing;
+    const originalCount = localFollowState.followersCount;
+
+    setIsFollowLoading(true);
+
+    try {
+      console.log('=== 팔로우 토글 시작 ===', { 
+        accountName: user.accountName, 
+        currentFollowing: originalFollowing 
+      });
+
+      // 낙관적 업데이트
+      const newFollowing = !originalFollowing;
+      const newCount = newFollowing ? originalCount + 1 : Math.max(0, originalCount - 1);
+      
+      setLocalFollowState(prev => ({
+        ...prev,
+        isFollowing: newFollowing,
+        followersCount: newCount
+      }));
+
+      // 🔥 실제 백엔드 API 호출 (accountName 기반)
+      await profileHeaderAPI.toggleFollowByAccountName(user.accountName, originalFollowing);
+
+      console.log('=== 팔로우 토글 성공 ===', { 
+        accountName: user.accountName, 
+        newFollowing 
+      });
+
+      // 부모 컴포넌트에 알림
+      onFollowClick?.();
+
+      // 성공 메시지 표시
+      showToast(newFollowing ? '팔로우했습니다!' : '언팔로우했습니다.');
+
+      // 🔥 상호 팔로우 상태 재확인 (실제 백엔드 API 사용)
+      if (newFollowing) {
+        try {
+          const mutualFollows = await profileHeaderAPI.getMutualFollowsByAccountName(user.accountName);
+          setMutualFollowCount(mutualFollows.length);
+          setIsMutualFollow(mutualFollows.length > 0);
+          
+          console.log('🔥 팔로우 후 상호 팔로우 재확인:', {
+            accountName: user.accountName,
+            mutualCount: mutualFollows.length,
+            hasMutualFollows: mutualFollows.length > 0
+          });
+        } catch (error) {
+          console.warn('상호 팔로우 상태 재확인 실패:', error);
+        }
+      } else {
+        setIsMutualFollow(false);
+        setMutualFollowCount(0);
+      }
+
+    } catch (error) {
+      console.error('Failed to toggle follow:', error);
+      
+      // 실패 시 롤백
+      setLocalFollowState(prev => ({
+        ...prev,
+        isFollowing: originalFollowing,
+        followersCount: originalCount
+      }));
+      
+      const errorMessage = error instanceof Error ? error.message : '팔로우 처리에 실패했습니다.';
+      showToast(errorMessage);
+    } finally {
+      setIsFollowLoading(false);
+    }
+  }, [user.accountName, localFollowState.isFollowing, isOwnProfile, isFollowLoading, isAuthenticated, onFollowClick, showToast]);
+
+  // 🔥 프로필 설정 페이지로 이동 (톱니바퀴 버튼)
+  const handleProfileSettings = useCallback(() => {
+    router.push('/profile'); // 프로필 설정 전용 페이지로 이동
+  }, [router]);
+
+  // 팔로워 버튼 클릭 핸들러 (accountName 기반)
+  const handleFollowersClick = useCallback(() => {
+    openFollowerModal(user.accountName);
+  }, [openFollowerModal, user.accountName]);
+
+  // 팔로잉 버튼 클릭 핸들러 (accountName 기반)
+  const handleFollowingClick = useCallback(() => {
+    openFollowingModal(user.accountName);
+  }, [openFollowingModal, user.accountName]);
 
   // ============================================================================
   // 렌더링
@@ -165,14 +455,26 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
       <div className={`bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8 ${className}`}>
         {/* 배경 이미지 */}
         <div 
-          className="h-32 bg-gradient-to-r from-blue-400 to-purple-500"
+          className="h-32 bg-gradient-to-r from-blue-400 to-purple-500 relative"
           style={{
             backgroundColor: user.feed.backgroundColor || '#f3f4f6',
             backgroundImage: user.feed.backgroundImageUrl ? `url(${user.feed.backgroundImageUrl})` : undefined,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}
-        />
+        >
+          {/* 설정 버튼 (본인 프로필인 경우만) - 우상단에 위치 */}
+          {isOwnProfile && (
+            <button
+              onClick={handleProfileSettings}
+              className="absolute top-4 right-4 bg-white bg-opacity-90 hover:bg-opacity-100 text-gray-700 p-2 rounded-full shadow-md transition-all duration-200 hover:shadow-lg"
+              title="프로필 설정"
+              aria-label="프로필 설정"
+            >
+              <CogIcon className="w-5 h-5" />
+            </button>
+          )}
+        </div>
 
         <div className="relative px-6 pb-6">
           {/* 프로필 이미지 */}
@@ -188,32 +490,29 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         target.style.display = 'none';
-                        target.nextElementSibling?.classList.remove('hidden');
+                        const fallback = target.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.classList.remove('hidden');
                       }}
                     />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <UserIcon className="w-12 h-12" />
-                    </div>
-                  )}
+                  ) : null}
                   
-                  {/* 이미지 로드 실패 시 표시될 fallback */}
-                  {user.profileImage && (
-                    <div className="hidden w-full h-full flex items-center justify-center text-gray-400">
-                      <UserIcon className="w-12 h-12" />
-                    </div>
-                  )}
+                  {/* 이미지 로드 실패 시 또는 이미지가 없을 때 표시될 fallback */}
+                  <div className={`w-full h-full flex items-center justify-center text-gray-400 ${user.profileImage ? 'hidden' : ''}`}>
+                    <UserIcon className="w-12 h-12" />
+                  </div>
                 </div>
               </div>
 
-              {/* 온라인 상태 표시 */}
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 border-2 border-white rounded-full" />
+              {/* 온라인 상태 표시 (본인 프로필인 경우만) */}
+              {isOwnProfile && (
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 border-2 border-white rounded-full" />
+              )}
             </div>
 
             {/* 🔥 액션 버튼들 */}
             <div className="flex items-center space-x-3">
-              {/* 팔로우/언팔로우 버튼 (타인 프로필인 경우만) */}
-              {!isOwnProfile && (
+              {/* 팔로우/언팔로우 버튼 (타인 프로필이고 로그인된 경우만) */}
+              {!isOwnProfile && isAuthenticated && (
                 <button
                   onClick={handleFollowToggle}
                   disabled={isFollowLoading}
@@ -241,6 +540,16 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                   className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
                 >
                   프로필 편집
+                </button>
+              )}
+
+              {/* 로그인이 안된 경우 안내 버튼 */}
+              {!isOwnProfile && !isAuthenticated && (
+                <button
+                  onClick={() => router.push('/login')}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  로그인하여 팔로우
                 </button>
               )}
             </div>
@@ -271,9 +580,9 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               </div>
             </div>
 
-            {/* 🔥 계정명 표시 (이메일 대신 accountName 사용) */}
+            {/* 🔥 계정명 표시 */}
             <p className="text-gray-600 mb-1 truncate">
-              @{user.accountName || user.email.split('@')[0]}
+              @{user.accountName}
             </p>
 
             {/* 피드 설명 */}
@@ -303,9 +612,9 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               <button 
                 onClick={handleFollowingClick}
                 className="hover:underline hover:bg-gray-50 px-2 py-1 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
-                aria-label={`${user.followingCount}명의 팔로잉 목록 보기`}
+                aria-label={`${localFollowState.followingCount}명의 팔로잉 목록 보기`}
               >
-                <span className="font-semibold text-gray-900">{user.followingCount.toLocaleString()}</span>
+                <span className="font-semibold text-gray-900">{localFollowState.followingCount.toLocaleString()}</span>
                 <span className="text-gray-500 ml-1">팔로잉</span>
               </button>
               
@@ -326,14 +635,14 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               </div>
             </div>
 
-            {/* 🔥 상호 팔로우 표시 (로컬 상태 반영) */}
-            {!isOwnProfile && localFollowState.isFollowing && user.isFollowedBy && (
+            {/* 🔥 상호 팔로우 표시 (백엔드 실제 API 데이터 기반) */}
+            {!isOwnProfile && localFollowState.isFollowing && isMutualFollow && (
               <div className="mt-3">
                 <span className="inline-flex items-center px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded">
                   <svg className="w-3 h-3 mr-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
                   </svg>
-                  서로 팔로우 중
+                  서로 팔로우 중 ({mutualFollowCount}명 공통)
                 </span>
               </div>
             )}
@@ -352,14 +661,40 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
       {/* 팔로우 모달 */}
       <FollowListModal
-        userId={targetUserId}
+        userId={modalTargetUserId}
         type={modalType}
         isOpen={isOpen}
         onClose={closeModal}
         currentUserId={currentUserId ? String(currentUserId) : undefined}
       />
-    </>
-  )
-}
 
-export default ProfileHeader
+      {/* 토스트 메시지 */}
+      {toastMessage && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="px-4 py-2 rounded-lg bg-green-500 text-white font-medium shadow-lg transition-all duration-300">
+            {toastMessage}
+          </div>
+        </div>
+      )}
+
+      {/* 개발 정보 (개발 모드에서만) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-4 left-4 bg-black bg-opacity-70 text-white text-xs rounded p-3 z-30 max-w-xs">
+          <div className="font-semibold mb-1">🔥 개발 정보</div>
+          <div>사용자 ID: {user.id}</div>
+          <div>계정명: {user.accountName}</div>
+          <div>팔로워: {localFollowState.followersCount}</div>
+          <div>팔로잉: {localFollowState.followingCount}</div>
+          <div>팔로우 상태: {localFollowState.isFollowing ? 'Yes' : 'No'}</div>
+          <div>상호 팔로우: {isMutualFollow ? 'Yes' : 'No'}</div>
+          <div>상호 팔로우 수: {mutualFollowCount}</div>
+          <div>본인 프로필: {isOwnProfile ? 'Yes' : 'No'}</div>
+          <div>인증: {isAuthenticated ? 'Yes' : 'No'}</div>
+        </div>
+      )}
+    </>
+  );
+};
+
+export default ProfileHeader;
+

@@ -1,3 +1,5 @@
+// src/app/feed/edit/page.tsx - 백엔드 연동 완료
+
 'use client'
 
 import React, { Suspense } from 'react'
@@ -6,78 +8,130 @@ import { XMarkIcon, CheckIcon, PhotoIcon } from '@heroicons/react/24/outline'
 import { useRouter, useSearchParams } from 'next/navigation'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useAuth } from '@/hooks/auth/useAuth'
+import axios from 'axios'
 
 // ============================================================================
-// 🔥 백엔드 API 연동 함수들
+// 백엔드 연동 설정
 // ============================================================================
-import api from '@/lib/axios'
 
-// API 응답 타입 (백엔드 ApiResponse와 일치)
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080'
+
+// Axios 인스턴스 생성
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// 인증 토큰 인터셉터
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('accessToken')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
+// 응답 인터셉터 (에러 처리)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('accessToken')
+    }
+    return Promise.reject(error)
+  }
+)
+
+// ============================================================================
+// 백엔드 연동 타입 정의 (실제 백엔드 API 구조와 일치)
+// ============================================================================
+
+// 백엔드 ApiResponse 표준 형식
 interface ApiResponse<T> {
-  error: boolean
-  message: string
-  data: T
+  error: boolean;
+  message: string | null;
+  data: T | null;
 }
 
-// 백엔드 Photo 엔티티 타입
-interface Photo {
-  photoId: number
-  imgUrl: string
-  createdAt: string
-  user: {
-    userId: number
-    userName: string
-    accountName: string
-  }
+// 🔥 백엔드 PhotoForFeedUploadResponse (MyRoom에서 가져온 사진 정보)
+interface PhotoForFeedUploadResponse {
+  photoId: number;
+  imgUrl: string;
+  takenAt: string;
+  alreadyInFeed: boolean;
 }
 
-// 백엔드 CreateFeedRequest 타입
-interface CreateFeedRequest {
-  photoId: number
-  caption: string
+// 🔥 백엔드 CreatePostFromMyRoomRequest (Feed API)
+interface CreatePostFromMyRoomRequest {
+  photoId: number;
+  caption: string;
 }
 
 // ============================================================================
-// 🔥 백엔드 API 함수들 - 완벽한 아키텍처 적용
+// 백엔드 API 함수들 (실제 백엔드 API 엔드포인트 사용)
 // ============================================================================
 
-// 사진 상세 조회
-const getPhotoById = async (photoId: number): Promise<Photo> => {
-  try {
-    const response = await api.get<ApiResponse<Photo>>(`/photos/${photoId}`)
-    if (response.data.error) {
-      throw new Error(response.data.message)
+const postCreateAPI = {
+  // 🔥 GET /myroom/photos/{photoId}/feed-upload-info - 마이룸 사진 정보 조회
+  getPhotoForFeedUpload: async (photoId: number): Promise<PhotoForFeedUploadResponse> => {
+    try {
+      const response = await api.get<ApiResponse<PhotoForFeedUploadResponse>>(
+        `/myroom/photos/${photoId}/feed-upload-info`
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '사진 정보를 가져올 수 없습니다.');
+      }
+      
+      if (!response.data.data) {
+        throw new Error('사진 데이터가 없습니다.');
+      }
+      
+      return response.data.data;
+    } catch (error) {
+      console.error('Failed to get photo for feed upload:', error);
+      throw error;
     }
-    return response.data.data
-  } catch (error: any) {
-    console.error('Failed to fetch photo:', error)
-    throw error
-  }
-}
+  },
 
-// 피드 생성
-const createFeed = async (photoId: number, caption: string): Promise<number> => {
-  try {
-    const requestBody: CreateFeedRequest = {
-      photoId,
-      caption: caption.trim()
+  // 🔥 POST /feeds/posts/from-myroom - 마이룸 사진으로 피드 게시물 생성
+  createPostFromMyRoom: async (photoId: number, caption: string): Promise<number> => {
+    try {
+      const requestBody: CreatePostFromMyRoomRequest = {
+        photoId,
+        caption: caption.trim()
+      };
+      
+      const response = await api.post<ApiResponse<number>>(
+        '/feeds/posts/from-myroom',
+        requestBody
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '게시물 생성에 실패했습니다.');
+      }
+      
+      if (!response.data.data) {
+        throw new Error('게시물 ID가 반환되지 않았습니다.');
+      }
+      
+      return response.data.data;
+    } catch (error) {
+      console.error('Failed to create post from myroom:', error);
+      throw error;
     }
-    
-    const response = await api.post<ApiResponse<number>>('/feeds', requestBody)
-    
-    if (response.data.error) {
-      throw new Error(response.data.message)
-    }
-    
-    return response.data.data
-  } catch (error: any) {
-    console.error('Failed to create feed:', error)
-    throw error
   }
-}
+};
 
 // ============================================================================
-// 🔥 SearchParams를 사용하는 컴포넌트 분리 (Suspense 경계 적용)
+// SearchParams를 사용하는 컴포넌트 분리 (Suspense 경계 적용)
 // ============================================================================
 
 const PostCreateContent: React.FC = () => {
@@ -89,16 +143,15 @@ const PostCreateContent: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [caption, setCaption] = useState<string>('')
-  const [photo, setPhoto] = useState<Photo | null>(null)
+  const [photoInfo, setPhotoInfo] = useState<PhotoForFeedUploadResponse | null>(null)
   
-  // URL 파라미터에서 사진 ID 가져오기 (새 게시물 생성 시 필수)
+  // URL 파라미터에서 사진 ID 가져오기
   const photoId = searchParams.get('photoId')
 
   // ============================================================================
-  // 🔥 백엔드 API 호출 - 완벽한 아키텍처 적용
+  // 백엔드 API 호출 - 사진 정보 로드 및 초기화
   // ============================================================================
 
-  // ✅ 인증 확인 및 초기화
   useEffect(() => {
     if (!isAuthenticated || !currentUser) {
       router.push('/login')
@@ -110,8 +163,8 @@ const PostCreateContent: React.FC = () => {
       setError(null)
 
       try {
+        // photoId 유효성 검사
         if (!photoId || isNaN(Number(photoId))) {
-          // 사진 ID가 없거나 올바르지 않으면 myroom으로 리다이렉트
           setError('사진을 먼저 선택해주세요.')
           setTimeout(() => {
             router.push('/myroom')
@@ -119,84 +172,111 @@ const PostCreateContent: React.FC = () => {
           return
         }
 
-        // 🔥 백엔드에서 사진 정보 가져오기 (완전한 에러 처리)
-        try {
-          const photoData = await getPhotoById(Number(photoId))
-          setPhoto(photoData)
-          console.log('사진 로드 성공:', photoData)
-        } catch (photoError: any) {
-          console.error('Failed to load photo:', photoError)
-          
-          // 백엔드 에러 메시지 처리
-          let errorMessage = '선택된 사진을 불러올 수 없습니다.'
-          if (photoError?.response?.status === 404) {
-            errorMessage = '존재하지 않는 사진입니다.'
-          } else if (photoError?.response?.status === 403) {
-            errorMessage = '해당 사진에 접근할 권한이 없습니다.'
-          } else if (photoError?.response?.data?.message) {
-            errorMessage = photoError.response.data.message
-          }
-          
-          setError(errorMessage)
+        console.log('=== 게시물 생성 페이지 초기화 시작 ===', { photoId });
+
+        // 🔥 백엔드에서 마이룸 사진 정보 가져오기
+        const photoData = await postCreateAPI.getPhotoForFeedUpload(Number(photoId));
+        
+        // 이미 피드에 올린 사진인지 확인
+        if (photoData.alreadyInFeed) {
+          setError('이미 피드에 올린 사진입니다.');
           setTimeout(() => {
             router.push('/myroom')
           }, 3000)
           return
         }
 
-        // photoId가 있고 사진 로드 성공 시 게시물 생성 준비 완료
-        setIsLoading(false)
+        setPhotoInfo(photoData);
+        console.log('✅ 사진 정보 로드 완료:', photoData);
+
+      } catch (error: any) {
+        console.error('❌ 게시물 편집기 초기화 실패:', error);
         
-      } catch (error) {
-        console.error('Failed to initialize editor:', error)
-        setError('편집기를 초기화하는데 실패했습니다.')
-        setIsLoading(false)
+        // 백엔드 에러 메시지 처리
+        let errorMessage = '사진 정보를 불러올 수 없습니다.';
+        
+        if (axios.isAxiosError(error)) {
+          if (error.response?.status === 404) {
+            errorMessage = '존재하지 않는 사진입니다.';
+          } else if (error.response?.status === 403) {
+            errorMessage = '해당 사진에 접근할 권한이 없습니다.';
+          } else if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
+          }
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        setError(errorMessage);
+        setTimeout(() => {
+          router.push('/myroom')
+        }, 3000)
+      } finally {
+        setIsLoading(false);
       }
     }
 
     initializeEditor()
   }, [isAuthenticated, currentUser, photoId, router])
 
-  // ✅ 백엔드 API 게시물 저장 - 완벽한 에러 처리
-  const handleSave = async (inputCaption?: string) => {
-    if (!currentUser || !photoId || !photo) return
+  // ============================================================================
+  // 백엔드 API - 게시물 생성
+  // ============================================================================
 
-    const finalCaption = inputCaption || caption || ''
+  const handleSave = async () => {
+    if (!currentUser || !photoId || !photoInfo) return
 
     setIsSaving(true)
     setError(null)
 
     try {
-      // 🔥 createFeed 함수 사용 (인터셉터를 통한 완전한 백엔드 연동)
-      const newFeedId = await createFeed(Number(photoId), finalCaption)
+      console.log('=== 게시물 생성 시작 ===', {
+        photoId: Number(photoId),
+        caption: caption.trim()
+      });
 
-      console.log('새 게시물 생성 완료:', newFeedId)
+      // 🔥 백엔드 API 호출 - 마이룸 사진으로 피드 게시물 생성
+      const newPostId = await postCreateAPI.createPostFromMyRoom(
+        Number(photoId), 
+        caption.trim()
+      );
+
+      console.log('✅ 게시물 생성 완료:', { newPostId });
 
       // 성공 시 내 피드 페이지로 이동
-      router.push('/my')
+      router.push('/my');
       
     } catch (error: any) {
-      console.error('Failed to create feed:', error)
+      console.error('❌ 게시물 생성 실패:', error);
       
       // 백엔드 에러 메시지 상세 처리
-      let errorMessage = '게시물 생성에 실패했습니다.'
-      if (error?.response?.status === 400) {
-        errorMessage = '잘못된 요청입니다. 사진 ID나 캡션을 확인해주세요.'
-      } else if (error?.response?.status === 403) {
-        errorMessage = '내 사진만 게시물로 만들 수 있습니다.'
-      } else if (error?.response?.status === 404) {
-        errorMessage = '존재하지 않는 사진입니다.'
-      } else if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message
-      } else if (error?.message) {
-        errorMessage = error.message
+      let errorMessage = '게시물 생성에 실패했습니다.';
+      
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 400) {
+          errorMessage = '잘못된 요청입니다. 사진 ID나 캡션을 확인해주세요.';
+        } else if (error.response?.status === 403) {
+          errorMessage = '내 사진만 게시물로 만들 수 있습니다.';
+        } else if (error.response?.status === 404) {
+          errorMessage = '존재하지 않는 사진입니다.';
+        } else if (error.response?.status === 409) {
+          errorMessage = '이미 피드에 올린 사진입니다.';
+        } else if (error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       
-      setError(errorMessage)
+      setError(errorMessage);
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
   }
+
+  // ============================================================================
+  // 이벤트 핸들러들
+  // ============================================================================
 
   const handleCancel = () => {
     if (caption.trim().length > 0) {
@@ -216,7 +296,11 @@ const PostCreateContent: React.FC = () => {
     }
   }
 
-  // 🔥 로그인하지 않은 경우
+  // ============================================================================
+  // 렌더링 조건
+  // ============================================================================
+
+  // 로그인하지 않은 경우
   if (!isAuthenticated || !currentUser) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -271,6 +355,10 @@ const PostCreateContent: React.FC = () => {
     )
   }
 
+  // ============================================================================
+  // 메인 렌더링
+  // ============================================================================
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* 상단 편집 헤더 */}
@@ -303,8 +391,8 @@ const PostCreateContent: React.FC = () => {
             )}
             
             <button
-              onClick={() => handleSave()}
-              disabled={isSaving || !photoId || !photo}
+              onClick={handleSave}
+              disabled={isSaving || !photoId || !photoInfo}
               className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
             >
               {isSaving ? (
@@ -330,18 +418,18 @@ const PostCreateContent: React.FC = () => {
       <main className="max-w-4xl mx-auto p-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           {/* 🔥 사진 미리보기 섹션 - 백엔드 데이터로 표시 */}
-          {photo && (
+          {photoInfo && (
             <div className="border-b border-gray-200">
               <div className="p-4">
                 <h3 className="text-sm font-medium text-gray-700 mb-3">선택된 사진</h3>
                 <div className="flex items-start space-x-4">
                   <div className="flex-shrink-0">
                     <img 
-                      src={photo.imgUrl} 
+                      src={photoInfo.imgUrl} 
                       alt="Selected photo" 
                       className="w-32 h-32 object-cover rounded-lg border border-gray-200"
                       onError={(e) => {
-                        console.error('Image failed to load:', photo.imgUrl)
+                        console.error('Image failed to load:', photoInfo.imgUrl)
                         setError('사진을 불러올 수 없습니다.')
                       }}
                     />
@@ -349,14 +437,22 @@ const PostCreateContent: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-2 text-sm text-gray-600 mb-2">
                       <PhotoIcon className="h-5 w-5" />
-                      <span>Photo ID: {photo.photoId}</span>
+                      <span>Photo ID: {photoInfo.photoId}</span>
                     </div>
                     <p className="text-xs text-gray-500">
-                      업로드: {new Date(photo.createdAt).toLocaleString('ko-KR')}
+                      촬영일: {new Date(photoInfo.takenAt).toLocaleString('ko-KR')}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      업로더: {photo.user.userName} (@{photo.user.accountName})
-                    </p>
+                    <div className="mt-2">
+                      {photoInfo.alreadyInFeed ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
+                          이미 피드에 게시됨
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                          게시 가능
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -414,10 +510,10 @@ const PostCreateContent: React.FC = () => {
               </div>
               
               {/* 🔥 실제 백엔드 사진이 있으면 표시 */}
-              {photo && (
+              {photoInfo && (
                 <div className="mb-3">
                   <img 
-                    src={photo.imgUrl} 
+                    src={photoInfo.imgUrl} 
                     alt="Post preview" 
                     className="max-w-full h-auto rounded-lg border border-gray-200"
                     style={{ maxHeight: '400px' }}
@@ -433,12 +529,23 @@ const PostCreateContent: React.FC = () => {
           </div>
         </div>
       </main>
+
+      {/* 개발 모드에서 디버깅 정보 표시 */}
+      {process.env.NODE_ENV === 'development' && photoInfo && (
+        <div className="fixed bottom-4 left-4 bg-black bg-opacity-70 text-white text-xs rounded p-3 z-30 max-w-xs">
+          <div className="font-semibold mb-1">🔧 게시물 생성 디버깅</div>
+          <div>Photo ID: {photoInfo.photoId}</div>
+          <div>이미지 URL: {photoInfo.imgUrl.substring(0, 30)}...</div>
+          <div>피드 게시 여부: {photoInfo.alreadyInFeed ? 'Yes' : 'No'}</div>
+          <div>캡션 길이: {caption.length}/200</div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ============================================================================
-// 🔥 메인 컴포넌트 - Suspense 경계 적용
+// 메인 컴포넌트 - Suspense 경계 적용
 // ============================================================================
 
 const PostCreatePage: React.FC = () => {

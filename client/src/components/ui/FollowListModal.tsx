@@ -1,140 +1,183 @@
+// src/components/ui/FollowListModal.tsx - 백엔드 연동 완료
+
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
-
-// 🔥 올바른 백엔드 연동 - api from '@/lib/axios' 사용
-import api from '@/lib/axios';
+import axios from 'axios';
 
 // ============================================================================
-// 백엔드 연동 타입 정의
+// 백엔드 연동 설정
+// ============================================================================
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080'
+
+// Axios 인스턴스 생성
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// 인증 토큰 인터셉터
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('accessToken')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
+// 응답 인터셉터 (에러 처리)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('accessToken')
+    }
+    return Promise.reject(error)
+  }
+)
+
+// ============================================================================
+// 백엔드 연동 타입 정의 (백엔드 API 구조에 맞춤)
 // ============================================================================
 
 // 백엔드 ApiResponse 표준 형식
 interface ApiResponse<T> {
   error: boolean;
-  message: string;
-  data: T;
+  message: string | null;
+  data: T | null;
 }
 
-// 백엔드 UserInfoResponse.java 기반
-interface BackendUserInfoResponse {
-  userName: string;        // 사용자 이름
-  userEmail: string;       // 이메일
-  profileImage?: string;   // 프로필 이미지
-  prettyFace?: string;     // 예쁜 얼굴 이미지
+// 🔥 백엔드 UserProfileResponse와 정확히 일치 (FollowService에서 사용)
+interface BackendUserProfileResponse {
+  userId: number;
+  accountName: string;    // 계정명 (ID 역할)
+  userName: string;       // 실제 이름
+  userEmail: string;      // 이메일
+  profileImage?: string;  // 프로필 이미지
+  prettyFace?: string;    // 예쁜 얼굴 이미지
 }
 
-// 프론트엔드에서 사용할 User 타입 (백엔드 응답 기반)
+// 프론트엔드에서 사용할 User 타입
 interface User {
-  id: string;              // userEmail을 id로 사용
-  username: string;        // userName
+  id: string;              // accountName을 string ID로 사용
+  userId: number;          // 실제 숫자 userId
+  username: string;        // accountName
   displayName: string;     // userName
   email: string;          // userEmail
   profileImage?: string;   // profileImage
   prettyFaceUrl?: string;  // prettyFace
-  isFollowing?: boolean;   // 팔로우 상태 (별도 조회 필요)
-  bio?: string;           // 임시 필드 (현재 백엔드에 없음)
+  isFollowing?: boolean;   // 팔로우 상태
+  bio?: string;           // 임시 필드
 }
 
 interface FollowListModalProps {
-  userId: string;           // 대상 사용자 ID (숫자 문자열)
+  accountName: string;      // 🔥 변경: userId → accountName (백엔드 API가 accountName 기반)
   type: 'followers' | 'following';
   isOpen: boolean;
   onClose: () => void;
-  currentUserId?: string;   // 현재 로그인 사용자 ID
+  currentUserAccountName?: string;   // 현재 로그인 사용자 accountName
 }
 
 // ============================================================================
-// 백엔드 API 함수들
+// 백엔드 API 함수들 (FollowController 기반)
 // ============================================================================
 
 const followListAPI = {
-  // GET /follows/followers/{userId} - 팔로워 목록 조회
-  getFollowers: async (userId: number): Promise<BackendUserInfoResponse[]> => {
-    const response = await api.get<ApiResponse<BackendUserInfoResponse[]>>(
-      `/follows/followers/${userId}`
-    );
-    
-    if (response.data.error) {
-      throw new Error(response.data.message);
-    }
-    
-    return response.data.data;
-  },
-
-  // GET /follows/following/{userId} - 팔로잉 목록 조회
-  getFollowing: async (userId: number): Promise<BackendUserInfoResponse[]> => {
-    const response = await api.get<ApiResponse<BackendUserInfoResponse[]>>(
-      `/follows/following/${userId}`
-    );
-    
-    if (response.data.error) {
-      throw new Error(response.data.message);
-    }
-    
-    return response.data.data;
-  },
-
-  // POST /follows/{followeeId} - 팔로우
-  followUser: async (followeeId: number): Promise<void> => {
-    const response = await api.post<ApiResponse<void>>(
-      `/follows/${followeeId}`
-    );
-    
-    if (response.data.error) {
-      throw new Error(response.data.message);
+  // 🔥 GET /follows/followers/{accountName} - 팔로워 목록 조회
+  getFollowersByAccountName: async (accountName: string): Promise<BackendUserProfileResponse[]> => {
+    try {
+      const response = await api.get<ApiResponse<BackendUserProfileResponse[]>>(
+        `/follows/followers/${accountName}`
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '팔로워 목록을 가져올 수 없습니다.');
+      }
+      
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Failed to get followers:', error);
+      throw error;
     }
   },
 
-  // DELETE /follows/{followeeId} - 언팔로우  
-  unfollowUser: async (followeeId: number): Promise<void> => {
-    const response = await api.delete<ApiResponse<void>>(
-      `/follows/${followeeId}`
-    );
-    
-    if (response.data.error) {
-      throw new Error(response.data.message);
+  // 🔥 GET /follows/following/{accountName} - 팔로잉 목록 조회
+  getFollowingByAccountName: async (accountName: string): Promise<BackendUserProfileResponse[]> => {
+    try {
+      const response = await api.get<ApiResponse<BackendUserProfileResponse[]>>(
+        `/follows/following/${accountName}`
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '팔로잉 목록을 가져올 수 없습니다.');
+      }
+      
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Failed to get following:', error);
+      throw error;
     }
   },
 
-  // GET /follows/check/{followeeId} - 팔로우 상태 확인
-  checkFollowStatus: async (followeeId: number): Promise<boolean> => {
+  // 🔥 POST /follows/{accountName} - 팔로우
+  followByAccountName: async (accountName: string): Promise<void> => {
+    try {
+      const response = await api.post<ApiResponse<void>>(
+        `/follows/${accountName}`
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '팔로우에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('Failed to follow user:', error);
+      throw error;
+    }
+  },
+
+  // 🔥 DELETE /follows/{accountName} - 언팔로우  
+  unfollowByAccountName: async (accountName: string): Promise<void> => {
+    try {
+      const response = await api.delete<ApiResponse<void>>(
+        `/follows/${accountName}`
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '언팔로우에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('Failed to unfollow user:', error);
+      throw error;
+    }
+  },
+
+  // 🔥 GET /follows/check/{accountName} - 팔로우 상태 확인
+  checkFollowStatusByAccountName: async (accountName: string): Promise<boolean> => {
     try {
       const response = await api.get<ApiResponse<boolean>>(
-        `/follows/check/${followeeId}`
+        `/follows/check/${accountName}`
       );
       
       if (response.data.error) {
         return false;
       }
       
-      return response.data.data;
+      return response.data.data || false;
     } catch (error) {
       console.warn('Failed to check follow status:', error);
       return false;
     }
-  },
-
-  // 이메일로 userId 찾기 (필요시 - 검색 API 활용)
-  findUserIdByEmail: async (email: string): Promise<number | null> => {
-    try {
-      // 검색 API를 활용해서 이메일로 userId 찾기
-      const response = await api.get<ApiResponse<any[]>>(
-        `/feeds/search?query=${encodeURIComponent(email)}&size=1`
-      );
-      
-      if (!response.data.error && response.data.data.length > 0) {
-        return response.data.data[0].authorId;
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Failed to find userId by email:', error);
-      return null;
-    }
-  },
+  }
 };
 
 // ============================================================================
@@ -142,11 +185,11 @@ const followListAPI = {
 // ============================================================================
 
 const FollowListModal: React.FC<FollowListModalProps> = ({
-  userId,
+  accountName,        // 🔥 변경: userId → accountName
   type,
   isOpen,
   onClose,
-  currentUserId
+  currentUserAccountName
 }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,26 +204,18 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
   // ============================================================================
 
   // 백엔드 응답을 User 타입으로 변환
-  const transformBackendUser = useCallback((backendUser: BackendUserInfoResponse): User => {
+  const transformBackendUser = useCallback((backendUser: BackendUserProfileResponse): User => {
     return {
-      id: backendUser.userEmail,                    // 이메일을 고유 ID로 사용
-      username: backendUser.userName,               // 사용자명
-      displayName: backendUser.userName,            // 표시명
-      email: backendUser.userEmail,                 // 이메일
-      profileImage: backendUser.profileImage,       // 프로필 이미지
-      prettyFaceUrl: backendUser.prettyFace,        // 예쁜 얼굴 이미지
-      isFollowing: false,                           // 초기값, 별도로 조회 필요
-      bio: `${backendUser.userName}님의 프로필`      // 임시 bio
+      id: backendUser.accountName,              // accountName을 고유 ID로 사용
+      userId: backendUser.userId,               // 실제 숫자 userId
+      username: backendUser.accountName,        // 계정명
+      displayName: backendUser.userName,        // 실제 이름
+      email: backendUser.userEmail,             // 이메일
+      profileImage: backendUser.profileImage,   // 프로필 이미지
+      prettyFaceUrl: backendUser.prettyFace,    // 예쁜 얼굴 이미지
+      isFollowing: false,                       // 초기값, 별도로 조회 필요
+      bio: `@${backendUser.accountName}`        // 간단한 bio
     };
-  }, []);
-
-  // userId를 숫자로 변환
-  const parseUserId = useCallback((userId: string): number => {
-    const parsed = parseInt(userId, 10);
-    if (isNaN(parsed)) {
-      throw new Error('유효하지 않은 사용자 ID입니다.');
-    }
-    return parsed;
   }, []);
 
   // ============================================================================
@@ -188,49 +223,42 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
   // ============================================================================
 
   const loadUserList = useCallback(async () => {
-    if (!isOpen || !isAuthenticated) return;
+    if (!isOpen) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const numericUserId = parseUserId(userId);
-      
-      console.log(`=== ${type} 목록 로딩 시작 ===`, { userId: numericUserId });
+      console.log(`=== ${type} 목록 로딩 시작 ===`, { accountName });
 
-      // 🔥 백엔드 API 호출
-      let backendUsers: BackendUserInfoResponse[] = [];
+      // 🔥 백엔드 API 호출 (accountName 기반)
+      let backendUsers: BackendUserProfileResponse[] = [];
       
       if (type === 'followers') {
-        backendUsers = await followListAPI.getFollowers(numericUserId);
+        backendUsers = await followListAPI.getFollowersByAccountName(accountName);
       } else {
-        backendUsers = await followListAPI.getFollowing(numericUserId);
+        backendUsers = await followListAPI.getFollowingByAccountName(accountName);
       }
 
       // 백엔드 응답을 User 타입으로 변환
       const transformedUsers = backendUsers.map(transformBackendUser);
 
-      console.log(`=== ${type} 목록 로딩 완료 ===`, {
+      console.log(`✅ ${type} 목록 로딩 완료:`, {
         count: transformedUsers.length,
-        users: transformedUsers
+        users: transformedUsers.map(u => ({ accountName: u.username, name: u.displayName }))
       });
 
-      // 🔥 각 사용자의 팔로우 상태 확인 (병렬 처리)
-      if (currentUserId && transformedUsers.length > 0) {
+      // 🔥 각 사용자의 팔로우 상태 확인 (현재 로그인 사용자가 있는 경우만)
+      if (currentUserAccountName && transformedUsers.length > 0 && isAuthenticated) {
         console.log('=== 팔로우 상태 확인 시작 ===');
         
         const followStatusPromises = transformedUsers.map(async (user) => {
           try {
-            // 이메일로 userId 찾기
-            const targetUserId = await followListAPI.findUserIdByEmail(user.email);
-            if (targetUserId) {
-              const isFollowing = await followListAPI.checkFollowStatus(targetUserId);
-              return { userId: user.id, isFollowing };
-            }
-            return { userId: user.id, isFollowing: false };
+            const isFollowing = await followListAPI.checkFollowStatusByAccountName(user.username);
+            return { accountName: user.username, isFollowing };
           } catch (error) {
-            console.warn(`Failed to check follow status for ${user.email}:`, error);
-            return { userId: user.id, isFollowing: false };
+            console.warn(`Failed to check follow status for ${user.username}:`, error);
+            return { accountName: user.username, isFollowing: false };
           }
         });
 
@@ -238,7 +266,7 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
         
         // 팔로우 상태 업데이트
         const usersWithFollowStatus = transformedUsers.map(user => {
-          const status = followStatuses.find(s => s.userId === user.id);
+          const status = followStatuses.find(s => s.accountName === user.username);
           return {
             ...user,
             isFollowing: status?.isFollowing || false
@@ -246,19 +274,19 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
         });
 
         setUsers(usersWithFollowStatus);
-        console.log('=== 팔로우 상태 확인 완료 ===');
+        console.log('✅ 팔로우 상태 확인 완료');
       } else {
         setUsers(transformedUsers);
       }
 
     } catch (err) {
-      console.error(`Failed to load ${type} list:`, err);
+      console.error(`❌ ${type} 목록 로딩 실패:`, err);
       const errorMessage = err instanceof Error ? err.message : `${type} 목록을 불러오는데 실패했습니다.`;
       setError(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [userId, type, isOpen, isAuthenticated, currentUserId, parseUserId, transformBackendUser]);
+  }, [accountName, type, isOpen, currentUserAccountName, isAuthenticated, transformBackendUser]);
 
   // ============================================================================
   // 초기 로드
@@ -273,47 +301,34 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
   // ============================================================================
 
   // 사용자 클릭 시 해당 프로필로 이동
-  const handleUserClick = useCallback(async (clickedUser: User) => {
+  const handleUserClick = useCallback((clickedUser: User) => {
     onClose(); // 모달 먼저 닫기
     
-    try {
-      // 이메일로 userId 찾기
-      const targetUserId = await followListAPI.findUserIdByEmail(clickedUser.email);
-      if (targetUserId) {
-        router.push(`/profile/${targetUserId}`); // userId 기반 프로필 페이지로 이동
-      } else {
-        console.warn('사용자 ID를 찾을 수 없습니다:', clickedUser.email);
-        router.push(`/profile?email=${encodeURIComponent(clickedUser.email)}`); // 이메일 기반 fallback
-      }
-    } catch (error) {
-      console.error('Failed to navigate to user profile:', error);
-    }
+    // 🔥 accountName 기반 프로필 페이지로 이동
+    router.push(`/feeds/users/account/${clickedUser.username}`);
   }, [onClose, router]);
 
   // 🔥 백엔드 연동 팔로우/언팔로우 토글
   const handleFollowToggle = useCallback(async (targetUser: User, isCurrentlyFollowing: boolean) => {
-    if (!currentUserId || !isAuthenticated) return;
+    if (!currentUserAccountName || !isAuthenticated) return;
+
+    // 본인 팔로우 방지
+    if (targetUser.username === currentUserAccountName) return;
 
     // 로딩 상태 설정
     setFollowingLoading(prev => new Set([...prev, targetUser.id]));
 
     try {
       console.log(`=== 팔로우 토글 시작 ===`, {
-        targetEmail: targetUser.email,
+        targetAccountName: targetUser.username,
         isCurrentlyFollowing
       });
 
-      // 이메일로 userId 찾기
-      const targetUserId = await followListAPI.findUserIdByEmail(targetUser.email);
-      if (!targetUserId) {
-        throw new Error('대상 사용자 ID를 찾을 수 없습니다.');
-      }
-
-      // 🔥 백엔드 API 호출
+      // 🔥 백엔드 API 호출 (accountName 기반)
       if (isCurrentlyFollowing) {
-        await followListAPI.unfollowUser(targetUserId);
+        await followListAPI.unfollowByAccountName(targetUser.username);
       } else {
-        await followListAPI.followUser(targetUserId);
+        await followListAPI.followByAccountName(targetUser.username);
       }
 
       // 성공 시 로컬 상태 업데이트
@@ -325,15 +340,18 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
         )
       );
 
-      console.log(`=== 팔로우 토글 성공 ===`, {
-        targetUserId,
+      console.log(`✅ 팔로우 토글 성공:`, {
+        targetAccountName: targetUser.username,
         newStatus: !isCurrentlyFollowing
       });
 
     } catch (err) {
-      console.error('팔로우 상태 변경 실패:', err);
+      console.error('❌ 팔로우 상태 변경 실패:', err);
       const errorMessage = err instanceof Error ? err.message : '팔로우 상태 변경에 실패했습니다.';
       setError(errorMessage);
+      
+      // 3초 후 에러 메시지 제거
+      setTimeout(() => setError(null), 3000);
     } finally {
       // 로딩 상태 해제
       setFollowingLoading(prev => {
@@ -342,9 +360,9 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
         return newSet;
       });
     }
-  }, [currentUserId, isAuthenticated]);
+  }, [currentUserAccountName, isAuthenticated]);
 
-  // 에러 클리어
+  // 에러 클리어 및 재시도
   const handleRetry = useCallback(() => {
     setError(null);
     loadUserList();
@@ -366,7 +384,7 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
         {/* 헤더 */}
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-lg font-semibold">
-            {type === 'followers' ? '팔로워' : '팔로잉'}
+            {type === 'followers' ? '팔로워' : '팔로잉'} {users.length > 0 && `(${users.length})`}
           </h2>
           <button
             onClick={onClose}
@@ -388,7 +406,7 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center py-8">
-              <div className="text-red-500 mb-2">{error}</div>
+              <div className="text-red-500 mb-2 text-center px-4">{error}</div>
               <button
                 onClick={handleRetry}
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
@@ -427,6 +445,11 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           target.style.display = 'none';
+                          target.parentElement!.innerHTML = `
+                            <div class="w-full h-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                              ${user.displayName.charAt(0).toUpperCase()}
+                            </div>
+                          `;
                         }}
                       />
                     ) : (
@@ -447,15 +470,15 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
                     <div className="text-sm text-gray-500 truncate">
                       @{user.username}
                     </div>
-                    {user.bio && (
-                      <div className="text-xs text-gray-400 mt-1 line-clamp-1">
-                        {user.bio}
+                    {user.email && (
+                      <div className="text-xs text-gray-400 truncate">
+                        {user.email}
                       </div>
                     )}
                   </div>
 
-                  {/* 팔로우 버튼 (본인이 아닌 경우만 표시) */}
-                  {isAuthenticated && currentUserId && user.email !== currentUserId && (
+                  {/* 팔로우 버튼 (본인이 아니고, 로그인 상태인 경우만 표시) */}
+                  {isAuthenticated && currentUserAccountName && user.username !== currentUserAccountName && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -478,19 +501,31 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
                       )}
                     </button>
                   )}
+
+                  {/* 본인 표시 */}
+                  {user.username === currentUserAccountName && (
+                    <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                      나
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* 🔥 백엔드 연동 정보 */}
-        <div className="px-4 py-2 bg-blue-50 border-t text-xs text-blue-800">
-          <div className="flex items-center justify-between">
-            <span>✅ 백엔드 완전 연동</span>
-            <span>{users.length}명 표시</span>
+        {/* 푸터 - 백엔드 연동 정보 */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="px-4 py-2 bg-blue-50 border-t text-xs text-blue-800">
+            <div className="flex items-center justify-between">
+              <span>✅ 백엔드 완전 연동 (accountName 기반)</span>
+              <span>{users.length}명 표시</span>
+            </div>
+            <div className="mt-1 text-blue-600">
+              대상: @{accountName} | 타입: {type}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

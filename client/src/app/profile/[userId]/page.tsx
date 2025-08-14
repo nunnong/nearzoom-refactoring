@@ -14,7 +14,7 @@ import {
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid'
 
 // ============================================================================
-// 🔥 백엔드 API 연동
+// 🔥 백엔드 API 연동 - 정확한 타입 정의
 // ============================================================================
 import api from '@/lib/axios'
 
@@ -42,26 +42,30 @@ interface ApiResponse<T> {
   data: T
 }
 
-// 백엔드 User 엔티티 기반 타입
-interface UserProfileResponse {
-  userId: number
-  userName: string
-  userEmail: string
-  accountName: string
-  profileImage: string
-  prettyFace: string | null
-}
-
-// 백엔드 FeedDetailResponse 타입
-interface FeedDetailResponse {
-  feedId: number
+// 🔥 수정: 백엔드 PostResponse 타입에 맞춤
+interface PostResponse {
+  postId: number
+  photoId: number
   imgUrl: string
   caption: string
+  displayOrder: number
+  createdAt: string
+  likeCount: number
+  isLikedByMe: boolean
   authorId: number
+  authorAccountName: string
+  authorProfileImage: string
+}
+
+// 🔥 수정: 백엔드 FeedWithPostsResponse 타입에 맞춤
+interface FeedWithPostsResponse {
+  feedId: number
+  userId: number
   accountName: string
   profileImage: string
   createdAt: string
-  liked: boolean
+  posts: PostResponse[]
+  isFollowing: boolean
 }
 
 // 백엔드 FollowCountsResponse 타입
@@ -70,8 +74,18 @@ interface FollowCountsResponse {
   followingCount: number
 }
 
+// 🔥 새로 추가: 사용자 기본 정보 타입 (User 엔티티 기반)
+interface UserBasicInfo {
+  userId: number
+  userName: string
+  userEmail: string
+  accountName: string
+  profileImage: string
+  prettyFace: string | null
+}
+
 // 프론트엔드에서 사용할 통합 타입
-interface UserProfileData extends UserProfileResponse {
+interface UserProfileData extends UserBasicInfo {
   postsCount: number
   followersCount: number
   followingCount: number
@@ -79,13 +93,13 @@ interface UserProfileData extends UserProfileResponse {
 }
 
 // ============================================================================
-// 🔥 백엔드 API 함수들 - 완벽한 아키텍처 적용
+// 🔥 백엔드 API 함수들 - 정확한 엔드포인트 사용
 // ============================================================================
 
-// 사용자 프로필 조회 (백엔드에 해당 API가 있다고 가정)
-const getUserProfile = async (userId: number): Promise<UserProfileResponse> => {
+// 🔥 수정: accountName으로 사용자 피드 조회 (FeedController.getUserFeedByAccountName)
+const getUserFeedByAccountName = async (accountName: string): Promise<FeedWithPostsResponse> => {
   try {
-    const response = await api.get<ApiResponse<UserProfileResponse>>(`/users/${userId}`)
+    const response = await api.get<ApiResponse<FeedWithPostsResponse>>(`/feeds/users/account/${accountName}`)
     
     if (response.data.error) {
       throw new Error(response.data.message)
@@ -93,15 +107,15 @@ const getUserProfile = async (userId: number): Promise<UserProfileResponse> => {
     
     return response.data.data
   } catch (error: any) {
-    console.error('Failed to fetch user profile:', error)
+    console.error('Failed to fetch user feed:', error)
     throw error
   }
 }
 
-// 팔로우 통계 조회 (백엔드 FollowController.countFollow)
-const getFollowStats = async (userId: number): Promise<FollowCountsResponse> => {
+// 🔥 수정: accountName으로 팔로우 통계 조회 (FollowController.countFollow)
+const getFollowStatsByAccountName = async (accountName: string): Promise<FollowCountsResponse> => {
   try {
-    const response = await api.get<ApiResponse<FollowCountsResponse>>(`/follows/count/${userId}`)
+    const response = await api.get<ApiResponse<FollowCountsResponse>>(`/follows/count/${accountName}`)
     
     if (response.data.error) {
       throw new Error(response.data.message)
@@ -114,10 +128,10 @@ const getFollowStats = async (userId: number): Promise<FollowCountsResponse> => 
   }
 }
 
-// 팔로우 상태 확인 (백엔드 FollowController.isFollowing)
-const checkFollowStatus = async (followeeId: number): Promise<boolean> => {
+// 🔥 수정: accountName으로 팔로우 상태 확인 (FollowController.isFollowing)
+const checkFollowStatusByAccountName = async (accountName: string): Promise<boolean> => {
   try {
-    const response = await api.get<ApiResponse<boolean>>(`/follows/check/${followeeId}`)
+    const response = await api.get<ApiResponse<boolean>>(`/follows/check/${accountName}`)
     
     if (response.data.error) {
       return false
@@ -130,49 +144,33 @@ const checkFollowStatus = async (followeeId: number): Promise<boolean> => {
   }
 }
 
-// 사용자 피드 조회 (백엔드 FeedController.userFeeds)
-const getUserFeeds = async (userId: number, size: number = 20): Promise<FeedDetailResponse[]> => {
+// 🔥 수정: accountName으로 팔로우 (FollowController.follow)
+const followUserByAccountName = async (accountName: string): Promise<void> => {
   try {
-    const response = await api.get<ApiResponse<FeedDetailResponse[]>>(`/feeds/users/${userId}?size=${size}`)
-    
-    if (response.data.error) {
-      throw new Error(response.data.message)
-    }
-    
-    return response.data.data
-  } catch (error: any) {
-    console.error('Failed to fetch user feeds:', error)
-    throw error
-  }
-}
-
-// 팔로우 (백엔드 FollowController.follow)
-const followUser = async (followeeId: number): Promise<void> => {
-  try {
-    await api.post<ApiResponse<void>>(`/follows/${followeeId}`)
+    await api.post<ApiResponse<void>>(`/follows/${accountName}`)
   } catch (error: any) {
     console.error('Failed to follow user:', error)
     throw error
   }
 }
 
-// 언팔로우 (백엔드 FollowController.unfollow)
-const unfollowUser = async (followeeId: number): Promise<void> => {
+// 🔥 수정: accountName으로 언팔로우 (FollowController.unfollow)
+const unfollowUserByAccountName = async (accountName: string): Promise<void> => {
   try {
-    await api.delete<ApiResponse<void>>(`/follows/${followeeId}`)
+    await api.delete<ApiResponse<void>>(`/follows/${accountName}`)
   } catch (error: any) {
     console.error('Failed to unfollow user:', error)
     throw error
   }
 }
 
-// 좋아요 토글 (백엔드 LikesController.like/unlike)
-const toggleLike = async (feedId: number, isCurrentlyLiked: boolean): Promise<void> => {
+// 🔥 수정: 게시물 좋아요 토글 (LikesController.likePost/unlikePost)
+const togglePostLike = async (postId: number, isCurrentlyLiked: boolean): Promise<void> => {
   try {
     if (isCurrentlyLiked) {
-      await api.delete<ApiResponse<void>>(`/likes/${feedId}`)
+      await api.delete<ApiResponse<void>>(`/likes/posts/${postId}`)
     } else {
-      await api.post<ApiResponse<void>>(`/likes/${feedId}`)
+      await api.post<ApiResponse<void>>(`/likes/posts/${postId}`)
     }
   } catch (error: any) {
     console.error('Failed to toggle like:', error)
@@ -186,29 +184,27 @@ const UserProfilePage: React.FC = () => {
   const { user: currentUser, isAuthenticated } = useAuth()
   
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null)
-  const [userPosts, setUserPosts] = useState<FeedDetailResponse[]>([])
+  const [userPosts, setUserPosts] = useState<PostResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [postsLoading, setPostsLoading] = useState(false)
   const [followLoading, setFollowLoading] = useState(false)
   const [showMoreOptions, setShowMoreOptions] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [postsError, setPostsError] = useState<string | null>(null)
   
-  // 🔥 URL에서 userId 추출
-  const targetUserId = Number(params.userId)
+  // 🔥 수정: URL에서 accountName 추출 (userId가 아닌 accountName을 사용)
+  const targetAccountName = params.userId as string // URL 파라미터명은 userId지만 실제로는 accountName
 
   // ============================================================================
   // 🔥 본인 프로필 접근 시 /my로 리다이렉트
   // ============================================================================
   useEffect(() => {
     if (isAuthenticated && currentUser) {
-      const currentUserId = (currentUser as any)?.userId || (currentUser as any)?.id
-      if (currentUserId === targetUserId) {
+      const currentAccountName = (currentUser as any)?.accountName
+      if (currentAccountName === targetAccountName) {
         router.push('/my')
         return
       }
     }
-  }, [isAuthenticated, currentUser, targetUserId, router])
+  }, [isAuthenticated, currentUser, targetAccountName, router])
 
   // ============================================================================
   // 🔥 데이터 로딩 함수들
@@ -216,8 +212,8 @@ const UserProfilePage: React.FC = () => {
 
   // 사용자 프로필 데이터 로드
   const loadUserProfile = async () => {
-    if (!targetUserId || isNaN(targetUserId)) {
-      setError('잘못된 사용자 ID입니다.')
+    if (!targetAccountName) {
+      setError('잘못된 사용자 계정명입니다.')
       setIsLoading(false)
       return
     }
@@ -226,17 +222,17 @@ const UserProfilePage: React.FC = () => {
     setError(null)
 
     try {
-      // 1. 사용자 기본 정보 조회
-      const userProfileResponse = await getUserProfile(targetUserId)
+      // 1. 사용자 피드 정보 조회 (게시물 포함)
+      const feedResponse = await getUserFeedByAccountName(targetAccountName)
       
       // 2. 팔로우 통계 조회
-      const statsResult = await getFollowStats(targetUserId)
+      const statsResult = await getFollowStatsByAccountName(targetAccountName)
       
       // 3. 팔로우 상태 확인 (로그인한 경우만)
       let isFollowing = false
       if (isAuthenticated) {
         try {
-          isFollowing = await checkFollowStatus(targetUserId)
+          isFollowing = await checkFollowStatusByAccountName(targetAccountName)
         } catch (e) {
           console.warn('팔로우 상태 확인 실패:', e)
         }
@@ -244,14 +240,25 @@ const UserProfilePage: React.FC = () => {
 
       // 4. 통합된 프로필 데이터 생성
       const profileData: UserProfileData = {
-        ...userProfileResponse,
-        postsCount: 0, // 게시물 로드 후 업데이트
+        userId: feedResponse.userId,
+        userName: targetAccountName, // 실제로는 User 엔티티에서 가져와야 하지만 일단 accountName 사용
+        userEmail: '', // FeedWithPostsResponse에 없으므로 빈 값
+        accountName: feedResponse.accountName,
+        profileImage: feedResponse.profileImage,
+        prettyFace: null, // FeedWithPostsResponse에 없으므로 null
+        postsCount: feedResponse.posts.length,
         followersCount: statsResult.followerCount,
         followingCount: statsResult.followingCount,
         isFollowing: isFollowing
       }
 
       setUserProfile(profileData)
+      setUserPosts(feedResponse.posts)
+
+      console.log('사용자 프로필 로드 완료:', {
+        profile: profileData,
+        postsCount: feedResponse.posts.length
+      })
 
     } catch (error: any) {
       console.error('사용자 프로필 로드 실패:', error)
@@ -274,38 +281,6 @@ const UserProfilePage: React.FC = () => {
     }
   }
 
-  // 사용자 게시물 로드
-  const loadUserPosts = async () => {
-    if (!userProfile) return
-
-    setPostsLoading(true)
-    setPostsError(null)
-
-    try {
-      const feeds = await getUserFeeds(userProfile.userId, 20)
-      setUserPosts(feeds)
-      
-      // 게시물 수 업데이트
-      setUserProfile(prev => prev ? { ...prev, postsCount: feeds.length } : null)
-
-    } catch (error: any) {
-      console.error('사용자 게시물 로드 실패:', error)
-      
-      let errorMessage = '게시물을 불러오는데 실패했습니다.'
-      if (error?.response?.status === 403) {
-        errorMessage = '이 사용자의 게시물을 볼 권한이 없습니다.'
-      } else if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message
-      } else if (error?.message) {
-        errorMessage = error.message
-      }
-      
-      setPostsError(errorMessage)
-    } finally {
-      setPostsLoading(false)
-    }
-  }
-
   // ============================================================================
   // useEffect 훅들
   // ============================================================================
@@ -314,21 +289,14 @@ const UserProfilePage: React.FC = () => {
   useEffect(() => {
     // 본인 프로필인 경우 로딩하지 않음 (리다이렉트됨)
     if (isAuthenticated && currentUser) {
-      const currentUserId = (currentUser as any)?.userId || (currentUser as any)?.id
-      if (currentUserId === targetUserId) {
+      const currentAccountName = (currentUser as any)?.accountName
+      if (currentAccountName === targetAccountName) {
         return
       }
     }
 
     loadUserProfile()
-  }, [targetUserId, isAuthenticated])
-
-  // 게시물 로드 (프로필 로드 후)
-  useEffect(() => {
-    if (userProfile) {
-      loadUserPosts()
-    }
-  }, [userProfile?.userId])
+  }, [targetAccountName, isAuthenticated])
 
   // ============================================================================
   // 🔥 이벤트 핸들러들
@@ -338,26 +306,28 @@ const UserProfilePage: React.FC = () => {
     router.back()
   }
 
-  // 팔로우 토글 (백엔드 연동)
+  // 🔥 수정: accountName 기반 팔로우 토글
   const handleFollow = async () => {
     if (!userProfile || !isAuthenticated) return
 
     setFollowLoading(true)
     try {
       if (userProfile.isFollowing) {
-        await unfollowUser(targetUserId)
+        await unfollowUserByAccountName(userProfile.accountName)
         setUserProfile(prev => prev ? {
           ...prev,
           isFollowing: false,
           followersCount: Math.max(0, prev.followersCount - 1)
         } : null)
+        console.log('언팔로우 완료:', userProfile.accountName)
       } else {
-        await followUser(targetUserId)
+        await followUserByAccountName(userProfile.accountName)
         setUserProfile(prev => prev ? {
           ...prev,
           isFollowing: true,
           followersCount: prev.followersCount + 1
         } : null)
+        console.log('팔로우 완료:', userProfile.accountName)
       }
     } catch (error: any) {
       console.error('팔로우 처리 실패:', error)
@@ -388,13 +358,13 @@ const UserProfilePage: React.FC = () => {
     }
   }
 
-  // 게시물 클릭 - feedId 기반으로 상세 페이지로 이동
-  const handlePostClick = (post: FeedDetailResponse) => {
-    router.push(`/feeds/${post.feedId}`)
+  // 🔥 수정: postId 기반으로 게시물 상세 페이지로 이동
+  const handlePostClick = (post: PostResponse) => {
+    router.push(`/feeds/posts/${post.postId}`)
   }
 
-  // 게시물 좋아요 (백엔드 연동)
-  const handlePostLike = async (post: FeedDetailResponse) => {
+  // 🔥 수정: PostResponse 기반 좋아요 처리
+  const handlePostLike = async (post: PostResponse) => {
     if (!isAuthenticated) {
       alert('로그인이 필요합니다.')
       return
@@ -403,20 +373,26 @@ const UserProfilePage: React.FC = () => {
     try {
       // 낙관적 업데이트
       setUserPosts(prev => prev.map(p => 
-        p.feedId === post.feedId 
-          ? { ...p, liked: !p.liked }
+        p.postId === post.postId 
+          ? { 
+              ...p, 
+              isLikedByMe: !p.isLikedByMe,
+              likeCount: p.isLikedByMe ? p.likeCount - 1 : p.likeCount + 1
+            }
           : p
       ))
 
-      await toggleLike(post.feedId, post.liked)
+      await togglePostLike(post.postId, post.isLikedByMe)
+      
+      console.log(`좋아요 ${post.isLikedByMe ? '취소' : '추가'} 완료:`, post.postId)
       
     } catch (error: any) {
       console.error('좋아요 처리 실패:', error)
       
       // 실패 시 롤백
       setUserPosts(prev => prev.map(p => 
-        p.feedId === post.feedId 
-          ? { ...p, liked: post.liked }
+        p.postId === post.postId 
+          ? post  // 원래 상태로 복원
           : p
       ))
       
@@ -511,7 +487,7 @@ const UserProfilePage: React.FC = () => {
             <ArrowLeftIcon className="w-5 h-5" />
           </button>
           
-          <h1 className="text-lg font-semibold text-gray-900">{userProfile.userName}</h1>
+          <h1 className="text-lg font-semibold text-gray-900">{userProfile.accountName}</h1>
           
           <div className="flex items-center space-x-2">
             <button
@@ -520,12 +496,51 @@ const UserProfilePage: React.FC = () => {
             >
               <ShareIcon className="w-5 h-5" />
             </button>
-            <button
-              onClick={() => setShowMoreOptions(!showMoreOptions)}
-              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-            >
-              <EllipsisHorizontalIcon className="w-5 h-5" />
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowMoreOptions(!showMoreOptions)}
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <EllipsisHorizontalIcon className="w-5 h-5" />
+              </button>
+              
+              {/* 더보기 옵션 드롭다운 */}
+              {showMoreOptions && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                  <button 
+                    onClick={() => {
+                      handleShare()
+                      setShowMoreOptions(false)
+                    }}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm"
+                  >
+                    프로필 공유
+                  </button>
+                  {canInteract && (
+                    <>
+                      <button 
+                        onClick={() => setShowMoreOptions(false)}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm"
+                      >
+                        신고하기
+                      </button>
+                      <button 
+                        onClick={() => setShowMoreOptions(false)}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm"
+                      >
+                        차단하기
+                      </button>
+                    </>
+                  )}
+                  <button 
+                    onClick={() => setShowMoreOptions(false)}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm text-gray-500"
+                  >
+                    취소
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -540,21 +555,23 @@ const UserProfilePage: React.FC = () => {
               {userProfile.profileImage ? (
                 <img
                   src={userProfile.profileImage}
-                  alt={userProfile.userName}
+                  alt={userProfile.accountName}
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <div className="w-full h-full bg-blue-500 flex items-center justify-center text-white text-2xl font-bold">
-                  {userProfile.userName.charAt(0).toUpperCase()}
+                  {userProfile.accountName.charAt(0).toUpperCase()}
                 </div>
               )}
             </div>
 
             {/* 사용자 정보 */}
             <div className="flex-1">
-              <h2 className="text-xl font-bold text-gray-900 mb-1">{userProfile.userName}</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-1">{userProfile.accountName}</h2>
               <p className="text-gray-500 text-sm mb-2">@{userProfile.accountName}</p>
-              <p className="text-gray-500 text-sm mb-4">{userProfile.userEmail}</p>
+              {userProfile.userEmail && (
+                <p className="text-gray-500 text-sm mb-4">{userProfile.userEmail}</p>
+              )}
 
               {/* 통계 */}
               <div className="flex items-center space-x-6 text-sm">
@@ -594,22 +611,22 @@ const UserProfilePage: React.FC = () => {
               <button
                 onClick={handleFollow}
                 disabled={followLoading}
-                className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+                className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center ${
                   userProfile.isFollowing
                     ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
               >
                 {followLoading ? (
-                  <LoadingSpinner size="sm" className="mx-auto" />
+                  <LoadingSpinner size="sm" />
                 ) : userProfile.isFollowing ? (
                   <>
-                    <UserMinusIcon className="w-4 h-4 mr-2 inline" />
+                    <UserMinusIcon className="w-4 h-4 mr-2" />
                     팔로잉
                   </>
                 ) : (
                   <>
-                    <UserPlusIcon className="w-4 h-4 mr-2 inline" />
+                    <UserPlusIcon className="w-4 h-4 mr-2" />
                     팔로우
                   </>
                 )}
@@ -633,33 +650,12 @@ const UserProfilePage: React.FC = () => {
 
         {/* 게시물 섹션 */}
         <div className="p-6">
-          {/* 에러 표시 */}
-          {postsError && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-              <p className="text-red-800">{postsError}</p>
-              <button
-                onClick={() => loadUserPosts()}
-                className="mt-2 text-red-600 hover:text-red-800 font-medium"
-              >
-                다시 시도
-              </button>
-            </div>
-          )}
-
-          {/* 로딩 상태 */}
-          {postsLoading && (
-            <div className="text-center py-12">
-              <LoadingSpinner size="lg" />
-              <p className="mt-4 text-gray-600">게시물을 불러오는 중...</p>
-            </div>
-          )}
-
           {/* 게시물 목록 */}
-          {!postsLoading && userPosts.length > 0 ? (
+          {userPosts.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {userPosts.map((post) => (
                 <div
-                  key={post.feedId}
+                  key={post.postId}
                   className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
                   onClick={() => handlePostClick(post)}
                 >
@@ -667,11 +663,11 @@ const UserProfilePage: React.FC = () => {
                   <div className="relative aspect-square overflow-hidden">
                     <img
                       src={post.imgUrl}
-                      alt={post.caption}
+                      alt={post.caption || '게시물 이미지'}
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
-                        target.src = `https://picsum.photos/300/300?seed=${post.feedId}`;
+                        target.src = `https://picsum.photos/300/300?seed=${post.postId}`;
                       }}
                     />
                     
@@ -684,7 +680,7 @@ const UserProfilePage: React.FC = () => {
                         }}
                         className="absolute top-2 right-2 p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white/90 transition-colors"
                       >
-                        {post.liked ? (
+                        {post.isLikedByMe ? (
                           <HeartSolidIcon className="w-5 h-5 text-red-500" />
                         ) : (
                           <HeartIcon className="w-5 h-5 text-gray-600" />
@@ -692,10 +688,11 @@ const UserProfilePage: React.FC = () => {
                       </button>
                     )}
 
-                    {/* 로그인하지 않은 경우 좋아요 표시만 */}
-                    {!canInteract && post.liked && (
-                      <div className="absolute top-2 right-2 p-2 bg-white/80 backdrop-blur-sm rounded-full">
-                        <HeartSolidIcon className="w-5 h-5 text-red-500" />
+                    {/* 좋아요 수 표시 */}
+                    {post.likeCount > 0 && (
+                      <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 text-white text-xs rounded-full flex items-center">
+                        <HeartSolidIcon className="w-3 h-3 mr-1 text-red-500" />
+                        {post.likeCount}
                       </div>
                     )}
                   </div>
@@ -707,7 +704,7 @@ const UserProfilePage: React.FC = () => {
                     )}
                     <div className="flex items-center justify-between text-xs text-gray-400">
                       <span>{new Date(post.createdAt).toLocaleDateString('ko-KR')}</span>
-                      {post.liked && (
+                      {post.isLikedByMe && (
                         <span className="flex items-center text-red-500">
                           <HeartSolidIcon className="h-3 w-3 mr-1" />
                           좋아요
@@ -718,7 +715,7 @@ const UserProfilePage: React.FC = () => {
                 </div>
               ))}
             </div>
-          ) : !postsLoading ? (
+          ) : (
             // 게시물 없음
             <div className="text-center py-20">
               <div className="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
@@ -727,48 +724,11 @@ const UserProfilePage: React.FC = () => {
                 </svg>
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">아직 게시물이 없습니다</h3>
-              <p className="text-gray-500">{userProfile.userName}님이 사진을 공유하면 여기에 표시됩니다.</p>
+              <p className="text-gray-500">{userProfile.accountName}님이 사진을 공유하면 여기에 표시됩니다.</p>
             </div>
-          ) : null}
+          )}
         </div>
       </main>
-
-      {/* 더보기 옵션 드롭다운 */}
-      {showMoreOptions && (
-        <div className="fixed top-16 right-4 bg-white rounded-lg shadow-lg border border-gray-200 py-2 min-w-[150px] z-50">
-          <button 
-            onClick={() => {
-              handleShare()
-              setShowMoreOptions(false)
-            }}
-            className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm"
-          >
-            프로필 공유
-          </button>
-          {canInteract && (
-            <>
-              <button 
-                onClick={() => setShowMoreOptions(false)}
-                className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm"
-              >
-                신고하기
-              </button>
-              <button 
-                onClick={() => setShowMoreOptions(false)}
-                className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm"
-              >
-                차단하기
-              </button>
-            </>
-          )}
-          <button 
-            onClick={() => setShowMoreOptions(false)}
-            className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm text-gray-500"
-          >
-            취소
-          </button>
-        </div>
-      )}
 
       {/* 하단 고정 액션 바 (모바일) */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-40">
@@ -807,6 +767,14 @@ const UserProfilePage: React.FC = () => {
 
       {/* 모바일 하단 액션 바 공간 확보 */}
       <div className="md:hidden h-20"></div>
+
+      {/* 드롭다운 외부 클릭 시 닫기 */}
+      {showMoreOptions && (
+        <div
+          className="fixed inset-0 z-30"
+          onClick={() => setShowMoreOptions(false)}
+        />
+      )}
     </div>
   )
 }

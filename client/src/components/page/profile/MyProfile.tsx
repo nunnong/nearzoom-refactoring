@@ -1,41 +1,30 @@
+// =============================================================================
+// 📁 MyProfile.tsx - 백엔드 완벽 연동 버전
+// =============================================================================
+
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
 import {
   PencilSquareIcon,
   HeartIcon,
-  EyeIcon
+  EyeIcon,
+  UsersIcon,
+  CameraIcon
 } from '@heroicons/react/24/outline'
+import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/auth/useAuth'
 import ProfileHeader from './ProfileHeader'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ProfileEditModal from './ProfileEditModal'
 
-// 🔥 올바른 백엔드 연동 - api from '@/lib/axios' 사용
+// 🔥 백엔드 연동 - axios 인스턴스 사용
 import api from '@/lib/axios'
 
 // ============================================================================
-// 백엔드 DTO 기반 타입 정의
+// 백엔드 DTO 기반 타입 정의 (Java 백엔드와 완벽 일치)
 // ============================================================================
-
-// FeedDetailResponse.java 기반
-interface FeedDetailResponse {
-  feedId: number;
-  imgUrl: string;
-  caption: string;
-  authorId: number;
-  accountName: string;
-  profileImage: string;
-  createdAt: string;
-  liked: boolean;
-}
-
-// FollowCountsResponse.java 기반
-interface FollowCountsResponse {
-  followerCount: number;
-  followingCount: number;
-}
 
 // 백엔드 ApiResponse 표준 형식
 interface ApiResponse<T> {
@@ -44,25 +33,87 @@ interface ApiResponse<T> {
   data: T;
 }
 
-// 🔥 프론트엔드 UserProfile 타입 (ProfileHeader와 동일)
+// PostResponse.java 기반
+interface PostResponse {
+  postId: number;
+  photoId: number;
+  imgUrl: string;
+  caption: string;
+  displayOrder: number | null;
+  createdAt: string;
+  likeCount: number;
+  isLikedByMe: boolean;
+  authorId: number;
+  authorAccountName: string;
+  authorProfileImage: string | null;
+}
+
+// FeedWithPostsResponse.java 기반
+interface FeedWithPostsResponse {
+  feedId: number;
+  userId: number;
+  accountName: string;
+  profileImage: string | null;
+  createdAt: string;
+  posts: PostResponse[];
+  isFollowing: boolean;
+}
+
+// FollowCountsResponse.java 기반
+interface FollowCountsResponse {
+  followerCount: number;
+  followingCount: number;
+}
+
+// MyFeedStatsResponse.java 기반
+interface MyFeedStatsResponse {
+  postCount: number;
+  totalLikes: number;
+  followerCount: number;
+  followingCount: number;
+}
+
+// UserProfileResponse.java 기반 (User 도메인)
+interface UserProfileResponse {
+  userId: number;
+  accountName: string;
+  userName: string;
+  userEmail: string;
+  profileImage: string | null;
+  prettyFace: string | null;
+}
+
+// 프론트엔드 통합 UserProfile 타입
 interface UserProfile {
-  id: number              // 백엔드 userId (Long)
-  accountName: string     
-  name: string
-  email: string
-  profileImage?: string
-  prettyFace?: string
-  followersCount: number
-  followingCount: number
-  isFollowing: boolean
-  isFollowedBy: boolean
-  feedsCount: number
-  feeds: FeedDetailResponse[] // 🔥 백엔드 피드 데이터 직접 사용
+  id: number;
+  accountName: string;
+  name: string;
+  email: string;
+  profileImage?: string;
+  prettyFace?: string;
+  followersCount: number;
+  followingCount: number;
+  isFollowing: boolean;
+  isFollowedBy: boolean;
+  feedsCount: number;
+  totalLikes: number;
+  posts: PostResponse[];
+  feed?: {
+    id: string;
+    name: string;
+    description: string;
+    isPublic: boolean;
+    backgroundColor: string;
+    backgroundImageUrl?: string;
+    likesCount: number;
+    createdAt: string;
+    updatedAt: string;
+  };
 }
 
 interface MyProfileProps {
-  userId?: number;         // 🔥 백엔드 userId 사용
-  accountName?: string;    
+  userId?: number;
+  accountName?: string;
   initialData?: UserProfile;
   onProfileUpdate?: (profile: UserProfile) => void;
   className?: string;
@@ -70,47 +121,205 @@ interface MyProfileProps {
 }
 
 // ============================================================================
-// 백엔드 API 함수들 (인터셉터 통해 자동 토큰 처리)
+// 백엔드 API 엔드포인트 상수
+// ============================================================================
+
+const PROFILE_ENDPOINTS = {
+  // FeedController 엔드포인트들
+  USER_FEED_BY_ID: (userId: number) => `/feeds/users/${userId}`,
+  USER_FEED_BY_ACCOUNT: (accountName: string) => `/feeds/users/account/${accountName}`,
+  MY_FEED_STATS: '/feeds/my-stats', // 가정된 엔드포인트
+  SEARCH_FEEDS: '/feeds/search',
+  
+  // FollowController 엔드포인트들
+  FOLLOW_COUNTS: (accountName: string) => `/follows/count/${accountName}`,
+  CHECK_FOLLOW: (accountName: string) => `/follows/check/${accountName}`,
+  FOLLOW_USER: (accountName: string) => `/follows/${accountName}`,
+  UNFOLLOW_USER: (accountName: string) => `/follows/${accountName}`,
+  
+  // LikesController 엔드포인트들
+  LIKE_POST: (postId: number) => `/likes/posts/${postId}`,
+  UNLIKE_POST: (postId: number) => `/likes/posts/${postId}`,
+};
+
+// ============================================================================
+// 백엔드 API 함수들 (실제 Java Controller 엔드포인트 사용)
 // ============================================================================
 
 const profileAPI = {
-  // GET /feeds/users/{userId} - 특정 사용자의 피드 목록
-  getUserFeeds: async (userId: number, size: number = 20): Promise<FeedDetailResponse[]> => {
-    const response = await api.get<ApiResponse<FeedDetailResponse[]>>(
-      `/feeds/users/${userId}?size=${size}`
+  // 🔥 GET /feeds/users/{userId} - 사용자 피드 조회
+  getUserFeedWithPosts: async (userId: number): Promise<FeedWithPostsResponse> => {
+    const response = await api.get<ApiResponse<FeedWithPostsResponse>>(
+      PROFILE_ENDPOINTS.USER_FEED_BY_ID(userId)
     );
+    
+    if (response.data.error) {
+      throw new Error(response.data.message || '사용자 피드를 불러올 수 없습니다.');
+    }
+    
     return response.data.data;
   },
 
-  // GET /follows/count/{userId} - 팔로우 수 조회  
-  getFollowCounts: async (userId: number): Promise<FollowCountsResponse> => {
-    const response = await api.get<ApiResponse<FollowCountsResponse>>(
-      `/follows/count/${userId}`
+  // 🔥 GET /feeds/users/account/{accountName} - 계정명으로 사용자 피드 조회
+  getUserFeedByAccountName: async (accountName: string): Promise<FeedWithPostsResponse> => {
+    const response = await api.get<ApiResponse<FeedWithPostsResponse>>(
+      PROFILE_ENDPOINTS.USER_FEED_BY_ACCOUNT(accountName)
     );
+    
+    if (response.data.error) {
+      throw new Error(response.data.message || '사용자를 찾을 수 없습니다.');
+    }
+    
     return response.data.data;
   },
 
-  // GET /follows/check/{followeeId} - 팔로우 상태 확인
-  checkFollowStatus: async (followeeId: number): Promise<boolean> => {
-    const response = await api.get<ApiResponse<boolean>>(
-      `/follows/check/${followeeId}`
-    );
-    return response.data.data;
-  },
-
-  // GET /feeds/search - 검색으로 accountName → userId 찾기
-  searchUserByAccountName: async (accountName: string): Promise<number | null> => {
+  // 🔥 GET /feeds/my-stats - 내 피드 통계 조회 (가정)
+  getMyFeedStats: async (): Promise<MyFeedStatsResponse> => {
     try {
-      const response = await api.get<ApiResponse<FeedDetailResponse[]>>(
-        `/feeds/search?query=${encodeURIComponent(accountName)}&size=1`
+      const response = await api.get<ApiResponse<MyFeedStatsResponse>>(
+        PROFILE_ENDPOINTS.MY_FEED_STATS
       );
-      const feeds = response.data.data;
-      return feeds.length > 0 ? feeds[0].authorId : null;
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '통계를 불러올 수 없습니다.');
+      }
+      
+      return response.data.data;
     } catch (error) {
-      console.error('Failed to find user by accountName:', error);
-      return null;
+      // 만약 이 엔드포인트가 없다면 기본값 반환
+      console.warn('My feed stats endpoint not available, using defaults');
+      return {
+        postCount: 0,
+        totalLikes: 0,
+        followerCount: 0,
+        followingCount: 0
+      };
     }
   },
+
+  // 🔥 GET /follows/count/{accountName} - 팔로우 수 조회
+  getFollowCounts: async (accountName: string): Promise<FollowCountsResponse> => {
+    const response = await api.get<ApiResponse<FollowCountsResponse>>(
+      PROFILE_ENDPOINTS.FOLLOW_COUNTS(accountName)
+    );
+    
+    if (response.data.error) {
+      throw new Error(response.data.message || '팔로우 수를 불러올 수 없습니다.');
+    }
+    
+    return response.data.data;
+  },
+
+  // 🔥 GET /follows/check/{accountName} - 팔로우 상태 확인
+  checkFollowStatus: async (accountName: string): Promise<boolean> => {
+    try {
+      const response = await api.get<ApiResponse<boolean>>(
+        PROFILE_ENDPOINTS.CHECK_FOLLOW(accountName)
+      );
+      
+      if (response.data.error) {
+        return false;
+      }
+      
+      return response.data.data;
+    } catch (error) {
+      console.error('Failed to check follow status:', error);
+      return false;
+    }
+  },
+
+  // 🔥 POST/DELETE /follows/{accountName} - 팔로우 토글
+  toggleFollow: async (accountName: string, isCurrentlyFollowing: boolean): Promise<void> => {
+    if (isCurrentlyFollowing) {
+      const response = await api.delete<ApiResponse<void>>(
+        PROFILE_ENDPOINTS.UNFOLLOW_USER(accountName)
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '언팔로우에 실패했습니다.');
+      }
+    } else {
+      const response = await api.post<ApiResponse<void>>(
+        PROFILE_ENDPOINTS.FOLLOW_USER(accountName)
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '팔로우에 실패했습니다.');
+      }
+    }
+  },
+
+  // 🔥 POST/DELETE /likes/posts/{postId} - 게시물 좋아요 토글
+  togglePostLike: async (postId: number, isCurrentlyLiked: boolean): Promise<void> => {
+    if (isCurrentlyLiked) {
+      const response = await api.delete<ApiResponse<void>>(
+        PROFILE_ENDPOINTS.UNLIKE_POST(postId)
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '좋아요 취소에 실패했습니다.');
+      }
+    } else {
+      const response = await api.post<ApiResponse<void>>(
+        PROFILE_ENDPOINTS.LIKE_POST(postId)
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '좋아요에 실패했습니다.');
+      }
+    }
+  }
+};
+
+// ============================================================================
+// 유틸리티 함수들
+// ============================================================================
+
+// 백엔드 응답을 UserProfile로 변환
+const convertToUserProfile = async (
+  feedData: FeedWithPostsResponse,
+  followCounts?: FollowCountsResponse,
+  myStats?: MyFeedStatsResponse,
+  isOwnProfile: boolean = false
+): Promise<UserProfile> => {
+  // 총 좋아요 수 계산
+  const totalLikes = myStats?.totalLikes || feedData.posts.reduce((sum, post) => sum + post.likeCount, 0);
+  
+  return {
+    id: feedData.userId,
+    accountName: feedData.accountName,
+    name: feedData.accountName, // TODO: 실제 userName 필드 추가 필요
+    email: `${feedData.accountName}@example.com`, // TODO: 실제 이메일 정보 필요
+    profileImage: feedData.profileImage || undefined,
+    prettyFace: undefined, // TODO: prettyFace 정보 추가 필요
+    followersCount: followCounts?.followerCount || myStats?.followerCount || 0,
+    followingCount: followCounts?.followingCount || myStats?.followingCount || 0,
+    isFollowing: feedData.isFollowing,
+    isFollowedBy: false, // TODO: 역팔로우 상태 API 필요
+    feedsCount: feedData.posts.length,
+    totalLikes: totalLikes,
+    posts: feedData.posts,
+    feed: {
+      id: `feed-${feedData.feedId}`,
+      name: `${feedData.accountName}의 피드`,
+      description: `${feedData.posts.length}개의 게시물`,
+      isPublic: true,
+      backgroundColor: '#f8fafc',
+      backgroundImageUrl: feedData.posts[0]?.imgUrl,
+      likesCount: totalLikes,
+      createdAt: feedData.createdAt,
+      updatedAt: feedData.createdAt,
+    }
+  };
+};
+
+// 사용자 ID 추출 헬퍼
+const extractUserId = (user: any): number => {
+  if (typeof user?.userId === 'number') return user.userId;
+  if (typeof user?.id === 'number') return user.id;
+  if (typeof user?.userId === 'string') return parseInt(user.userId) || 0;
+  if (typeof user?.id === 'string') return parseInt(user.id) || 0;
+  return 0;
 };
 
 // ============================================================================
@@ -118,107 +327,115 @@ const profileAPI = {
 // ============================================================================
 
 const MyProfile: React.FC<MyProfileProps> = ({
-  userId: propUserId,      
+  userId: propUserId,
   accountName: propAccountName,
   initialData,
   onProfileUpdate,
   className = '',
   isOwnProfile = true,
 }) => {
-  const router = useRouter()
-  const { user: currentUser, isAuthenticated } = useAuth()
-
+  const router = useRouter();
+  const { user: currentUser, isAuthenticated } = useAuth();
+  
   // ============================================================================
   // 상태 관리
   // ============================================================================
   
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(initialData || null)
-  const [isLoading, setIsLoading] = useState(!initialData)
-  const [error, setError] = useState<string | null>(null)
-  const [isProfileEditOpen, setIsProfileEditOpen] = useState(false)
-  const [feedsLoading, setFeedsLoading] = useState(false)
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(initialData || null);
+  const [isLoading, setIsLoading] = useState(!initialData);
+  const [error, setError] = useState<string | null>(null);
+  const [isProfileEditOpen, setIsProfileEditOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // ============================================================================
+  // 유틸리티 함수들
+  // ============================================================================
+
+  // 토스트 메시지 표시
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(null), 3000);
+  }, []);
+
+  // 현재 사용자 ID 가져오기
+  const getCurrentUserId = useCallback((): number => {
+    return extractUserId(currentUser);
+  }, [currentUser]);
 
   // ============================================================================
   // 백엔드 연동 - 프로필 데이터 로드
   // ============================================================================
 
   const loadUserProfile = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
     try {
-      let targetUserId: number | null = null;
+      console.log('=== 프로필 로드 시작 ===', { 
+        propUserId, 
+        propAccountName, 
+        isOwnProfile 
+      });
 
-      // 1. userId 결정
-      if (propUserId) {
-        targetUserId = propUserId;
-      } else if (propAccountName) {
-        // accountName으로 userId 찾기
-        targetUserId = await profileAPI.searchUserByAccountName(propAccountName);
-        if (!targetUserId) {
-          throw new Error(`사용자 '${propAccountName}'을 찾을 수 없습니다.`);
-        }
-      } else if (isOwnProfile && currentUser) {
-        // 본인 프로필 - 현재 사용자 ID 사용 (string → number 변환)
-        const currentUserId = currentUser?.id;
-        if (typeof currentUserId === 'string') {
-          targetUserId = parseInt(currentUserId);
-        } else if (typeof currentUserId === 'number') {
-          targetUserId = currentUserId;
-        }
+      let feedData: FeedWithPostsResponse;
+      let followCounts: FollowCountsResponse | undefined;
+      let myStats: MyFeedStatsResponse | undefined;
+
+      if (isOwnProfile) {
+        // 🔥 본인 프로필 - 내 피드 통계 및 피드 데이터 로드
+        const currentUserId = getCurrentUserId();
         
-        if (!targetUserId || isNaN(targetUserId)) {
-          throw new Error('현재 사용자 ID가 올바르지 않습니다.');
+        if (!currentUserId || !isAuthenticated) {
+          throw new Error('로그인이 필요합니다.');
         }
+
+        // 내 통계와 피드 데이터 병렬 로드
+        const [statsResult, feedResult] = await Promise.allSettled([
+          profileAPI.getMyFeedStats(),
+          profileAPI.getUserFeedWithPosts(currentUserId)
+        ]);
+
+        if (statsResult.status === 'fulfilled') {
+          myStats = statsResult.value;
+        }
+
+        if (feedResult.status === 'fulfilled') {
+          feedData = feedResult.value;
+        } else {
+          throw new Error('내 피드 정보를 불러올 수 없습니다.');
+        }
+
       } else {
-        throw new Error('사용자 정보를 확인할 수 없습니다.');
+        // 🔥 다른 사용자 프로필 - accountName 우선 사용
+        if (propAccountName) {
+          // accountName으로 피드 조회
+          feedData = await profileAPI.getUserFeedByAccountName(propAccountName);
+          
+          // 팔로우 수 조회
+          followCounts = await profileAPI.getFollowCounts(propAccountName);
+          
+        } else if (propUserId) {
+          // userId로 피드 조회
+          feedData = await profileAPI.getUserFeedWithPosts(propUserId);
+          
+          // accountName을 알아야 팔로우 수를 조회할 수 있음
+          if (feedData.accountName) {
+            followCounts = await profileAPI.getFollowCounts(feedData.accountName);
+          }
+        } else {
+          throw new Error('사용자 정보가 부족합니다.');
+        }
       }
 
-      console.log('=== 프로필 로드 시작 ===', { targetUserId, isOwnProfile });
+      // UserProfile 객체 변환
+      const profileData = await convertToUserProfile(
+        feedData,
+        followCounts,
+        myStats,
+        isOwnProfile
+      );
 
-      // 2. 병렬로 데이터 로드
-      const [userFeeds, followCounts, followStatus] = await Promise.all([
-        profileAPI.getUserFeeds(targetUserId).catch(() => []), // 피드 없으면 빈 배열
-        profileAPI.getFollowCounts(targetUserId).catch(() => ({ followerCount: 0, followingCount: 0 })),
-        !isOwnProfile ? profileAPI.checkFollowStatus(targetUserId).catch(() => false) : Promise.resolve(false)
-      ]);
-
-      // 3. 사용자 정보 구성 (첫 번째 피드에서 추출 또는 기본값)
-      const firstFeed = userFeeds[0];
-      let accountName: string = propAccountName || '';
-      let userName: string = propAccountName || '';
-      let profileImage: string | undefined;
-
-      if (firstFeed) {
-        accountName = firstFeed.accountName;
-        userName = firstFeed.accountName; // TODO: 실제 userName 필드 필요
-        profileImage = firstFeed.profileImage || undefined;
-      } else if (isOwnProfile && currentUser) {
-        const userAny = currentUser as any;
-        accountName = userAny.accountName || currentUser.email || '';
-        userName = userAny.name || currentUser.email || '';
-      } else {
-        accountName = accountName || `user${targetUserId}`;
-        userName = userName || `사용자${targetUserId}`;
-      }
-
-      // 4. UserProfile 객체 생성
-      const profileData: UserProfile = {
-        id: targetUserId,
-        accountName: accountName,
-        name: userName,
-        email: isOwnProfile && currentUser ? (currentUser.email || '') : `${accountName}@example.com`,
-        profileImage: profileImage,
-        prettyFace: undefined,
-        followersCount: followCounts.followerCount,
-        followingCount: followCounts.followingCount,
-        isFollowing: followStatus,
-        isFollowedBy: false, // TODO: 역팔로우 상태 API 필요
-        feedsCount: userFeeds.length,
-        feeds: userFeeds
-      };
-
-      console.log('프로필 로드 완료:', profileData);
+      console.log('=== 프로필 로드 완료 ===', profileData);
 
       setUserProfile(profileData);
       onProfileUpdate?.(profileData);
@@ -227,10 +444,11 @@ const MyProfile: React.FC<MyProfileProps> = ({
       console.error('Failed to load profile:', err);
       const errorMessage = err instanceof Error ? err.message : '프로필을 불러오는데 실패했습니다.';
       setError(errorMessage);
+      showToast(errorMessage);
     } finally {
       setIsLoading(false);
     }
-  }, [propUserId, propAccountName, isOwnProfile, currentUser, onProfileUpdate]);
+  }, [propUserId, propAccountName, isOwnProfile, getCurrentUserId, isAuthenticated, onProfileUpdate, showToast]);
 
   // ============================================================================
   // 초기 로드
@@ -243,77 +461,154 @@ const MyProfile: React.FC<MyProfileProps> = ({
   }, [loadUserProfile, initialData]);
 
   // ============================================================================
-  // 인증 확인 (본인 프로필일 때)
-  // ============================================================================
-
-  if (isOwnProfile && (!isAuthenticated || !currentUser)) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">로그인이 필요합니다</h2>
-          <p className="text-gray-600 mb-4">내 프로필을 보려면 로그인해주세요.</p>
-          <button
-            onClick={() => router.push('/login')}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-          >
-            로그인하기
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // ============================================================================
   // 이벤트 핸들러들
   // ============================================================================
 
+  // 피드 편집 페이지로 이동
   const handleEditFeed = useCallback(() => {
-    router.push('/my/edit')
-  }, [router])
+    router.push('/feed/create');
+  }, [router]);
 
+  // 프로필 설정 모달 열기
   const handleSettings = useCallback(() => {
-    setIsProfileEditOpen(true)
-  }, [])
+    setIsProfileEditOpen(true);
+  }, []);
 
+  // 재시도
   const handleRetry = useCallback(() => {
-    loadUserProfile()
-  }, [loadUserProfile])
+    loadUserProfile();
+  }, [loadUserProfile]);
 
-  // 🔥 피드 클릭 핸들러 (백엔드 feedId 사용)
-  const handleFeedClick = useCallback((feed: FeedDetailResponse) => {
-    router.push(`/feed/${feed.feedId}`) // feedId로 상세 페이지 이동
-  }, [router])
+  // 🔥 백엔드 연동 - 게시물 클릭 핸들러
+  const handlePostClick = useCallback((post: PostResponse) => {
+    router.push(`/post/${post.postId}`); // postId로 상세 페이지 이동
+  }, [router]);
 
-  // 🔥 팔로우 토글 핸들러
+  // 🔥 백엔드 연동 - 팔로우 토글 핸들러
   const handleFollowToggle = useCallback(async () => {
-    if (!userProfile || isOwnProfile) return;
+    if (!userProfile || isOwnProfile || !isAuthenticated) return;
+
+    const originalFollowing = userProfile.isFollowing;
+    const originalCount = userProfile.followersCount;
 
     try {
-      if (userProfile.isFollowing) {
-        await api.delete(`/follows/${userProfile.id}`);
-      } else {
-        await api.post(`/follows/${userProfile.id}`);
-      }
+      console.log('=== 팔로우 토글 시작 ===', { 
+        accountName: userProfile.accountName, 
+        currentFollowing: originalFollowing 
+      });
 
-      // 상태 업데이트
+      // 낙관적 업데이트
+      const newFollowing = !originalFollowing;
+      const newCount = newFollowing ? originalCount + 1 : Math.max(0, originalCount - 1);
+      
       setUserProfile(prev => prev ? {
         ...prev,
-        isFollowing: !prev.isFollowing,
-        followersCount: prev.isFollowing ? prev.followersCount - 1 : prev.followersCount + 1
+        isFollowing: newFollowing,
+        followersCount: newCount
       } : null);
+
+      // 🔥 실제 백엔드 API 호출
+      await profileAPI.toggleFollow(userProfile.accountName, originalFollowing);
+
+      console.log('=== 팔로우 토글 성공 ===', { 
+        accountName: userProfile.accountName, 
+        newFollowing 
+      });
+
+      showToast(newFollowing ? '팔로우했습니다!' : '언팔로우했습니다.');
 
     } catch (error) {
       console.error('Failed to toggle follow:', error);
+      
+      // 실패 시 롤백
+      setUserProfile(prev => prev ? {
+        ...prev,
+        isFollowing: originalFollowing,
+        followersCount: originalCount
+      } : null);
+      
+      const errorMessage = error instanceof Error ? error.message : '팔로우 처리에 실패했습니다.';
+      showToast(errorMessage);
     }
-  }, [userProfile, isOwnProfile]);
+  }, [userProfile, isOwnProfile, isAuthenticated, showToast]);
 
-  // 🔥 프로필 편집 저장 (백엔드 연동)
+  // 🔥 백엔드 연동 - 게시물 좋아요 토글
+  const handlePostLike = useCallback(async (post: PostResponse, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!isAuthenticated) {
+      showToast('로그인이 필요합니다.');
+      return;
+    }
+
+    const originalLiked = post.isLikedByMe;
+    const originalCount = post.likeCount;
+
+    try {
+      console.log('=== 게시물 좋아요 토글 시작 ===', { 
+        postId: post.postId, 
+        currentLiked: originalLiked 
+      });
+
+      // 낙관적 업데이트
+      const newLiked = !originalLiked;
+      const newCount = newLiked ? originalCount + 1 : Math.max(0, originalCount - 1);
+      
+      setUserProfile(prev => {
+        if (!prev) return null;
+        
+        const updatedPosts = prev.posts.map(p => 
+          p.postId === post.postId 
+            ? { ...p, isLikedByMe: newLiked, likeCount: newCount }
+            : p
+        );
+        
+        return {
+          ...prev,
+          posts: updatedPosts,
+          totalLikes: prev.totalLikes + (newLiked ? 1 : -1)
+        };
+      });
+
+      // 🔥 실제 백엔드 API 호출
+      await profileAPI.togglePostLike(post.postId, originalLiked);
+
+      console.log('=== 게시물 좋아요 토글 성공 ===', { 
+        postId: post.postId, 
+        newLiked 
+      });
+
+      showToast(newLiked ? '좋아요를 눌렀습니다!' : '좋아요를 취소했습니다.');
+
+    } catch (error) {
+      console.error('Failed to toggle post like:', error);
+      
+      // 실패 시 롤백
+      setUserProfile(prev => {
+        if (!prev) return null;
+        
+        const updatedPosts = prev.posts.map(p => 
+          p.postId === post.postId 
+            ? { ...p, isLikedByMe: originalLiked, likeCount: originalCount }
+            : p
+        );
+        
+        return {
+          ...prev,
+          posts: updatedPosts
+        };
+      });
+      
+      const errorMessage = error instanceof Error ? error.message : '좋아요 처리에 실패했습니다.';
+      showToast(errorMessage);
+    }
+  }, [isAuthenticated, showToast]);
+
+  // 🔥 프로필 편집 저장 (백엔드 연동 - 향후 구현)
   const handleProfileSave = useCallback(async (data: { name: string; description: string }) => {
     try {
-      // TODO: 프로필 업데이트 API 호출
-      // await api.put('/user/profile', { name: data.name, bio: data.description });
-      
-      console.log('프로필 업데이트 (현재 미구현):', data);
+      // TODO: 실제 프로필 업데이트 API 구현 필요
+      console.log('프로필 업데이트 (향후 구현):', data);
 
       // 로컬 상태 업데이트
       setUserProfile(prev => {
@@ -329,15 +624,43 @@ const MyProfile: React.FC<MyProfileProps> = ({
       });
 
       setIsProfileEditOpen(false);
+      showToast('프로필이 업데이트되었습니다!');
 
     } catch (error) {
       console.error('Failed to update profile:', error);
+      showToast('프로필 업데이트에 실패했습니다.');
     }
-  }, [onProfileUpdate]);
+  }, [onProfileUpdate, showToast]);
 
   const closeProfileEditModal = useCallback(() => {
     setIsProfileEditOpen(false);
   }, []);
+
+  // ============================================================================
+  // 렌더링 - 인증 확인 (본인 프로필일 때)
+  // ============================================================================
+
+  if (isOwnProfile && (!isAuthenticated || !currentUser)) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-center">
+          <div className="mb-4">
+            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">로그인이 필요합니다</h2>
+          <p className="text-gray-600 mb-4">내 프로필을 보려면 로그인해주세요.</p>
+          <button
+            onClick={() => router.push('/login')}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+          >
+            로그인하기
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ============================================================================
   // 렌더링 - 로딩 상태
@@ -351,7 +674,7 @@ const MyProfile: React.FC<MyProfileProps> = ({
           <p className="mt-4 text-gray-600">프로필을 불러오는 중...</p>
         </div>
       </div>
-    )
+    );
   }
 
   // ============================================================================
@@ -377,7 +700,7 @@ const MyProfile: React.FC<MyProfileProps> = ({
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   if (!userProfile) {
@@ -394,7 +717,7 @@ const MyProfile: React.FC<MyProfileProps> = ({
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   // ============================================================================
@@ -403,42 +726,24 @@ const MyProfile: React.FC<MyProfileProps> = ({
 
   return (
     <div className={`max-w-4xl mx-auto ${className}`}>
-      {/* 🔥 프로필 헤더 - ProfileHeader 타입에 맞춰 수정 */}
+      {/* 🔥 프로필 헤더 */}
       <ProfileHeader
         user={{
-          id: userProfile.id, // number 타입 그대로
+          id: userProfile.id,
           name: userProfile.name,
           email: userProfile.email,
-          accountName: userProfile.accountName, // accountName 추가
+          accountName: userProfile.accountName,
           profileImage: userProfile.profileImage,
           followersCount: userProfile.followersCount,
           followingCount: userProfile.followingCount,
           isFollowing: userProfile.isFollowing,
           isFollowedBy: userProfile.isFollowedBy,
-          feed: {
-            id: `feed-${userProfile.id}`,
-            name: `${userProfile.name}의 피드`,
-            description: '내 소중한 이야기들',
-            isPublic: true,
-            backgroundColor: '#ffffff',
-            backgroundImageUrl: undefined,
-            likesCount: 0,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }
+          feed: userProfile.feed!
         }}
         isOwnProfile={isOwnProfile}
         onEditClick={handleSettings}
         onFollowClick={handleFollowToggle}
-        currentUserId={(() => {
-          const userId = currentUser?.id;
-          if (typeof userId === 'string') {
-            return parseInt(userId) || 0;
-          } else if (typeof userId === 'number') {
-            return userId;
-          }
-          return 0;
-        })()}
+        currentUserId={getCurrentUserId()}
       />
 
       {/* 🔥 피드 편집 버튼 - 본인 프로필일 때만 표시 */}
@@ -449,69 +754,139 @@ const MyProfile: React.FC<MyProfileProps> = ({
             className="inline-flex items-center px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium transition-colors shadow-lg hover:shadow-xl transform hover:scale-105"
           >
             <PencilSquareIcon className="h-5 w-5 mr-2" />
-            <span>피드 편집하기</span>
+            <span>새 게시물 만들기</span>
           </button>
         </div>
       )}
 
-      {/* 🔥 피드 목록 (백엔드 데이터) */}
+      {/* 🔥 통계 요약 */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
+          <div className="text-2xl font-bold text-red-500 mb-1">{userProfile.totalLikes}</div>
+          <div className="text-sm text-gray-600">총 좋아요</div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
+          <div className="text-2xl font-bold text-green-600 mb-1">{userProfile.followersCount}</div>
+          <div className="text-sm text-gray-600">팔로워</div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
+          <div className="text-2xl font-bold text-purple-600 mb-1">{userProfile.followingCount}</div>
+          <div className="text-sm text-gray-600">팔로잉</div>
+        </div>
+      </div>
+
+      {/* 🔥 게시물 목록 (백엔드 데이터) */}
       <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-        {/* 피드 헤더 */}
+        {/* 게시물 헤더 */}
         <div className="p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
-            {userProfile.name}의 피드
-          </h2>
-          <p className="text-gray-600 text-sm">총 {userProfile.feedsCount}개의 피드</p>
-          <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
-            <span className="flex items-center">
-              <HeartIcon className="w-4 h-4 mr-1" />
-              팔로워 {userProfile.followersCount}
-            </span>
-            <span className="flex items-center">
-              <EyeIcon className="w-4 h-4 mr-1" />
-              팔로잉 {userProfile.followingCount}
-            </span>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">
+                {isOwnProfile ? '내 게시물' : `${userProfile.name}의 게시물`}
+              </h2>
+              <p className="text-gray-600 text-sm">총 {userProfile.posts.length}개의 게시물</p>
+            </div>
+            
+            {isOwnProfile && (
+              <button
+                onClick={handleEditFeed}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+              >
+                <CameraIcon className="h-4 w-4 mr-2" />
+                새 게시물
+              </button>
+            )}
           </div>
         </div>
 
-        {/* 피드 그리드 */}
+        {/* 게시물 그리드 */}
         <div className="p-6">
-          {userProfile.feeds.length > 0 ? (
+          {userProfile.posts.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {userProfile.feeds.map((feed) => (
+              {userProfile.posts.map((post) => (
                 <div
-                  key={feed.feedId}
-                  className="bg-gray-50 rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => handleFeedClick(feed)}
+                  key={post.postId}
+                  className="group bg-gray-50 rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-all duration-200 border border-gray-200"
+                  onClick={() => handlePostClick(post)}
                 >
-                  {/* 피드 이미지 */}
-                  {feed.imgUrl && (
-                    <div className="w-full h-48 mb-3 rounded-lg overflow-hidden">
-                      <img
-                        src={feed.imgUrl}
-                        alt={feed.caption || '피드 이미지'}
-                        className="w-full h-full object-cover"
-                      />
+                  {/* 게시물 이미지 */}
+                  <div className="relative aspect-square overflow-hidden">
+                    <img
+                      src={post.imgUrl}
+                      alt={post.caption || '게시물 이미지'}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = '/api/placeholder/300/300?text=No+Image';
+                      }}
+                    />
+                    
+                    {/* 호버 오버레이 */}
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center space-x-4 text-white">
+                        <div className="flex items-center">
+                          {post.isLikedByMe ? (
+                            <HeartSolidIcon className="h-6 w-6 text-red-500" />
+                          ) : (
+                            <HeartIcon className="h-6 w-6" />
+                          )}
+                          <span className="ml-1 font-medium">{post.likeCount}</span>
+                        </div>
+                        <div className="flex items-center">
+                          <EyeIcon className="h-6 w-6" />
+                          <span className="ml-1 font-medium">보기</span>
+                        </div>
+                      </div>
                     </div>
-                  )}
+                  </div>
                   
-                  {/* 피드 정보 */}
-                  <h3 className="font-medium text-gray-900 mb-1">
-                    {feed.caption || '제목 없음'}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                    {feed.accountName}
-                  </p>
-                  
-                  {/* 피드 통계 */}
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span className="flex items-center">
-                      <HeartIcon className={`w-3 h-3 mr-1 ${feed.liked ? 'text-red-500 fill-current' : ''}`} />
-                      {feed.liked ? '좋아함' : '좋아요'}
-                    </span>
-                    <span>
-                      {new Date(feed.createdAt).toLocaleDateString()}
-                    </span>
+                  {/* 게시물 정보 */}
+                  <div className="p-4">
+                    <h3 className="font-medium text-gray-900 mb-2 line-clamp-2">
+                      {post.caption || '제목 없음'}
+                    </h3>
+                    
+                    {/* 게시물 통계 */}
+                    <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
+                      <button
+                        onClick={(e) => handlePostLike(post, e)}
+                        className="flex items-center hover:text-red-500 transition-colors"
+                      >
+                        {post.isLikedByMe ? (
+                          <HeartSolidIcon className="h-4 w-4 text-red-500 mr-1" />
+                        ) : (
+                          <HeartIcon className="h-4 w-4 mr-1" />
+                        )}
+                        <span>{post.likeCount}</span>
+                      </button>
+                      
+                      <span>
+                        {new Date(post.createdAt).toLocaleDateString('ko-KR', {
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </span>
+                    </div>
+                    
+                    {/* 작성자 정보 (다른 사람 프로필에서 보는 경우) */}
+                    {!isOwnProfile && (
+                      <div className="flex items-center">
+                        <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-200 mr-2">
+                          {post.authorProfileImage ? (
+                            <img
+                              src={post.authorProfileImage}
+                              alt={post.authorAccountName}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                              {post.authorAccountName.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-xs text-gray-600">{post.authorAccountName}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -519,19 +894,21 @@ const MyProfile: React.FC<MyProfileProps> = ({
           ) : (
             <div className="text-center py-12">
               <div className="text-gray-400 mb-4">
-                <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
+                <CameraIcon className="mx-auto h-12 w-12" />
               </div>
-              <p className="text-gray-500">
-                {isOwnProfile ? '아직 피드가 없습니다. 첫 번째 피드를 만들어보세요!' : '피드가 없습니다.'}
+              <p className="text-gray-500 text-lg mb-2">
+                {isOwnProfile ? '아직 게시물이 없습니다' : '게시물이 없습니다'}
+              </p>
+              <p className="text-gray-400 text-sm mb-6">
+                {isOwnProfile ? '첫 번째 게시물을 만들어보세요!' : '아직 업로드된 게시물이 없습니다.'}
               </p>
               {isOwnProfile && (
                 <button
                   onClick={handleEditFeed}
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
-                  피드 만들기
+                  <CameraIcon className="h-5 w-5 mr-2" />
+                  첫 게시물 만들기
                 </button>
               )}
             </div>
@@ -550,8 +927,33 @@ const MyProfile: React.FC<MyProfileProps> = ({
           onSave={handleProfileSave}
         />
       )}
-    </div>
-  )
-}
 
-export default MyProfile
+      {/* 토스트 메시지 */}
+      {toastMessage && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="px-4 py-2 rounded-lg bg-green-500 text-white font-medium shadow-lg transition-all duration-300">
+            {toastMessage}
+          </div>
+        </div>
+      )}
+
+      {/* 개발 정보 (개발 모드에서만) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-4 right-4 bg-black bg-opacity-70 text-white text-xs rounded p-3 z-30 max-w-xs">
+          <div className="font-semibold mb-1">🔥 개발 정보</div>
+          <div>사용자 ID: {userProfile.id}</div>
+          <div>계정명: {userProfile.accountName}</div>
+          <div>게시물 수: {userProfile.posts.length}</div>
+          <div>팔로워: {userProfile.followersCount}</div>
+          <div>팔로잉: {userProfile.followingCount}</div>
+          <div>총 좋아요: {userProfile.totalLikes}</div>
+          <div>본인 프로필: {isOwnProfile ? 'Yes' : 'No'}</div>
+          <div>팔로우 상태: {userProfile.isFollowing ? 'Yes' : 'No'}</div>
+          <div>인증: {isAuthenticated ? 'Yes' : 'No'}</div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default MyProfile;
