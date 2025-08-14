@@ -19,7 +19,7 @@ export const API_ENDPOINTS = {
   PHOTOS: '/myroom/photos',
   HEART: '/myroom/photos/heart',
   DELETE_PHOTO: '/myroom/photos',
-  SAVE_EDITED: '/myroom/photos/save-edited',
+  SAVE_EDITED: '/photos/save-edited-with-url', // 1 편집 사진 -> 2, 4 백엔드(주소 받아와서 저장까지) -> 3. 이미지 서버
   SAVE_FACE_IMAGE: '/user/save-face-image',
 
   // PhotoPrompt
@@ -37,10 +37,6 @@ export const API_ENDPOINTS = {
   LIKE_PHOTO: '/likes',
   UNLIKE_PHOTO: '/likes',
   LIKE_COUNT: '/likes',
-
-  // Feeds
-  FEEDS: '/feeds',
-  FEED_DETAIL: '/feeds',
 
   // User Management
   USER_INFO: '/user/userInfo', // (닉네임, 프로필, 참고 사진)

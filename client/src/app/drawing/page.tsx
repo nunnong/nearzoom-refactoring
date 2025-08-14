@@ -146,20 +146,11 @@ const DrawingPage: React.FC = () => {
     if (id) setImageId(id)
     if (src) {
       const imgSrc = decodeURIComponent(src)
-      console.log('📷 디코딩된 이미지 URL:', imgSrc)
       
       const img = new Image()
       
       // 이미지 URL이 같은 도메인인지 확인
       const isCurrentDomain = imgSrc.startsWith(window.location.origin) || imgSrc.startsWith('/')
-      console.log('🌐 이미지 도메인 확인:', {
-        imgSrc,
-        currentOrigin: window.location.origin,
-        isCurrentDomain,
-        isDataUrl: imgSrc.startsWith('data:'),
-        isHttps: imgSrc.startsWith('https://'),
-        isHttp: imgSrc.startsWith('http://')
-      })
       
       // crossOrigin 설정 제거 (CORS 문제로 이미지 로드 실패)
       
@@ -552,17 +543,10 @@ const DrawingPage: React.FC = () => {
     }
 
     try {
-      console.log('💾 Starting save process...')
-      console.log('📝 Original image ID:', imageId)
-
-      // 백엔드에 편집본 저장 요청 (상태만 변경)
-      console.log('📤 Saving edited photo to backend...')
+      // 백엔드에 편집본 저장 요청 -> "/photos/save-edited" 여기로 
       await myroomService.saveEditedPhoto({
         photoId: parseInt(imageId!)
       })
-
-      console.log('✅ Successfully saved edited photo to backend')
-
       // 저장 성공 알림
       alert('이미지가 성공적으로 저장되었습니다!')
 

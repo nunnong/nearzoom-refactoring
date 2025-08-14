@@ -74,36 +74,18 @@ const EditConfirmModal: React.FC<EditConfirmModalProps> = ({
 
           {/* 함께한 친구 정보 */}
           <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-2">함께한 친구</h4>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">With</h4>
             <div className="text-sm text-gray-600">
               {image.partnerEmails ? (
                 <span className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full">
                   {image.partnerEmails}
                 </span>
               ) : (
-                '혼자 그린 작품'
+                'ME'
               )}
             </div>
           </div>
 
-          {/* 태그 정보 */}
-          <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-2">태그 정보</h4>
-            <div className="flex flex-wrap gap-2">
-              {image.hashtags && image.hashtags.length > 0 ? (
-                image.hashtags.map((tag, index) => (
-                  <span
-                    key={index}
-                    className="inline-block bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full"
-                  >
-                    #{tag}
-                  </span>
-                ))
-              ) : (
-                <span className="text-gray-500 text-sm">태그가 없습니다</span>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* Actions */}

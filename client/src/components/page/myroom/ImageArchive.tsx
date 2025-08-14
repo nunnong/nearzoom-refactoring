@@ -31,12 +31,11 @@ interface ImageArchiveProps {
   onLike?: (imageId: string) => void
   onShareKakao?: (imageId: string) => void
   onDelete?: (imageId: string) => void
-  onEdit?: (imageId: string) => void
+  onEdit?: (imageId: string, editedImageUrl: string) => Promise<void>
   onLoadMore?: () => Promise<void>
   hasMoreProp?: boolean
 }
 
-// debounce 함수
 const debounce = (func: Function, wait: number) => {
   let timeout: NodeJS.Timeout
   return function executedFunction(...args: any[]) {
@@ -78,7 +77,6 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
     return 36 // 매우 큰 화면: 6열 × 6개
   }, [])
 
-  // 초기 사진 데이터 가져오기 (커서 기반)
   const fetchPhotos = useCallback(async (cursor: number | null = null, isReset: boolean = false) => {
     if (propImages && propImages.length > 0) {
       return
@@ -116,7 +114,7 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
         src: photo.imageUrl, // 실제 이미지 URL 사용
         alt: `Photo ${photo.photoId}`,        // 기본값
         isLiked: photo.heart === 1,          // DB heart (1: true, 0: false)
-        isEdited: !photo.editable,           // DB editable (false면 편집됨)
+        isEdited: photo.editable === 0,      // DB editable (0: 편집 완료/불가, 1: 편집 가능)
         hashtags: []                         // hashtags 필드 없음
       }))
 
@@ -246,21 +244,61 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
   }
 
   const handleEditClick = (image: ImageItem): void => {
-    if (!image.isEdited) {
+    if (!image.isEdited) {  // editable === 1인 경우만 편집 가능
       setImageToEdit(image)
       setEditModalOpen(true)
     }
   }
 
-  const handleEditConfirm = (): void => {
+  const handleEditConfirm = async (): Promise<void> => {
     if (imageToEdit) {
-      onEdit?.(imageToEdit.id)
-      // 로컬 상태에서도 편집 상태 업데이트
+      try {
+        // TODO: 실제 편집 페이지에서 편집된 이미지 URL을 받아와야 함
+        // 여기서는 편집 프로세스를 시작하는 것으로 가정
+        // 편집이 완료되면 saveEditedPhotoWithUrl을 호출해야 함
+        
+        // 임시: 편집 페이지로 이동하거나 편집 프로세스 시작
+        if (onEdit) {
+          await onEdit(imageToEdit.id, "")  // 편집된 URL은 나중에 받아옴
+        }
+        
+        setEditModalOpen(false)
+        setImageToEdit(null)
+      } catch (error) {
+        console.error('편집 시작 실패:', error)
+      }
+    }
+  }
+
+  // 편집 완료 후 호출되는 함수 (편집 페이지에서 호출)
+  const handleEditComplete = async (originalPhotoId: string, editedImageUrl: string): Promise<void> => {
+    try {
+      // 백엔드에 편집된 이미지 저장 요청
+      await myroomService.saveEditedPhotoWithUrl({
+        editedImageUrl,
+        originalPhotoId: parseInt(originalPhotoId)
+      })
+      
+      // 로컬 상태에서 원본 이미지를 편집 불가능으로 변경
       setImages(prev => prev.map(img => 
-        img.id === imageToEdit.id ? { ...img, isEdited: true } : img
+        img.id === originalPhotoId ? { ...img, isEdited: true } : img
       ))
-      setEditModalOpen(false)
-      setImageToEdit(null)
+      
+      // 새로운 편집본 이미지를 목록에 추가 (편집 불가능 상태로)
+      const newEditedImage: ImageItem = {
+        id: `edited_${Date.now()}`, // 임시 ID, 실제로는 백엔드에서 받아온 ID 사용
+        src: editedImageUrl,
+        alt: `Edited Photo from ${originalPhotoId}`,
+        isLiked: false,
+        isEdited: true, // 편집본은 편집 불가능
+        hashtags: []
+      }
+      
+      setImages(prev => [newEditedImage, ...prev])
+      
+    } catch (error) {
+      console.error('편집 저장 실패:', error)
+      throw error
     }
   }
 
@@ -410,15 +448,6 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
                 aria-label="Share image"
               >
                 <ShareIcon className="h-4 w-4 text-white" />
-              </button>
-
-              {/* Share.png Button - Left Center */}
-              <button
-                onClick={() => {/* Share.png 관련 새로운 기능 */}}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-white/30"
-                aria-label="Share with Share.png"
-              >
-                <img src="/Share.png" alt="Share" className="h-5 w-5 object-contain" />
               </button>
 
               {/* Delete Button - Center */}

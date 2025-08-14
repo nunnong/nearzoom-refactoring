@@ -37,6 +37,17 @@ export interface PhotoDeleteRequest {
 
 export interface PhotoEditSaveRequest {
   photoId: number
+  imageFile: File
+}
+
+export interface SaveEditedPhotoWithUrlRequest {
+  editedImageUrl: string
+  originalPhotoId: number
+}
+
+export interface SaveEditedPhotoWithUrlResponse {
+  photoId: number
+  message: string
 }
 
 export const myroomService = {
@@ -81,8 +92,9 @@ export const myroomService = {
     await api.delete(API_ENDPOINTS.DELETE_PHOTO, { data: request })
   },
 
-  // 편집본 저장 (상태만 변경)
-  saveEditedPhoto: async (request: PhotoEditSaveRequest): Promise<void> => {
-    await api.post(API_ENDPOINTS.SAVE_EDITED, request)
+  // 편집 이미지 URL로 저장
+  saveEditedPhotoWithUrl: async (request: SaveEditedPhotoWithUrlRequest): Promise<SaveEditedPhotoWithUrlResponse> => {
+    const response = await api.post('/myroom/photos/save-edited-with-url', request)
+    return response.data
   },
 }

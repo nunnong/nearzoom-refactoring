@@ -117,7 +117,6 @@ export default function RoomJoinPage() {
     return () => clearInterval(interval)
   }, [pageState, isAuthenticated, roomId, lastParticipantCount])
 
-  // 🔥 추가: 브라우저 포커스 시 갱신
   useEffect(() => {
     const handleFocus = () => {
       if (pageState === 'success' && isAuthenticated && roomId) {
@@ -130,7 +129,6 @@ export default function RoomJoinPage() {
     return () => window.removeEventListener('focus', handleFocus)
   }, [pageState, isAuthenticated, roomId])
 
-  // 🔥 추가: 가시성 변경 시 갱신 (탭 전환)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && pageState === 'success' && isAuthenticated && roomId) {
