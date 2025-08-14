@@ -363,6 +363,9 @@ public void webhookFrameCompleted(FrameCompositionCompletedWebhook webhook) {
   log.info("Event: {}", webhook.event());
   log.info("Timestamp: {}", webhook.timestamp());
 
+  // 🔍 단계별 로깅 강화
+  log.info("🔍 STEP 1: 웹훅 데이터 분석 시작");
+
   // 웹훅 데이터 상세 분석
   if (webhook.data() != null) {
     log.info("=== 웹훅 Data 상세 분석 ===");
@@ -372,7 +375,11 @@ public void webhookFrameCompleted(FrameCompositionCompletedWebhook webhook) {
     log.error("❌ webhook.data()가 null입니다!");
   }
 
+  log.info("🔍 STEP 2: Try 블록 진입");
+
   try {
+    log.info("🔍 STEP 3: Redis Frame Job 정보 조회 시작");
+
     // 1️⃣ Redis Frame Job 정보 조회
     log.info("=== 1️⃣ Redis Frame Job 정보 조회 ===");
     String frameJobKey = "frame_job:" + jobId;
@@ -389,9 +396,12 @@ public void webhookFrameCompleted(FrameCompositionCompletedWebhook webhook) {
     Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries(frameJobKey);
     log.info("조회된 Frame Job 필드 개수: {}", jobInfo.size());
 
+    log.info("🔍 STEP 4: Frame Job 정보 확인 완료");
+
     if (jobInfo.isEmpty()) {
       log.error("❌ Frame Job 정보를 찾을 수 없습니다 - JobId: {}", jobId);
 
+      log.info("🔍 STEP 5: 재시도 로직 시작");
       // 재시도 로직
       log.info("=== 재시도 시작 ===");
       for (int i = 1; i <= 3; i++) {
@@ -410,8 +420,8 @@ public void webhookFrameCompleted(FrameCompositionCompletedWebhook webhook) {
 
       if (jobInfo.isEmpty()) {
         log.error("❌ 3번 재시도 후에도 Frame Job 정보를 찾을 수 없음");
-        log.warn("⚠️ Frame Job 정보 없이 진행합니다 (PhotoService는 여전히 호출)");
-        // 🔥 return을 제거하고 계속 진행!
+        log.warn("⚠️ Frame Job 정보 없이 진행합니다");
+        log.info("🔍 STEP 6: Frame Job 없이 계속 진행");
       }
     }
 
@@ -421,6 +431,8 @@ public void webhookFrameCompleted(FrameCompositionCompletedWebhook webhook) {
         log.info("  {}: {}", entry.getKey(), entry.getValue());
       }
     }
+
+    log.info("🔍 STEP 7: Redis 저장 단계");
 
     // 2️⃣ 합성 결과 저장 (Frame Job 정보가 있을 때만)
     if (!jobInfo.isEmpty()) {
@@ -435,8 +447,12 @@ public void webhookFrameCompleted(FrameCompositionCompletedWebhook webhook) {
       log.warn("⚠️ Frame Job 정보가 없어서 Redis 저장 건너뜀");
     }
 
+    log.info("🔍 STEP 8: PhotoService 호출 단계 - 이 로그가 나와야 함!");
+
     // 3️⃣ PhotoService에 최종 결과 저장 (항상 실행!)
     log.info("=== 3️⃣ PhotoService 최종 결과 저장 ===");
+    log.info("🔥🔥🔥 PhotoService 호출 직전입니다!");
+
     try {
       log.info("🔥 PhotoService.saveFinalComposedPhoto 호출 시작!");
       photoService.saveFinalComposedPhoto(webhook);
@@ -448,6 +464,8 @@ public void webhookFrameCompleted(FrameCompositionCompletedWebhook webhook) {
         log.error("finalImageUrl: {}", webhook.data().finalImageUrl());
       }
     }
+
+    log.info("🔍 STEP 9: ImageProcessingService 호출 단계");
 
     // 4️⃣ ImageProcessingService에 완료 알림
     log.info("=== 4️⃣ ImageProcessingService 완료 알림 ===");
@@ -465,12 +483,15 @@ public void webhookFrameCompleted(FrameCompositionCompletedWebhook webhook) {
       log.warn("⚠️ finalImageUrl이 없어서 ImageProcessingService 알림 생략");
     }
 
+    log.info("🔍 STEP 10: 웹훅 처리 완료");
+
     long endTime = System.currentTimeMillis();
     log.info("=== ✅ 프레임 합성 완료 웹훅 처리 성공 ===");
     log.info("JobId: {}, 총 소요시간: {}ms", jobId, (endTime - startTime));
     log.info("FinalUrl: {}", webhook.data() != null ? webhook.data().finalImageUrl() : "null");
 
   } catch (Exception e) {
+    log.info("🔍 EXCEPTION: 예외 발생!");
     long endTime = System.currentTimeMillis();
     log.error("=== ❌ 프레임 합성 완료 웹훅 처리 실패 ===");
     log.error("JobId: {}, 소요시간: {}ms", jobId, (endTime - startTime));
@@ -482,6 +503,7 @@ public void webhookFrameCompleted(FrameCompositionCompletedWebhook webhook) {
         "프레임 합성 완료 웹훅 처리 중 오류가 발생했습니다: " + e.getMessage());
   }
 }
+
 
   // 프레임 합성 실패 웹훅 상세 로깅
   public void webhookFrameFailed(FrameCompositionFailedWebhook webhook) {
