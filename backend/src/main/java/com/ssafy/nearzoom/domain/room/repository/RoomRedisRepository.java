@@ -24,11 +24,11 @@ public class RoomRedisRepository {
   private final RedisTemplate<String, String> redisTemplate;
 
   public void saveInitialInfo(Long roomId, String liveKitUrl, User user, Room liveKitRoom, String participantIdentity) {
-    // 방 정보 저장
+    // 방 정보 저장 - host를 participantIdentity로 저장
     Map<String, String> roomData = new HashMap<>();
     roomData.put("roomId", String.valueOf(roomId));
     roomData.put("serverUrl", liveKitUrl);
-    roomData.put("host", user.getUserEmail());
+    roomData.put("host", participantIdentity); // participantIdentity로 저장
     roomData.put("createdAt", LocalDateTime.now().toString());
     roomData.put("status", "active");
     roomData.put("liveKitSid", liveKitRoom.getSid());
@@ -42,7 +42,8 @@ public class RoomRedisRepository {
     // 참가자 정보 저장 (identity 기반)
     saveParticipantInfo(roomId, user.getUserName(), participantIdentity, user);
 
-    log.info("Initial room info saved. RoomId: {}, Host: {}", roomId, user.getUserName());
+    log.info("Initial room info saved. RoomId: {}, Host Identity: {}",
+        roomId, participantIdentity);
   }
 
   public void updateRoomMetadata(RoomMetaSaveRequest roomMetaSaveRequest, String roomKey) {
@@ -148,25 +149,25 @@ public class RoomRedisRepository {
     }
   }
 
-  //방장 권한 이양
-  public void transferHostAuthority(Long roomId, User currentHost, User newHost, String roomKey) {
-    // 1. 방장 정보 업데이트
-    redisTemplate.opsForHash().put(roomKey, "host", newHost.getUserEmail());
+  //방장 권한 이양 - identity 기반으로 변경
+  public void transferHostAuthority(Long roomId, String currentHostIdentity, String newHostIdentity, String roomKey) {
+    // 1. 방장 정보 업데이트 - identity로 저장
+    redisTemplate.opsForHash().put(roomKey, "host", newHostIdentity);
     redisTemplate.opsForHash().put(roomKey, "hostTransferredAt", LocalDateTime.now().toString());
-    redisTemplate.opsForHash().put(roomKey, "previousHost", currentHost.getUserEmail());
+    redisTemplate.opsForHash().put(roomKey, "previousHost", currentHostIdentity);
 
     // 2. 방장 이양 히스토리 저장 (선택사항)
     String historyKey = "host_transfer:" + roomId + ":" + System.currentTimeMillis();
     Map<String, String> transferHistory = new HashMap<>();
     transferHistory.put("roomId", String.valueOf(roomId));
-    transferHistory.put("fromHost", currentHost.getUserEmail());
-    transferHistory.put("toHost", newHost.getUserEmail());
+    transferHistory.put("fromHostIdentity", currentHostIdentity);
+    transferHistory.put("toHostIdentity", newHostIdentity);
     transferHistory.put("transferredAt", LocalDateTime.now().toString());
 
     redisTemplate.opsForHash().putAll(historyKey, transferHistory);
     redisTemplate.expire(historyKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
 
-    log.info("Host authority transferred in Redis. RoomId: {}, From: {} To: {}",
-        roomId, currentHost.getUserEmail(), newHost.getUserEmail());
+    log.info("Host authority transferred in Redis. RoomId: {}, From Identity: {} To Identity: {}",
+        roomId, currentHostIdentity, newHostIdentity);
   }
 }

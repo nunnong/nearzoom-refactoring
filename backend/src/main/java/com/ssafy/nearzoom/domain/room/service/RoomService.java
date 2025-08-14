@@ -273,11 +273,12 @@ public class RoomService {
         // LiveKit 서버 오류는 치명적이지 않으므로 계속 진행
       }
 
-      // 4. 방에 참가자가 없으면 방 종료
+      // 4. 참가자가 0명이어도 방을 유지 (수정된 부분)
       String updatedParticipants = (String) redisTemplate.opsForHash().get(roomKey, "participants");
       if (updatedParticipants == null || updatedParticipants.trim().isEmpty()) {
-        closeRoom(leaveRequest.roomId());
-        log.info("Room closed automatically as last participant left. RoomId: {}", leaveRequest.roomId());
+        log.info("Room has no participants but will be kept alive. RoomId: {}", leaveRequest.roomId());
+        // 방 상태를 "empty"로 변경하여 빈 방임을 표시 (선택사항)
+        redisTemplate.opsForHash().put(roomKey, "lastEmptyAt", LocalDateTime.now().toString());
       }
 
       log.info("User left room successfully. RoomId: {}, User: {}, Identity: {}",
@@ -292,7 +293,7 @@ public class RoomService {
           "방 나가기 중 오류가 발생했습니다: " + e.getMessage());
     }
   }
-   // 방장이 방을 완전히 종료하는 기능
+  // 방장이 방을 완전히 종료하는 기능
   public void closeRoom(HttpServletRequest request, Long roomId) {
     User user = validateUserFromCookie(request);
 
@@ -301,14 +302,16 @@ public class RoomService {
 
     isExistingRoom(roomData);
 
-    // 방장 권한 확인
-    String hostEmail = (String) roomData.get("host");
-    if (!user.getUserEmail().equals(hostEmail)) {
+    // 방장 권한 확인 - identity로 비교
+    String hostIdentity = (String) roomData.get("host");
+    String currentUserIdentity = getCurrentUserIdentity(roomId, user);
+
+    if (currentUserIdentity == null || !currentUserIdentity.equals(hostIdentity)) {
       throw new ApiException(HttpStatus.FORBIDDEN, "방을 종료할 권한이 없습니다. 방장만 방을 종료할 수 있습니다.");
     }
 
     closeRoom(roomId);
-    log.info("Room closed by host. RoomId: {}, Host: {}", roomId, user.getUserName());
+    log.info("Room closed by host. RoomId: {}, Host Identity: {}", roomId, hostIdentity);
   }
 
   //내부적으로 방을 종료하는 로직
@@ -351,9 +354,11 @@ public class RoomService {
 
     isExistingRoom(roomData);
 
-    // 현재 사용자가 방장인지 확인
-    String currentHost = (String) roomData.get("host");
-    if (!currentUser.getUserEmail().equals(currentHost)) {
+    // 현재 사용자가 방장인지 확인 - identity로 비교
+    String currentHostIdentity = (String) roomData.get("host");
+    String currentUserIdentity = getCurrentUserIdentity(transferRequest.roomId(), currentUser);
+
+    if (currentUserIdentity == null || !currentUserIdentity.equals(currentHostIdentity)) {
       throw new ApiException(HttpStatus.FORBIDDEN, "방장만 권한을 이양할 수 있습니다.");
     }
 
@@ -363,27 +368,28 @@ public class RoomService {
       throw new ApiException(HttpStatus.BAD_REQUEST, "종료된 방에서는 권한을 이양할 수 없습니다.");
     }
 
-    User newHost = findParticipantByEmail(transferRequest.roomId(), transferRequest.newHostEmail());
-    if (newHost == null) {
+    // 새로운 방장의 identity 찾기
+    String newHostIdentity = findParticipantIdentityByEmail(transferRequest.roomId(), transferRequest.newHostEmail());
+    if (newHostIdentity == null) {
       throw new ApiException(HttpStatus.BAD_REQUEST,
           "새로운 방장이 현재 방에 참가하고 있지 않습니다. 먼저 방에 참가해야 합니다.");
     }
 
     try {
-      // 방장 권한 이양
+      // 방장 권한 이양 - identity로 처리
       roomRedisRepository.transferHostAuthority(
           transferRequest.roomId(),
-          currentUser,
-          newHost,
+          currentUserIdentity,
+          newHostIdentity,
           roomKey
       );
 
-      log.info("Host authority transferred. RoomId: {}, From: {} To: {}",
-          transferRequest.roomId(), currentUser.getUserEmail(), newHost.getUserEmail());
+      log.info("Host authority transferred. RoomId: {}, From Identity: {} To Identity: {}",
+          transferRequest.roomId(), currentUserIdentity, newHostIdentity);
 
     } catch (Exception e) {
-      log.error("Host transfer error. RoomId: {}, From: {} To: {}",
-          transferRequest.roomId(), currentUser.getUserEmail(), transferRequest.newHostEmail(), e);
+      log.error("Host transfer error. RoomId: {}, From Identity: {} To Email: {}",
+          transferRequest.roomId(), currentUserIdentity, transferRequest.newHostEmail(), e);
       throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
           "방장 권한 이양 중 오류가 발생했습니다: " + e.getMessage());
     }
@@ -399,12 +405,14 @@ public class RoomService {
       return false;
     }
 
-    String hostEmail = (String) roomData.get("host");
-    return user.getUserEmail().equals(hostEmail);
+    String hostIdentity = (String) roomData.get("host");
+    String currentUserIdentity = getCurrentUserIdentity(roomId, user);
+
+    return currentUserIdentity != null && currentUserIdentity.equals(hostIdentity);
   }
 
-  private User findParticipantByEmail(Long roomId, String email) {
-    // Redis에서 해당 방의 모든 참가자 정보 조회
+  // 현재 사용자의 identity를 찾는 메서드
+  private String getCurrentUserIdentity(Long roomId, User user) {
     String participantPattern = RedisKeyConstants.PARTICIPANT_KEY_PREFIX + roomId + ":*";
     Set<String> participantKeys = redisTemplate.keys(participantPattern);
 
@@ -412,25 +420,35 @@ public class RoomService {
       return null;
     }
 
-    // 각 참가자의 이메일과 소셜 정보를 확인
     for (String participantKey : participantKeys) {
       Map<Object, Object> participantData = redisTemplate.opsForHash().entries(participantKey);
       String participantEmail = (String) participantData.get("userEmail");
       String participantStatus = (String) participantData.get("status");
 
-      // 활성 상태이고 이메일이 일치하는 참가자 찾기
+      if ("active".equals(participantStatus) && user.getUserEmail().equals(participantEmail)) {
+        return (String) participantData.get("participantIdentity");
+      }
+    }
+
+    return null;
+  }
+
+  // 이메일로 참가자의 identity를 찾는 메서드
+  private String findParticipantIdentityByEmail(Long roomId, String email) {
+    String participantPattern = RedisKeyConstants.PARTICIPANT_KEY_PREFIX + roomId + ":*";
+    Set<String> participantKeys = redisTemplate.keys(participantPattern);
+
+    if (participantKeys.isEmpty()) {
+      return null;
+    }
+
+    for (String participantKey : participantKeys) {
+      Map<Object, Object> participantData = redisTemplate.opsForHash().entries(participantKey);
+      String participantEmail = (String) participantData.get("userEmail");
+      String participantStatus = (String) participantData.get("status");
+
       if ("active".equals(participantStatus) && email.equals(participantEmail)) {
-        // 해당 이메일로 모든 소셜 타입 시도
-        for (Social social : Social.values()) {
-          try {
-            User user = userRepository.getByEmailAndSocial(email, social);
-            log.info("Found participant for host transfer. Email: {}, Social: {}", email, social);
-            return user;
-          } catch (Exception e) {
-            // 해당 소셜 타입으로 찾지 못한 경우 다음 소셜 타입 시도
-            continue;
-          }
-        }
+        return (String) participantData.get("participantIdentity");
       }
     }
 
