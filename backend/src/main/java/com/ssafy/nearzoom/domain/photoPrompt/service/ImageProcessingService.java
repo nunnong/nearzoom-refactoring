@@ -128,6 +128,7 @@ public class ImageProcessingService {
     log.info("개별 처리 진행률 확인 - RoomId: {}, Completed: {}/{}",
         roomId, completedImages, totalImages);
 
+    // 개별 사진이 완료되고 나면 frame 단계로 넘어감
     if (completedImages == totalImages && totalImages > 0) {
       log.info("모든 개별 처리 완료. 프레임 합성 시작 - RoomId: {}", roomId);
       startFrameComposition(roomId, roomData, totalImages);
@@ -150,9 +151,6 @@ public class ImageProcessingService {
       }
 
       String frameColor = (String) roomData.get("frame_color");
-      if (frameColor == null) {
-        frameColor = "#FFFFFF"; // 기본값
-      }
 
       // 프레임 합성 요청
       FrameComposeRequest composeRequest = new FrameComposeRequest(
