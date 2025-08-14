@@ -70,4 +70,18 @@ public class UserService {
         User user = userRepository.getByEmailAndSocial(email, social);
         user.updatePrettyFace(prettyFaceUrl);
     }
+
+
+    @Transactional
+    public String getPrettyFace(Authentication authentication) {
+        UserAuthInfoResponse userAuthInfo = AuthUtil.getUserAuthInfo(authentication);
+
+        String email = userAuthInfo.email();
+        Social social = userAuthInfo.social();
+
+        User user = userRepository.getByEmailAndSocial(email, social);
+        String prettyFaceUrl = user.getPrettyFace();
+
+        return prettyFaceUrl;
+    }
 }
