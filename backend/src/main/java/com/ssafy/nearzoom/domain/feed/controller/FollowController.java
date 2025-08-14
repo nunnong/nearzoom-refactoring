@@ -77,4 +77,14 @@ public class FollowController {
                                                             @PathVariable String accountName) {
         return ApiResponse.ok(followService.isFollowingByAccountName(authentication, accountName));
     }
+
+    /**
+     * 🔥 accountName으로 상호 팔로우 목록 조회 - UserProfileResponse 반환
+     */
+    @GetMapping("/mutual/{accountName}")
+    public ResponseEntity<ApiResponse<List<UserProfileResponse>>> getMutualFollows(
+        Authentication authentication,
+        @PathVariable String accountName) {
+        return ApiResponse.ok(followService.getMutualFollowsByAccountName(authentication, accountName));
+    }
 }

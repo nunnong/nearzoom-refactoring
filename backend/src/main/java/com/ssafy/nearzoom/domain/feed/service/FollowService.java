@@ -129,4 +129,31 @@ public class FollowService {
         int following = followRepository.countByFollower_UserId(user.getUserId());
         return new FollowCountsResponse(followers, following);
     }
+
+    /**
+     * 🔥 accountName으로 상호 팔로우 목록 조회 - UserProfileResponse 사용
+     */
+    @Transactional(readOnly = true)
+    public List<UserProfileResponse> getMutualFollowsByAccountName(Authentication authentication, String accountName) {
+        // 현재 로그인한 사용자 조회
+        UserAuthInfoResponse loginUserInfo = AuthUtil.getUserAuthInfo(authentication);
+        User loginUser = userRepository.getByEmailAndSocial(loginUserInfo.email(), loginUserInfo.social());
+
+        // accountName으로 대상 사용자 찾기
+        User targetUser = userRepository.findByAccountName(accountName)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+
+        // 상호 팔로우 목록 조회
+        return followRepository.findMutualFollows(loginUser.getUserId(), targetUser.getUserId())
+            .stream()
+            .map(mutualUser -> new UserProfileResponse(
+                mutualUser.getUserId(),
+                mutualUser.getAccountName(),
+                mutualUser.getUserName(),
+                mutualUser.getUserEmail(),
+                mutualUser.getProfileImage(),
+                mutualUser.getPrettyFace()
+            ))
+            .toList();
+    }
 }

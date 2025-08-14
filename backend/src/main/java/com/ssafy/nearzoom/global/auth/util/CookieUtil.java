@@ -11,6 +11,7 @@ public class CookieUtil {
         cookie.setPath("/");
         cookie.setMaxAge(24 * 60 * 60);
         // cookie.setDomain("nearzoom.store");  // 🔥 이 줄 주석 처리 또는 삭제
+
         return cookie;
     }
 }

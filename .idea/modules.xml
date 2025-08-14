@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/S13P11A605.iml" filepath="$PROJECT_DIR$/.idea/S13P11A605.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/nearzoom.main.iml" filepath="$PROJECT_DIR$/.idea/modules/nearzoom.main.iml" />
     </modules>
   </component>
 </project>

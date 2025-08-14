@@ -130,4 +130,6 @@ public class FeedController {
         @RequestParam(defaultValue = "10") int size) {
         return ApiResponse.ok(feedService.searchFeeds(authentication, query, size));
     }
+
+
 }
