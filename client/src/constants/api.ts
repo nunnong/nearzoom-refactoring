@@ -43,3 +43,6 @@ export const API_ENDPOINTS = {
   LOGOUT: '/user/logout',
   SIGNOUT: '/user/signout',
 }
+
+// 🔥 타입 안전성을 위한 타입 export
+export type ApiEndpoint = typeof API_ENDPOINTS[keyof typeof API_ENDPOINTS]

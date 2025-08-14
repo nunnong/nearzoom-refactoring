@@ -24,9 +24,15 @@ export default function UploadPhotoPage() {
     try {
       const response = await api.get('/user/userInfo')
       const profile = response.data.data
+<<<<<<< HEAD
       
       if (profile.pretty_face) {
         setCurrentReferenceImage(profile.pretty_face)
+=======
+
+      if (profile.faceImageUrl) {
+        setCurrentReferenceImage(profile.faceImageUrl)
+>>>>>>> 4b630cc2cb88a469c63eb1e054f65be169a4447e
         setHasExistingImage(true)
       }
     } catch (error) {
@@ -36,16 +42,24 @@ export default function UploadPhotoPage() {
     }
   }
 
-  // 리다이렉트 로직
+  
+  // returnUrl 파라미터를 항상 URL 그대로, localStorage에도 혹시 값 있으면 보조로 체크하게 설계
   const getRedirectDestination = () => {
     const returnUrl = searchParams.get('returnUrl')
     const action = searchParams.get('action')
-    
+
+    // [변경 포인트1]: localStorage 예비 체크 (콜백구간 잘못된 전달 대비)
+    const fallbackRedirect = typeof window !== "undefined" ? localStorage.getItem('redirectAfterLogin') : null
+
     if (returnUrl) {
       // 공유받은 URL로 돌아가기
       const decodedUrl = decodeURIComponent(returnUrl)
       console.log('공유받은 URL로 이동:', decodedUrl)
       return decodedUrl
+    } else if (fallbackRedirect) {
+      // 혹시라도 남은 게 있으면 보조로 이동
+      localStorage.removeItem('redirectAfterLogin')
+      return fallbackRedirect
     } else if (action === 'createRoom') {
       // 메인페이지로 이동 (방 생성을 위해)
       console.log('메인페이지로 이동 (방 생성 예정)')
@@ -73,6 +87,7 @@ export default function UploadPhotoPage() {
     fileInputRef.current?.click()
   }
 
+  // 저장/업로드 성공 후 리턴URL로 이동
   const handleSave = async () => {
     if (!selectedImage) return
 
@@ -84,7 +99,7 @@ export default function UploadPhotoPage() {
       const blob = await base64Response.blob()
       const formData = new FormData()
       formData.append('file', blob, 'profile.jpg')
-      
+
       // 2단계: 이미지 업로드 API 호출 (URL을 반환받음)
       const uploadResponse = await api.post(
         'https://image.nearzoom.store/upload',
@@ -93,11 +108,10 @@ export default function UploadPhotoPage() {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
-          withCredentials: false, // CORS 에러 방지를 위해 credentials 비활성화
+          withCredentials: false,
         }
       )
 
-      // 업로드된 이미지 URL 추출
       const imageUrl = uploadResponse.data?.data?.file_url || uploadResponse.data?.file_url
       if (!imageUrl) {
         throw new Error('이미지 URL을 받아올 수 없습니다.')
@@ -112,29 +126,28 @@ export default function UploadPhotoPage() {
           'Content-Type': 'application/json',
         },
       })
-      
-      console.log('프로필 이미지 저장 완료:', imageUrl)
-      
-      // 저장 완료 후 적절한 목적지로 이동
+
+      console.log('참조 이미지 저장 완료:', imageUrl)
+
+      // 업로드 처리 후 반드시 목적지로 이동
       const destination = getRedirectDestination()
       router.replace(destination)
-      
+
     } catch (error: any) {
-      console.error('프로필 이미지 저장 실패:', error)
-      alert('프로필 이미지 저장에 실패했습니다. 다시 시도해주세요.')
+      console.error('참조 이미지 저장 실패:', error)
+      alert('참조 이미지 저장에 실패했습니다. 다시 시도해주세요.')
     } finally {
       setIsUploading(false)
     }
   }
 
+  // '시작하기', '취소', '나중에 등록', '닫기' 모두 동일하게 목적지로 이동
   const handleSkip = () => {
-    // 적절한 목적지로 이동
     const destination = getRedirectDestination()
     router.replace(destination)
   }
 
   const handleClose = () => {
-    // 닫기 시에도 적절한 목적지로 이동
     const destination = getRedirectDestination()
     router.replace(destination)
   }
@@ -174,9 +187,9 @@ export default function UploadPhotoPage() {
           <h2 className="mb-3 text-xl font-medium text-gray-800">
             {hasExistingImage ? '참조 사진 교체' : '참조 사진 등록'}
           </h2>
-          
+
           <p className="mb-6 text-sm leading-relaxed text-gray-600">
-            {hasExistingImage 
+            {hasExistingImage
               ? '새로운 참조 사진으로 교체하거나 현재 사진을 그대로 사용하세요.'
               : '가장 잘 나온 사진 하나를 업로드해주세요. AI가 이를 참조하여 더 예쁘고 자연스러운 사진을 만들어 드립니다.'
             }
@@ -195,7 +208,7 @@ export default function UploadPhotoPage() {
             <div className="h-32 w-32 overflow-hidden rounded-full bg-gradient-to-br from-orange-200 via-green-200 to-blue-200 p-1">
               <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-white">
                 {displayImage ? (
-                  <img 
+                  <img
                     src={displayImage}
                     alt="참조 사진"
                     className="h-full w-full object-cover"
@@ -214,7 +227,7 @@ export default function UploadPhotoPage() {
 
           {/* 업로드/교체 버튼 */}
           {!selectedImage && (
-            <button 
+            <button
               onClick={handleUploadClick}
               className="mb-4 flex w-full items-center justify-center space-x-2 rounded-full bg-blue-50 py-3 text-blue-600 transition-colors hover:bg-blue-100"
             >

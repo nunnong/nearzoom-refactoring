@@ -34,6 +34,9 @@ export const useAuth = () => {
     logout,
   } = useAuthStore()
 
+  // ✅ 수정: 최상위에서 store hooks 호출
+  const { setRoomData, setIsHost } = useRoomStore()
+
   const startSocialLogin = (provider: SocialType) => {
     const loginUrl = authService.getSocialLoginUrl(provider)
     window.location.href = loginUrl
@@ -116,7 +119,7 @@ export const useAuth = () => {
       
       console.log('방 생성 성공:', roomData)
       
-      const { setRoomData, setIsHost } = useRoomStore.getState()
+      // ✅ 수정: 이미 최상위에서 가져온 함수들 사용
       setRoomData(roomData)
       setIsHost(true)
       
