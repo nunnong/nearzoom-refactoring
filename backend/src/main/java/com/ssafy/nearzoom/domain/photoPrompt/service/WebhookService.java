@@ -454,12 +454,17 @@ public class WebhookService {
       }
 
       // 3️⃣ PhotoService에 최종 결과 저장
-      log.info("=== 3️⃣ PhotoService 최종 결과 저장 ===");
+      log.info("=== 4️⃣ PhotoService 최종 결과 저장 ===");
       try {
+        log.info("PhotoService.saveFinalComposedPhoto 호출 시작...");
         photoService.saveFinalComposedPhoto(webhook);
         log.info("✅ PhotoService 최종 결과 저장 완료");
       } catch (Exception e) {
         log.error("❌ PhotoService 최종 결과 저장 실패: {}", e.getMessage(), e);
+        log.error("웹훅 데이터: event={}, jobId={}", webhook.event(), webhook.jobId());
+        if (webhook.data() != null) {
+          log.error("finalImageUrl: {}", webhook.data().finalImageUrl());
+        }
       }
 
       // 4️⃣ ImageProcessingService에 완료 알림
