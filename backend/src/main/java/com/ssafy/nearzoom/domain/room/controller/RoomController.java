@@ -6,12 +6,14 @@ import com.ssafy.nearzoom.domain.room.dto.RoomInfo;
 import com.ssafy.nearzoom.domain.room.dto.JoinRequest;
 import com.ssafy.nearzoom.domain.room.dto.RoomMetaSaveRequest;
 import com.ssafy.nearzoom.domain.room.dto.TransferHostRequest;
+import com.ssafy.nearzoom.domain.room.dto.BecomeHostRequest;
 import com.ssafy.nearzoom.domain.room.service.RoomService;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import com.ssafy.nearzoom.global.response.ApiResponse;
 import com.ssafy.nearzoom.global.swagger.response.ApiResponseConstants.*;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
@@ -21,7 +23,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.HashMap;
-import java.util.Map;
 
 @Slf4j
 @RestController
@@ -271,6 +272,40 @@ public class RoomController {
     } catch (Exception e) {
       log.error("Unexpected error during host check. RoomId: {}", roomId, e);
       return ApiResponse.failedOf(HttpStatus.INTERNAL_SERVER_ERROR, "방장 권한 확인 중 오류가 발생했습니다: " + e.getMessage());
+    }
+  }
+
+  @PostMapping("/{roomId}/become-host")
+  @Operation(summary = "방장 되기", description = "참가자가 바로 방장이 됩니다.")
+  @PostApiResponses
+  public ResponseEntity<ApiResponse<Map<String, Object>>> becomeHost(
+      HttpServletRequest request,
+      @PathVariable Long roomId,
+      @RequestBody BecomeHostRequest becomeHostRequest) {
+
+    try {
+      // roomId 일치 확인
+      if (!roomId.equals(becomeHostRequest.roomId())) {
+        throw new ApiException(HttpStatus.BAD_REQUEST, "경로의 roomId와 요청 데이터의 roomId가 일치하지 않습니다.");
+      }
+
+      roomService.becomeHost(request, becomeHostRequest);
+
+      Map<String, Object> responseData = new HashMap<>();
+      responseData.put("roomId", roomId);
+      responseData.put("newHostIdentity", becomeHostRequest.participantIdentity());
+      responseData.put("becameHostAt", LocalDateTime.now().toString());
+
+      log.info("User became host via API. RoomId: {}, NewHost: {}", roomId, becomeHostRequest.participantIdentity());
+
+      return ResponseEntity.ok(new ApiResponse<>(false, "방장이 되었습니다.", responseData));
+
+    } catch (ApiException e) {
+      log.warn("Become host failed. RoomId: {}, Error: {}", roomId, e.getMessage());
+      return ApiResponse.failedOf(e);
+    } catch (Exception e) {
+      log.error("Unexpected error during become host. RoomId: {}", roomId, e);
+      return ApiResponse.failedOf(HttpStatus.INTERNAL_SERVER_ERROR, "방장 되기 중 오류가 발생했습니다: " + e.getMessage());
     }
   }
 
