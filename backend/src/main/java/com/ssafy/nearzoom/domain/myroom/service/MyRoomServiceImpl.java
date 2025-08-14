@@ -6,7 +6,6 @@ import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoListResponse;
 import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoResponse;
 import com.ssafy.nearzoom.domain.myroom.dto.PhotoDeleteRequest;
 import com.ssafy.nearzoom.domain.myroom.dto.PhotoEditSaveRequest;
-import com.ssafy.nearzoom.domain.myroom.dto.PhotoInsertDto;
 import com.ssafy.nearzoom.domain.myroom.repository.MyPhotoMapper;
 import com.ssafy.nearzoom.domain.user.repository.UserRepository;
 import com.ssafy.nearzoom.domain.user.dto.UserAuthInfoResponse;
@@ -102,13 +101,17 @@ public class MyRoomServiceImpl implements MyRoomService {
             }
             
             // 3. photo 테이블에 편집본 저장
-            PhotoInsertDto photoDto = new PhotoInsertDto(imageUrl, null, null, originalPhotoId);
-            photoRepository.savePhotoToMyPhoto(photoDto);
-            Long newPhotoId = photoDto.getPhotoId();
+//            PhotoInsertDto photoDto = new PhotoInsertDto(imageUrl, null, null, originalPhotoId);
+//            photoRepository.savePhotoToMyPhoto(photoDto);
+
+            Photo photo = new Photo(imageUrl, null, null, originalPhotoId);
+            photoRepository.save(photo);
+
+            Long newPhotoId = photo.getPhotoId();
             log.debug(">>> photo 테이블에 편집본 저장 완료 - photoId: {}", newPhotoId);
             
             // 4. archive 테이블에 편집본 저장 (편집 불가 상태로)
-            photoRepository.saveToArchive(userId, newPhotoId);
+            myPhotoMapper.saveToArchive(userId, newPhotoId);
             log.debug(">>> archive 테이블에 편집본 저장 완료");
             
             // 5. 원본 사진을 편집 불가 상태로 변경

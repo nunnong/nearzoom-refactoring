@@ -19,4 +19,5 @@ public interface PhotoRepository extends JpaRepository<Photo, Long> {
         return findByRoomIdAndDeletedAtIsNull(roomId)
             .orElseThrow(() -> new RuntimeException("해당 방의 사진을 찾을 수 없습니다."));
     }
+
 }

@@ -184,7 +184,7 @@ public class PhotoService {
    */
   private Photo createPhotoWithTimestamp(String imageUrl, Long roomId, String userList, LocalDateTime roomCreatedAt) {
     // 기본 생성자 사용
-    Photo photo = new Photo(imageUrl, roomId, userList);
+    Photo photo = new Photo(imageUrl, roomId, userList, null);
 
     // 리플렉션을 사용하여 방 생성 시간으로 설정
     try {
