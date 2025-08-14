@@ -5,6 +5,7 @@ import com.ssafy.nearzoom.domain.photo.repository.PhotoRepository;
 import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingCompletedWebhook;
 import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.FrameCompositionCompletedWebhook;
 import com.ssafy.nearzoom.domain.myroom.repository.MyPhotoMapper;
+import com.ssafy.nearzoom.domain.myroom.dto.PhotoInsertDto;
 import com.ssafy.nearzoom.domain.user.repository.UserRepository;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -94,7 +95,7 @@ public class PhotoService {
             savedPhoto.getPhotoId(), roomId, userList, roomCreatedAt);
 
         // 4. 각 사용자별로 MyPhoto 테이블에도 저장
-        saveToMyPhotoForAllUsers(processedImageUrl, userList);
+        saveToMyPhotoForAllUsers(processedImageUrl, userList, roomId);
       }
 
     } catch (Exception e) {
@@ -170,7 +171,7 @@ public class PhotoService {
             savedPhoto.getPhotoId(), roomId, finalImageUrl, roomCreatedAt);
 
         // 4. 각 사용자별로 MyPhoto 테이블에도 저장
-        saveToMyPhotoForAllUsers(finalImageUrl, userList);
+        saveToMyPhotoForAllUsers(finalImageUrl, userList, roomId);
       }
 
     } catch (Exception e) {
@@ -227,7 +228,7 @@ public class PhotoService {
   /**
    * Photo 저장 후 각 사용자별로 MyPhoto 테이블에도 저장
    */
-  private void saveToMyPhotoForAllUsers(String imageUrl, String userList) {
+  private void saveToMyPhotoForAllUsers(String imageUrl, String userList, Long roomId) {
     if (userList == null || userList.trim().isEmpty()) {
       log.warn("⚠️ userList가 비어있어서 MyPhoto 저장을 건너뜁니다.");
       return;
@@ -250,9 +251,13 @@ public class PhotoService {
               .orElse(null);
 
           if (userId != null) {
-            // MyPhoto 테이블에 저장
-            myPhotoMapper.savePhotoToMyPhoto(userId, imageUrl, userList);
-            log.debug("✅ MyPhoto 저장 성공 - userId: {}, email: {}, imageUrl: {}", userId, trimmedEmail, imageUrl);
+            // Photo 테이블에 저장
+            PhotoInsertDto photoDto = new PhotoInsertDto(imageUrl, userList, roomId, null);
+            myPhotoMapper.savePhotoToMyPhoto(photoDto);
+            
+            // Archive 테이블에 저장
+            myPhotoMapper.saveToArchive(userId, photoDto.getPhotoId());
+            log.debug("✅ Photo 및 Archive 저장 성공 - userId: {}, email: {}, imageUrl: {}", userId, trimmedEmail, imageUrl);
           } else {
             log.warn("⚠️ 사용자를 찾을 수 없습니다 - email: {}", trimmedEmail);
           }

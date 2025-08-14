@@ -1,6 +1,10 @@
 package com.ssafy.nearzoom.domain.myroom.controller;
 
-import com.ssafy.nearzoom.domain.myroom.dto.*;
+import com.ssafy.nearzoom.domain.myroom.dto.HeartUpdateRequest;
+import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoListCondition;
+import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoListResponse;
+import com.ssafy.nearzoom.domain.myroom.dto.PhotoDeleteRequest;
+import com.ssafy.nearzoom.domain.myroom.dto.PhotoEditSaveRequest;
 import com.ssafy.nearzoom.domain.myroom.service.MyRoomService;
 import com.ssafy.nearzoom.global.response.ApiResponse;
 import com.ssafy.nearzoom.global.swagger.response.ApiResponseConstants.DeleteApiResponses;
@@ -11,8 +15,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/myroom")
@@ -23,7 +33,9 @@ public class MyRoomController {
     private final MyRoomService myRoomService;
 
     /**
-     * 사진 조회 + 각종 필터(좋아요,친구,날짜 등 모든 조합)
+     * 사진 조회 + 각종 필터(좋아요,친구,날짜 등 모든 조합) heart: Boolean(좋아요 여부) partnerEmails:comma-seperated(함께 찍은
+     * 유저 이메일) startDate, endDate: YYYY-MM-DD 형식 cursor: Long(커서 기반 페이징) limit: Integer(페이지 크기별 개수
+     * 제한)
      */
     @GetMapping("/photos")
     @Operation(
@@ -37,7 +49,6 @@ public class MyRoomController {
     ) {
         return myRoomService.getMyPhotos(authentication, condition);
     }
-
     @PostMapping("/photos/heart")
     @Operation(
         summary = "사진 좋아요 토글",
@@ -80,36 +91,18 @@ public class MyRoomController {
         return ApiResponse.ok("수정본이 저장되었습니다.");
     }
 
-    @PostMapping("/photos/upload-edited")
+    @PostMapping("/photos/save-edited-url")
     @Operation(
-        summary = "편집된 이미지 업로드",
-        description = "편집된 이미지를 업로드하고 my_photo 테이블에 저장"
+        summary = "편집된 이미지 URL 저장",
+        description = "편집된 이미지 URL을 받아서 photo, archive 테이블에 저장"
     )
     @PostApiResponses
-    public ResponseEntity<ApiResponse<String>> uploadEditedImage(
-        @RequestParam("file") MultipartFile file,
+    public ResponseEntity<ApiResponse<String>> saveEditedImageUrl(
+        @RequestParam("imageUrl") String imageUrl,
         @RequestParam("originalPhotoId") Long originalPhotoId,
-        @RequestParam(value = "description", required = false) String description,
         Authentication authentication
     ) {
-        String uploadedUrl = myRoomService.uploadEditedImage(file, originalPhotoId, authentication, description);
-        return ApiResponse.ok("편집된 이미지가 업로드되었습니다. URL: " + uploadedUrl);
-    }
-
-    /**
-     * 🆕 마이룸 사진을 피드 게시물로 업로드하기 위한 정보 조회
-     */
-    @GetMapping("/photos/{photoId}/feed-upload-info")
-    @Operation(
-        summary = "피드 업로드용 사진 정보 조회",
-        description = "마이룸 사진을 피드에 업로드하기 위한 기본 정보 조회"
-    )
-    @GetApiResponses
-    public ResponseEntity<ApiResponse<PhotoForFeedUploadResponse>> getPhotoForFeedUpload(
-        @PathVariable Long photoId,
-        Authentication authentication
-    ) {
-        PhotoForFeedUploadResponse response = myRoomService.getPhotoForFeedUpload(photoId, authentication);
-        return ApiResponse.ok(response);
+        String savedUrl = myRoomService.saveEditedImageUrl(imageUrl, originalPhotoId, authentication);
+        return ApiResponse.ok("편집된 이미지 URL이 저장되었습니다. URL: " + savedUrl);
     }
 }

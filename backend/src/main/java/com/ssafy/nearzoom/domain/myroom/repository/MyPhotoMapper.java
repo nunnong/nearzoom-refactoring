@@ -2,6 +2,7 @@ package com.ssafy.nearzoom.domain.myroom.repository;
 
 import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoListCondition;
 import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoResponse;
+import com.ssafy.nearzoom.domain.myroom.dto.PhotoInsertDto;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -27,8 +28,11 @@ public interface MyPhotoMapper {
 
     void markAsEdited(@Param("userId") Long userId, @Param("photoId") Long photoId);
 
-    // Photo에서 MyPhoto로 데이터 이동을 위한 메서드
-    void savePhotoToMyPhoto(@Param("userId") Long userId, @Param("imageUrl") String imageUrl, @Param("userList") String userList);
+    // Photo 테이블에 저장
+    void savePhotoToMyPhoto(PhotoInsertDto photoDto);
+    
+    // Archive 테이블에 저장
+    void saveToArchive(@Param("userId") Long userId, @Param("photoId") Long photoId);
 
     // 편집 권한 확인
     boolean checkEditPermission(@Param("userId") Long userId, @Param("photoId") Long photoId);

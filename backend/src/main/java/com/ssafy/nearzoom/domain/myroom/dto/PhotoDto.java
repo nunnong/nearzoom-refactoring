@@ -1,21 +1,22 @@
-package com.ssafy.nearzoom.domain.myroom.entity;
+package com.ssafy.nearzoom.domain.myroom.dto;
 
-import com.ssafy.nearzoom.global.common.BaseEntity;
-import lombok.AccessLevel;
+import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class MyPhoto extends BaseEntity {
-
+@NoArgsConstructor
+public class PhotoDto {
     private Long photoId;
     private String imgUrl;
     private String userList;
     private Long roomId;
     private Long originalPhotoId;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private LocalDateTime deletedAt;
 
-    public MyPhoto(String imgUrl, String userList, Long roomId, Long originalPhotoId) {
+    public PhotoDto(String imgUrl, String userList, Long roomId, Long originalPhotoId) {
         this.imgUrl = imgUrl;
         this.userList = userList;
         this.roomId = roomId;
