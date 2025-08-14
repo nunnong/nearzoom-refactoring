@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/myroom")
@@ -92,19 +91,18 @@ public class MyRoomController {
         return ApiResponse.ok("수정본이 저장되었습니다.");
     }
 
-    @PostMapping("/photos/upload-edited")
+    @PostMapping("/photos/save-edited-url")
     @Operation(
-        summary = "편집된 이미지 업로드",
-        description = "편집된 이미지를 업로드하고 my_photo 테이블에 저장"
+        summary = "편집된 이미지 URL 저장",
+        description = "편집된 이미지 URL을 받아서 photo, archive 테이블에 저장"
     )
     @PostApiResponses
-    public ResponseEntity<ApiResponse<String>> uploadEditedImage(
-        @RequestParam("file") MultipartFile file,
+    public ResponseEntity<ApiResponse<String>> saveEditedImageUrl(
+        @RequestParam("imageUrl") String imageUrl,
         @RequestParam("originalPhotoId") Long originalPhotoId,
-        @RequestParam(value = "description", required = false) String description,
         Authentication authentication
     ) {
-        String uploadedUrl = myRoomService.uploadEditedImage(file, originalPhotoId, authentication, description);
-        return ApiResponse.ok("편집된 이미지가 업로드되었습니다. URL: " + uploadedUrl);
+        String savedUrl = myRoomService.saveEditedImageUrl(imageUrl, originalPhotoId, authentication);
+        return ApiResponse.ok("편집된 이미지 URL이 저장되었습니다. URL: " + savedUrl);
     }
 }
