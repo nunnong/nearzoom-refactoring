@@ -319,6 +319,16 @@ public class PhotoService {
             log.error("❌ Photo 저장 실패: {}", e.getMessage(), e);
         }
     }
+
+    /**
+     * 새로 추가 - 개별 처리된 이미지 저장 (명시적 메소드명)
+     */
+    @Transactional
+    public void saveIndividualProcessedPhoto(ImageProcessingCompletedWebhook webhook) {
+        // 기존 메소드 활용
+        saveCompletedPhoto(webhook);
+    }
+
     /**
      * 새로 추가 - 최종 합성된 이미지 저장
      */
