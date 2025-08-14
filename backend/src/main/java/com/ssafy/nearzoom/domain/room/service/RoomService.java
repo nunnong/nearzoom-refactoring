@@ -412,10 +412,10 @@ public class RoomService {
     return currentUserIdentity != null && currentUserIdentity.equals(hostIdentity);
   }
 
-  public void becomeHost(HttpServletRequest request, BecomeHostRequest becomeHostRequest) {
+  public void becomeHost(HttpServletRequest request, Long roomId) {
     User user = validateUserFromCookie(request);
 
-    String roomKey = RedisKeyConstants.ROOM_KEY_PREFIX + becomeHostRequest.roomId();
+    String roomKey = RedisKeyConstants.ROOM_KEY_PREFIX + roomId;
     Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
 
     isExistingRoom(roomData);
@@ -427,7 +427,7 @@ public class RoomService {
     }
 
     // JWT에서 확인한 사용자의 identity를 찾기
-    String userIdentity = getCurrentUserIdentity(becomeHostRequest.roomId(), user);
+    String userIdentity = getCurrentUserIdentity(roomId, user);
     if (userIdentity == null) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "방에 참가하지 않은 사용자는 방장이 될 수 없습니다.");
     }
@@ -441,18 +441,18 @@ public class RoomService {
     try {
       // 바로 방장 권한 이양
       roomRedisRepository.transferHostAuthority(
-          becomeHostRequest.roomId(),
+          roomId,
           currentHostIdentity,
           userIdentity,
           roomKey
       );
 
       log.info("User became host. RoomId: {}, NewHost Identity: {}, NewHost Email: {}, PreviousHost Identity: {}",
-          becomeHostRequest.roomId(), userIdentity, user.getUserEmail(), currentHostIdentity);
+          roomId, userIdentity, user.getUserEmail(), currentHostIdentity);
 
     } catch (Exception e) {
       log.error("Become host error. RoomId: {}, User Email: {}, User Identity: {}",
-          becomeHostRequest.roomId(), user.getUserEmail(), userIdentity, e);
+          roomId, user.getUserEmail(), userIdentity, e);
       throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
           "방장 되기 중 오류가 발생했습니다: " + e.getMessage());
     }
