@@ -353,98 +353,77 @@ public class WebhookService {
 //    }
 //  }
   // WebhookService.java - 프레임 합성 완료 웹훅 상세 로깅
-  public void webhookFrameCompleted(FrameCompositionCompletedWebhook webhook) {
-    String jobId = webhook.jobId();
-    long startTime = System.currentTimeMillis();
+public void webhookFrameCompleted(FrameCompositionCompletedWebhook webhook) {
+  String jobId = webhook.jobId();
+  long startTime = System.currentTimeMillis();
 
-    log.info("=== 🖼️ 프레임 합성 완료 웹훅 처리 시작 ===");
-    log.info("JobId: {}", jobId);
-    log.info("수신 시간: {}", startTime);
-    log.info("Event: {}", webhook.event());
-    log.info("Timestamp: {}", webhook.timestamp());
+  log.info("=== 🖼️ 프레임 합성 완료 웹훅 처리 시작 ===");
+  log.info("JobId: {}", jobId);
+  log.info("수신 시간: {}", startTime);
+  log.info("Event: {}", webhook.event());
+  log.info("Timestamp: {}", webhook.timestamp());
 
-    // 웹훅 데이터 상세 분석
-    if (webhook.data() != null) {
-      log.info("=== 웹훅 Data 상세 분석 ===");
-      log.info("finalImageUrl: {}", webhook.data().finalImageUrl());
+  // 웹훅 데이터 상세 분석
+  if (webhook.data() != null) {
+    log.info("=== 웹훅 Data 상세 분석 ===");
+    log.info("finalImageUrl: {}", webhook.data().finalImageUrl());
+    // ... 기존 로직
+  } else {
+    log.error("❌ webhook.data()가 null입니다!");
+  }
 
-      try {
-        if (webhook.data().individualImageUrls() != null) {
-          log.info("individualImageUrls 개수: {}", webhook.data().individualImageUrls().size());
-          for (int i = 0; i < webhook.data().individualImageUrls().size(); i++) {
-            log.info("  개별 이미지 {}: {}", i, webhook.data().individualImageUrls().get(i));
-          }
-        } else {
-          log.warn("individualImageUrls가 null입니다");
+  try {
+    // 1️⃣ Redis Frame Job 정보 조회
+    log.info("=== 1️⃣ Redis Frame Job 정보 조회 ===");
+    String frameJobKey = "frame_job:" + jobId;
+    Boolean keyExists = redisTemplate.hasKey(frameJobKey);
+    log.info("Frame Job 키: {}", frameJobKey);
+    log.info("키 존재 여부: {}", keyExists);
+
+    Set<String> allFrameKeys = redisTemplate.keys("frame_job:*");
+    log.info("현재 존재하는 frame_job 키들 ({}개): {}", allFrameKeys.size(), allFrameKeys);
+
+    Set<String> jobIdKeys = redisTemplate.keys("*" + jobId + "*");
+    log.info("JobId({}) 포함된 모든 키들: {}", jobId, jobIdKeys);
+
+    Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries(frameJobKey);
+    log.info("조회된 Frame Job 필드 개수: {}", jobInfo.size());
+
+    if (jobInfo.isEmpty()) {
+      log.error("❌ Frame Job 정보를 찾을 수 없습니다 - JobId: {}", jobId);
+
+      // 재시도 로직
+      log.info("=== 재시도 시작 ===");
+      for (int i = 1; i <= 3; i++) {
+        log.info("재시도 {}/3 - 대기 중...", i);
+        Thread.sleep(1000);
+
+        keyExists = redisTemplate.hasKey(frameJobKey);
+        jobInfo = redisTemplate.opsForHash().entries(frameJobKey);
+        log.info("재시도 {} 결과 - 키 존재: {}, 필드 개수: {}", i, keyExists, jobInfo.size());
+
+        if (!jobInfo.isEmpty()) {
+          log.info("✅ 재시도 {}에서 Frame Job 정보 발견!", i);
+          break;
         }
-      } catch (Exception e) {
-        log.error("individualImageUrls 처리 실패: {}", e.getMessage());
       }
-
-      try {
-        if (webhook.data().frameInfo() != null) {
-          log.info("frameInfo 존재:");
-          log.info("  color: {}", webhook.data().frameInfo().color());
-          log.info("  layout: {}", webhook.data().frameInfo().layout());
-        } else {
-          log.warn("frameInfo가 null입니다");
-        }
-      } catch (Exception e) {
-        log.error("frameInfo 처리 실패: {}", e.getMessage());
-      }
-    } else {
-      log.error("❌ webhook.data()가 null입니다!");
-    }
-
-    try {
-      // 1️⃣ Redis Frame Job 정보 조회
-      log.info("=== 1️⃣ Redis Frame Job 정보 조회 ===");
-      String frameJobKey = "frame_job:" + jobId;
-      Boolean keyExists = redisTemplate.hasKey(frameJobKey);
-      log.info("Frame Job 키: {}", frameJobKey);
-      log.info("키 존재 여부: {}", keyExists);
-
-      // 관련된 모든 키 패턴 확인
-      Set<String> allFrameKeys = redisTemplate.keys("frame_job:*");
-      log.info("현재 존재하는 frame_job 키들 ({}개): {}", allFrameKeys.size(), allFrameKeys);
-
-      Set<String> jobIdKeys = redisTemplate.keys("*" + jobId + "*");
-      log.info("JobId({}) 포함된 모든 키들: {}", jobId, jobIdKeys);
-
-      Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries(frameJobKey);
-      log.info("조회된 Frame Job 필드 개수: {}", jobInfo.size());
 
       if (jobInfo.isEmpty()) {
-        log.error("❌ Frame Job 정보를 찾을 수 없습니다 - JobId: {}", jobId);
-
-        // 재시도 로직
-        log.info("=== 재시도 시작 ===");
-        for (int i = 1; i <= 3; i++) {
-          log.info("재시도 {}/3 - 대기 중...", i);
-          Thread.sleep(1000);
-
-          keyExists = redisTemplate.hasKey(frameJobKey);
-          jobInfo = redisTemplate.opsForHash().entries(frameJobKey);
-          log.info("재시도 {} 결과 - 키 존재: {}, 필드 개수: {}", i, keyExists, jobInfo.size());
-
-          if (!jobInfo.isEmpty()) {
-            log.info("✅ 재시도 {}에서 Frame Job 정보 발견!", i);
-            break;
-          }
-        }
-
-        if (jobInfo.isEmpty()) {
-          log.error("❌ 3번 재시도 후에도 Frame Job 정보를 찾을 수 없음");
-          return;
-        }
+        log.error("❌ 3번 재시도 후에도 Frame Job 정보를 찾을 수 없음");
+        log.warn("⚠️ Frame Job 정보 없이 진행합니다 (PhotoService는 여전히 호출)");
+        // 🔥 return을 제거하고 계속 진행!
       }
+    }
 
+    if (!jobInfo.isEmpty()) {
       log.info("✅ Frame Job 정보 발견! 상세 내용:");
       for (Map.Entry<Object, Object> entry : jobInfo.entrySet()) {
         log.info("  {}: {}", entry.getKey(), entry.getValue());
       }
+    }
 
-      // 2️⃣ 합성 결과 저장
+    // 2️⃣ 합성 결과 저장 (Frame Job 정보가 있을 때만)
+    if (!jobInfo.isEmpty()) {
       log.info("=== 2️⃣ 합성 결과 Redis 저장 ===");
       try {
         saveFrameCompletedResult(webhook);
@@ -452,54 +431,57 @@ public class WebhookService {
       } catch (Exception e) {
         log.error("❌ 합성 결과 Redis 저장 실패: {}", e.getMessage(), e);
       }
-
-      // 3️⃣ PhotoService에 최종 결과 저장
-      log.info("=== 4️⃣ PhotoService 최종 결과 저장 ===");
-      try {
-        log.info("PhotoService.saveFinalComposedPhoto 호출 시작...");
-        photoService.saveFinalComposedPhoto(webhook);
-        log.info("✅ PhotoService 최종 결과 저장 완료");
-      } catch (Exception e) {
-        log.error("❌ PhotoService 최종 결과 저장 실패: {}", e.getMessage(), e);
-        log.error("웹훅 데이터: event={}, jobId={}", webhook.event(), webhook.jobId());
-        if (webhook.data() != null) {
-          log.error("finalImageUrl: {}", webhook.data().finalImageUrl());
-        }
-      }
-
-      // 4️⃣ ImageProcessingService에 완료 알림
-      log.info("=== 4️⃣ ImageProcessingService 완료 알림 ===");
-      if (webhook.data() != null && webhook.data().finalImageUrl() != null) {
-        String finalImageUrl = webhook.data().finalImageUrl();
-        log.info("최종 이미지 URL: {}", finalImageUrl);
-
-        try {
-          imageProcessingService.handleFrameCompositionCompleted(jobId, finalImageUrl);
-          log.info("✅ ImageProcessingService 완료 알림 완료");
-        } catch (Exception e) {
-          log.error("❌ ImageProcessingService 완료 알림 실패: {}", e.getMessage(), e);
-        }
-      } else {
-        log.warn("⚠️ finalImageUrl이 없어서 ImageProcessingService 알림 생략");
-      }
-
-      long endTime = System.currentTimeMillis();
-      log.info("=== ✅ 프레임 합성 완료 웹훅 처리 성공 ===");
-      log.info("JobId: {}, 총 소요시간: {}ms", jobId, (endTime - startTime));
-      log.info("FinalUrl: {}", webhook.data() != null ? webhook.data().finalImageUrl() : "null");
-
-    } catch (Exception e) {
-      long endTime = System.currentTimeMillis();
-      log.error("=== ❌ 프레임 합성 완료 웹훅 처리 실패 ===");
-      log.error("JobId: {}, 소요시간: {}ms", jobId, (endTime - startTime));
-      log.error("오류 타입: {}", e.getClass().getSimpleName());
-      log.error("오류 메시지: {}", e.getMessage());
-      log.error("스택 트레이스: ", e);
-
-      throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
-          "프레임 합성 완료 웹훅 처리 중 오류가 발생했습니다: " + e.getMessage());
+    } else {
+      log.warn("⚠️ Frame Job 정보가 없어서 Redis 저장 건너뜀");
     }
+
+    // 3️⃣ PhotoService에 최종 결과 저장 (항상 실행!)
+    log.info("=== 3️⃣ PhotoService 최종 결과 저장 ===");
+    try {
+      log.info("🔥 PhotoService.saveFinalComposedPhoto 호출 시작!");
+      photoService.saveFinalComposedPhoto(webhook);
+      log.info("✅ PhotoService 최종 결과 저장 완료");
+    } catch (Exception e) {
+      log.error("❌ PhotoService 최종 결과 저장 실패: {}", e.getMessage(), e);
+      log.error("웹훅 데이터: event={}, jobId={}", webhook.event(), webhook.jobId());
+      if (webhook.data() != null) {
+        log.error("finalImageUrl: {}", webhook.data().finalImageUrl());
+      }
+    }
+
+    // 4️⃣ ImageProcessingService에 완료 알림
+    log.info("=== 4️⃣ ImageProcessingService 완료 알림 ===");
+    if (webhook.data() != null && webhook.data().finalImageUrl() != null) {
+      String finalImageUrl = webhook.data().finalImageUrl();
+      log.info("최종 이미지 URL: {}", finalImageUrl);
+
+      try {
+        imageProcessingService.handleFrameCompositionCompleted(jobId, finalImageUrl);
+        log.info("✅ ImageProcessingService 완료 알림 완료");
+      } catch (Exception e) {
+        log.error("❌ ImageProcessingService 완료 알림 실패: {}", e.getMessage(), e);
+      }
+    } else {
+      log.warn("⚠️ finalImageUrl이 없어서 ImageProcessingService 알림 생략");
+    }
+
+    long endTime = System.currentTimeMillis();
+    log.info("=== ✅ 프레임 합성 완료 웹훅 처리 성공 ===");
+    log.info("JobId: {}, 총 소요시간: {}ms", jobId, (endTime - startTime));
+    log.info("FinalUrl: {}", webhook.data() != null ? webhook.data().finalImageUrl() : "null");
+
+  } catch (Exception e) {
+    long endTime = System.currentTimeMillis();
+    log.error("=== ❌ 프레임 합성 완료 웹훅 처리 실패 ===");
+    log.error("JobId: {}, 소요시간: {}ms", jobId, (endTime - startTime));
+    log.error("오류 타입: {}", e.getClass().getSimpleName());
+    log.error("오류 메시지: {}", e.getMessage());
+    log.error("스택 트레이스: ", e);
+
+    throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
+        "프레임 합성 완료 웹훅 처리 중 오류가 발생했습니다: " + e.getMessage());
   }
+}
 
   // 프레임 합성 실패 웹훅 상세 로깅
   public void webhookFrameFailed(FrameCompositionFailedWebhook webhook) {
