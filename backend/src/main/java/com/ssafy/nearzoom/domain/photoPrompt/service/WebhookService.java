@@ -8,6 +8,7 @@ import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.FrameCompositionFailedW
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PhotoPrompt;
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PromptStatus;
 import com.ssafy.nearzoom.domain.photoPrompt.repository.PhotoPromptRepository;
+import com.ssafy.nearzoom.domain.room.constants.RedisKeyConstants;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import java.time.Duration;
 import java.util.HashMap;
@@ -419,7 +420,7 @@ public class WebhookService {
         // 재시도 로직
         log.info("=== 재시도 시작 ===");
         for (int i = 1; i <= 3; i++) {
-          log.info("재시도 {}/3 - 1초 대기 중...", i);
+          log.info("재시도 {}/3 - 대기 중...", i);
           Thread.sleep(1000);
 
           keyExists = redisTemplate.hasKey(frameJobKey);
@@ -617,7 +618,7 @@ public class WebhookService {
     }
 
     redisTemplate.opsForHash().putAll(resultKey, resultData);
-    redisTemplate.expire(resultKey, Duration.ofHours(24));
+    redisTemplate.expire(resultKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
   }
 
   private void saveIndividualFailureResult(ImageProcessingFailedWebhook webhook) {
@@ -635,7 +636,7 @@ public class WebhookService {
     }
 
     redisTemplate.opsForHash().putAll(resultKey, resultData);
-    redisTemplate.expire(resultKey, Duration.ofHours(24));
+    redisTemplate.expire(resultKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
   }
 
   private void saveFrameCompletedResult(FrameCompositionCompletedWebhook webhook) {
@@ -661,7 +662,7 @@ public class WebhookService {
     }
 
     redisTemplate.opsForHash().putAll(resultKey, resultData);
-    redisTemplate.expire(resultKey, Duration.ofHours(24));
+    redisTemplate.expire(resultKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
   }
 
   private void saveFrameFailureResult(FrameCompositionFailedWebhook webhook) {
@@ -679,7 +680,7 @@ public class WebhookService {
     }
 
     redisTemplate.opsForHash().putAll(resultKey, resultData);
-    redisTemplate.expire(resultKey, Duration.ofHours(24));
+    redisTemplate.expire(resultKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
   }
 
   // === 배치 상태 관리 메소드들 ===
