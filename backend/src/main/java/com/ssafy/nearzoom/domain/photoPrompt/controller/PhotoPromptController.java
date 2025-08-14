@@ -90,7 +90,7 @@ public class PhotoPromptController {
           "https://storage.example.com/users/user2_profile.jpg", 
           "https://storage.example.com/users/user3_profile.jpg"
         ],
-        "backgroundType": "solid",
+        "backgroundType": "color",
         "colorValue": "#FF5733"
       }
       

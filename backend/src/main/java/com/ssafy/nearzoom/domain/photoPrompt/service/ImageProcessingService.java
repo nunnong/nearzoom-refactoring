@@ -42,27 +42,15 @@ public class ImageProcessingService {
       String promptId) {
     try {
       // 이미지 서버 요청 생성
-      ImageServerRequest request = new ImageServerRequest(
-          imageUrl,
-          personIds,
-          options
-      );
+      ImageServerRequest request = new ImageServerRequest(imageUrl, personIds, options);
 
       // 이미지 서버로 전송
       ImageServerResponse response = sendToImageServer("/jobs", request);
 
-      if (response == null || response.data() == null || response.data().jobId() == null) {
-        throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
-            "이미지 서버에서 올바른 응답을 받지 못했습니다.");
-      }
-
       String jobId = response.data().jobId();
+      log.info("이미지 서버로부터 받은 JobId: {}", jobId);
 
-      // Job 정보 Redis에 저장
-      saveIndividualJobInfo(jobId, roomId, imageOrder, imageUrl, options, promptId);
-
-      log.info("개별 이미지 처리 요청 완료 - JobId: {}, RoomId: {}, Order: {}",
-          jobId, roomId, imageOrder);
+      saveIndividualJobInfoToRedis(jobId, roomId, imageOrder, imageUrl, options, promptId);
 
     } catch (Exception e) {
       log.error("개별 이미지 즉시 처리 실패 - RoomId: {}, Order: {}, Error: {}",
@@ -82,11 +70,6 @@ public class ImageProcessingService {
   public void IndividualCompleted(String jobId, String processedImageUrl) {
     Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries("individual_job:" + jobId);
 
-    if (jobInfo.isEmpty()) {
-      log.error("Individual Job 정보를 찾을 수 없습니다: {}", jobId);
-      return;
-    }
-
     Long roomId = Long.valueOf((String) jobInfo.get("room_id"));
     int imageOrder = Integer.parseInt((String) jobInfo.get("image_order"));
     String promptId = (String) jobInfo.get("prompt_id");
@@ -94,7 +77,6 @@ public class ImageProcessingService {
     log.info("개별 이미지 처리 완료 - JobId: {}, RoomId: {}, Order: {}, ProcessedUrl: {}",
         jobId, roomId, imageOrder, processedImageUrl);
 
-    // 프롬프트 상태 업데이트
     if (promptId != null) {
       updatePromptStatus(Long.valueOf(promptId), PromptStatus.SUCCESS);
     }
@@ -103,10 +85,8 @@ public class ImageProcessingService {
     String roomKey = "room:" + roomId;
     redisTemplate.opsForHash().put(roomKey, "processed_image_" + imageOrder, processedImageUrl);
 
-    // 완료된 개별 처리 수 증가
     redisTemplate.opsForHash().increment(roomKey, "completed_individual_count", 1);
 
-    // 모든 개별 처리가 완료되었는지 확인
     checkAndStartFrameComposition(roomId);
   }
 
@@ -115,23 +95,15 @@ public class ImageProcessingService {
     String roomKey = "room:" + roomId;
     Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
 
-    String totalImagesStr = (String) roomData.get("total_images");
-    String completedCountStr = (String) roomData.get("completed_individual_count");
-
-    if (totalImagesStr == null || completedCountStr == null) {
-      log.warn("총 이미지 수 또는 완료 수 정보가 없습니다 - RoomId: {}", roomId);
-      return;
-    }
-
-    int totalImages = Integer.parseInt(totalImagesStr);
-    int completedImages = Integer.parseInt(completedCountStr);
+    int totalImages = Integer.parseInt((String) roomData.get("total_images"));
+    int completedImages = Integer.parseInt((String) roomData.get("completed_individual_count"));
 
     log.info("개별 처리 진행률 확인 - RoomId: {}, Completed: {}/{}",
         roomId, completedImages, totalImages);
 
     // 개별 사진이 완료되고 나면 frame 단계로 넘어감
     if (completedImages == totalImages && totalImages > 0) {
-      log.info("모든 개별 처리 완료. 프레임 합성 시작 - RoomId: {}", roomId);
+      log.info("모든 개별 처리 완료되어 프레임 합성 시작합니다.");
       startFrameComposition(roomId, roomData, totalImages);
     }
   }
@@ -144,10 +116,7 @@ public class ImageProcessingService {
 
       for (int i = 0; i < totalImages; i++) {
         String processedUrl = (String) roomData.get("processed_image_" + i);
-        if (processedUrl == null) {
-          throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
-              "처리된 이미지를 찾을 수 없습니다: order " + i);
-        }
+
         processedImageUrls.add(processedUrl);
       }
 
@@ -159,20 +128,14 @@ public class ImageProcessingService {
           frameColor
       );
 
-      log.info("프레임 합성 요청 시작 - RoomId: {}, ImageCount: {}, FrameColor: {}",
-          roomId, totalImages, frameColor);
+      log.info("프레임 합성 요청 시작 - ImageCount: {}, FrameColor: {}", totalImages, frameColor);
 
       ImageServerResponse response = sendToImageServer("/frame", composeRequest);
-
-      if (response == null || response.data() == null || response.data().jobId() == null) {
-        throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
-            "프레임 합성 서버에서 올바른 응답을 받지 못했습니다.");
-      }
 
       String composeJobId = response.data().jobId();
 
       // 프레임 합성 Job 정보 저장
-      saveFrameComposeJobInfo(composeJobId, roomId, processedImageUrls, frameColor);
+      saveFrameComposeJobInfoToRedis(composeJobId, roomId, processedImageUrls, frameColor);
 
       // 방 상태 업데이트
       redisTemplate.opsForHash().put("room:" + roomId, "compose_job_id", composeJobId);
@@ -187,29 +150,22 @@ public class ImageProcessingService {
           "프레임 합성 시작 실패: " + e.getMessage());
     }
   }
+
   // 프레임 합성 완료 처리 (웹훅에서 호출)
   public void handleFrameCompositionCompleted(String jobId, String finalImageUrl) {
     Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries("frame_job:" + jobId);
 
-    if (jobInfo.isEmpty()) {
-      log.error("Frame Job 정보를 찾을 수 없습니다: {}", jobId);
-      return;
-    }
-
     Long roomId = Long.valueOf((String) jobInfo.get("room_id"));
 
-    log.info("프레임 합성 완료 - JobId: {}, RoomId: {}, FinalUrl: {}",
-        jobId, roomId, finalImageUrl);
+    log.info("프레임 합성 완료 - JobId: {}, RoomId: {}, FinalUrl: {}", jobId, roomId, finalImageUrl);
 
     // 최종 결과 저장
     String roomKey = "room:" + roomId;
     redisTemplate.opsForHash().put(roomKey, "final_image_url", finalImageUrl);
     redisTemplate.opsForHash().put(roomKey, "status", "all_completed");
-
-    // 최종 결과를 별도 키에도 저장 (조회 편의성)
     redisTemplate.opsForValue().set("final_result:" + roomId, finalImageUrl, Duration.ofDays(1));
 
-    log.info("전체 프로세스 완료 - RoomId: {}, FinalImageUrl: {}", roomId, finalImageUrl);
+    log.info("✅✅✅✅✅ 최종 사진 Redis에 저장 완료 -> frame_job:{} ✅✅✅✅✅", jobId);
   }
 
   // 처리 결과 조회
@@ -309,122 +265,42 @@ public class ImageProcessingService {
     }
   }
 
-  // 개별 Job 정보 저장
-//  private void saveIndividualJobInfo(String jobId, Long roomId, int imageOrder,
-//      String imageUrl, ProcessingOptions options, String promptId) {
-//    Map<String, String> jobInfo = new HashMap<>();
-//    jobInfo.put("room_id", String.valueOf(roomId));
-//    jobInfo.put("image_order", String.valueOf(imageOrder));
-//    jobInfo.put("image_url", imageUrl);
-//    jobInfo.put("background_type", options.backgroundType());
-//    jobInfo.put("job_type", "individual");
-//    jobInfo.put("status", "processing");
-//    jobInfo.put("created_at", String.valueOf(System.currentTimeMillis()));
-//
-//    if (promptId != null) {
-//      jobInfo.put("prompt_id", promptId);
-//    }
-//    if (options.promptText() != null) {
-//      jobInfo.put("prompt_text", options.promptText());
-//    }
-//    if (options.backgroundColor() != null) {
-//      jobInfo.put("background_color", options.backgroundColor());
-//    }
-//
-//    redisTemplate.opsForHash().putAll("individual_job:" + jobId, jobInfo);
-//    redisTemplate.expire("individual_job:" + jobId, Duration.ofHours(2));
-//  }
-
-  private void saveIndividualJobInfo(String jobId, Long roomId, int imageOrder,
+  private void saveIndividualJobInfoToRedis(String jobId, Long roomId, int imageOrder,
       String imageUrl, ProcessingOptions options, String promptId) {
 
-    long saveStartTime = System.currentTimeMillis();
-    log.info("=== 🔍 Job 정보 저장 시작 ===");
-    log.info("JobId: {}, RoomId: {}, ImageOrder: {}", jobId, roomId, imageOrder);
-    log.info("PromptId: {}, BackgroundType: {}", promptId, options.backgroundType());
+    String redisKey = "individual_job:" + jobId;
+    log.info("🔍 Redis 저장 시작 () - Key: {}", redisKey);
 
-    try {
-      // 1️⃣ Job 데이터 준비
-      log.info("1️⃣ Job 데이터 준비 중...");
-      Map<String, String> jobInfo = new HashMap<>();
-      jobInfo.put("room_id", String.valueOf(roomId));
-      jobInfo.put("image_order", String.valueOf(imageOrder));
-      jobInfo.put("image_url", imageUrl);
-      jobInfo.put("background_type", options.backgroundType());
-      jobInfo.put("job_type", "individual");
-      jobInfo.put("status", "processing");
-      jobInfo.put("created_at", String.valueOf(saveStartTime));
+    Map<String, String> jobInfo = new HashMap<>();
+    jobInfo.put("room_id", String.valueOf(roomId));
+    jobInfo.put("image_order", String.valueOf(imageOrder));
+    jobInfo.put("image_url", imageUrl);
+    jobInfo.put("background_type", options.backgroundType());
+    jobInfo.put("job_type", "individual");
+    jobInfo.put("status", "processing");
 
-      if (promptId != null) {
-        jobInfo.put("prompt_id", promptId);
-      }
-      if (options.promptText() != null) {
-        jobInfo.put("prompt_text", options.promptText());
-      }
-      if (options.backgroundColor() != null) {
-        jobInfo.put("background_color", options.backgroundColor());
-      }
-
-      log.info("준비된 Job 데이터 필드 개수: {}", jobInfo.size());
-      for (Map.Entry<String, String> entry : jobInfo.entrySet()) {
-        log.info("  {}: {}", entry.getKey(), entry.getValue());
-      }
-
-      // 2️⃣ Redis 저장
-      String redisKey = "individual_job:" + jobId;
-      log.info("2️⃣ Redis 저장 시작 - Key: {}", redisKey);
-
-      redisTemplate.opsForHash().putAll(redisKey, jobInfo);
-      log.info("✅ Redis putAll 완료");
-
-      // 3️⃣ TTL 설정
-      log.info("3️⃣ TTL 설정 중...");
-      Boolean expireResult = redisTemplate.expire(redisKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
-      log.info("TTL 설정 결과: {} (2시간)", expireResult);
-
-      // 4️⃣ 저장 확인
-      log.info("4️⃣ 저장 결과 확인 중...");
-      Boolean keyExists = redisTemplate.hasKey(redisKey);
-      Map<Object, Object> savedData = redisTemplate.opsForHash().entries(redisKey);
-      Long ttl = redisTemplate.getExpire(redisKey);
-
-      log.info("저장 확인 - 키 존재: {}, 필드 개수: {}, TTL: {}초", keyExists, savedData.size(), ttl);
-
-      if (savedData.size() != jobInfo.size()) {
-        log.error("❌ 저장된 필드 개수 불일치! 예상: {}, 실제: {}", jobInfo.size(), savedData.size());
-      }
-
-      for (Map.Entry<Object, Object> entry : savedData.entrySet()) {
-        log.info("  저장된 데이터: {} = {}", entry.getKey(), entry.getValue());
-      }
-
-      long saveEndTime = System.currentTimeMillis();
-      log.info("=== ✅ Job 정보 저장 완료 ===");
-      log.info("JobId: {}, 저장 소요시간: {}ms", jobId, (saveEndTime - saveStartTime));
-
-    } catch (Exception e) {
-      long saveEndTime = System.currentTimeMillis();
-      log.error("=== ❌ Job 정보 저장 실패 ===");
-      log.error("JobId: {}, 저장 소요시간: {}ms", jobId, (saveEndTime - saveStartTime));
-      log.error("오류 타입: {}", e.getClass().getSimpleName());
-      log.error("오류 메시지: {}", e.getMessage());
-      log.error("스택 트레이스: ", e);
-
-      // Redis 연결 상태 확인
-      try {
-        String pingResult = redisTemplate.getConnectionFactory().getConnection().ping();
-        log.info("Redis 연결 상태: {}", pingResult);
-      } catch (Exception redisEx) {
-        log.error("Redis 연결 확인 실패: {}", redisEx.getMessage());
-      }
-
-      throw new RuntimeException("Job 정보 저장 실패: " + e.getMessage(), e);
+    if (promptId != null) {
+      jobInfo.put("prompt_id", promptId);
     }
+    if (options.promptText() != null) {
+      jobInfo.put("prompt_text", options.promptText());
+    }
+    if (options.backgroundColor() != null) {
+      jobInfo.put("background_color", options.backgroundColor());
+    }
+
+    redisTemplate.opsForHash().putAll(redisKey, jobInfo);
+    redisTemplate.expire(redisKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
+    log.info("✅ Redis individual_job 완료");
   }
 
   // 프레임 합성 Job 정보 저장
-  private void saveFrameComposeJobInfo(String jobId, Long roomId,
+  private void saveFrameComposeJobInfoToRedis(String jobId, Long roomId,
       List<String> processedImageUrls, String frameColor) {
+
+    String redisKey = "frame_job:" + jobId;
+    log.info("🔍 Redis 저장 시작 () - Key: {}", redisKey);
+
     Map<String, String> jobInfo = new HashMap<>();
     jobInfo.put("room_id", String.valueOf(roomId));
     jobInfo.put("processed_image_urls", String.join(",", processedImageUrls));
@@ -433,8 +309,9 @@ public class ImageProcessingService {
     jobInfo.put("status", "processing");
     jobInfo.put("created_at", String.valueOf(System.currentTimeMillis()));
 
-    redisTemplate.opsForHash().putAll("frame_job:" + jobId, jobInfo);
-    redisTemplate.expire("frame_job:" + jobId, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
+    redisTemplate.opsForHash().putAll(redisKey, jobInfo);
+    redisTemplate.expire(redisKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
+    log.info("✅ Redis frame_job 완료");
   }
 
   private ApiException handleImageServerError(String errorBody) {
