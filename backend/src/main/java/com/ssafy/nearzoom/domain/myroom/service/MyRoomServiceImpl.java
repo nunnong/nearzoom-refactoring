@@ -1,6 +1,5 @@
 package com.ssafy.nearzoom.domain.myroom.service;
 
-<<<<<<< HEAD
 import com.ssafy.nearzoom.domain.myroom.dto.HeartUpdateRequest;
 import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoListCondition;
 import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoListResponse;
