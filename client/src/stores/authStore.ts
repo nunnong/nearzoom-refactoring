@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { devtools } from 'zustand/middleware'
 
 import type { AuthState, User } from '@/types/auth'
 import { API_ENDPOINTS } from '@/constants/api'
@@ -15,7 +16,9 @@ interface AuthActions {
   logoutDueToInactivity: () => void
 }
 
-export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
+export const useAuthStore = create<AuthState & AuthActions>()(
+  devtools(
+    (set, get) => ({
   // 상태
   accessToken: null,
   user: null,
@@ -142,4 +145,9 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       window.location.href = '/'
     }
   },
-}))
+    }),
+    {
+      name: 'auth-store', // DevTools에서 표시될 이름
+    }
+  )
+)

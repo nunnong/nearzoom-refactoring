@@ -1,16 +1,22 @@
 'use client'
 
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { useRoomStore } from '@/stores/roomStore'
 import { useAuthStore } from '@/stores/authStore'
 import WaitingPage from '@/components/page/groupcall/WaitingPage'
+import UploadSelfieModal from '@/components/page/myroom/UploadSelfieModal' // 🔥 추가
 import { roomAPI, JoinRoomData, getErrorMessage } from '@/lib/api/room'
 
-type PageState = 'loading' | 'success' | 'error' | 'login_required'
+type PageState =
+  | 'loading'
+  | 'success'
+  | 'error'
+  | 'login_required'
+  | 'photo_required' // 🔥 추가
 
-function RoomJoinContent() {
+export default function RoomJoinPage() {
   const { roomId } = useParams()
   const router = useRouter()
 
@@ -18,31 +24,77 @@ function RoomJoinContent() {
   const isHost = searchParams?.get('isHost') === 'true'
   const skipJoin = searchParams?.get('skipJoin') === 'true'
 
-  const { isAuthenticated, isLoading: authLoading } = useAuthStore()
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore() // 🔥 user 추가
   const { roomData: storedRoomData, clearRoomData } = useRoomStore()
 
   const [pageState, setPageState] = useState<PageState>('loading')
   const [roomData, setRoomData] = useState<JoinRoomData | null>(null)
   const [errorMessage, setErrorMessage] = useState<string>('')
+  const [showPhotoModal, setShowPhotoModal] = useState(false) // 🔥 추가
 
-  // 🔥 추가: 실시간 갱신을 위한 상태
+  // 실시간 갱신을 위한 상태
   const [lastParticipantCount, setLastParticipantCount] = useState(0)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // 인증 상태 확인 및 로그인 페이지 리다이렉트
+  // 인증 및 참조사진 상태 확인
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      console.log('❌ 로그인되지 않음 - 로그인 페이지로 리다이렉트')
+    if (authLoading) return
 
+    // 1. 로그인되지 않은 경우
+    if (!isAuthenticated) {
+      console.log('❌ 로그인되지 않음 - 로그인 페이지로 리다이렉트')
       const currentUrl = `/room/${roomId}${isHost ? '?isHost=true&skipJoin=true' : ''}`
       localStorage.setItem('redirectAfterLogin', currentUrl)
-
       router.push('/login')
       return
     }
-  }, [authLoading, isAuthenticated, roomId, isHost, router])
 
-  // 🔥 추가: 방 정보 갱신 함수
+    // 2. 로그인되어 있지만 참조사진이 없는 경우
+    if (isAuthenticated && user && !user.faceImageUrl) {
+      console.log('❌ 참조사진 없음 - 참조사진 모달 표시')
+      setPageState('photo_required')
+      setShowPhotoModal(true)
+      return
+    }
+
+    // 3. 방장이고 skipJoin=true인 경우 (방금 생성한 방) - 바로 입장
+    if (isAuthenticated && user && user.faceImageUrl && isHost && skipJoin) {
+      console.log('✅ 방장 - 바로 입장')
+      loadHostData()
+      return
+    }
+
+    // 4. 일반 참가자이거나 방장이지만 URL로 재접속한 경우 - 참조사진 확인 모달
+    if (
+      isAuthenticated &&
+      user &&
+      user.faceImageUrl &&
+      (!isHost || !skipJoin)
+    ) {
+      console.log('📸 참조사진 확인 모달 표시')
+      setPageState('photo_required')
+      setShowPhotoModal(true)
+      return
+    }
+  }, [authLoading, isAuthenticated, user, roomId, isHost, skipJoin, router])
+
+  //참조사진 모달 완료 후 처리
+  const handlePhotoModalClose = () => {
+    setShowPhotoModal(false)
+
+    // 참조사진 처리 완료 후 방 입장 로직 실행
+    if (roomId && typeof roomId === 'string') {
+      if (skipJoin && isHost) {
+        console.log('방장으로 접속 - Zustand store에서 데이터 로드')
+        loadHostData()
+      } else {
+        console.log('참가자로 접속 - joinRoom API 호출')
+        joinRoom(roomId)
+      }
+    }
+  }
+
+  // 방 정보 갱신 함수
   const refreshRoomData = async () => {
     if (!roomId || !isAuthenticated || pageState !== 'success') return
 
@@ -50,7 +102,6 @@ function RoomJoinContent() {
       setIsRefreshing(true)
       console.log('🔄 방 정보 실시간 갱신 중...', roomId)
 
-      // 🔥 수정: roomId가 string[]일 경우 처리
       let numericRoomId: number | null = null
       if (typeof roomId === 'string') {
         numericRoomId = parseInt(roomId, 10)
@@ -63,13 +114,11 @@ function RoomJoinContent() {
         throw new Error('유효하지 않은 방 ID입니다')
       }
 
-      const updatedRoomInfo = await roomAPI.getRoomInfo(+numericRoomId)
+      const updatedRoomInfo = await roomAPI.getRoomInfo(numericRoomId)
       console.log('✅ 방 정보 갱신 성공:', updatedRoomInfo)
 
-      // 기존 roomData 구조에 맞게 변환
       const updatedRoomData: JoinRoomData = {
         ...roomData!,
-        // 실제 서버에서 온 정보로 업데이트 (필요한 필드들)
         participantName:
           roomData?.participantName ||
           updatedRoomInfo.participants[0]?.name ||
@@ -78,12 +127,10 @@ function RoomJoinContent() {
           updatedRoomInfo.createdAt ||
           roomData?.createdAt ||
           new Date().toISOString(),
-        // 다른 필드들도 필요시 추가
       }
 
       setRoomData(updatedRoomData)
 
-      // 참가자 수 변경 감지
       const newParticipantCount = updatedRoomInfo.participants?.length || 0
       if (newParticipantCount !== lastParticipantCount) {
         console.log(
@@ -94,7 +141,6 @@ function RoomJoinContent() {
         )
         setLastParticipantCount(newParticipantCount)
 
-        // 새로운 참가자가 들어왔을 때 알림 (선택사항)
         if (
           newParticipantCount > lastParticipantCount &&
           lastParticipantCount > 0
@@ -105,7 +151,6 @@ function RoomJoinContent() {
     } catch (error) {
       console.error('❌ 방 정보 갱신 실패:', error)
 
-      // 인증 에러인 경우 로그인 페이지로 리다이렉트
       const errorMsg = getErrorMessage(error)
       if (errorMsg.includes('로그인') || errorMsg.includes('인증')) {
         console.log('🔴 인증 에러 발생 - 로그인 페이지로 리다이렉트')
@@ -118,19 +163,19 @@ function RoomJoinContent() {
     }
   }
 
-  // 🔥 추가: 주기적 갱신 (10초마다)
+  // 주기적 갱신 (10초마다)
   useEffect(() => {
     if (pageState !== 'success' || !isAuthenticated || !roomId) return
 
     const interval = setInterval(() => {
       console.log('⏰ 주기적 방 정보 갱신 (10초)')
       refreshRoomData()
-    }, 10000) // 10초마다
+    }, 10000)
 
     return () => clearInterval(interval)
   }, [pageState, isAuthenticated, roomId, lastParticipantCount])
 
-  // 🔥 추가: 브라우저 포커스 시 갱신
+  // 브라우저 포커스 시 갱신
   useEffect(() => {
     const handleFocus = () => {
       if (pageState === 'success' && isAuthenticated && roomId) {
@@ -143,7 +188,7 @@ function RoomJoinContent() {
     return () => window.removeEventListener('focus', handleFocus)
   }, [pageState, isAuthenticated, roomId])
 
-  // 🔥 추가: 가시성 변경 시 갱신 (탭 전환)
+  // 가시성 변경 시 갱신 (탭 전환)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (
@@ -153,7 +198,7 @@ function RoomJoinContent() {
         roomId
       ) {
         console.log('👁️ 탭 활성화 - 방 정보 갱신')
-        setTimeout(() => refreshRoomData(), 1000) // 1초 후 갱신
+        setTimeout(() => refreshRoomData(), 1000)
       }
     }
 
@@ -173,8 +218,7 @@ function RoomJoinContent() {
       setRoomData(result)
       setPageState('success')
 
-      // 🔥 추가: 참가 성공 후 첫 번째 참가자 수 설정
-      setTimeout(() => refreshRoomData(), 2000) // 2초 후 방 정보 갱신
+      setTimeout(() => refreshRoomData(), 2000)
     } catch (error) {
       console.error('방 참가 실패:', error)
 
@@ -200,8 +244,7 @@ function RoomJoinContent() {
         setRoomData(storedRoomData)
         setPageState('success')
 
-        // 🔥 추가: 방장 데이터 로드 후 방 정보 갱신
-        setTimeout(() => refreshRoomData(), 1000) // 1초 후 갱신
+        setTimeout(() => refreshRoomData(), 1000)
       } else {
         console.log('Zustand에 방장 데이터 없음')
         setErrorMessage('방 정보를 찾을 수 없습니다. 다시 시도해주세요.')
@@ -213,30 +256,6 @@ function RoomJoinContent() {
       setPageState('error')
     }
   }
-
-  useEffect(() => {
-    if (authLoading || !isAuthenticated) {
-      return
-    }
-
-    if (roomId && typeof roomId === 'string') {
-      if (/^\d+$/.test(roomId)) {
-        if (skipJoin && isHost) {
-          console.log('방장으로 접속 - Zustand store에서 데이터 로드')
-          loadHostData()
-        } else {
-          console.log('참가자로 접속 - joinRoom API 호출')
-          joinRoom(roomId)
-        }
-      } else {
-        setErrorMessage('유효하지 않은 방 ID입니다.')
-        setPageState('error')
-      }
-    } else {
-      setErrorMessage('방 ID가 없습니다.')
-      setPageState('error')
-    }
-  }, [roomId, skipJoin, isHost, storedRoomData, authLoading, isAuthenticated])
 
   const handleRetry = () => {
     if (roomId && typeof roomId === 'string') {
@@ -271,6 +290,25 @@ function RoomJoinContent() {
           <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
           <p className="text-lg text-gray-600">인증 상태 확인 중...</p>
         </div>
+      </div>
+    )
+  }
+
+  //  참조사진 필요 상태
+  if (pageState === 'photo_required') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+          <p className="text-lg text-gray-600">참조사진 확인 중...</p>
+        </div>
+
+        {/*  UploadSelfieModal 사용 */}
+        <UploadSelfieModal
+          isOpen={showPhotoModal}
+          onClose={handlePhotoModalClose}
+          onImageUpdated={handlePhotoModalClose}
+        />
       </div>
     )
   }
@@ -354,7 +392,7 @@ function RoomJoinContent() {
   if (pageState === 'success' && roomData) {
     return (
       <div className="relative">
-        {/* 🔥 추가: 실시간 갱신 상태 표시 */}
+        {/* 실시간 갱신 상태 표시 */}
         {isRefreshing && (
           <div className="fixed top-4 right-4 z-50 rounded-lg bg-blue-500 px-4 py-2 text-sm text-white shadow-lg">
             <div className="flex items-center gap-2">
@@ -373,13 +411,5 @@ function RoomJoinContent() {
     <div className="flex min-h-screen items-center justify-center">
       <p>예상치 못한 오류가 발생했습니다.</p>
     </div>
-  )
-}
-
-export default function RoomJoinPage() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <RoomJoinContent />
-    </Suspense>
   )
 }

@@ -41,6 +41,12 @@ export default function Header({
       >
         테스트
       </Link>
+      <Link
+        href="/edit-test"
+        className="ml-20 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 px-8 py-4 font-semibold text-white shadow-md transition-transform duration-200 hover:scale-105"
+      >
+        합성테스트
+      </Link>
       {/* </div> */}
 
       <IsLogin

@@ -1,9 +1,6 @@
 // constants/api.ts
 // 백엔드 API 서버 주소
-export const API_BASE_URL =
-  process.env.NODE_ENV === 'production'
-    ? 'https://api.nearzoom.store'
-    : 'http://localhost:8080' // 개발 환경에서 백엔드 포트
+export const API_BASE_URL = 'https://api.nearzoom.store'
 
 // 프론트엔드 콜백 URL
 export const FRONTEND_BASE_URL =
@@ -28,7 +25,7 @@ export const API_ENDPOINTS = {
 
   // PhotoPrompt
   PHOTO_SELECTION: '/photoprompt/selection',
-  PHOTO_BACKGROUND: '/photoprompt/background',
+  PHOTO_BACKGROUND: '/photoprompt/image/background',
 
   // Follow System(피드 쪽)
   FOLLOW: '/follows',
