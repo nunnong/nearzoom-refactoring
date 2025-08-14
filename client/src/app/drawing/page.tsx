@@ -491,72 +491,72 @@ const DrawingPage: React.FC = () => {
   }
 
   const saveDrawing = async () => {
-    if (!stageRef.current) return
+  if (!stageRef.current) return
 
-    // 변경사항이 없으면 저장하지 않고 경고 메시지 표시
-    if (!hasChanges) {
-      alert('변경사항이 없습니다. 이미지를 편집한 후 저장해주세요.')
-      return
-    }
-
-    try {
-      console.log('💾 Starting save process...')
-      console.log('📝 Original image ID:', imageId)
-
-      // 1단계: Konva 스테이지를 이미지로 변환
-      const dataURL = stageRef.current.toDataURL({
-        mimeType: 'image/png',
-        quality: 1,
-      })
-
-      // 2단계: dataURL을 Blob으로 변환
-      const response = await fetch(dataURL)
-      const blob = await response.blob()
-
-      // 3단계: FormData 생성하여 이미지 서버에 업로드
-      const formData = new FormData()
-      formData.append('file', blob, 'edited-image.png')
-
-      console.log('📤 Uploading edited image to image server...')
-      const uploadResponse = await fetch('https://image.nearzoom.store/upload', {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!uploadResponse.ok) {
-        throw new Error(`이미지 업로드 실패: ${uploadResponse.status} ${uploadResponse.statusText}`)
-      }
-
-      const uploadResult = await uploadResponse.json()
-      const imageUrl = uploadResult?.data?.file_url || uploadResult?.url || uploadResult?.imageUrl
-
-      if (!imageUrl) {
-        throw new Error('업로드된 이미지 URL을 받아올 수 없습니다.')
-      }
-
-      console.log('✅ Image uploaded successfully:', imageUrl)
-
-      // 4단계: 백엔드에 편집본 저장 요청 (myroomService 사용)
-      console.log('📤 Saving edited photo to backend...')
-      await myroomService.saveEditedPhoto({
-        photoId: parseInt(imageId!)
-      })
-
-      console.log('✅ Successfully saved edited photo to backend')
-
-      // 저장 성공 알림
-      alert('이미지가 성공적으로 저장되었습니다!')
-
-      // 저장 후 이전 페이지로 돌아가기
-      const currentUrl = new URL(window.location.href)
-      const returnUrl = currentUrl.searchParams.get('returnUrl') || '/'
-      router.push(returnUrl)
-
-    } catch (error) {
-      console.error('❌ Failed to save image:', error)
-      alert(`이미지 저장에 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
-    }
+  // 변경사항이 없으면 저장하지 않고 경고 메시지 표시
+  if (!hasChanges) {
+    alert('변경사항이 없습니다. 이미지를 편집한 후 저장해주세요.')
+    return
   }
+
+  try {
+    console.log('💾 Starting save process...')
+    console.log('📝 Original image ID:', imageId)
+
+    // 1단계: Konva 스테이지를 이미지로 변환
+    const dataURL = stageRef.current.toDataURL({
+      mimeType: 'image/png',
+      quality: 1,
+    })
+
+    // 2단계: dataURL을 Blob으로 변환
+    const response = await fetch(dataURL)
+    const blob = await response.blob()
+
+    // 3단계: FormData 생성하여 이미지 서버에 업로드
+    const formData = new FormData()
+    formData.append('file', blob, 'edited-image.png')
+
+    console.log('📤 Uploading edited image to image server...')
+    const uploadResponse = await fetch('https://image.nearzoom.store/upload', {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!uploadResponse.ok) {
+      throw new Error(`이미지 업로드 실패: ${uploadResponse.status} ${uploadResponse.statusText}`)
+    }
+
+    const uploadResult = await uploadResponse.json()
+    const imageUrl = uploadResult?.data?.file_url || uploadResult?.url || uploadResult?.imageUrl
+
+    if (!imageUrl) {
+      throw new Error('업로드된 이미지 URL을 받아올 수 없습니다.')
+    }
+
+    console.log('✅ Image uploaded successfully:', imageUrl)
+
+    // 4단계: 백엔드에 편집된 이미지 URL 저장 (핵심 수정 부분!)
+    console.log('📤 Saving edited image URL to backend...')
+    const originalPhotoId = imageId ? parseInt(imageId) : 0
+    
+    await myroomService.saveEditedImageUrl(imageUrl, originalPhotoId)
+
+    console.log('✅ Successfully saved edited image URL to backend')
+
+    // 저장 성공 알림
+    alert('이미지가 성공적으로 저장되었습니다!')
+
+    // 저장 후 이전 페이지로 돌아가기
+    const currentUrl = new URL(window.location.href)
+    const returnUrl = currentUrl.searchParams.get('returnUrl') || '/myroom'
+    router.push(returnUrl)
+
+  } catch (error) {
+    console.error('❌ Failed to save image:', error)
+    alert(`이미지 저장에 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
+  }
+}
 
   const goBack = () => {
     if (hasChanges) {

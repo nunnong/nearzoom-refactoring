@@ -8,8 +8,8 @@ export const API_BASE_URL =
 // 프론트엔드 콜백 URL
 export const FRONTEND_BASE_URL =
   process.env.NODE_ENV === 'production'
-    ? 'http://localhost:3000'
-    : 'https://nearzoom.store' // 프론트엔드 포트
+    ? 'https://nearzoom.store' // 프론트엔드 포트
+    : 'http://localhost:3000' 
 
 export const API_ENDPOINTS = {
   // Auth
@@ -20,6 +20,8 @@ export const API_ENDPOINTS = {
   HEART: '/myroom/photos/heart',
   DELETE_PHOTO: '/myroom/photos',
   SAVE_EDITED: '/myroom/photos/save-edited',
+  SAVE_EDITED_URL: '/myroom/photos/save-edited-url',  // 추가
+  FEED_UPLOAD_INFO: '/myroom/photos',
   SAVE_FACE_IMAGE: '/user/save-face-image',
   IMAGE_PROXY: '/myroom/image', // 이미지 프록시 엔드포인트
 
