@@ -5,8 +5,6 @@ import java.util.List;
 
 public record FeedWithPostsResponse(
     Long feedId,
-    String title,
-    String description,
     Long userId,
     String accountName,
     String profileImage,
