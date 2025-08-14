@@ -10,6 +10,7 @@ import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingResult;
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PhotoPrompt;
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PromptStatus;
 import com.ssafy.nearzoom.domain.photoPrompt.repository.PhotoPromptRepository;
+import com.ssafy.nearzoom.domain.room.constants.RedisKeyConstants;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import java.time.Duration;
 import java.util.*;
@@ -36,7 +37,7 @@ public class ImageProcessingService {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   // 개별 이미지 즉시 처리
-  public void processIndividualImageImmediately(Long roomId, int imageOrder,
+  public void processIndividualStart(Long roomId, int imageOrder,
       String imageUrl, List<String> personIds, ProcessingOptions options,
       String promptId) {
     try {
@@ -378,7 +379,7 @@ public class ImageProcessingService {
 
       // 3️⃣ TTL 설정
       log.info("3️⃣ TTL 설정 중...");
-      Boolean expireResult = redisTemplate.expire(redisKey, Duration.ofHours(2));
+      Boolean expireResult = redisTemplate.expire(redisKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
       log.info("TTL 설정 결과: {} (2시간)", expireResult);
 
       // 4️⃣ 저장 확인
@@ -433,7 +434,7 @@ public class ImageProcessingService {
     jobInfo.put("created_at", String.valueOf(System.currentTimeMillis()));
 
     redisTemplate.opsForHash().putAll("frame_job:" + jobId, jobInfo);
-    redisTemplate.expire("frame_job:" + jobId, Duration.ofHours(2));
+    redisTemplate.expire("frame_job:" + jobId, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
   }
 
   private ApiException handleImageServerError(String errorBody) {

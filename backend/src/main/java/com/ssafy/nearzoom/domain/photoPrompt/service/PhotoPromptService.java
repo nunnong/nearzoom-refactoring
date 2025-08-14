@@ -6,6 +6,7 @@ import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingResult;
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PhotoPrompt;
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PromptStatus;
 import com.ssafy.nearzoom.domain.photoPrompt.repository.PhotoPromptRepository;
+import com.ssafy.nearzoom.domain.room.constants.RedisKeyConstants;
 import com.ssafy.nearzoom.domain.user.entity.Social;
 import com.ssafy.nearzoom.domain.user.entity.User;
 import com.ssafy.nearzoom.domain.user.repository.UserRepository;
@@ -44,7 +45,7 @@ public class PhotoPromptService {
     basicData.put("status", "basic_settings_saved");
 
     redisTemplate.opsForHash().putAll(roomKey, basicData);
-    redisTemplate.expire(roomKey, Duration.ofHours(2));
+    redisTemplate.expire(roomKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
 
     log.info("기본 설정 저장 완료 - RoomId: {}, FrameColor: {}", roomId, frameColor);
   }
@@ -106,7 +107,7 @@ public class PhotoPromptService {
 
     // 즉시 이미지 서버로 전송
     try {
-      imageProcessingService.processIndividualImageImmediately(
+      imageProcessingService.processIndividualStart(
           roomId,
           imageOrder,
           backgroundRequest.imageUrl(),
