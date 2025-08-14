@@ -36,7 +36,7 @@ export default function UploadPhotoPage() {
     }
   }
 
-  // 🔥 [수정: 리다이렉트 목적지 계산 로직 강화]
+  
   // returnUrl 파라미터를 항상 URL 그대로, localStorage에도 혹시 값 있으면 보조로 체크하게 설계
   const getRedirectDestination = () => {
     const returnUrl = searchParams.get('returnUrl')
@@ -81,7 +81,7 @@ export default function UploadPhotoPage() {
     fileInputRef.current?.click()
   }
 
-  // 🔥 [변경 포인트2]: 저장/업로드 성공 후 리턴URL로 이동
+  // 저장/업로드 성공 후 리턴URL로 이동
   const handleSave = async () => {
     if (!selectedImage) return
 
@@ -123,7 +123,7 @@ export default function UploadPhotoPage() {
 
       console.log('참조 이미지 저장 완료:', imageUrl)
 
-      // 🔥 업로드 처리 후 반드시 목적지로 이동
+      // 업로드 처리 후 반드시 목적지로 이동
       const destination = getRedirectDestination()
       router.replace(destination)
 
@@ -135,7 +135,7 @@ export default function UploadPhotoPage() {
     }
   }
 
-  // 🔥 [변경 포인트3]: '시작하기', '취소', '나중에 등록', '닫기' 모두 동일하게 목적지로 이동
+  // '시작하기', '취소', '나중에 등록', '닫기' 모두 동일하게 목적지로 이동
   const handleSkip = () => {
     const destination = getRedirectDestination()
     router.replace(destination)

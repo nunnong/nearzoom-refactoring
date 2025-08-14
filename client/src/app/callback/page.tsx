@@ -16,7 +16,7 @@ export default function CallbackPage() {
   const [errorMessage, setErrorMessage] = useState<string>('')
   const [processed, setProcessed] = useState(false)
 
-  // 🔥 [추가] 리다이렉트 목적지 계산 함수
+  // 리다이렉트 목적지 계산 함수
   const getRedirectAfterLogin = () => {
     const returnUrl = searchParams.get('returnUrl')
     // 콜백까지 오기 전에 localStorage에 저장한 값
@@ -77,7 +77,7 @@ export default function CallbackPage() {
           }
         })
 
-        // 🔥 [변경] 리다이렉트 목적지 읽기
+        // 리다이렉트 목적지 읽기
         const redirectDest = getRedirectAfterLogin()
 
         if (userInfo.ok) {
@@ -101,7 +101,7 @@ export default function CallbackPage() {
               }
             }
 
-            // ⬇ 여기서 localStorage 정리
+            // localStorage 정리
             localStorage.removeItem('redirectAfterLogin')
             localStorage.removeItem('actionAfterLogin')
           }, 500)

@@ -31,7 +31,7 @@ export default function RoomJoinPage() {
   const [lastParticipantCount, setLastParticipantCount] = useState(0)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // 🔥 수정: 인증 및 참조사진 상태 확인
+  // 인증 및 참조사진 상태 확인
   useEffect(() => {
     if (authLoading) return
 
@@ -69,7 +69,7 @@ export default function RoomJoinPage() {
 
   }, [authLoading, isAuthenticated, user, roomId, isHost, skipJoin, router])
 
-  // 🔥 참조사진 모달 완료 후 처리
+  //참조사진 모달 완료 후 처리
   const handlePhotoModalClose = () => {
     setShowPhotoModal(false)
     
@@ -268,7 +268,7 @@ export default function RoomJoinPage() {
     )
   }
 
-  // 🔥 참조사진 필요 상태
+  //  참조사진 필요 상태
   if (pageState === 'photo_required') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
@@ -277,7 +277,7 @@ export default function RoomJoinPage() {
           <p className="text-lg text-gray-600">참조사진 확인 중...</p>
         </div>
         
-        {/* 🔥 UploadSelfieModal 사용 */}
+        {/*  UploadSelfieModal 사용 */}
         <UploadSelfieModal
           isOpen={showPhotoModal}
           onClose={handlePhotoModalClose}

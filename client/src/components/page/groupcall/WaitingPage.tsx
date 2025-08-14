@@ -241,8 +241,8 @@ export default function WaitingPage({
   const handleCopyRoomUrl = useCallback(() => {
     if (roomInfo.url && typeof navigator !== 'undefined') {
       navigator.clipboard.writeText(roomInfo.url)
-      console.log('URL 복사됨:', roomInfo.url)
-      alert('방 URL이 복사되었습니다!')
+      console.log('방 URL 복사됨:', roomInfo.url)
+      // alert('방 URL이 복사되었습니다!')
     }
   }, [roomInfo.url])
 
