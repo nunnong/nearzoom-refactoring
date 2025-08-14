@@ -277,7 +277,7 @@ public class WebhookService {
     }
   }
 
-//  // 프레임 합성 완료 웹훅
+//  // 프레임 합성 완료 웹훅 (기존 로직이나 테스트 성공하면 지워도 됨)
 //  public void webhookFrameCompleted(FrameCompositionCompletedWebhook webhook) {
 //    String jobId = webhook.jobId();
 //    log.info("프레임 합성 완료 웹훅 수신 - JobId: {}", jobId);
@@ -314,7 +314,7 @@ public class WebhookService {
 //    }
 //  }
 //
-//  // 프레임 합성 실패 웹훅
+    // 프레임 합성 실패 웹훅 (기존 로직이나 테스트 성공하면 지워도 됨)
 //  public void webhookFrameFailed(FrameCompositionFailedWebhook webhook) {
 //    String jobId = webhook.jobId();
 //    log.error("프레임 합성 실패 웹훅 수신 - JobId: {}", jobId);
@@ -807,17 +807,17 @@ private void updatePromptStatus(Long promptId, PromptStatus status) {
     log.warn("⚠️ 프롬프트 상태 업데이트 실패했지만 예외를 억제하여 웹훅 처리 계속 진행");
   }
 }
-  @Deprecated
-  public void handleImageProcessingCompleted(ImageProcessingCompletedWebhook webhook) {
-    log.warn("Deprecated 메소드 호출 - handleImageProcessingCompleted: {}", webhook.jobId());
-    // 기존 로직과의 호환성을 위해 개별 처리로 리다이렉트
-    webhookIndividualCompleted(webhook);
-  }
-
-  @Deprecated
-  public void handleImageProcessingFailed(ImageProcessingFailedWebhook webhook) {
-    log.warn("Deprecated 메소드 호출 - handleImageProcessingFailed: {}", webhook.jobId());
-    // 기존 로직과의 호환성을 위해 개별 처리로 리다이렉트
-    webhookIndividualFailed(webhook);
-  }
+//  @Deprecated
+//  public void handleImageProcessingCompleted(ImageProcessingCompletedWebhook webhook) {
+//    log.warn("Deprecated 메소드 호출 - handleImageProcessingCompleted: {}", webhook.jobId());
+//    // 기존 로직과의 호환성을 위해 개별 처리로 리다이렉트
+//    webhookIndividualCompleted(webhook);
+//  }
+//
+//  @Deprecated
+//  public void handleImageProcessingFailed(ImageProcessingFailedWebhook webhook) {
+//    log.warn("Deprecated 메소드 호출 - handleImageProcessingFailed: {}", webhook.jobId());
+//    // 기존 로직과의 호환성을 위해 개별 처리로 리다이렉트
+//    webhookIndividualFailed(webhook);
+//  }
 }
