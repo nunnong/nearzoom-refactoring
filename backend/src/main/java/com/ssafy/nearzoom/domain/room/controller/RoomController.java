@@ -293,10 +293,9 @@ public class RoomController {
 
       Map<String, Object> responseData = new HashMap<>();
       responseData.put("roomId", roomId);
-      responseData.put("newHostIdentity", becomeHostRequest.participantIdentity());
       responseData.put("becameHostAt", LocalDateTime.now().toString());
 
-      log.info("User became host via API. RoomId: {}, NewHost: {}", roomId, becomeHostRequest.participantIdentity());
+      log.info("User became host via API. RoomId: {}", roomId);
 
       return ResponseEntity.ok(new ApiResponse<>(false, "방장이 되었습니다.", responseData));
 
