@@ -280,16 +280,10 @@ public class RoomController {
   @PostApiResponses
   public ResponseEntity<ApiResponse<Map<String, Object>>> becomeHost(
       HttpServletRequest request,
-      @PathVariable Long roomId,
-      @RequestBody BecomeHostRequest becomeHostRequest) {
+      @PathVariable Long roomId) {
 
     try {
-      // roomId 일치 확인
-      if (!roomId.equals(becomeHostRequest.roomId())) {
-        throw new ApiException(HttpStatus.BAD_REQUEST, "경로의 roomId와 요청 데이터의 roomId가 일치하지 않습니다.");
-      }
-
-      roomService.becomeHost(request, becomeHostRequest);
+      roomService.becomeHost(request, roomId);
 
       Map<String, Object> responseData = new HashMap<>();
       responseData.put("roomId", roomId);
