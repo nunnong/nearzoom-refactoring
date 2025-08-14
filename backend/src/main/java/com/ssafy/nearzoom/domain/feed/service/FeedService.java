@@ -58,7 +58,8 @@ public class FeedService {
         // 사용자의 피드 조회 또는 생성
         Feed userFeed = feedRepository.findByUser_UserId(loginUser.getUserId())
             .orElseGet(() -> {
-                Feed newFeed = Feed.of(loginUser, loginUser.getAccountName() + "의 피드", "");
+                // ⚡️ 수정: title, description 제거
+                Feed newFeed = Feed.of(loginUser);
                 return feedRepository.save(newFeed);
             });
 
@@ -94,8 +95,6 @@ public class FeedService {
 
         return new FeedWithPostsResponse(
             feed.getFeedId(),
-            feed.getTitle(),
-            feed.getDescription(),
             feed.getUser().getUserId(),
             feed.getUser().getAccountName(),
             feed.getUser().getProfileImage(),
@@ -213,8 +212,6 @@ public class FeedService {
 
                     return new FeedWithPostsResponse(
                         feed.getFeedId(),
-                        feed.getTitle(),
-                        feed.getDescription(),
                         user.getUserId(),
                         user.getAccountName(),
                         user.getProfileImage(),
