@@ -5,9 +5,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(description = "방장 되기 요청 DTO")
 public record BecomeHostRequest(
     @Schema(description = "방 ID", example = "123456")
-    Long roomId,
-
-    @Schema(description = "요청자의 participant identity", example = "user_1234567890_abc123")
-    String participantIdentity
+    Long roomId
 ) {
 }

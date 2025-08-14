@@ -426,15 +426,10 @@ public class RoomService {
       throw new ApiException(HttpStatus.BAD_REQUEST, "종료된 방에서는 방장이 될 수 없습니다.");
     }
 
-    // 요청자가 현재 방에 참가하고 있는지 확인
+    // JWT에서 확인한 사용자의 identity를 찾기
     String userIdentity = getCurrentUserIdentity(becomeHostRequest.roomId(), user);
     if (userIdentity == null) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "방에 참가하지 않은 사용자는 방장이 될 수 없습니다.");
-    }
-
-    // 요청한 identity와 실제 identity가 일치하는지 확인
-    if (!userIdentity.equals(becomeHostRequest.participantIdentity())) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "요청자의 participant identity가 일치하지 않습니다.");
     }
 
     // 이미 방장인지 확인
@@ -452,12 +447,12 @@ public class RoomService {
           roomKey
       );
 
-      log.info("User became host. RoomId: {}, NewHost Identity: {}, PreviousHost Identity: {}",
-          becomeHostRequest.roomId(), userIdentity, currentHostIdentity);
+      log.info("User became host. RoomId: {}, NewHost Identity: {}, NewHost Email: {}, PreviousHost Identity: {}",
+          becomeHostRequest.roomId(), userIdentity, user.getUserEmail(), currentHostIdentity);
 
     } catch (Exception e) {
-      log.error("Become host error. RoomId: {}, User Identity: {}",
-          becomeHostRequest.roomId(), userIdentity, e);
+      log.error("Become host error. RoomId: {}, User Email: {}, User Identity: {}",
+          becomeHostRequest.roomId(), user.getUserEmail(), userIdentity, e);
       throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
           "방장 되기 중 오류가 발생했습니다: " + e.getMessage());
     }
