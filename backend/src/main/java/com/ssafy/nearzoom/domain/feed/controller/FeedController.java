@@ -1,3 +1,5 @@
+// FeedController.java - 마이룸 방식에 맞춘 무한 스크롤
+
 package com.ssafy.nearzoom.domain.feed.controller;
 
 import com.ssafy.nearzoom.domain.feed.dto.*;
@@ -18,59 +20,66 @@ public class FeedController {
     private final FeedService feedService;
 
     // =========================================
-    // 📱 EXPLORE: 모든 게시물 탐색
+    // 📱 EXPLORE: 모든 게시물 탐색 (마이룸 방식)
     // =========================================
 
     /**
      * 🌍 Explore: 모든 사용자의 게시물 랜덤 조회
+     * 📱 마이룸과 동일한 방식: limit, cursor 직접 파라미터로 받기
      */
     @GetMapping("/explore")
-    public ResponseEntity<ApiResponse<List<PostResponse>>> getExplorePosts(
+    public ResponseEntity<ApiResponse<PostListResponse>> getExplorePosts(
         Authentication authentication,
-        @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok(feedService.getRandomPosts(authentication, size));
+        @RequestParam(defaultValue = "20") int limit,
+        @RequestParam(required = false) Long cursor) {
+        return ApiResponse.ok(feedService.getRandomPosts(authentication, limit, cursor));
     }
 
     // =========================================
-    // 📰 TIMELINE: 팔로잉 피드
+    // 📰 TIMELINE: 팔로잉 피드 (마이룸 방식)
     // =========================================
 
     /**
      * 📰 Timeline: 팔로잉하는 사용자들의 최신 게시물들 조회
      */
     @GetMapping("/timeline")
-    public ResponseEntity<ApiResponse<List<PostResponse>>> getTimelinePosts(
+    public ResponseEntity<ApiResponse<PostListResponse>> getTimelinePosts(
         Authentication authentication,
-        @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok(feedService.getFollowingLatestPosts(authentication, size));
+        @RequestParam(defaultValue = "20") int limit,
+        @RequestParam(required = false) Long cursor) {
+        return ApiResponse.ok(feedService.getFollowingLatestPosts(authentication, limit, cursor));
     }
 
     // =========================================
-    // 👤 USER FEED: 특정 사용자 피드 조회
+    // 👤 USER FEED: 특정 사용자 피드 조회 (마이룸 방식)
     // =========================================
 
     /**
-     * 👤 특정 사용자의 피드 조회 (게시물 포함) - 읽기 권한
+     * 👤 특정 사용자의 피드 조회 (게시물 포함) - 마이룸 방식
      */
     @GetMapping("/users/{userId}")
     public ResponseEntity<ApiResponse<FeedWithPostsResponse>> getUserFeed(
         Authentication authentication,
-        @PathVariable Long userId) {
-        return ApiResponse.ok(feedService.getUserFeedWithPosts(authentication, userId));
+        @PathVariable Long userId,
+        @RequestParam(defaultValue = "20") int limit,
+        @RequestParam(required = false) Long cursor) {
+        return ApiResponse.ok(feedService.getUserFeedWithPosts(authentication, userId, limit, cursor));
     }
 
     /**
-     * 👤 계정명으로 사용자 피드 조회 (게시물 포함) - 읽기 권한
+     * 👤 계정명으로 사용자 피드 조회 (게시물 포함) - 마이룸 방식
      */
     @GetMapping("/users/account/{accountName}")
     public ResponseEntity<ApiResponse<FeedWithPostsResponse>> getUserFeedByAccountName(
         Authentication authentication,
-        @PathVariable String accountName) {
-        return ApiResponse.ok(feedService.getUserFeedByAccountName(authentication, accountName));
+        @PathVariable String accountName,
+        @RequestParam(defaultValue = "20") int limit,
+        @RequestParam(required = false) Long cursor) {
+        return ApiResponse.ok(feedService.getUserFeedByAccountName(authentication, accountName, limit, cursor));
     }
 
     // =========================================
-    // 📝 POST MANAGEMENT: 게시물 관리
+    // 📝 POST MANAGEMENT: 게시물 관리 (기존 유지)
     // =========================================
 
     /**
@@ -117,19 +126,18 @@ public class FeedController {
     }
 
     // =========================================
-    // 🔍 SEARCH: 피드/사용자 검색
+    // 🔍 SEARCH: 피드/사용자 검색 (마이룸 방식)
     // =========================================
 
     /**
-     * 🔍 피드 검색 (사용자 검색)
+     * 🔍 피드 검색 (사용자 검색) - 마이룸 방식
      */
     @GetMapping("/search")
-    public ResponseEntity<ApiResponse<List<FeedWithPostsResponse>>> searchFeeds(
+    public ResponseEntity<ApiResponse<FeedSearchResponse>> searchFeeds(
         Authentication authentication,
         @RequestParam String query,
-        @RequestParam(defaultValue = "10") int size) {
-        return ApiResponse.ok(feedService.searchFeeds(authentication, query, size));
+        @RequestParam(defaultValue = "10") int limit,
+        @RequestParam(required = false) Long cursor) {
+        return ApiResponse.ok(feedService.searchFeeds(authentication, query, limit, cursor));
     }
-
-
 }

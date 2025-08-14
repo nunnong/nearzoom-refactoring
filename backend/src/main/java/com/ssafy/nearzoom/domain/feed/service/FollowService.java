@@ -1,6 +1,6 @@
 package com.ssafy.nearzoom.domain.feed.service;
 
-import com.ssafy.nearzoom.domain.feed.dto.FollowCountsResponse; // 🔥 추가
+import com.ssafy.nearzoom.domain.feed.dto.FollowCountsResponse;
 import com.ssafy.nearzoom.domain.feed.entity.Follow;
 import com.ssafy.nearzoom.domain.feed.repository.FollowRepository;
 import com.ssafy.nearzoom.domain.user.dto.UserAuthInfoResponse;
@@ -121,12 +121,13 @@ public class FollowService {
      */
     @Transactional(readOnly = true)
     public FollowCountsResponse getCountsByAccountName(String accountName) {
-        // accountName으로 사용자 찾기
         User user = userRepository.findByAccountName(accountName)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
-        int followers = followRepository.countByFollowee_UserId(user.getUserId());
-        int following = followRepository.countByFollower_UserId(user.getUserId());
+        // int → long 타입 변경
+        long followers = followRepository.countByFollowee_UserId(user.getUserId());
+        long following = followRepository.countByFollower_UserId(user.getUserId());
+
         return new FollowCountsResponse(followers, following);
     }
 
