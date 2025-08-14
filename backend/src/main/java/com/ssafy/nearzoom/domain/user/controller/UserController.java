@@ -1,6 +1,7 @@
 package com.ssafy.nearzoom.domain.user.controller;
 
 import com.ssafy.nearzoom.domain.user.dto.UserInfoResponse;
+import com.ssafy.nearzoom.domain.user.repository.UserRepository;
 import com.ssafy.nearzoom.domain.user.service.UserService;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import com.ssafy.nearzoom.global.response.ApiResponse;
@@ -60,6 +61,15 @@ public class UserController {
         UserInfoResponse info = userService.getUserInfo(authentication);
         return ApiResponse.ok(info);
     }
+
+    @GetMapping("/prettyFace")
+    public ResponseEntity<ApiResponse<String>> getPrettyFace(
+            Authentication authentication) {
+        String prettyFace = userService.getPrettyFace(authentication);
+        return ApiResponse.ok(prettyFace);
+    }
+
+
 
     @DeleteMapping("/signout")
     public ResponseEntity<ApiResponse<Void>> withdraw(HttpServletRequest request,
