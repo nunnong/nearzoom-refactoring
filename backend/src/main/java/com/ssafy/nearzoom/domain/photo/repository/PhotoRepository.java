@@ -1,5 +1,6 @@
 package com.ssafy.nearzoom.domain.photo.repository;
 
+import com.ssafy.nearzoom.domain.myroom.dto.PhotoInsertDto;
 import com.ssafy.nearzoom.domain.photo.entity.Photo;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,4 +20,8 @@ public interface PhotoRepository extends JpaRepository<Photo, Long> {
         return findByRoomIdAndDeletedAtIsNull(roomId)
             .orElseThrow(() -> new RuntimeException("해당 방의 사진을 찾을 수 없습니다."));
     }
+
+    void savePhotoToMyPhoto(PhotoInsertDto photoDto);
+
+    void saveToArchive(Long userId, Long newPhotoId);
 }

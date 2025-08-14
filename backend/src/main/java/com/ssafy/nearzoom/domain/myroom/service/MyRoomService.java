@@ -1,10 +1,6 @@
 package com.ssafy.nearzoom.domain.myroom.service;
 
-import com.ssafy.nearzoom.domain.myroom.dto.HeartUpdateRequest;
-import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoListCondition;
-import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoListResponse;
-import com.ssafy.nearzoom.domain.myroom.dto.PhotoDeleteRequest;
-import com.ssafy.nearzoom.domain.myroom.dto.PhotoEditSaveRequest;
+import com.ssafy.nearzoom.domain.myroom.dto.*;
 import org.springframework.security.core.Authentication;
 public interface MyRoomService {
 
@@ -26,4 +22,8 @@ public interface MyRoomService {
      */
     String saveEditedImageUrl(String imageUrl, Long originalPhotoId, Authentication authentication);
 
+    /**
+     * 🆕 마이룸 사진을 피드 게시물로 업로드하기 위한 정보 조회
+     */
+    PhotoForFeedUploadResponse getPhotoForFeedUpload(Long photoId, Authentication authentication);
 }

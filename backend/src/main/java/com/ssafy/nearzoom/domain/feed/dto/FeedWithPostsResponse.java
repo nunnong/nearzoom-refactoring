@@ -1,17 +1,15 @@
 package com.ssafy.nearzoom.domain.feed.dto;
 
-
 import java.time.LocalDateTime;
+import java.util.List;
 
-public record FeedDetailResponse(
+public record FeedWithPostsResponse(
     Long feedId,
-    String imgUrl,
-    String caption,
-    Long authorId,
+    Long userId,
     String accountName,
     String profileImage,
     LocalDateTime createdAt,
-    boolean liked
+    List<PostResponse> posts,
+    boolean isFollowing
 ) {
-
 }

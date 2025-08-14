@@ -13,19 +13,19 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class LikesId implements Serializable {
 
-    @Column(name = "feed_id", nullable = false)
-    private Long feedId;
+    @Column(name = "post_id", nullable = false)  // feed_id → post_id로 변경
+    private Long postId;  // feedId → postId로 변경
 
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    private LikesId(Long feedId, Long userId) {
-        this.feedId = feedId;
+    private LikesId(Long postId, Long userId) {
+        this.postId = postId;
         this.userId = userId;
     }
 
-    public static LikesId of(Long feedId, Long userId) {
-        return new LikesId(feedId, userId);
+    public static LikesId of(Long postId, Long userId) {
+        return new LikesId(postId, userId);
     }
 
     @Override
@@ -36,12 +36,12 @@ public class LikesId implements Serializable {
         if (!(o instanceof LikesId that)) {
             return false;
         }
-        return Objects.equals(feedId, that.feedId) &&
+        return Objects.equals(postId, that.postId) &&
             Objects.equals(userId, that.userId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(feedId, userId);
+        return Objects.hash(postId, userId);
     }
 }

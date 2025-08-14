@@ -1,0 +1,57 @@
+// 소셜 로그인 타입
+export type SocialType = 'GOOGLE' | 'KAKAO'
+
+// 사용자 정보 타입
+export interface User {
+  id: number
+  name: string
+  email: string
+  profileImage?: string
+  pretty_face?: string
+  socialType: SocialType
+  createdAt: string
+  updatedAt: string
+}
+
+// 인증 상태 타입
+export interface AuthState {
+  accessToken: string | null
+  user: User | null
+  isLoading: boolean
+  isAuthenticated: boolean
+}
+
+// 토큰 응답 타입
+export interface TokenResponse {
+  accessToken: string
+}
+
+// 로그인 응답 타입
+export interface LoginResponse {
+  user: User
+  accessToken: string
+}
+
+// API 에러 타입
+export interface ApiError {
+  message: string
+  code?: string
+  status?: number
+}
+
+// 세션 관련 타입
+export interface SessionData {
+  timestamp: number
+  isExpired: boolean
+}
+
+// 인증 구성 타입
+export interface AuthConfig {
+  SESSION_TIMEOUT: number
+  IDLE_TIMEOUT: number
+  STORAGE_KEYS: {
+    ACCESS_TOKEN: string
+    SESSION_TIMESTAMP: string
+  }
+  IDLE_EVENTS: readonly string[]
+}

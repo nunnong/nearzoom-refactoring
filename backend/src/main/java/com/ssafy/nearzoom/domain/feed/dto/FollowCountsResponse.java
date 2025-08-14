@@ -4,5 +4,4 @@ public record FollowCountsResponse(
     long followerCount,
     long followingCount
 ) {
-
 }

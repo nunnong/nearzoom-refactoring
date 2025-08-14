@@ -1,8 +1,8 @@
-package com.ssafy.nearzoom.domain.photoPrompt.dto.imageInfo;
+package com.ssafy.nearzoom.domain.photoPrompt.dto;
 
 import java.util.List;
 
-public record IndividualImageRequest(
+public record IndividualBackgroundRequest(
     Long roomId,
     int imageOrder,          // 0, 1, 2, 3 순서
     String imageUrl,

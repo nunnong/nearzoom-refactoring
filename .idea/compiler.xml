@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile default="true" name="Default" enabled="true" />
+    </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="nearzoom" target="21" />
+      <module name="nearzoom.main" target="21" />
+      <module name="nearzoom.test" target="21" />
+    </bytecodeTargetLevel>
+  </component>
+</project>
