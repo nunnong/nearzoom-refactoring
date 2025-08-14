@@ -332,7 +332,7 @@ public class RoomService {
       }
 
       // 4. Redis에서 방 정보 TTL을 1시간으로 단축 (로그 보관용)
-      redisTemplate.expire(roomKey, Duration.ofHours(1));
+      redisTemplate.expire(roomKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
 
       log.info("Room closed and cleanup completed. RoomId: {}", roomId);
 
