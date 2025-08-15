@@ -3,8 +3,7 @@ package com.ssafy.nearzoom.domain.feed.dto;
 import java.time.LocalDateTime;
 
 /**
- * 게시물 상세 조회 응답 DTO
- * 단일 게시물 클릭 시 상세 정보 + 작성자 피드 접근 정보 포함
+ * 게시물 상세 조회 응답 DTO - 기존 유지
  */
 public record PostDetailResponse(
     // 게시물 정보
@@ -27,5 +26,4 @@ public record PostDetailResponse(
     // 현재 사용자와의 관계
     boolean isMyPost,          // 내 게시물인지
     boolean isFollowingAuthor  // 작성자를 팔로우하는지
-) {
-}
+) {}

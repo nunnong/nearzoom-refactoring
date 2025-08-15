@@ -40,11 +40,10 @@ public class PhotoPromptService {
 
     String roomKey = "room:" + roomId;
 
-    Map<String, String> basicData = new HashMap<>();
-    basicData.put("frame_color", frameColor);
-    basicData.put("status", "basic_settings_saved");
+    // ✅ 수정: putAll() 대신 개별 put() 사용
+    redisTemplate.opsForHash().put(roomKey, "frame_color", frameColor);
+    redisTemplate.opsForHash().put(roomKey, "photo_status", "basic_settings_saved");
 
-    redisTemplate.opsForHash().putAll(roomKey, basicData);
     redisTemplate.expire(roomKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
 
     log.info("기본 설정 저장 완료 - RoomId: {}, FrameColor: {}", roomId, frameColor);
@@ -77,43 +76,37 @@ public class PhotoPromptService {
       photoPromptRepository.save(photoPrompt);
       promptId = String.valueOf(photoPrompt.getPromptId());
 
-//      PhotoPrompt photoPrompt = new PhotoPrompt(promptText);
-//      PhotoPrompt savedPhotoPrompt = photoPromptRepository.save(photoPrompt);  // 반환값 받기
-//      promptId = String.valueOf(savedPhotoPrompt.getPromptId());  // 이제 ID가 있음!
-
       processingOptions = new ProcessingOptions("prompt", promptText, null);
     } else { // solid
       String color = backgroundRequest.colorValue();
       processingOptions = new ProcessingOptions("color", null, color);
     }
 
-    // 설정 정보를 Redis에 저장 (상태 추적용)
-    Map<String, String> imageData = new HashMap<>();
-    imageData.put("image_url_" + imageOrder, backgroundRequest.imageUrl());
-    imageData.put("background_type_" + imageOrder, backgroundType);
+    // ✅ 수정: Map 생성하지 말고 개별 put() 사용
+    redisTemplate.opsForHash().put(roomKey, "image_url_" + imageOrder, backgroundRequest.imageUrl());
+    redisTemplate.opsForHash().put(roomKey, "background_type_" + imageOrder, backgroundType);
+
     if (promptId != null) {
-      imageData.put("prompt_id_" + imageOrder, promptId);
+      redisTemplate.opsForHash().put(roomKey, "prompt_id_" + imageOrder, promptId);
     }
 
     // 총 이미지 수 업데이트 (동적으로 증가)
     String currentMaxOrder = (String) roomData.get("max_image_order");
     int maxOrder = currentMaxOrder != null ? Integer.parseInt(currentMaxOrder) : -1;
     if (imageOrder > maxOrder) {
-      imageData.put("max_image_order", String.valueOf(imageOrder));
-      imageData.put("total_images", String.valueOf(imageOrder + 1));
+      redisTemplate.opsForHash().put(roomKey, "max_image_order", String.valueOf(imageOrder));
+      redisTemplate.opsForHash().put(roomKey, "total_images", String.valueOf(imageOrder + 1));
     }
-
-    redisTemplate.opsForHash().putAll(roomKey, imageData);
 
     // 즉시 이미지 서버로 전송
     try {
       imageProcessingService.processIndividualStart(
-          roomId,
-          imageOrder,
-          backgroundRequest.imageUrl(),
-          backgroundRequest.personIds(),
-          processingOptions,
-          promptId
+              roomId,
+              imageOrder,
+              backgroundRequest.imageUrl(),
+              backgroundRequest.personIds(),
+              processingOptions,
+              promptId
       );
 
       log.info("이미지 서버 전송 완료 - RoomId: {}, Order: {}", roomId, imageOrder);
@@ -162,7 +155,8 @@ public class PhotoPromptService {
     Map<String, Object> status = new HashMap<>();
 
     String totalImagesStr = (String) roomData.get("total_images");
-    String currentStatus = (String) roomData.get("status");
+    // ✅ 수정: "status" → "photo_status" 키 사용
+    String currentStatus = (String) roomData.get("photo_status");
 
     status.put("roomId", roomId);
     status.put("status", currentStatus != null ? currentStatus : "unknown");
@@ -173,9 +167,9 @@ public class PhotoPromptService {
       int configuredImages = countConfiguredImages(roomData);
 
       status.put("configurationProgress", Map.of(
-          "total", totalImages,
-          "configured", configuredImages,
-          "isComplete", configuredImages == totalImages
+              "total", totalImages,
+              "configured", configuredImages,
+              "isComplete", configuredImages == totalImages
       ));
 
       // 각 이미지별 설정 상태
@@ -208,7 +202,7 @@ public class PhotoPromptService {
 
     for (int i = 0; i < totalImages; i++) {
       if (roomData.containsKey("image_url_" + i) &&
-          roomData.containsKey("background_type_" + i)) {
+              roomData.containsKey("background_type_" + i)) {
         count++;
       }
     }
@@ -224,7 +218,8 @@ public class PhotoPromptService {
       throw new ApiException(HttpStatus.BAD_REQUEST, "방 정보를 찾을 수 없습니다.");
     }
 
-    String status = (String) roomData.get("status");
+    // ✅ 수정: "status" → "photo_status" 키 사용 (RoomService의 status와 구분)
+    String status = (String) roomData.get("photo_status");
     String totalImagesStr = (String) roomData.get("total_images");
     String completedCountStr = (String) roomData.get("completed_individual_count");
 

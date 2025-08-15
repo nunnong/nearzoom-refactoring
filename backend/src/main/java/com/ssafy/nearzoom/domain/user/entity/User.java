@@ -70,4 +70,5 @@ public class User extends BaseEntity {
     public void updatePrettyFace(String prettyFaceUrl) {
         this.prettyFace = prettyFaceUrl;
     }
+
 }
