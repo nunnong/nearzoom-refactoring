@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { Room } from 'livekit-client'
 import { LiveKitRoom } from '@livekit/components-react'
+import { useAuthStore } from '@/stores/authStore'
 
 import Header from '@/components/page/groupcall/Header'
 import Sidebar from '@/components/page/groupcall/Sidebar'
@@ -47,10 +48,11 @@ export default function WaitingPage({
   isHost = true,
   onStartCall,
 }: WaitingPageProps) {
+  const { user } = useAuthStore()
   const [room] = useState(() => new Room())
   const [isConnected, setIsConnected] = useState(false)
   
-  const [realParticipants, setRealParticipants] = useState<Participant[]>([])
+  const [serverParticipants, setServerParticipants] = useState<string[]>([])
   const [isLoadingParticipants, setIsLoadingParticipants] = useState(false)
 
   // LiveKit connect
@@ -77,7 +79,7 @@ export default function WaitingPage({
     }
   }, [roomData, room])
 
-  // 🔥 수정: 안전한 방 정보 불러오기
+  // 방 정보 불러오기
   const loadRoomInfo = useCallback(async () => {
     if (!roomData?.roomId) return
     
@@ -89,36 +91,14 @@ export default function WaitingPage({
       const roomInfo = await roomAPI.getRoomInfo(numericRoomId)
       console.log('✅ 방 정보 로드 성공:', roomInfo)
       
-      // 🔥 수정: 안전한 데이터 변환
-      const participants: Participant[] = (roomInfo.participants || [])
-        .filter(p => p && typeof p === 'object') // null/undefined 객체 필터링
-        .map(p => {
-          // 🔥 안전한 이메일 처리
-          const safeEmail = p.email || 'unknown@unknown.com'
-          const safeName = p.name || (
-            safeEmail && typeof safeEmail === 'string' && safeEmail.includes('@')
-              ? safeEmail.split('@')[0]
-              : 'Unknown User'
-          )
-          
-          return {
-            id: p.id || `participant-${Date.now()}-${Math.random()}`,
-            email: safeEmail,
-            name: safeName,
-            isHost: Boolean(p.isHost),
-            isMicOn: true,
-            isCameraOn: true,
-            isConnected: true,
-          }
-        })
-      
-      setRealParticipants(participants)
-      console.log('👥 참가자 목록 업데이트:', participants)
+      // 서버에서 온 참가자 이름 배열을 그대로 저장
+      const participantNames = roomInfo.participants || []
+      setServerParticipants(participantNames)
+      console.log('👥 참가자 이름 목록:', participantNames)
       
     } catch (error) {
       console.error('❌ 방 정보 로드 실패:', error)
-      // 🔥 에러 발생 시 빈 배열로 설정하여 UI 깨짐 방지
-      setRealParticipants([])
+      setServerParticipants([])
     } finally {
       setIsLoadingParticipants(false)
     }
@@ -170,58 +150,79 @@ export default function WaitingPage({
   })
 
   const [currentUser, setCurrentUser] = useState<CurrentUser>(() => {
-    if (roomData) {
-      return {
-        id: 'current-user',
-        email: 'current@user.com',
-        name: roomData.participantName,
-        isMicOn: true,
-        isCameraOn: true,
-      }
-    }
     return {
-      id: 'user-1',
-      email: 'ssafy123.5@gmail.com',
-      name: '김싸피',
+      id: 'current-user',
+      email: user?.email || 'current@user.com',
+      name: roomData?.participantName || user?.name || 'Loading...',
       isMicOn: true,
       isCameraOn: true,
     }
   })
 
-  // 🔥 수정: 더 안전한 참가자 목록 처리
-  const participants = useMemo(() => {
-    if (realParticipants.length > 0) {
-      return realParticipants
+  // 🔥 추가: user 정보가 변경될 때 currentUser 업데이트 (카카오 로그인 지연 대응)
+  useEffect(() => {
+    if (user?.email) {
+      setCurrentUser(prev => ({
+        ...prev,
+        email: user.email,
+        name: roomData?.participantName || user.name || prev.name
+      }))
+      console.log('🔄 사용자 정보 업데이트:', { email: user.email, name: user.name })
     }
+  }, [user, roomData?.participantName])
+
+  // 참가자 목록 생성 로직
+  const participants = useMemo(() => {
+    const participantList: Participant[] = []
     
-    // fallback: 서버 데이터 로딩 중이거나 실패한 경우에만 현재 사용자 표시
-    if (roomData?.participantName) {
-      return [
-        {
-          id: 'current-user',
-          email: 'current@user.com',
-          name: roomData.participantName,
-          isHost: isHost,
+    // 1. 현재 사용자를 첫 번째로 추가 (항상 표시)
+    const currentUserParticipant: Participant = {
+      id: 'current-user',
+      email: user?.email || currentUser.email || 'current@user.com', // 🔥 실제 이메일 우선 사용
+      name: roomData?.participantName || user?.name || currentUser.name || 'You',
+      isHost: isHost, // 🔥 방 생성자만 Host
+      isMicOn: true,
+      isCameraOn: true,
+      isConnected: true,
+    }
+    participantList.push(currentUserParticipant)
+    
+    console.log('🔍 현재 사용자 정보:', {
+      userEmail: user?.email,
+      userName: user?.name,
+      currentUserEmail: currentUser.email,
+      currentUserName: currentUser.name,
+      roomDataName: roomData?.participantName,
+      finalEmail: currentUserParticipant.email,
+      finalName: currentUserParticipant.name
+    })
+    
+    // 2. 서버에서 온 다른 참가자들 추가
+    if (serverParticipants.length > 0) {
+      const currentUserName = roomData?.participantName || user?.name || currentUser.name
+      
+      serverParticipants.forEach((participantName, index) => {
+        // 현재 사용자와 같은 이름이면 건너뛰기 (중복 방지)
+        if (participantName === currentUserName) {
+          console.log('🔄 중복 참가자 건너뛰기:', participantName)
+          return
+        }
+        
+        participantList.push({
+          id: `server-participant-${index}`,
+          email: `${participantName.toLowerCase().replace(/\s+/g, '')}@unknown.com`, // 임시 이메일
+          name: participantName,
+          isHost: false, // 🔥 다른 참가자는 Host가 아님
           isMicOn: true,
           isCameraOn: true,
           isConnected: true,
-        },
-      ]
+        })
+      })
     }
     
-    // 🔥 최후의 fallback
-    return [
-      {
-        id: 'fallback-user',
-        email: 'fallback@user.com',
-        name: 'Loading...',
-        isHost: isHost,
-        isMicOn: true,
-        isCameraOn: true,
-        isConnected: true,
-      }
-    ]
-  }, [realParticipants, roomData, isHost])
+    console.log('🎯 최종 참가자 목록:', participantList)
+    return participantList
+  }, [serverParticipants, roomData, user, currentUser, isHost])
 
   const gridCols = useMemo(() => {
     const count = participants.length
@@ -241,12 +242,7 @@ export default function WaitingPage({
   const handleCopyRoomUrl = useCallback(() => {
     if (roomInfo.url && typeof navigator !== 'undefined') {
       navigator.clipboard.writeText(roomInfo.url)
-<<<<<<< HEAD
-      console.log('URL 복사됨:', roomInfo.url)
-=======
       console.log('방 URL 복사됨:', roomInfo.url)
-      // alert('방 URL이 복사되었습니다!')
->>>>>>> 4b630cc2cb88a469c63eb1e054f65be169a4447e
     }
   }, [roomInfo.url])
 
@@ -273,15 +269,10 @@ export default function WaitingPage({
     }
   }, [isHost, onStartCall])
 
-  // const handleRefreshParticipants = useCallback(() => {
-  //   console.log('🔄 수동 참가자 목록 새로고침')
-  //   loadRoomInfo()
-  // }, [loadRoomInfo])
-
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       {/* 헤더 */}
-      <Header roomInfo={roomInfo} onLeaveRoom={handleLeaveRoom} />
+      <Header roomInfo={roomInfo}/>
 
       <main className="flex flex-1 flex-col gap-4 bg-[#2d3243] p-4 md:flex-row md:gap-6 md:p-6 lg:p-8">
         {/* 비디오 영역 */}

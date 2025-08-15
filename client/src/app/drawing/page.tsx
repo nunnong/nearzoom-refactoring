@@ -66,7 +66,7 @@ interface TextData {
   rotation?: number
 }
 
-const DrawingPage: React.FC = () => {
+const DrawingPage = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const stageRef = useRef<any>(null)
@@ -585,7 +585,7 @@ const DrawingPage: React.FC = () => {
       })
       
       await myroomService.saveEditedPhoto({
-        imgUrl: uploadedImageUrl,
+        imageUrl: uploadedImageUrl,
         originalPhotoId: parseInt(imageId!)
       })
       

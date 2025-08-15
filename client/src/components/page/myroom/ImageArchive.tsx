@@ -1,4 +1,3 @@
-'use client'
 
 import {
   HeartIcon,
@@ -33,7 +32,7 @@ interface ImageArchiveProps {
   onDelete?: (imageId: string) => void
   onEdit?: (imageId: string, editedImageUrl: string) => Promise<void>
   onLoadMore?: () => Promise<void>
-  hasMoreProp?: boolean
+  hasMore?: boolean
 }
 
 const debounce = (func: Function, wait: number) => {
@@ -49,136 +48,56 @@ const debounce = (func: Function, wait: number) => {
 }
 
 const ImageArchive: React.FC<ImageArchiveProps> = ({
-  images: propImages,
+  images = [],
   onLike,
   onShareKakao,
   onDelete,
   onEdit,
   onLoadMore,
-  hasMoreProp,
+  hasMore = false,
 }) => {
-  const [images, setImages] = useState<ImageItem[]>(propImages || [])
-  const [loading, setLoading] = useState(false)
+  // 모달 상태들
+  const [deleteModalOpen, setDeleteModalOpen] = useState<boolean>(false)
+  const [imageToDelete, setImageToDelete] = useState<ImageItem | null>(null)
+  const [shareModalOpen, setShareModalOpen] = useState<boolean>(false)
+  const [imageToShare, setImageToShare] = useState<ImageItem | null>(null)
+  const [editModalOpen, setEditModalOpen] = useState<boolean>(false)
+  const [imageToEdit, setImageToEdit] = useState<ImageItem | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [cursor, setCursor] = useState<number | null>(null)
-  const [hasMore, setHasMore] = useState(true)
+
+  // 무한 스크롤을 위한 ref
   const observerRef = useRef<IntersectionObserver | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
 
-  // 반응형 limit 계산 함수
-  const calculateLimit = useCallback(() => {
-    const screenWidth = window.innerWidth
-    if (screenWidth < 640) return 6   // 모바일: 1열 × 6개
-    if (screenWidth < 768) return 12  // 작은 태블릿: 2열 × 6개  
-    if (screenWidth < 1024) return 18 // 태블릿: 3열 × 6개
-    if (screenWidth < 1280) return 24 // 데스크톱: 4열 × 6개
-    if (screenWidth < 1536) return 30 // 큰 데스크톱: 5열 × 6개
-    return 36 // 매우 큰 화면: 6열 × 6개
-  }, [])
-
-  const fetchPhotos = useCallback(async (cursor: number | null = null, isReset: boolean = false) => {
-    if (propImages && propImages.length > 0) {
-      return
-    }
-
+  // 더 많은 이미지 로드
+  const fetchMoreImages = useCallback(async () => {
+    if (!hasMore || loadingMore) return
+    
+    setLoadingMore(true)
     try {
-      if (!cursor) {
-        setLoading(true)
-        setError(null)
-      } else {
-        setLoadingMore(true)
-      }
-      
-      const limit = calculateLimit()
-      
-      const condition: any = { limit }
-      if (cursor) {
-        condition.cursor = cursor
-      }
-      
-      const response = await myroomService.getPhotos(condition)
-      
-      // myroomService.getPhotos()는 MyPhotoListResponse를 직접 반환
-      const photosData = response.photos           // MyPhotoResponse[] photos
-      const nextCursor = response.nextCursor       // number | undefined nextCursor  
-      const hasNext = response.hasNext             // boolean hasNext
-      
-      if (!Array.isArray(photosData)) {
-        throw new Error('응답 데이터가 배열 형식이 아닙니다.')
-      }
-      
-      const formattedImages: ImageItem[] = photosData.map((photo: any) => ({
-        id: photo.photoId.toString(),         // DB photo_id
-        // 직접 이미지 URL 사용 (API 프록시 불필요)
-        src: photo.imageUrl, // 실제 이미지 URL 사용
-        alt: `Photo ${photo.photoId}`,        // 기본값
-        isLiked: photo.heart === 1,          // DB heart (1: true, 0: false)
-        editable: photo.editable,            // DB editable (1: 편집 가능, 0: 편집 불가능)
-        hashtags: [],                        // hashtags 필드 없음
-        createdAt: photo.createdAt,          // 생성 날짜
-        partnerEmails: photo.partnerEmails   // 함께 찍은 사람들
-      }))
-
-      // hasNext가 false면 더 이상 불러올 데이터가 없음
-      if (!hasNext) {
-        setHasMore(false)
-      }
-
-      if (isReset || !cursor) {
-        setImages(formattedImages)
-        setCursor(nextCursor ?? null)
-      } else {
-        setImages(prev => [...prev, ...formattedImages])
-        setCursor(nextCursor ?? null)
-      }
-      
-    } catch (err: any) {
-      let errorMessage = '사진을 불러오는데 실패했습니다.'
-      if (err?.response?.status === 404) {
-        errorMessage = '아직 생성된 사진이 없습니다.'
-      } else if (err?.response?.status === 401) {
-        errorMessage = '로그인이 필요합니다.'
-      } else if (err?.response?.data?.message) {
-        errorMessage = err.response.data.message
-      } else if (err?.message) {
-        errorMessage = err.message
-      }
-      
-      setError(errorMessage)
+      await onLoadMore?.()
+    } catch (error) {
+      console.error('Failed to load more images:', error)
     } finally {
-      setLoading(false)
       setLoadingMore(false)
     }
-  }, [propImages, calculateLimit])
-
-  // 더 많은 사진 로드
-  const fetchMorePhotos = useCallback(async () => {
-    if (!hasMore || loadingMore || loading || !cursor) return
-    
-    await fetchPhotos(cursor, false)
-  }, [hasMore, loadingMore, loading, cursor, fetchPhotos])
-
-  // 초기 로드
-  useEffect(() => {
-    fetchPhotos(null, true)
-  }, [fetchPhotos])
+  }, [hasMore, loadingMore, onLoadMore])
 
   // 무한 스크롤 설정
   useEffect(() => {
-    if (!loadMoreRef.current || !hasMore) return
+    if (!loadMoreRef.current || !hasMore || !onLoadMore) return
 
     const currentRef = loadMoreRef.current
 
     observerRef.current = new IntersectionObserver(
       (entries) => {
         const [entry] = entries
-        if (entry.isIntersecting && hasMore && !loadingMore && !loading) {
-          fetchMorePhotos()
+        if (entry.isIntersecting && hasMore && !loadingMore) {
+          fetchMoreImages()
         }
       },
       {
-        rootMargin: '100px', // 요소가 뷰포트에 100px 전에 미리 로드
+        rootMargin: '100px',
         threshold: 0.1
       }
     )
@@ -190,32 +109,7 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
         observerRef.current.unobserve(currentRef)
       }
     }
-  }, [hasMore, loadingMore, loading, fetchMorePhotos])
-
-  // 반응형 리사이즈 이벤트
-  useEffect(() => {
-    const handleResize = debounce(() => {
-      // 화면 크기가 바뀌면 처음부터 다시 로드
-      setImages([])
-      setCursor(null)
-      setHasMore(true)
-      setError(null)
-      fetchPhotos(null, true)
-    }, 300)
-
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [fetchPhotos, calculateLimit])
-
-  // 모달 상태들
-  const [deleteModalOpen, setDeleteModalOpen] = useState<boolean>(false)
-  const [imageToDelete, setImageToDelete] = useState<ImageItem | null>(null)
-  const [shareModalOpen, setShareModalOpen] = useState<boolean>(false)
-  const [imageToShare, setImageToShare] = useState<ImageItem | null>(null)
-  const [editModalOpen, setEditModalOpen] = useState<boolean>(false)
-  const [imageToEdit, setImageToEdit] = useState<ImageItem | null>(null)
-  const [editSaving, setEditSaving] = useState<boolean>(false)
-  const [editSuccess, setEditSuccess] = useState<boolean>(false)
+  }, [hasMore, loadingMore, fetchMoreImages])
 
   const handleDeleteClick = (image: ImageItem): void => {
     setImageToDelete(image)
@@ -225,8 +119,6 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
   const handleDeleteConfirm = (): void => {
     if (imageToDelete) {
       onDelete?.(imageToDelete.id)
-      // 로컬 상태에서도 삭제
-      setImages(prev => prev.filter(img => img.id !== imageToDelete.id))
       setDeleteModalOpen(false)
       setImageToDelete(null)
     }
@@ -248,7 +140,7 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
   }
 
   const handleEditClick = (image: ImageItem): void => {
-    if (!image.isEdited) {  // editable === 1인 경우만 편집 가능
+    if (image.editable === 1) {  // editable === 1인 경우만 편집 가능
       setImageToEdit(image)
       setEditModalOpen(true)
     }
@@ -269,54 +161,12 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
     }
   }
 
-  // 편집 완료 후 호출되는 함수 (편집 페이지에서 호출)
-  const handleEditComplete = async (originalPhotoId: string, editedImageUrl: string): Promise<void> => {
-    try {
-      // 1. 로딩 상태 시작
-      setEditSaving(true)
-      
-      // 2. 백엔드에 편집된 이미지 저장 요청
-      await myroomService.saveEditedImageUrl({
-        imgUrl: editedImageUrl,
-        originalPhotoId: parseInt(originalPhotoId)
-      })
-      
-      // 3. 로딩 완료, 성공 메시지 표시
-      setEditSaving(false)
-      setEditSuccess(true)
-      
-      // 4. 1초 후 목록 새로고침
-      setTimeout(async () => {
-        setEditSuccess(false)
-        await refreshPhotos()
-      }, 1000)
-      
-    } catch (error) {
-      setEditSaving(false)
-      console.error('편집 저장 실패:', error)
-      throw error
-    }
-  }
-
-  // 사진 목록 새로고침 함수
-  const refreshPhotos = async (): Promise<void> => {
-    setImages([])
-    setCursor(null)
-    setHasMore(true)
-    setError(null)
-    await fetchPhotos(null, true)
-  }
-
   const handleEditCancel = (): void => {
     setEditModalOpen(false)
     setImageToEdit(null)
   }
 
   const handleLikeClick = (imageId: string): void => {
-    // 로컬 상태에서 즉시 업데이트 (Optimistic UI)
-    setImages(prev => prev.map(img => 
-      img.id === imageId ? { ...img, isLiked: !img.isLiked } : img
-    ))
     onLike?.(imageId)
   }
 
@@ -329,51 +179,8 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
     640: 1,
   }
 
-  // 로딩 상태 표시
-  if (loading && images.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="mb-4">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
-        </div>
-        <p className="text-gray-500">사진을 불러오는 중...</p>
-      </div>
-    )
-  }
-
-  // 에러 상태 표시
-  if (error && images.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="mb-4">
-          <svg
-            className="mx-auto h-24 w-24 text-red-300"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-            />
-          </svg>
-        </div>
-        <h3 className="mb-2 text-xl font-semibold text-red-600">오류 발생</h3>
-        <p className="text-gray-500">{error}</p>
-        <button 
-          onClick={() => fetchPhotos(null, true)}
-          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
-        >
-          다시 시도
-        </button>
-      </div>
-    )
-  }
-
   // 이미지가 없을 때 표시할 메시지
-  if (!loading && images.length === 0) {
+  if (images.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <div className="mb-6">
@@ -415,7 +222,7 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
             className="group relative mb-4 overflow-hidden rounded-lg"
           >
             <img
-              src={image.src} // 실제 이미지 URL
+              src={image.src}
               alt={image.alt}
               className="w-full cursor-pointer rounded-lg shadow-md transition-all duration-300 ease-in-out group-hover:scale-105"
               loading="lazy"
@@ -455,6 +262,17 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
                 <ShareIcon className="h-4 w-4 text-white" />
               </button>
 
+              {/* Share.png Button - Left Center */}
+              <button
+                onClick={() => {
+                  console.log('Share.png 버튼 클릭:', image.id)
+                }}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-white/30"
+                aria-label="Share with Share.png"
+              >
+                <img src="/Share.png" alt="Share" className="h-5 w-5 object-contain" />
+              </button>
+
               {/* Delete Button - Center */}
               <button
                 onClick={() => handleDeleteClick(image)}
@@ -467,17 +285,17 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
               {/* Edit Button - Right */}
               <button
                 onClick={() => handleEditClick(image)}
-                disabled={image.isEdited}
+                disabled={image.editable === 0}
                 className={`flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-sm transition-all duration-200 ${
-                  image.isEdited
+                  image.editable === 0
                     ? 'cursor-not-allowed bg-gray-500/60'
                     : 'bg-white/20 hover:scale-110 hover:bg-blue-500/80'
                 }`}
                 aria-label={
-                  image.isEdited ? 'Image already edited' : 'Edit image'
+                  image.editable === 0 ? 'Image already edited' : 'Edit image'
                 }
               >
-                {image.isEdited ? (
+                {image.editable === 0 ? (
                   <span className="px-1 text-xs font-medium text-white">
                     edited
                   </span>
@@ -543,27 +361,23 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
         </div>
       )}
 
-      {/* 편집 저장 상태 표시 */}
-      {(editSaving || editSuccess) && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-sm mx-4 text-center">
-            {editSaving && (
+      {/* Load More Button (추가 옵션) */}
+      {hasMore && onLoadMore && (
+        <div className="mt-8 flex justify-center">
+          <button
+            onClick={fetchMoreImages}
+            disabled={loadingMore}
+            className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          >
+            {loadingMore ? (
               <>
-                <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-                <p className="text-lg font-medium text-gray-800">편집본을 저장하고 있습니다...</p>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                더 불러오는 중...
               </>
+            ) : (
+              '더 보기'
             )}
-            {editSuccess && (
-              <>
-                <div className="h-12 w-12 bg-green-500 rounded-full mx-auto mb-4 flex items-center justify-center">
-                  <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <p className="text-lg font-medium text-gray-800">편집본이 저장되었습니다!</p>
-              </>
-            )}
-          </div>
+          </button>
         </div>
       )}
 
@@ -590,37 +404,6 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
         onConfirm={handleEditConfirm}
         onCancel={handleEditCancel}
       />
-
-      {/* Load More Button */}
-      {hasMore && (
-        <div className="mt-8 flex justify-center">
-          <button
-            onClick={async () => {
-              if (onLoadMore && !loadingMore) {
-                setLoadingMore(true)
-                try {
-                  await onLoadMore()
-                } catch (error) {
-                  console.error('Failed to load more images:', error)
-                } finally {
-                  setLoadingMore(false)
-                }
-              }
-            }}
-            disabled={loadingMore}
-            className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-          >
-            {loadingMore ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                더 불러오는 중...
-              </>
-            ) : (
-              '더 보기'
-            )}
-          </button>
-        </div>
-      )}
     </>
   )
 }
