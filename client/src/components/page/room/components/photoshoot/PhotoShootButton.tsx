@@ -56,33 +56,33 @@ export default function PhotoShootButton({ className }: PhotoShootButtonProps) {
 
   // 버튼 텍스트 결정
   const getButtonText = () => {
-    if (!isRoomLeader) return '대기 중...'
+    if (!isRoomLeader) return 'Waiting...'
 
     // 모든 컷이 완료되었으면 "촬영 완료" 텍스트
     if (currentCutIndex === cutCount) {
-      return '📸 촬영 완료'
+      return '📸 Shooting Complete'
     }
 
     // 카운트다운 중이면 "취소" 텍스트
     if (isShooting && shootingTimer > 0) {
-      return `❌ 취소 (${shootingTimer}초)`
+      return `❌ Cancel (${shootingTimer}s)`
     }
 
     // 기타 촬영 상태들
-    if (isFlashing) return '✨ 촬영!'
-    if (isCapturing) return '📸 캡쳐 중...'
-    if (isSaving) return '💾 저장 중...'
+    if (isFlashing) return '✨ Flash!'
+    if (isCapturing) return '📸 Capturing...'
+    if (isSaving) return '💾 Saving...'
 
     // PhotoBooth 상태별 텍스트
     switch (photoBoothState) {
       case PhotoBoothState.WAITING:
-        return '대기방'
+        return 'Waiting Room'
       case PhotoBoothState.SHOOTING:
-        return '📸 촬영 시작'
+        return '📸 Start Shooting'
       case PhotoBoothState.SELECTING:
-        return '🎨 사진 선택'
+        return '🎨 Photo Select'
       default:
-        return '📸 촬영'
+        return '📸 Shoot'
     }
   }
 
