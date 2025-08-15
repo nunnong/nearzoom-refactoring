@@ -19,11 +19,12 @@ export const useAuthenticatedImage = (photoId: string) => {
         console.log('📤 요청 URL:', `/myroom/image/${photoId}`)
 
         // 현재 인증 상태 확인
-        const authStore = (await import('@/stores/authStore')).useAuthStore.getState()
+        const { useAuthStore } = await import('@/stores/authStore')
+        const authState = useAuthStore.getState()
         console.log('🔑 인증 상태:', {
-          isAuthenticated: authStore.isAuthenticated,
-          hasToken: !!authStore.accessToken,
-          tokenPreview: authStore.accessToken?.substring(0, 20) + '...'
+          isAuthenticated: authState.isAuthenticated,
+          hasToken: !!authState.accessToken,
+          tokenPreview: authState.accessToken?.substring(0, 20) + '...'
         })
 
         // 인증된 API 요청으로 이미지 바이너리 가져오기 (자동으로 Bearer 토큰 포함)

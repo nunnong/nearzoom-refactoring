@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { X, Edit } from 'lucide-react'
 import api from '@/lib/axios'
+import { resizeImage } from '@/utils/imageOptimizer'
 
 interface UploadSelfieModalProps {
   isOpen: boolean
@@ -16,6 +17,7 @@ export default function UploadSelfieModal({
   onImageUpdated
 }: UploadSelfieModalProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [optimizedBlob, setOptimizedBlob] = useState<Blob | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [currentReferenceImage, setCurrentReferenceImage] = useState<string | null>(null)
   const [hasExistingImage, setHasExistingImage] = useState(false)
@@ -56,15 +58,36 @@ export default function UploadSelfieModal({
     }
   }
 
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const result = e.target?.result as string
-        setSelectedImage(result)
+      try {
+        console.log('원본 이미지 크기:', (file.size / 1024 / 1024).toFixed(2) + 'MB')
+        
+        // 이미지 최적화
+        const optimizedImage = await resizeImage(file)
+        console.log('최적화된 이미지 크기:', (optimizedImage.size / 1024 / 1024).toFixed(2) + 'MB')
+        
+        // 미리보기용 base64 변환
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          setSelectedImage(e.target?.result as string)
+        }
+        reader.readAsDataURL(optimizedImage)
+        
+        // 업로드용 Blob 저장
+        setOptimizedBlob(optimizedImage)
+        
+      } catch (error) {
+        console.error('이미지 최적화 실패:', error)
+        // 실패시 원본 사용
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          setSelectedImage(e.target?.result as string)
+        }
+        reader.readAsDataURL(file)
+        setOptimizedBlob(file)
       }
-      reader.readAsDataURL(file)
     }
   }
 
@@ -73,15 +96,15 @@ export default function UploadSelfieModal({
   }
 
   const handleSave = async () => {
-    if (!selectedImage) return
+    if (!selectedImage || !optimizedBlob) return
 
     try {
       setIsUploading(true)
 
-      const base64Response = await fetch(selectedImage)
-      const blob = await base64Response.blob()
+      // 최적화된 Blob 직접 사용
       const formData = new FormData()
-      formData.append('file', blob, 'profile.jpg')
+      formData.append('file', optimizedBlob, 'profile.png')
+      formData.append('type', 'profile')
 
       const uploadResponse = await api.post(
         'https://image.nearzoom.store/upload',
@@ -106,6 +129,7 @@ export default function UploadSelfieModal({
       setCurrentReferenceImage(imageUrl)
       setHasExistingImage(true)
       setSelectedImage(null)
+      setOptimizedBlob(null)
       
       onImageUpdated?.()
       onClose()

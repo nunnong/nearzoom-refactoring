@@ -4,9 +4,11 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { X, Edit } from 'lucide-react'
 import api from '@/lib/axios'
+import { resizeImage } from '@/utils/imageOptimizer'
 
 export default function UploadPhotoPage() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [optimizedBlob, setOptimizedBlob] = useState<Blob | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [currentReferenceImage, setCurrentReferenceImage] = useState<
     string | null
@@ -69,15 +71,38 @@ export default function UploadPhotoPage() {
     }
   }
 
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
-      const reader = new FileReader()
-      reader.onload = e => {
-        const result = e.target?.result as string
-        setSelectedImage(result)
+      try {
+        console.log('원본 이미지 크기:', (file.size / 1024 / 1024).toFixed(2) + 'MB')
+        
+        // 이미지 최적화
+        const optimizedImage = await resizeImage(file)
+        console.log('최적화된 이미지 크기:', (optimizedImage.size / 1024 / 1024).toFixed(2) + 'MB')
+        
+        // 미리보기용 base64 변환
+        const reader = new FileReader()
+        reader.onload = e => {
+          const result = e.target?.result as string
+          setSelectedImage(result)
+        }
+        reader.readAsDataURL(optimizedImage)
+        
+        // 업로드용 Blob 저장
+        setOptimizedBlob(optimizedImage)
+        
+      } catch (error) {
+        console.error('이미지 최적화 실패:', error)
+        // 실패시 원본 사용
+        const reader = new FileReader()
+        reader.onload = e => {
+          const result = e.target?.result as string
+          setSelectedImage(result)
+        }
+        reader.readAsDataURL(file)
+        setOptimizedBlob(file)
       }
-      reader.readAsDataURL(file)
     }
   }
 
@@ -87,16 +112,15 @@ export default function UploadPhotoPage() {
 
   // 저장/업로드 성공 후 리턴URL로 이동
   const handleSave = async () => {
-    if (!selectedImage) return
+    if (!selectedImage || !optimizedBlob) return
 
     try {
       setIsUploading(true)
 
-      // 1단계: 이미지를 Blob으로 변환하여 업로드
-      const base64Response = await fetch(selectedImage)
-      const blob = await base64Response.blob()
+      // 최적화된 Blob 직접 사용
       const formData = new FormData()
-      formData.append('file', blob, 'profile.jpg')
+      formData.append('file', optimizedBlob, 'profile.png')
+      formData.append('type', 'profile')
 
       // 2단계: 이미지 업로드 API 호출 (URL을 반환받음)
       const uploadResponse = await api.post(
