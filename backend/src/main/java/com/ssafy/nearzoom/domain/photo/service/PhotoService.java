@@ -496,4 +496,39 @@ public class PhotoService {
                 userList, e.getMessage());
         }
     }
+
+    /**
+     * 편집본 저장을 위한 원본 Photo 정보 조회
+     */
+    public Photo getOriginalPhotoInfo(Long originalPhotoId) {
+        return photoRepository.getById(originalPhotoId);
+    }
+
+    /**
+     * 편집본 Photo 저장
+     */
+    @Transactional
+    public Photo saveEditedPhoto(String editedImageUrl, Long originalPhotoId) {
+        // 원본 Photo 정보 조회
+        Photo originalPhoto = getOriginalPhotoInfo(originalPhotoId);
+
+        // 편집본 Photo 생성 (created_at은 원본 것 사용, updated_at은 현재 시간)
+        Photo editedPhoto = new Photo(editedImageUrl, originalPhoto.getRoomId(),
+                originalPhoto.getUserList(), originalPhotoId);
+
+        // created_at은 원본의 것을 사용하도록 설정
+        try {
+            setFieldValue(editedPhoto, "createdAt", originalPhoto.getCreatedAt());
+            log.debug("편집본 Photo 생성 완료 - 원본 created_at 사용: {}", originalPhoto.getCreatedAt());
+        } catch (Exception e) {
+            log.warn("편집본 Photo created_at 설정 실패: {}", e.getMessage());
+        }
+
+        // DB 저장
+        Photo savedPhoto = photoRepository.save(editedPhoto);
+        log.info("✅ 편집본 Photo 저장 성공 - PhotoId: {}, OriginalPhotoId: {}, EditedUrl: {}",
+                savedPhoto.getPhotoId(), originalPhotoId, editedImageUrl);
+
+        return savedPhoto;
+    }
 }
