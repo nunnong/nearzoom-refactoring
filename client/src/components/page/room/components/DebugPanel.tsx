@@ -181,7 +181,7 @@ export default function DebugPanel({ className = '' }: DebugPanelProps) {
                 <div>
                   Photos:{' '}
                   <span className="text-cyan-400">
-                    {selectedPhotos.length} selected
+                    {selectedPhotos.filter(p => p !== null).length}/{selectedPhotos.length} filled
                   </span>
                 </div>
                 <div>
@@ -438,27 +438,25 @@ export default function DebugPanel({ className = '' }: DebugPanelProps) {
             <div>
               <h4 className="mb-2 font-semibold text-yellow-400">🖼️ Photos</h4>
               <div className="space-y-1">
-                {selectedPhotos.length > 0 ? (
-                  <div className="max-h-20 overflow-y-auto rounded bg-gray-800 p-2">
-                    {selectedPhotos.map((photo, index) => (
-                      <div
-                        key={index}
-                        className="truncate text-xs text-gray-400"
-                      >
-                        {index + 1}. {typeof photo === 'string' ? photo : photo.imgUrl}
-                        {typeof photo === 'object' && (
-                          <div className="ml-2 text-xs text-gray-500">
-                            Cut: {photo.cutIndex}, Faces: {photo.personIds.length}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-2 text-center text-xs text-gray-500">
-                    No photos selected
-                  </div>
-                )}
+                <div className="max-h-20 overflow-y-auto rounded bg-gray-800 p-2">
+                  {selectedPhotos.map((photo, index) => (
+                    <div
+                      key={index}
+                      className="truncate text-xs text-gray-400"
+                    >
+                      {index + 1}. {
+                        photo === null 
+                          ? '[Empty]' 
+                          : (typeof photo === 'string' ? photo : photo.imgUrl)
+                      }
+                      {photo && typeof photo === 'object' && (
+                        <div className="ml-2 text-xs text-gray-500">
+                          Cut: {photo.cutIndex}, Faces: {photo.personIds.length}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
 
                 <div className="flex gap-1">
                   <button

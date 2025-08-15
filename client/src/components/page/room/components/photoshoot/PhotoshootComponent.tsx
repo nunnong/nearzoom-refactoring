@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import CompletionModal from './CompletionModal'
+import { useState, useEffect } from 'react'
 import ProgressBar from './ProgressBar'
 import Timer from './Timer'
 import PhotoShootSidebar from './PhotoShootSidebar'
 import { cn } from '@/lib/utils'
 import { usePhotoBoothStore } from '../../providers/PhotoBoothProvider'
+import { PhotoBoothState } from '../../stores/photobooth/stateSlice'
 import dynamic from 'next/dynamic'
 
 // Konva 컴포넌트를 dynamic import로 로드 (SSR 방지)
@@ -31,16 +31,17 @@ export default function PhotoshootComponent({
   onComplete = () => {},
   className,
 }: PhotoshootComponentProps) {
-  const [showCompletionModal, setShowCompletionModal] = useState(false)
-
   // PhotoBooth store에서 상태들 가져오기
   const currentCutIndex = usePhotoBoothStore(state => state.currentCutIndex)
   const isShooting = usePhotoBoothStore(state => state.isShooting)
   const shootingTimer = usePhotoBoothStore(state => state.shootingTimer)
   const isRoomLeader = usePhotoBoothStore(state => state.isRoomLeader)
+  const photoBoothState = usePhotoBoothStore(state => state.photoBoothState)
 
   // PhotoBooth actions
   const completeCapture = usePhotoBoothStore(state => state.completeCapture)
+  const setPhotoBoothState = usePhotoBoothStore(state => state.setPhotoBoothState)
+  const resetCutIndex = usePhotoBoothStore(state => state.resetCutIndex)
 
   // 캔버스 캡쳐 완료 핸들러
   const handleCaptureComplete = async (imageData: string, personIds?: string[]) => {
@@ -52,13 +53,7 @@ export default function PhotoshootComponent({
 
   const cutLabels = ['1컷', '2컷', '3컷', '4컷']
 
-  // SELECTING 상태로의 전환은 shootingSlice에서 자동 처리됨
-  // useEffect 제거 - 더 이상 수동으로 완료 모달을 표시하지 않음
 
-  const handleNextStep = () => {
-    setShowCompletionModal(false)
-    onComplete()
-  }
 
   return (
     <div
@@ -111,8 +106,6 @@ export default function PhotoshootComponent({
         <PhotoShootSidebar showStartButton={true} showLeaveButton={true} />
       </aside>
 
-      {/* 완료 모달 */}
-      <CompletionModal isOpen={showCompletionModal} onClose={handleNextStep} />
     </div>
   )
 }

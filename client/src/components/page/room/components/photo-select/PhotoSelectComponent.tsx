@@ -1,11 +1,13 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useParticipants, useLocalParticipant } from '@livekit/components-react'
 import ControlPanel from '../ControlPanel'
 import FrameColorSelector from '../photo-select/FrameColorSelector'
 import PhotoCutSelector from '../photo-select/PhotoCutSelector'
 import PhotoPicker from '../photo-select/PhotoPicker'
 import WebCam from '../photo-select/WebCam'
+import CompletionModal from '../photoshoot/CompletionModal'
 import { cn } from '@/lib/utils'
 import { usePhotoBoothStore } from '../../providers/PhotoBoothProvider'
 import { PhotoBoothState } from '../../stores/photoboothStore'
@@ -20,11 +22,15 @@ export default function PhotoSelectComponent({
   const participants = useParticipants()
   const localParticipant = useLocalParticipant()
 
+  // Local modal state (not synced via Yjs)
+  const [showWelcomeModal, setShowWelcomeModal] = useState(true)
+
   // Yjs store에서 상태 가져오기
   const cutCount = usePhotoBoothStore(state => state.cutCount)
   const selectedPhotos = usePhotoBoothStore(state => state.selectedPhotos)
   const frameColor = usePhotoBoothStore(state => state.frameColor)
   const capturedImages = usePhotoBoothStore(state => state.capturedImages)
+  const isRoomLeader = usePhotoBoothStore(state => state.isRoomLeader)
 
   // Yjs store 액션들
   const setCutCount = usePhotoBoothStore(state => state.setCutCount)
@@ -72,6 +78,11 @@ export default function PhotoSelectComponent({
   }
 
   const isCompleteDisabled = selectedPhotos.length !== cutCount
+
+  // Modal close handler
+  const handleWelcomeModalClose = () => {
+    setShowWelcomeModal(false)
+  }
 
   return (
     <div className={cn('flex flex-1 gap-4 bg-gray-100 px-8 py-6', className)}>
@@ -130,6 +141,13 @@ export default function PhotoSelectComponent({
           showLeaveButton={true}
         />
       </div> */}
+
+      {/* Welcome Modal */}
+      <CompletionModal 
+        isOpen={showWelcomeModal}
+        onClose={handleWelcomeModalClose}
+        isRoomLeader={isRoomLeader}
+      />
     </div>
   )
 }

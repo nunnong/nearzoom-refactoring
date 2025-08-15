@@ -23,9 +23,18 @@ export const createCutSlice = (_set: any, get: any, roomName: string) => ({
   ...defaultCutSliceState,
   
   setCutCount: (count: number) => {
+    console.log(`🔢 Setting cut count to ${count}`)
+    
     // Yjs에 상태 업데이트
     const { updateCutCount } = require('./index')
     updateCutCount(roomName, count)
+    
+    // Initialize photo array with new count
+    const state = get()
+    if (state.initializePhotoArray) {
+      state.initializePhotoArray(count)
+      console.log(`🏗️ Photo array initialized for ${count} cuts`)
+    }
   },
     
   setCurrentCutIndex: (index: number) => {

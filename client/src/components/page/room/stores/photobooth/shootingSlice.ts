@@ -139,31 +139,9 @@ export const createShootingSlice = (set: any, get: any, roomName: string) => ({
     })
   },
 
-  handleCutProgress: () => {
-    const { currentCutIndex, cutCount, roomName } = get()
-    
-    console.log(`📊 Cut progress check: ${currentCutIndex + 1}/${cutCount}`)
-    
-    if (currentCutIndex < cutCount - 1) {
-      // 0, 1, 2컷 완료 → 다음 컷으로 이동
-      console.log(`➡️ Moving to next cut: ${currentCutIndex + 1 + 1}/${cutCount}`)
-      setTimeout(() => {
-        const { updateCurrentCutIndex } = require('./index')
-        updateCurrentCutIndex(roomName, currentCutIndex + 1)
-      }, 1000) // 1초 후 다음 컷으로
-    } else if (currentCutIndex === cutCount - 1) {
-      // 3번째 인덱스 (4컷) 완료 - SELECTING 상태로 전환
-      console.log(`🎉 All cuts completed (${currentCutIndex + 1}/${cutCount})! Moving to SELECTING state`)
-      setTimeout(() => {
-        const { updatePhotoBoothState } = require('./index')
-        const { PhotoBoothState } = require('./stateSlice')
-        updatePhotoBoothState(roomName, PhotoBoothState.SELECTING)
-      }, 1500) // 1.5초 후 SELECTING으로
-    }
-  },
-  
+
   completeCapture: async (imageData: string, personIds: string[] = []) => {
-    const { capturedImages, isRoomLeader, timerInterval, currentCutIndex, cutCount, roomName, handleCutProgress } = get()
+    const { capturedImages, isRoomLeader, timerInterval, currentCutIndex, cutCount, roomName } = get()
     
     console.log(`✅ Capture completed! Cut ${currentCutIndex + 1}/${cutCount}`)
     console.log(`👥 Person IDs (left to right):`, personIds)
@@ -225,13 +203,13 @@ export const createShootingSlice = (set: any, get: any, roomName: string) => ({
             timestamp: Date.now()
           }
           
-          // selectSlice에 Photo 객체 추가
+          // selectSlice에 Photo 객체를 cutIndex 위치에 저장
           const state = get()
-          if (state.addSelectedPhoto) {
-            state.addSelectedPhoto(photo)
-            console.log('📸 Photo added to selection:', photo)
+          if (state.setPhotoAtIndex) {
+            state.setPhotoAtIndex(photo, currentCutIndex)
+            console.log(`📸 Photo stored at index ${currentCutIndex}:`, photo)
           } else {
-            console.error('❌ addSelectedPhoto function not available in state')
+            console.error('❌ setPhotoAtIndex function not available in state')
           }
           
           // 기존 localStorage 저장도 유지 (backwards compatibility)
@@ -246,8 +224,22 @@ export const createShootingSlice = (set: any, get: any, roomName: string) => ({
             shootingTimer: 0
           })
           
-          // 성공 시에만 컷 진행 처리
-          handleCutProgress()
+          // 성공 시에만 컷 진행 처리 (handleCutProgress 로직을 인라인으로 이동)
+          console.log(`📊 Cut progress check: ${currentCutIndex + 1}/${cutCount}`)
+          
+          if (currentCutIndex < cutCount - 1) {
+            // 0, 1, 2컷 완료 → 다음 컷으로 이동
+            console.log(`➡️ Moving to next cut: ${currentCutIndex + 1 + 1}/${cutCount}`)
+            setTimeout(() => {
+              const { updateCurrentCutIndex } = require('./index')
+              updateCurrentCutIndex(roomName, currentCutIndex + 1)
+            }, 1000) // 1초 후 다음 컷으로
+          } else if (currentCutIndex === cutCount - 1) {
+            // 3번째 인덱스 (4컷) 완료 - 인덱스를 cutCount로 증가시켜서 버튼이 "촬영 완료"로 변경되도록 함
+            console.log(`🎉 All cuts completed (${currentCutIndex + 1}/${cutCount})! Incrementing to show completion button`)
+            const { updateCurrentCutIndex } = require('./index')
+            updateCurrentCutIndex(roomName, currentCutIndex + 1) // 3 → 4로 즉시 증가
+          }
           
         } else {
           throw new Error('Upload response missing file_url')

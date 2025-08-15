@@ -10,25 +10,29 @@ export interface Photo {
 }
 
 export interface SelectSliceState {
-  selectedPhotos: Photo[]
+  selectedPhotos: (Photo | null)[]
   frameColor: string
 }
 
 export interface SelectSliceActions {
   // Photo selection actions
-  setSelectedPhotos: (photos: Photo[]) => void
-  addSelectedPhoto: (photo: Photo) => void
-  removeSelectedPhoto: (photoIndex: number) => void
+  setSelectedPhotos: (photos: (Photo | null)[]) => void
+  setPhotoAtIndex: (photo: Photo, index: number) => void
+  removePhotoAtIndex: (index: number) => void
   clearSelectedPhotos: () => void
+  initializePhotoArray: (cutCount: number) => void
   
   // Frame color actions
   setFrameColor: (color: string) => void
+  
+  // Legacy method for backward compatibility
+  addSelectedPhoto?: (photo: Photo) => void
 }
 
 export type SelectSlice = SelectSliceState & SelectSliceActions
 
 export const defaultSelectSliceState: SelectSliceState = {
-  selectedPhotos: [],
+  selectedPhotos: new Array(4).fill(null), // Default 4 cuts, all empty
   frameColor: '#FFFFFF',
 }
 
@@ -36,49 +40,78 @@ export const createSelectSlice = (set: any, get: any, roomName: string) => ({
   ...defaultSelectSliceState,
   
   // Photo selection actions
-  setSelectedPhotos: (photos: Photo[]) => {
+  setSelectedPhotos: (photos: (Photo | null)[]) => {
     // Yjs에 상태 업데이트
     const { updateSelectState } = require('./index')
     updateSelectState(roomName, { selectedPhotos: photos })
   },
     
-  addSelectedPhoto: (photo: Photo) => {
+  setPhotoAtIndex: (photo: Photo, index: number) => {
     const { selectedPhotos } = get()
-    console.log('📸 Adding photo to selection:', {
+    console.log(`📸 Setting photo at index ${index}:`, {
       imgUrl: photo.imgUrl,
       personIds: photo.personIds,
       cutIndex: photo.cutIndex,
       roomId: photo.roomId
     })
     
-    // 중복 체크 (imgUrl 기준)
-    const isDuplicate = selectedPhotos.some(p => p.imgUrl === photo.imgUrl)
-    if (!isDuplicate) {
-      const newPhotos = [...selectedPhotos, photo]
-      // Yjs에 상태 업데이트
-      const { updateSelectState } = require('./index')
-      updateSelectState(roomName, { selectedPhotos: newPhotos })
-    } else {
-      console.log('⚠️ Duplicate photo not added:', photo.imgUrl)
+    // Create a copy of the photos array
+    const photos = [...selectedPhotos]
+    
+    // Ensure array has correct length (in case cutCount changed)
+    while (photos.length <= index) {
+      photos.push(null)
     }
+    
+    // Set photo at specific index (replaces existing photo)
+    photos[index] = photo
+    
+    // Yjs에 상태 업데이트
+    const { updateSelectState } = require('./index')
+    updateSelectState(roomName, { selectedPhotos: photos })
+    
+    console.log(`✅ Photo set at index ${index}`)
   },
   
-  removeSelectedPhoto: (photoIndex: number) => {
+  removePhotoAtIndex: (index: number) => {
     const { selectedPhotos } = get()
-    if (photoIndex >= 0 && photoIndex < selectedPhotos.length) {
-      const newPhotos = selectedPhotos.filter((_, index) => index !== photoIndex)
+    if (index >= 0 && index < selectedPhotos.length) {
+      const photos = [...selectedPhotos]
+      photos[index] = null // Set to null instead of removing
+      
       // Yjs에 상태 업데이트
       const { updateSelectState } = require('./index')
-      updateSelectState(roomName, { selectedPhotos: newPhotos })
-      console.log('🗑️ Removed photo at index:', photoIndex)
+      updateSelectState(roomName, { selectedPhotos: photos })
+      console.log(`🗑️ Removed photo at index: ${index}`)
     }
+  },
+
+  initializePhotoArray: (cutCount: number) => {
+    console.log(`🏗️ Initializing photo array with ${cutCount} slots`)
+    const photos = new Array(cutCount).fill(null)
+    
+    // Yjs에 상태 업데이트
+    const { updateSelectState } = require('./index')
+    updateSelectState(roomName, { selectedPhotos: photos })
   },
   
   clearSelectedPhotos: () => {
+    const { selectedPhotos } = get()
+    // Clear to array of nulls instead of empty array
+    const photos = new Array(selectedPhotos.length).fill(null)
+    
     // Yjs에 상태 업데이트
     const { updateSelectState } = require('./index')
-    updateSelectState(roomName, { selectedPhotos: [] })
+    updateSelectState(roomName, { selectedPhotos: photos })
     console.log('🧹 Cleared all selected photos')
+  },
+  
+  // Legacy method for backward compatibility
+  addSelectedPhoto: (photo: Photo) => {
+    // Use cutIndex to determine where to place the photo
+    const { setPhotoAtIndex } = get()
+    setPhotoAtIndex(photo, photo.cutIndex)
+    console.log('⚠️ Using legacy addSelectedPhoto - consider using setPhotoAtIndex directly')
   },
 
   // Frame color actions  

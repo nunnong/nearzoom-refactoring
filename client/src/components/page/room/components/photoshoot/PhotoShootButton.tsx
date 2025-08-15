@@ -22,10 +22,23 @@ export default function PhotoShootButton({ className }: PhotoShootButtonProps) {
   const isCapturing = usePhotoBoothStore(state => state.isCapturing)
   const isFlashing = usePhotoBoothStore(state => state.isFlashing)
   const isSaving = usePhotoBoothStore(state => state.isSaving)
+  const setPhotoBoothState = usePhotoBoothStore(state => state.setPhotoBoothState)
+  const resetCutIndex = usePhotoBoothStore(state => state.resetCutIndex)
+  const roomName = usePhotoBoothStore(state => state.roomName)
 
   // 버튼 클릭 핸들러
   const handleClick = () => {
     if (!isRoomLeader) return
+
+    console.log('🔵 Button clicked:', { currentCutIndex, cutCount, isEqual: currentCutIndex === cutCount })
+
+    // 모든 컷이 완료되었으면 SELECTING 상태로 직접 전환
+    if (currentCutIndex === cutCount) {
+      console.log('🎉 All cuts completed - transitioning to SELECTING')
+      resetCutIndex() // 다음 촬영 세션을 위해 인덱스를 0으로 리셋
+      setPhotoBoothState(PhotoBoothState.SELECTING)
+      return
+    }
 
     // 카운트다운 중이면 리셋
     if (isShooting && shootingTimer > 0) {
@@ -44,6 +57,11 @@ export default function PhotoShootButton({ className }: PhotoShootButtonProps) {
   // 버튼 텍스트 결정
   const getButtonText = () => {
     if (!isRoomLeader) return '대기 중...'
+
+    // 모든 컷이 완료되었으면 "촬영 완료" 텍스트
+    if (currentCutIndex === cutCount) {
+      return '📸 촬영 완료'
+    }
 
     // 카운트다운 중이면 "취소" 텍스트
     if (isShooting && shootingTimer > 0) {
@@ -68,8 +86,8 @@ export default function PhotoShootButton({ className }: PhotoShootButtonProps) {
     }
   }
 
-  // 버튼 비활성화 조건 - 방장이 아니거나 SHOOTING 상태가 아닌 경우
-  const isDisabled = !isRoomLeader || photoBoothState !== PhotoBoothState.SHOOTING
+  // 버튼 비활성화 조건 - 방장이 아니거나 (SHOOTING 상태가 아니고 모든 컷이 완료되지도 않은 경우)
+  const isDisabled = !isRoomLeader || (photoBoothState !== PhotoBoothState.SHOOTING && currentCutIndex !== cutCount)
 
   console.log('isRoomLeader', isRoomLeader)
   console.log('isShooting', isShooting)

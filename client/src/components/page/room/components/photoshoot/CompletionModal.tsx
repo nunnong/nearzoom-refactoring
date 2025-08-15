@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from 'react'
 interface CompletionModalProps {
   isOpen: boolean
   onClose: () => void
+  isRoomLeader: boolean
 }
 
 // 애니메이션이 있는 카메라 아이콘 컴포넌트
@@ -102,6 +103,7 @@ function Confetti() {
 export default function CompletionModal({
   isOpen,
   onClose,
+  isRoomLeader,
 }: CompletionModalProps) {
   const [showConfetti, setShowConfetti] = useState(false)
 
@@ -121,7 +123,7 @@ export default function CompletionModal({
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
+      <Dialog as="div" className="relative z-[9999]" onClose={() => {}}>
         {/* 배경 오버레이 */}
         <Transition.Child
           as={Fragment}
@@ -173,7 +175,7 @@ export default function CompletionModal({
                 </div>
               </div>
 
-              {/* 버튼 */}
+              {/* 버튼 - 모든 참가자 활성화 */}
               <button
                 type="button"
                 onClick={onClose}
@@ -183,7 +185,7 @@ export default function CompletionModal({
                 }}
               >
                 <span className="flex items-center justify-center gap-2">
-                 꾸미기 시작하기
+                  꾸미기 시작하기
                 </span>
               </button>
             </Dialog.Panel>
