@@ -3,7 +3,9 @@
 export enum PhotoBoothState {
   WAITING = 'waiting',
   SHOOTING = 'photoshoot',
-  SELECTING = 'photo-select'
+  SELECTING = 'photo-select',
+  EDITING = 'photo-edit',
+  END = 'end'
 }
 
 export interface StateSliceState {
@@ -43,6 +45,12 @@ export const createStateSlice = (set: any, get: any, roomName: string) => ({
         nextState = PhotoBoothState.SELECTING
         break
       case PhotoBoothState.SELECTING:
+        nextState = PhotoBoothState.EDITING
+        break
+      case PhotoBoothState.EDITING:
+        nextState = PhotoBoothState.END
+        break
+      case PhotoBoothState.END:
         nextState = PhotoBoothState.WAITING
         break
       default:

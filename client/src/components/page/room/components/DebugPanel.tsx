@@ -445,11 +445,11 @@ export default function DebugPanel({ className = '' }: DebugPanelProps) {
                       className="truncate text-xs text-gray-400"
                     >
                       {index + 1}. {
-                        photo === null 
+                        photo === null || photo === undefined
                           ? '[Empty]' 
-                          : (typeof photo === 'string' ? photo : photo.imgUrl)
+                          : (typeof photo === 'string' ? photo : (photo.imgUrl || '[No URL]'))
                       }
-                      {photo && typeof photo === 'object' && (
+                      {photo && typeof photo === 'object' && photo.cutIndex !== undefined && photo.personIds && (
                         <div className="ml-2 text-xs text-gray-500">
                           Cut: {photo.cutIndex}, Faces: {photo.personIds.length}
                         </div>

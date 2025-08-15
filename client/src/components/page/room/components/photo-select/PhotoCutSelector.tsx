@@ -5,33 +5,55 @@ import React from 'react';
 interface PhotoCutSelectorProps {
   cutCount: number
   onChange: (count: number) => void
+  maxAvailable?: number
 }
 
-export default function PhotoCutSelector({ cutCount, onChange }: PhotoCutSelectorProps) {
+export default function PhotoCutSelector({ cutCount, onChange, maxAvailable = 4 }: PhotoCutSelectorProps) {
   return (
     <div className="text-center">
-      <div className="relative mx-auto flex w-64 flex-wrap rounded-lg bg-gray-200 p-0.5 text-sm shadow-sm">
-        {[1, 2, 4].map(n => (
-          <label key={n} className="flex-1 cursor-pointer text-center">
-            <input
-              type="radio"
-              name="cutCount"
-              checked={cutCount === n}
-              onChange={() => onChange(n)}
-              className="hidden"
-            />
-            <span
-              className={`relative flex items-center justify-center rounded-md py-2 transition-all duration-150 ease-in-out ${
-                cutCount === n
-                  ? 'bg-white font-semibold text-slate-700 shadow-md'
-                  : 'text-slate-600 hover:bg-white/50'
-              } `}
+      <div className="relative mx-auto flex w-64 flex-wrap rounded-lg bg-[#D0D6ED]/50 p-0.5 text-sm shadow-sm">
+        {[1, 2, 4].map(n => {
+          const isAvailable = n <= maxAvailable
+          const isDisabled = !isAvailable
+          
+          return (
+            <label 
+              key={n} 
+              className={`flex-1 text-center ${
+                isDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+              }`}
             >
-              {n}컷
-            </span>
-          </label>
-        ))}
+              <input
+                type="radio"
+                name="cutCount"
+                checked={cutCount === n}
+                onChange={() => isAvailable && onChange(n)}
+                disabled={isDisabled}
+                className="hidden"
+              />
+              <span
+                className={`relative flex items-center justify-center rounded-md py-2 transition-all duration-150 ease-in-out ${
+                  cutCount === n
+                    ? 'bg-white font-semibold text-slate-700 shadow-md'
+                    : isDisabled
+                    ? 'text-slate-400 cursor-not-allowed'
+                    : 'text-slate-600 hover:bg-white/50'
+                }`}
+              >
+                {n}컷
+                {isDisabled && (
+                  <span className="ml-1 text-xs text-red-400">✗</span>
+                )}
+              </span>
+            </label>
+          )
+        })}
       </div>
+      {maxAvailable < 4 && (
+        <p className="mt-2 text-xs text-gray-500">
+          촬영된 사진: {maxAvailable}장 (최대 {maxAvailable}컷까지 선택 가능)
+        </p>
+      )}
     </div>
   )
 }

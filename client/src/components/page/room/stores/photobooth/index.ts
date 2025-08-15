@@ -9,6 +9,7 @@ export type { SelectSlice } from './selectSlice'
 export type { ShootingSlice } from './shootingSlice'
 export type { PhotoCanvasSlice } from './photoCanvasSlice'
 export type { CanvasSlice } from './canvasSlice'
+export type { EditSlice } from './editSlice'
 
 // Legacy types removed - now using selectSlice
 
@@ -19,6 +20,7 @@ export { createSelectSlice } from './selectSlice'
 export { createShootingSlice } from './shootingSlice'
 export { createPhotoCanvasSlice } from './photoCanvasSlice'
 export { createCanvasSlice } from './canvasSlice'
+export { createEditSlice } from './editSlice'
 
 // Legacy creators removed - now using selectSlice
 
@@ -29,6 +31,7 @@ export type PhotoBoothSlice = import('./stateSlice').StateSlice &
   import('./shootingSlice').ShootingSlice &
   import('./photoCanvasSlice').PhotoCanvasSlice &
   import('./canvasSlice').CanvasSlice &
+  import('./editSlice').EditSlice &
   import('../roomLeaderSlice').RoomLeaderSlice
 
 // Room별 WebSocket Provider와 Doc을 관리하는 Map
@@ -112,6 +115,11 @@ export const getPhotoCanvasMap = (roomName: string) => {
   return room.ydoc.getMap('photoCanvasState')
 }
 
+export const getEditMap = (roomName: string) => {
+  const room = getOrCreateRoom(roomName)
+  return room.ydoc.getMap('editState')
+}
+
 // 하위 호환성을 위한 legacy 함수
 export const getPhotoBoothMap = (roomName: string) => {
   return getStateMap(roomName)
@@ -126,6 +134,7 @@ export const initializePhotoBoothState = (
   const shootingMap = getShootingMap(roomName)
   const selectMap = getSelectMap(roomName)
   const photoCanvasMap = getPhotoCanvasMap(roomName)
+  const editMap = getEditMap(roomName)
 
   console.log('🎯 Initializing PhotoBooth state for room:', roomName)
 
@@ -175,23 +184,43 @@ export const initializePhotoBoothState = (
     onUpdate(data)
   }
 
+  // Edit 상태 변경사항 감지 리스너
+  const editUpdateHandler = () => {
+    const data = {
+      selectedPhotoUrls: editMap.get('selectedPhotoUrls') || [],
+      photoPersonIds: editMap.get('photoPersonIds') || [],
+      processedPhotoUrls: editMap.get('processedPhotoUrls') || [],
+      currentEditIndex: editMap.get('currentEditIndex') || 0,
+      backgroundType: editMap.get('backgroundType') || 'color',
+      selectedColor: editMap.get('selectedColor') || '#C8B5FF',
+      promptText: editMap.get('promptText') || '',
+      photoBackgrounds: editMap.get('photoBackgrounds') || [],
+      editSessionStarted: editMap.get('editSessionStarted') || false,
+    }
+    console.log('🔄 Edit state updated:', data)
+    onUpdate(data)
+  }
+
   // 리스너 등록
   photoBoothMap.observe(photoBoothUpdateHandler)
   selectMap.observe(selectUpdateHandler)
   shootingMap.observe(shootingUpdateHandler)
   photoCanvasMap.observe(photoCanvasUpdateHandler)
+  editMap.observe(editUpdateHandler)
 
   // 초기 상태 전송
   photoBoothUpdateHandler()
   selectUpdateHandler()
   shootingUpdateHandler()
   photoCanvasUpdateHandler()
+  editUpdateHandler()
 
   return () => {
     photoBoothMap.unobserve(photoBoothUpdateHandler)
     selectMap.unobserve(selectUpdateHandler)
     shootingMap.unobserve(shootingUpdateHandler)
     photoCanvasMap.unobserve(photoCanvasUpdateHandler)
+    editMap.unobserve(editUpdateHandler)
   }
 }
 
@@ -320,6 +349,29 @@ export const updatePhotoCanvasState = (
     photoCanvasMap.set('selectedParticipant', state.selectedParticipant)
     console.log('🔄 Selected participant:', state.selectedParticipant)
   }
+}
+
+// Edit slice 업데이트
+export const updateEditState = (
+  roomName: string,
+  updates: Partial<{
+    selectedPhotoUrls: string[]
+    photoPersonIds: string[][]
+    processedPhotoUrls: string[]
+    currentEditIndex: number
+    backgroundType: string
+    selectedColor: string
+    promptText: string
+    photoBackgrounds: any[]
+    editSessionStarted: boolean
+  }>
+) => {
+  const editMap = getEditMap(roomName)
+
+  Object.entries(updates).forEach(([key, value]) => {
+    editMap.set(key, value)
+    console.log(`🔄 Edit state updated - ${key}:`, value)
+  })
 }
 
 // Room 연결 해제

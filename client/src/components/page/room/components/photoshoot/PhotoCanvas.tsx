@@ -49,6 +49,19 @@ export default function PhotoCanvas({
   const allParticipants = useParticipants()
   const { localParticipant } = useLocalParticipant()
   const cameraTrackRefs = useTracks([Track.Source.Camera])
+  
+  // 참가자 메타데이터 디버깅
+  useEffect(() => {
+    console.log('🔍 === PARTICIPANT METADATA DEBUG ===')
+    allParticipants.forEach((p, idx) => {
+      console.log(`Participant ${idx + 1} (${p.identity}):`, {
+        hasMetadata: !!p.metadata,
+        metadata: p.metadata ? JSON.parse(p.metadata) : null,
+        isLocal: p === localParticipant?.participant
+      })
+    })
+    console.log('🔍 === END METADATA DEBUG ===')
+  }, [allParticipants, localParticipant])
 
   // VirtualBackground 상태
   const virtualBackgroundReady = useVirtualBackgroundReady()
@@ -161,7 +174,9 @@ export default function PhotoCanvas({
               try {
                 const metadata = JSON.parse(livekitParticipant.metadata)
                 console.log(`👤 Found metadata for ${participantId}:`, {
-                  faceImageUrl: metadata.faceImageUrl ? 'provided' : 'null'
+                  fullMetadata: metadata,
+                  faceImageUrl: metadata.faceImageUrl ? metadata.faceImageUrl : 'null',
+                  hasUrl: !!metadata.faceImageUrl
                 })
                 return metadata.faceImageUrl
               } catch (error) {

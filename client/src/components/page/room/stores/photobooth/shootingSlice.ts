@@ -145,6 +145,11 @@ export const createShootingSlice = (set: any, get: any, roomName: string) => ({
     
     console.log(`✅ Capture completed! Cut ${currentCutIndex + 1}/${cutCount}`)
     console.log(`👥 Person IDs (left to right):`, personIds)
+    console.log(`📊 PersonIds debug:`, {
+      count: personIds.length,
+      isEmpty: personIds.length === 0,
+      values: personIds
+    })
     
     // 타이머 정리 (혹시 남아있다면)
     if (timerInterval) {
@@ -202,6 +207,12 @@ export const createShootingSlice = (set: any, get: any, roomName: string) => ({
             roomId: roomName,
             timestamp: Date.now()
           }
+          
+          console.log('📸 Created Photo object with personIds:', {
+            hasPersonIds: personIds && personIds.length > 0,
+            personIdsCount: personIds.length,
+            photo: photo
+          })
           
           // selectSlice에 Photo 객체를 cutIndex 위치에 저장
           const state = get()

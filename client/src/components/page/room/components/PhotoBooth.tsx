@@ -5,10 +5,12 @@ import WaitingComponent from './waiting/WaitingComponent'
 import PhotoshootComponent from './photoshoot/PhotoshootComponent'
 import CursorOverlay from './CursorOverlay'
 import { usePhotoBoothStore } from '../providers/PhotoBoothProvider'
-import { PhotoBoothState } from '../stores/photoboothStore'
+import { PhotoBoothState } from '../stores/photobooth/stateSlice'
 import { useRoomInfo } from '@livekit/components-react'
 import { useEffect } from 'react'
 import PhotoSelectComponent from './photo-select/PhotoSelectComponent'
+import PhotoEditComponent from './photo-edit/PhotoEditComponent'
+import CompletePage from './complete/CompletePage'
 
 interface PhotoBoothProps {}
 
@@ -30,6 +32,10 @@ export default function PhotoBooth({}: PhotoBoothProps = {}) {
         return <PhotoshootComponent />
       case PhotoBoothState.SELECTING:
         return <PhotoSelectComponent />
+      case PhotoBoothState.EDITING:
+        return <PhotoEditComponent />
+      case PhotoBoothState.END:
+        return <CompletePage />
       default:
         return <WaitingComponent />
     }

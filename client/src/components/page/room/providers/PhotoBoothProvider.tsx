@@ -18,6 +18,7 @@ import {
   createShootingSlice,
   createPhotoCanvasSlice,
   createCanvasSlice,
+  createEditSlice,
   type PhotoBoothSlice,
 } from '../stores/photobooth'
 import { createRoomLeaderSlice } from '../stores/roomLeaderSlice'
@@ -65,6 +66,7 @@ const createPhotoBoothStore = (roomName: string) => {
     ...createShootingSlice(set, get, roomName),
     ...createPhotoCanvasSlice(set),
     ...createCanvasSlice(set),
+    ...createEditSlice(set, get, roomName),
     ...createRoomLeaderSlice(set),
   }))
 }
@@ -273,6 +275,34 @@ export const PhotoBoothProvider = ({
       } else if (data.selectedParticipant !== undefined) {
         // 선택 상태만 업데이트
         store.setState({ selectedParticipant: data.selectedParticipant })
+      }
+      // Edit slice 상태 업데이트
+      if (data.selectedPhotoUrls !== undefined) {
+        store.setState({ selectedPhotoUrls: data.selectedPhotoUrls })
+      }
+      if (data.photoPersonIds !== undefined) {
+        store.setState({ photoPersonIds: data.photoPersonIds })
+      }
+      if (data.processedPhotoUrls !== undefined) {
+        store.setState({ processedPhotoUrls: data.processedPhotoUrls })
+      }
+      if (data.currentEditIndex !== undefined) {
+        store.setState({ currentEditIndex: data.currentEditIndex })
+      }
+      if (data.backgroundType !== undefined) {
+        store.setState({ backgroundType: data.backgroundType })
+      }
+      if (data.selectedColor !== undefined) {
+        store.setState({ selectedColor: data.selectedColor })
+      }
+      if (data.promptText !== undefined) {
+        store.setState({ promptText: data.promptText })
+      }
+      if (data.photoBackgrounds !== undefined) {
+        store.setState({ photoBackgrounds: data.photoBackgrounds })
+      }
+      if (data.editSessionStarted !== undefined) {
+        store.setState({ editSessionStarted: data.editSessionStarted })
       }
     }
 

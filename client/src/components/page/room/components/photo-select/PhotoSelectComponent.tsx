@@ -1,16 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useParticipants, useLocalParticipant } from '@livekit/components-react'
 import ControlPanel from '../ControlPanel'
 import FrameColorSelector from '../photo-select/FrameColorSelector'
 import PhotoCutSelector from '../photo-select/PhotoCutSelector'
 import PhotoPicker from '../photo-select/PhotoPicker'
+import Preview from '../photo-select/Preview'
+import StartButton from '../photo-select/StartButton'
 import WebCam from '../photo-select/WebCam'
 import CompletionModal from '../photoshoot/CompletionModal'
 import { cn } from '@/lib/utils'
 import { usePhotoBoothStore } from '../../providers/PhotoBoothProvider'
-import { PhotoBoothState } from '../../stores/photoboothStore'
+import { PhotoBoothState } from '../../stores/photobooth/stateSlice'
+import api from '@/lib/axios'
+import { API_ENDPOINTS } from '@/constants/api'
 
 interface PhotoSelectComponentProps {
   className?: string
@@ -27,10 +31,11 @@ export default function PhotoSelectComponent({
 
   // Yjs store에서 상태 가져오기
   const cutCount = usePhotoBoothStore(state => state.cutCount)
-  const selectedPhotos = usePhotoBoothStore(state => state.selectedPhotos)
+  const selectedPhotos = usePhotoBoothStore(state => state.selectedPhotos) // Photo objects array
   const frameColor = usePhotoBoothStore(state => state.frameColor)
   const capturedImages = usePhotoBoothStore(state => state.capturedImages)
   const isRoomLeader = usePhotoBoothStore(state => state.isRoomLeader)
+  const roomName = usePhotoBoothStore(state => state.roomName)
 
   // Yjs store 액션들
   const setCutCount = usePhotoBoothStore(state => state.setCutCount)
@@ -39,108 +44,255 @@ export default function PhotoSelectComponent({
   const setPhotoBoothState = usePhotoBoothStore(
     state => state.setPhotoBoothState
   )
+  const initializeEditSession = usePhotoBoothStore(state => state.initializeEditSession)
 
-  // 실제 촬영된 사진들 사용 (하드코딩된 사진 대신)
-  const capturedPhotos =
-    capturedImages.length > 0
-      ? capturedImages
-      : [
-          // 개발/테스트용 fallback 이미지들
-          'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&h=400&fit=crop',
-          'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&h=400&fit=crop',
-          'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&h=400&fit=crop',
-          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop',
-        ]
+  // 실제 촬영된 사진들 사용 - PhotoShoot에서 저장된 Photo 객체들에서 imgUrl 추출
+  const capturedPhotos = useMemo(() => {
+    console.log('📸 Raw selectedPhotos:', selectedPhotos)
+    
+    if (!selectedPhotos || !Array.isArray(selectedPhotos)) {
+      console.log('📸 selectedPhotos is not an array:', selectedPhotos)
+      return []
+    }
+    
+    // selectedPhotos 배열에서 null이 아닌 Photo 객체들의 imgUrl 추출
+    const photoUrls = selectedPhotos
+      .filter(photo => photo !== null && photo !== undefined && typeof photo === 'object' && photo.imgUrl)
+      .map(photo => photo.imgUrl)
+    
+    console.log('📸 Extracted photo URLs from selectedPhotos:', photoUrls)
+    
+    // 실제 촬영된 사진이 있으면 사용, 없으면 빈 배열 (fallback 제거)
+    return photoUrls.length > 0 ? photoUrls : []
+  }, [selectedPhotos])
 
-  const frameColors = [
+  // 촬영된 사진 개수에 따라 최대 선택 가능한 컷 수 결정
+  const maxAvailableCuts = useMemo(() => {
+    const photoCount = capturedPhotos.length
+    console.log('📸 Available photo count:', photoCount)
+    
+    if (photoCount >= 4) return 4
+    if (photoCount >= 2) return 2
+    if (photoCount >= 1) return 1
+    return 1 // 최소 1컷은 선택 가능하도록
+  }, [capturedPhotos.length])
+
+  // cutCount가 사용 가능한 사진 수를 초과하면 자동으로 조정
+  useMemo(() => {
+    if (cutCount > maxAvailableCuts) {
+      console.log(`📸 Adjusting cutCount from ${cutCount} to ${maxAvailableCuts}`)
+      setCutCount(maxAvailableCuts)
+    }
+  }, [cutCount, maxAvailableCuts, setCutCount])
+
+  // PhotoPicker를 위한 선택된 이미지 URL 배열 (로컬 상태)
+  const [selectedImageUrls, setSelectedImageUrls] = useState<string[]>([])
+  
+  // API 호출 로딩 상태
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // selectedPhotos가 변경되면 selectedImageUrls도 업데이트
+  useMemo(() => {
+    if (!selectedPhotos || !Array.isArray(selectedPhotos)) {
+      setSelectedImageUrls([])
+      return
+    }
+    
+    const urls = selectedPhotos
+      .filter(photo => photo !== null && photo !== undefined && typeof photo === 'object' && photo.imgUrl)
+      .map(photo => photo!.imgUrl)
+    setSelectedImageUrls(urls)
+  }, [selectedPhotos])
+
+  const frameColors = useMemo(() => [
     '#FFFFFF',
     '#000000',
     '#929292',
     '#73c0ef',
     '#293e85',
     '#2D3243',
-  ]
+  ], [])
 
-  const handleComplete = () => {
-    if (selectedPhotos.length === cutCount) {
-      console.log('🎉 Photo selection completed:', {
-        cutCount,
-        selectedPhotos,
-        frameColor,
-      })
+  // 컷수 변경 핸들러
+  const handleCutCountChange = useCallback((count: number) => {
+    setCutCount(count)
+    setSelectedImageUrls([]) // 로컬 선택 초기화
+  }, [setCutCount])
 
-      // 선택 완료 후 WAITING 상태로 돌아가거나 새로운 완료 상태로 전환
-      setPhotoBoothState(PhotoBoothState.WAITING)
+  // PhotoPicker 선택 변경 핸들러
+  const handlePhotoSelection = useCallback((urls: string[]) => {
+    setSelectedImageUrls(urls)
+  }, [])
 
-      // 선택된 사진들과 설정들이 이미 Yjs에 저장되어 있음
-      // 다른 참가자들도 실시간으로 확인 가능
+  // 완료 핸들러
+  const handleComplete = useCallback(async () => {
+    if (selectedImageUrls.length !== cutCount) {
+      alert('먼저 사진을 선택해주세요.')
+      return
     }
-  }
 
-  const isCompleteDisabled = selectedPhotos.length !== cutCount
+    setIsSubmitting(true)
+    
+    try {
+      console.log('=== 사진 선택 API 호출 시작 ===')
+      
+      // 선택된 사진들의 인덱스 계산 (1-based)
+      const selectedCutIds = selectedImageUrls.map(selectedUrl => 
+        capturedPhotos.indexOf(selectedUrl) + 1 // 1-based index
+      )
+
+      const requestData = {
+        roomId: parseInt(roomName),
+        selectedCutIds: selectedCutIds,
+        cutCount: selectedImageUrls.length,
+        frameColor: frameColor
+      }
+
+      console.log('요청 데이터:', requestData)
+      
+      const response = await api.post(API_ENDPOINTS.PHOTO_SELECTION, requestData)
+      
+      console.log('사진 선택 API 성공:', response.data)
+
+      alert('사진 선택이 성공적으로 전송되었습니다!')
+      
+      // 편집 세션 시작 - Photo 객체들 전달 (URL과 personIds 포함)
+      const selectedPhotoObjects = selectedImageUrls.map(url => {
+        // selectedPhotos에서 해당 URL을 가진 Photo 객체 찾기
+        const photoObj = selectedPhotos.find(photo => photo && photo.imgUrl === url)
+        return photoObj!
+      }).filter(Boolean) // null/undefined 제거
+      
+      console.log('🎨 Passing Photo objects to edit session:', selectedPhotoObjects)
+      initializeEditSession(selectedPhotoObjects)
+      
+      // EDITING 상태로 전환
+      setPhotoBoothState(PhotoBoothState.EDITING)
+      
+    } catch (error: any) {
+      console.error('사진 선택 API 실패:', error)
+      alert('사진 선택 전송에 실패했습니다. 다시 시도해주세요.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [selectedImageUrls, cutCount, frameColor, capturedPhotos, roomName, setPhotoBoothState, initializeEditSession])
+
+  // 완료 버튼 비활성화 상태
+  const isCompleteDisabled = useMemo(() => 
+    selectedImageUrls.length !== cutCount || isSubmitting,
+    [selectedImageUrls.length, cutCount, isSubmitting]
+  )
 
   // Modal close handler
-  const handleWelcomeModalClose = () => {
+  const handleWelcomeModalClose = useCallback(() => {
     setShowWelcomeModal(false)
-  }
+  }, [])
 
   return (
-    <div className={cn('flex flex-1 gap-4 bg-gray-100 px-8 py-6', className)}>
-      {/* 왼쪽: 사진 선택 영역 */}
-      <div className="flex-1 rounded-lg bg-white p-6 shadow-sm">
-        <div className="mb-4 text-center">
-          <p className="text-sm font-bold text-gray-600">
-            원하는 컷 수를 선택하고 사진을 골라주세요
-          </p>
-        </div>
+    <div className={cn('flex flex-1 flex-col gap-4 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 md:flex-row md:gap-6 md:p-6 lg:p-8', className)}>
+      {/* 메인 영역 */}
+      <section className="min-w-0 flex-1">
+        <div className="rounded-2xl border border-white/20 bg-white/95 backdrop-blur-sm p-3 shadow-lg sm:p-4 lg:p-6">
+          <div className="mx-auto max-w-6xl space-y-6 sm:space-y-8">
+            
+            {/* 사진 선택과 프레임 선택 */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-5 lg:gap-8 xl:gap-12 mt-4 mb-8">
+              
+              {/* 왼쪽: 사진 선택 */}
+              <div className="space-y-4 lg:col-span-3">
+                <h2 className="text-lg font-extrabold tracking-tight text-gray-900 text-center sm:text-xl">
+                  사진 선택
+                </h2>
+                
+                <div className="flex justify-center">
+                  <PhotoCutSelector 
+                    cutCount={cutCount} 
+                    onChange={handleCutCountChange}
+                    maxAvailable={maxAvailableCuts}
+                  />
+                </div>
+                
+                <PhotoPicker
+                  photos={capturedPhotos}
+                  cutCount={cutCount}
+                  selected={selectedImageUrls}
+                  onSelect={handlePhotoSelection}
+                />
+              </div>
 
-        <div className="mx-auto max-w-2xl space-y-6">
-          {/* 컷 수 선택 */}
-          <PhotoCutSelector cutCount={cutCount} onChange={setCutCount} />
+              {/* 오른쪽: 프레임 색상 + 미리보기 + 완료 버튼 */}
+              <div className="space-y-4 lg:col-span-2 lg:space-y-6">
+                
+                <div className="space-y-3">
+                  <h2 className="text-lg font-extrabold tracking-tight text-gray-900 text-center sm:text-xl">
+                    프레임 색상
+                  </h2>
+                  <FrameColorSelector
+                    frameColor={frameColor}
+                    onFrameColorChange={setFrameColor}
+                    palette={frameColors}
+                  />
+                </div>
 
-          {/* 사진 선택 */}
-          <PhotoPicker
-            photos={capturedPhotos}
-            cutCount={cutCount}
-            selected={selectedPhotos}
-            onSelect={setSelectedPhotos}
-          />
+                <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-3 text-center sm:p-4">
+                  <div className="mb-2 text-sm text-gray-500 sm:text-base">미리보기</div>
+                  <div className="flex justify-center">
+                    <Preview
+                      cutCount={cutCount}
+                      selectedPhotos={selectedImageUrls}
+                      frameColor={frameColor}
+                      className="max-w-full"
+                    />
+                  </div>
+                </div>
 
-          {/* 프레임 색상 선택 */}
-          <FrameColorSelector
-            frameColor={frameColor}
-            onFrameColorChange={setFrameColor}
-            palette={frameColors}
-          />
+                <div className="flex flex-col items-center justify-center space-y-3 pt-2">
+                  <StartButton
+                    onClick={handleComplete}
+                    disabled={isCompleteDisabled}
+                    className="w-full max-w-xs sm:w-54"
+                  >
+                    {isSubmitting ? 'SENDING...' : 'COMPLETE'}
+                  </StartButton>
 
-          {/* 완료 버튼 */}
-          <div className="flex justify-center pt-4">
-            <button
-              onClick={handleComplete}
-              disabled={isCompleteDisabled}
-              className={`rounded-lg px-8 py-3 text-lg font-semibold transition-all ${
-                isCompleteDisabled
-                  ? 'cursor-not-allowed bg-gray-300 text-gray-500'
-                  : 'bg-[#2D3243] text-white shadow-lg hover:bg-[#C9D76D] hover:text-[#2D3243] active:scale-95'
-              }`}
-            >
-              선택 완료
-            </button>
+                  {isCompleteDisabled && (
+                    <p className="text-center text-xs text-gray-500 sm:text-base">
+                      {isSubmitting ? (
+                        <span>사진 선택을 전송 중입니다...</span>
+                      ) : (
+                        <>
+                          <span className="hidden sm:inline">
+                            {cutCount}장의 사진을 모두 선택해주세요
+                          </span>
+                          <span className="sm:hidden">
+                            {cutCount}장 선택 필요
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* 오른쪽: 사이드바 (참가자 웹캠) */}
-      {/* <div className="flex w-80 flex-col gap-6">
-        <WebCam
-          participants={participants}
-          localParticipant={localParticipant}
-        />
-        <ControlPanel
-          localParticipant={localParticipant}
-          showLeaveButton={true}
-        />
-      </div> */}
+      {/* 데스크톱 사이드바 */}
+      <aside className="hidden w-[300px] shrink-0 md:block lg:w-80">
+        <div className="flex flex-col gap-3 sm:gap-4">
+          {/* Webcam 컴포넌트 */}
+          <WebCam
+            participants={participants}
+            localParticipant={localParticipant}
+          />
+          
+          {/* 컨트롤 패널 */}
+          <ControlPanel
+            showLeaveButton={true}
+          />
+        </div>
+      </aside>
 
       {/* Welcome Modal */}
       <CompletionModal 
