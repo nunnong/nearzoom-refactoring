@@ -40,7 +40,7 @@ public class PhotoPromptService {
 
     String roomKey = "room:" + roomId;
 
-    // ✅ 수정: putAll() 대신 개별 put() 사용
+    // 수정: putAll() 대신 개별 put() 사용
     redisTemplate.opsForHash().put(roomKey, "frame_color", frameColor);
     redisTemplate.opsForHash().put(roomKey, "photo_status", "basic_settings_saved");
 
@@ -82,7 +82,7 @@ public class PhotoPromptService {
       processingOptions = new ProcessingOptions("color", null, color);
     }
 
-    // ✅ 수정: Map 생성하지 말고 개별 put() 사용
+    // 수정: Map 생성하지 말고 개별 put() 사용
     redisTemplate.opsForHash().put(roomKey, "image_url_" + imageOrder, backgroundRequest.imageUrl());
     redisTemplate.opsForHash().put(roomKey, "background_type_" + imageOrder, backgroundType);
 
@@ -155,7 +155,7 @@ public class PhotoPromptService {
     Map<String, Object> status = new HashMap<>();
 
     String totalImagesStr = (String) roomData.get("total_images");
-    // ✅ 수정: "status" → "photo_status" 키 사용
+    //수정: "status" → "photo_status" 키 사용
     String currentStatus = (String) roomData.get("photo_status");
 
     status.put("roomId", roomId);
@@ -218,7 +218,7 @@ public class PhotoPromptService {
       throw new ApiException(HttpStatus.BAD_REQUEST, "방 정보를 찾을 수 없습니다.");
     }
 
-    // ✅ 수정: "status" → "photo_status" 키 사용 (RoomService의 status와 구분)
+    // 수정: "status" → "photo_status" 키 사용 (RoomService의 status와 구분)
     String status = (String) roomData.get("photo_status");
     String totalImagesStr = (String) roomData.get("total_images");
     String completedCountStr = (String) roomData.get("completed_individual_count");

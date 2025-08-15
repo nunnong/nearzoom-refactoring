@@ -38,8 +38,8 @@ public class ImageProcessingService {
 
   // 개별 이미지 즉시 처리
   public void processIndividualStart(Long roomId, int imageOrder,
-      String imageUrl, List<String> personIds, ProcessingOptions options,
-      String promptId) {
+                                     String imageUrl, List<String> personIds, ProcessingOptions options,
+                                     String promptId) {
     try {
       // 이미지 서버 요청 생성
       ImageServerRequest request = new ImageServerRequest(imageUrl, personIds, options);
@@ -54,7 +54,7 @@ public class ImageProcessingService {
 
     } catch (Exception e) {
       log.error("개별 이미지 즉시 처리 실패 - RoomId: {}, Order: {}, Error: {}",
-          roomId, imageOrder, e.getMessage());
+              roomId, imageOrder, e.getMessage());
 
       // 프롬프트 상태 업데이트
       if (promptId != null) {
@@ -62,7 +62,7 @@ public class ImageProcessingService {
       }
 
       throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
-          "이미지 처리 중 오류가 발생했습니다: " + e.getMessage());
+              "이미지 처리 중 오류가 발생했습니다: " + e.getMessage());
     }
   }
 
@@ -75,7 +75,7 @@ public class ImageProcessingService {
     String promptId = (String) jobInfo.get("prompt_id");
 
     log.info("개별 이미지 처리 완료 - JobId: {}, RoomId: {}, Order: {}, ProcessedUrl: {}",
-        jobId, roomId, imageOrder, processedImageUrl);
+            jobId, roomId, imageOrder, processedImageUrl);
 
     if (promptId != null) {
       updatePromptStatus(Long.valueOf(promptId), PromptStatus.SUCCESS);
@@ -95,11 +95,14 @@ public class ImageProcessingService {
     String roomKey = "room:" + roomId;
     Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
 
-    int totalImages = Integer.parseInt((String) roomData.get("total_images"));
-    int completedImages = Integer.parseInt((String) roomData.get("completed_individual_count"));
+    //  null 체크 추가 (500 오류 방지)
+    String totalImagesStr = (String) roomData.get("total_images");
+    String completedImagesStr = (String) roomData.get("completed_individual_count");
 
-    log.info("개별 처리 진행률 확인 - RoomId: {}, Completed: {}/{}",
-        roomId, completedImages, totalImages);
+    int totalImages = totalImagesStr != null ? Integer.parseInt(totalImagesStr) : 0;
+    int completedImages = completedImagesStr != null ? Integer.parseInt(completedImagesStr) : 0;
+
+    log.info("개별 처리 진행률 확인 - RoomId: {}, Completed: {}/{}", roomId, completedImages, totalImages);
 
     // 개별 사진이 완료되고 나면 frame 단계로 넘어감
     if (completedImages == totalImages && totalImages > 0) {
@@ -116,7 +119,6 @@ public class ImageProcessingService {
 
       for (int i = 0; i < totalImages; i++) {
         String processedUrl = (String) roomData.get("processed_image_" + i);
-
         processedImageUrls.add(processedUrl);
       }
 
@@ -124,8 +126,8 @@ public class ImageProcessingService {
 
       // 프레임 합성 요청
       FrameComposeRequest composeRequest = new FrameComposeRequest(
-          processedImageUrls,
-          frameColor
+              processedImageUrls,
+              frameColor
       );
 
       log.info("프레임 합성 요청 시작 - ImageCount: {}, FrameColor: {}", totalImages, frameColor);
@@ -137,17 +139,18 @@ public class ImageProcessingService {
       // 프레임 합성 Job 정보 저장
       saveFrameComposeJobInfoToRedis(composeJobId, roomId, processedImageUrls, frameColor);
 
-      // 방 상태 업데이트
+      // photo_status 키 사용
       redisTemplate.opsForHash().put("room:" + roomId, "compose_job_id", composeJobId);
-      redisTemplate.opsForHash().put("room:" + roomId, "status", "frame_composing");
+      redisTemplate.opsForHash().put("room:" + roomId, "photo_status", "frame_composing");
 
       log.info("프레임 합성 요청 완료 - ComposeJobId: {}, RoomId: {}", composeJobId, roomId);
 
     } catch (Exception e) {
       log.error("프레임 합성 시작 실패 - RoomId: {}, Error: {}", roomId, e.getMessage());
-      redisTemplate.opsForHash().put("room:" + roomId, "status", "frame_compose_failed");
+      //  photo_status 키 사용
+      redisTemplate.opsForHash().put("room:" + roomId, "photo_status", "frame_compose_failed");
       redisTemplate.opsForHash().put("room:" + roomId, "error_message",
-          "프레임 합성 시작 실패: " + e.getMessage());
+              "프레임 합성 시작 실패: " + e.getMessage());
     }
   }
 
@@ -159,10 +162,10 @@ public class ImageProcessingService {
 
     log.info("프레임 합성 완료 - JobId: {}, RoomId: {}, FinalUrl: {}", jobId, roomId, finalImageUrl);
 
-    // 최종 결과 저장
+    // photo_status 키 사용
     String roomKey = "room:" + roomId;
     redisTemplate.opsForHash().put(roomKey, "final_image_url", finalImageUrl);
-    redisTemplate.opsForHash().put(roomKey, "status", "all_completed");
+    redisTemplate.opsForHash().put(roomKey, "photo_status", "all_completed");
     redisTemplate.opsForValue().set("final_result:" + roomId, finalImageUrl, Duration.ofDays(1));
 
     log.info("✅✅✅✅✅ 최종 사진 Redis에 저장 완료 -> frame_job:{} ✅✅✅✅✅", jobId);
@@ -177,12 +180,12 @@ public class ImageProcessingService {
       String finalImageUrl = redisTemplate.opsForValue().get("final_result:" + roomIdLong);
       if (finalImageUrl != null) {
         return new ImageProcessingResult(
-            roomId,
-            "SUCCESS",
-            finalImageUrl,
-            null,
-            null,
-            null
+                roomId,
+                "SUCCESS",
+                finalImageUrl,
+                null,
+                null,
+                null
         );
       }
 
@@ -194,17 +197,18 @@ public class ImageProcessingService {
         throw new ApiException(HttpStatus.NOT_FOUND, "처리 중인 작업을 찾을 수 없습니다.");
       }
 
-      String status = (String) roomData.get("status");
+      // photo_status 키 사용
+      String status = (String) roomData.get("photo_status");
       String errorMessage = (String) roomData.get("error_message");
 
       if ("frame_compose_failed".equals(status) || errorMessage != null) {
         return new ImageProcessingResult(
-            roomId,
-            "FAILED",
-            null,
-            null,
-            "PROCESSING_ERROR",
-            errorMessage != null ? errorMessage : "처리 중 오류가 발생했습니다."
+                roomId,
+                "FAILED",
+                null,
+                null,
+                "PROCESSING_ERROR",
+                errorMessage != null ? errorMessage : "처리 중 오류가 발생했습니다."
         );
       }
 
@@ -223,12 +227,12 @@ public class ImageProcessingService {
       }
 
       return new ImageProcessingResult(
-          roomId,
-          "PROCESSING",
-          null,
-          progressMessage,
-          null,
-          null
+              roomId,
+              "PROCESSING",
+              null,
+              progressMessage,
+              null,
+              null
       );
 
     } catch (NumberFormatException e) {
@@ -240,36 +244,36 @@ public class ImageProcessingService {
   private ImageServerResponse sendToImageServer(String endpoint, Object request) {
     try {
       return imageServerWebClient
-          .post()
-          .uri(endpoint)
-          .bodyValue(request)
-          .retrieve()
-          .onStatus(
-              status -> status.is4xxClientError() || status.is5xxServerError(),
-              response -> response.bodyToMono(String.class)
-                  .map(this::handleImageServerError)
-          )
-          .bodyToMono(ImageServerResponse.class)
-          .timeout(Duration.ofMinutes(10))
-          .retryWhen(
-              Retry.backoff(3, Duration.ofSeconds(2))
-                  .filter(throwable -> throwable instanceof WebClientRequestException
-                      || throwable instanceof TimeoutException)
-          )
-          .block();
+              .post()
+              .uri(endpoint)
+              .bodyValue(request)
+              .retrieve()
+              .onStatus(
+                      status -> status.is4xxClientError() || status.is5xxServerError(),
+                      response -> response.bodyToMono(String.class)
+                              .map(this::handleImageServerError)
+              )
+              .bodyToMono(ImageServerResponse.class)
+              .timeout(Duration.ofMinutes(10))
+              .retryWhen(
+                      Retry.backoff(3, Duration.ofSeconds(2))
+                              .filter(throwable -> throwable instanceof WebClientRequestException
+                                      || throwable instanceof TimeoutException)
+              )
+              .block();
 
     } catch (Exception e) {
       log.error("이미지 서버 요청 실패 - Endpoint: {}, Error: {}", endpoint, e.getMessage());
       throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
-          "이미지 서버 요청 실패: " + e.getMessage());
+              "이미지 서버 요청 실패: " + e.getMessage());
     }
   }
 
   private void saveIndividualJobInfoToRedis(String jobId, Long roomId, int imageOrder,
-      String imageUrl, ProcessingOptions options, String promptId) {
+                                            String imageUrl, ProcessingOptions options, String promptId) {
 
     String redisKey = "individual_job:" + jobId;
-    log.info("🔍 Redis 저장 시작 () - Key: {}", redisKey);
+    log.info("📝 Redis 저장 시작 () - Key: {}", redisKey);
 
     Map<String, String> jobInfo = new HashMap<>();
     jobInfo.put("room_id", String.valueOf(roomId));
@@ -277,6 +281,7 @@ public class ImageProcessingService {
     jobInfo.put("image_url", imageUrl);
     jobInfo.put("background_type", options.backgroundType());
     jobInfo.put("job_type", "individual");
+    // ✅ 개별 job에서는 status 그대로 유지 (room의 photo_status와 구분)
     jobInfo.put("status", "processing");
 
     if (promptId != null) {
@@ -296,16 +301,17 @@ public class ImageProcessingService {
 
   // 프레임 합성 Job 정보 저장
   private void saveFrameComposeJobInfoToRedis(String jobId, Long roomId,
-      List<String> processedImageUrls, String frameColor) {
+                                              List<String> processedImageUrls, String frameColor) {
 
     String redisKey = "frame_job:" + jobId;
-    log.info("🔍 Redis 저장 시작 () - Key: {}", redisKey);
+    log.info("📝 Redis 저장 시작 () - Key: {}", redisKey);
 
     Map<String, String> jobInfo = new HashMap<>();
     jobInfo.put("room_id", String.valueOf(roomId));
     jobInfo.put("processed_image_urls", String.join(",", processedImageUrls));
     jobInfo.put("frame_color", frameColor);
     jobInfo.put("job_type", "frame_compose");
+    // frame job에서도 status 그대로 유지 (room의 photo_status와 구분)
     jobInfo.put("status", "processing");
     jobInfo.put("created_at", String.valueOf(System.currentTimeMillis()));
 
