@@ -1,12 +1,15 @@
 'use client'
 
-import { XMarkIcon, ShareIcon } from '@heroicons/react/24/outline'
+import { XMarkIcon, ShareIcon, PencilSquareIcon } from '@heroicons/react/24/outline'
 import React from 'react'
+import { useRouter } from 'next/navigation'
 
 interface ImageItem {
-  id: string
-  src: string
-  alt: string
+  photoId: string
+  imgUrl: string
+  isLiked?: boolean
+  isEdited?: boolean
+  hashtags?: string[]
 }
 
 interface ShareModalProps {
@@ -22,10 +25,22 @@ const ShareModal: React.FC<ShareModalProps> = ({
   onClose,
   onShareKakao,
 }) => {
+  const router = useRouter()
+  
   if (!isOpen || !image) return null
 
   const handleKakaoShare = () => {
-    onShareKakao(image.id)
+    onShareKakao(image.photoId)
+    onClose()
+  }
+
+  const handleFeedCreate = () => {
+    const params = new URLSearchParams({
+      imageId: image.photoId,
+      imageSrc: encodeURIComponent(image.imgUrl),
+      imageAlt: '' // alt is removed from ImageItem, so pass empty string or remove if not needed
+    })
+    router.push(`/feeds?${params.toString()}`)
     onClose()
   }
 
@@ -55,8 +70,8 @@ const ShareModal: React.FC<ShareModalProps> = ({
           <div className="mb-4 flex justify-center">
             <div className="overflow-hidden rounded-lg">
               <img
-                src={image.src}
-                alt={image.alt}
+                src={image.imgUrl}
+                alt={image.imgUrl} // alt is removed from ImageItem, so pass imgUrl
                 className="h-20 w-20 object-cover"
               />
             </div>
@@ -65,7 +80,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
           {/* Image Info */}
           <div className="mb-6 text-center">
             <p className="text-sm font-medium text-gray-900">
-              "{image.alt}"
+              "{image.imgUrl}"
             </p>
             <p className="mt-1 text-xs text-gray-500">
               이 사진을 공유해보세요
@@ -74,21 +89,17 @@ const ShareModal: React.FC<ShareModalProps> = ({
 
           {/* Share Options */}
           <div className="space-y-3">
-            {/* KakaoTalk Share */}
+            {/* Feed Create */}
             <button
-              onClick={handleKakaoShare}
-              className="flex w-full items-center space-x-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2"
+              onClick={handleFeedCreate}
+              className="flex w-full items-center space-x-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-400">
-                <img 
-                  src="/kakaologo.svg" 
-                  alt="KakaoTalk" 
-                  className="h-6 w-6"
-                />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500">
+                <PencilSquareIcon className="h-6 w-6 text-white" />
               </div>
               <div>
-                <p className="font-medium text-gray-900">카카오톡으로 공유</p>
-                <p className="text-sm text-gray-500">친구들과 대화방에 공유하기</p>
+                <p className="font-medium text-gray-900">피드 게시물 작성하기</p>
+                <p className="text-sm text-gray-500">사진과 함께 게시물을 작성해보세요</p>
               </div>
             </button>
           </div>

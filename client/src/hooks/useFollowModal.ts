@@ -322,6 +322,7 @@ export const useFollowModal = (): UseFollowModalReturn => {
   // 🔥 백엔드 UserProfileResponse를 User 타입으로 변환
   const transformBackendUser = useCallback((backendUser: UserProfileResponse): User => {
     return {
+<<<<<<< HEAD
       id: backendUser.accountName,                            // accountName을 고유 ID로 사용
       userId: backendUser.userId,                             // 백엔드 userId
       accountName: backendUser.accountName,                   // 계정명
@@ -331,6 +332,15 @@ export const useFollowModal = (): UseFollowModalReturn => {
       profileImageUrl: backendUser.profileImage || undefined, // 프로필 이미지 (null → undefined)
       prettyFace: backendUser.prettyFace || null,             // prettyFace
       isFollowing: false                                      // 초기값, 별도로 조회
+=======
+      id: backendUser.userEmail,                    // 이메일을 고유 ID로 사용
+      username: backendUser.userName,               // 사용자명
+      displayName: backendUser.userName,            // 표시명
+      email: backendUser.userEmail,                 // 이메일
+      profileImageUrl: backendUser.profileImage,    // 프로필 이미지
+      prettyFaceUrl: backendUser.faceImageUrl,        // 예쁜 얼굴 이미지
+      isFollowing: false                            // 초기값, 별도로 조회 필요
+>>>>>>> origin/frontend
     }
   }, [])
 

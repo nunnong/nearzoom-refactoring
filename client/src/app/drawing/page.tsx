@@ -14,9 +14,8 @@ import {
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import React, { useState, useRef, useEffect } from 'react'
-
-import { saveImageToLocal, updateImageInLocal } from '@/utils/localStorage'
 import { myroomService } from '@/services/myroomService'
+import api from '@/lib/axios'
 
 
 // Konva 컴포넌트들을 동적으로 import
@@ -67,7 +66,7 @@ interface TextData {
   rotation?: number
 }
 
-const DrawingPage: React.FC = () => {
+const DrawingPage = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const stageRef = useRef<any>(null)
@@ -141,12 +140,29 @@ const DrawingPage: React.FC = () => {
     const id = searchParams.get('id')
     const src = searchParams.get('src')
 
+    console.log('🔍 Drawing 페이지 파라미터:', { id, src })
+
     if (id) setImageId(id)
     if (src) {
       const imgSrc = decodeURIComponent(src)
+      
       const img = new Image()
-      img.crossOrigin = 'anonymous'
+      
+      // 이미지 URL이 같은 도메인인지 확인
+      const isCurrentDomain = imgSrc.startsWith(window.location.origin) || imgSrc.startsWith('/')
+      
+      // CORS 문제 해결을 위한 crossOrigin 설정
+      if (!isCurrentDomain) {
+        img.crossOrigin = 'anonymous'
+      }
+      
       img.onload = () => {
+        console.log('✅ 이미지 로드 성공:', {
+          width: img.width,
+          height: img.height,
+          src: img.src
+        })
+        
         setOriginalImage(img)
         // 원본 이미지 크기 저장
         setOriginalImageSize({
@@ -169,6 +185,35 @@ const DrawingPage: React.FC = () => {
         setHistory([initialState])
         setHistoryStep(0)
       }
+      
+      img.onerror = (error) => {
+        console.error('❌ 이미지 로드 실패:', {
+          error: error,
+          errorType: error instanceof Event ? error.type : 'unknown',
+          imgSrc: imgSrc,
+          originalSrc: src,
+          imgCurrentSrc: img.currentSrc,
+          imgComplete: img.complete,
+          imgNaturalWidth: img.naturalWidth,
+          imgNaturalHeight: img.naturalHeight
+        })
+        
+        // 이미지 URL 직접 테스트
+        console.log('🔗 이미지 URL 직접 테스트:', imgSrc)
+        fetch(imgSrc)
+          .then(response => {
+            console.log('📡 Fetch 응답:', {
+              status: response.status,
+              statusText: response.statusText,
+              headers: Object.fromEntries(response.headers.entries()),
+              url: response.url
+            })
+          })
+          .catch(fetchError => {
+            console.error('📡 Fetch 실패:', fetchError)
+          })
+      }
+      
       img.src = imgSrc
     }
   }, [searchParams])
@@ -500,61 +545,189 @@ const DrawingPage: React.FC = () => {
     }
 
     try {
-      console.log('💾 Starting save process...')
-      console.log('📝 Original image ID:', imageId)
-
-      // 1단계: Konva 스테이지를 이미지로 변환
-      const dataURL = stageRef.current.toDataURL({
-        mimeType: 'image/png',
-        quality: 1,
+      // 1. 스케일 비율 계산
+      const scaleX = originalImageSize.width / stageSize.width
+      const scaleY = originalImageSize.height / stageSize.height
+      
+      // 2. 원본 크기로 캔버스 생성
+      const canvas = stageRef.current.toCanvas({
+        width: originalImageSize.width,
+        height: originalImageSize.height,
+        pixelRatio: 1
+      })
+      
+      // 3. 2D 컨텍스트 가져오기
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        throw new Error('캔버스 컨텍스트를 가져올 수 없습니다.')
+      }
+      
+      // 4. 원본 이미지를 캔버스에 그리기
+      if (originalImage) {
+        ctx.drawImage(originalImage, 0, 0, originalImageSize.width, originalImageSize.height)
+      }
+      
+      // 5. 그리기 선들을 원본 크기에 맞게 조정하여 그리기
+      lines.forEach(line => {
+        ctx.strokeStyle = line.stroke
+        ctx.lineWidth = line.strokeWidth * Math.min(scaleX, scaleY) // 선 굵기 조정
+        ctx.lineCap = 'round'
+        ctx.lineJoin = 'round'
+        
+        ctx.beginPath()
+        // points 배열은 [x1, y1, x2, y2, ...] 형태로 저장됨
+        for (let i = 0; i < line.points.length; i += 2) {
+          const x = line.points[i]
+          const y = line.points[i + 1]
+          const scaledX = x * scaleX
+          const scaledY = y * scaleY
+          
+          if (i === 0) {
+            ctx.moveTo(scaledX, scaledY)
+          } else {
+            ctx.lineTo(scaledX, scaledY)
+          }
+        }
+        ctx.stroke()
+      })
+      
+      // 6. 스티커들을 원본 크기에 맞게 조정하여 그리기
+      const stickerPromises = stickers.map(sticker => {
+        return new Promise<void>((resolve) => {
+          const stickerImg = new Image()
+          stickerImg.onload = () => {
+            const scaledX = sticker.x * scaleX
+            const scaledY = sticker.y * scaleY
+            const scaledWidth = sticker.width * scaleX
+            const scaledHeight = sticker.height * scaleY
+            
+            ctx.save()
+            ctx.translate(scaledX + scaledWidth / 2, scaledY + scaledHeight / 2)
+            ctx.rotate((sticker.rotation || 0) * Math.PI / 180)
+            ctx.drawImage(stickerImg, -scaledWidth / 2, -scaledHeight / 2, scaledWidth, scaledHeight)
+            ctx.restore()
+            resolve()
+          }
+          stickerImg.onerror = () => {
+            console.warn('스티커 이미지 로드 실패:', sticker.src)
+            resolve() // 에러가 있어도 계속 진행
+          }
+          stickerImg.src = sticker.src
+        })
+      })
+      
+      // 7. 텍스트들을 원본 크기에 맞게 조정하여 그리기
+      texts.forEach(text => {
+        const scaledX = text.x * scaleX
+        const scaledY = text.y * scaleY
+        const scaledFontSize = text.fontSize * Math.min(scaleX, scaleY)
+        
+        ctx.font = `${scaledFontSize}px ${text.fontFamily}`
+        ctx.fillStyle = text.fill
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        
+        ctx.save()
+        ctx.translate(scaledX, scaledY)
+        if (text.rotation) {
+          ctx.rotate(text.rotation * Math.PI / 180)
+        }
+        ctx.fillText(text.text, 0, 0)
+        ctx.restore()
+      })
+      
+      // 8. 모든 스티커 이미지가 로드될 때까지 대기
+      await Promise.all(stickerPromises)
+      
+      // 9. 캔버스를 Blob으로 변환
+      const blob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((blob: Blob | null) => {
+          if (blob) resolve(blob)
+        }, 'image/png', 1.0)
       })
 
-      // 2단계: dataURL을 Blob으로 변환
-      const response = await fetch(dataURL)
-      const blob = await response.blob()
-
-      // 3단계: FormData 생성하여 이미지 서버에 업로드
+      // 10. FormData로 이미지 서버에 업로드
       const formData = new FormData()
       formData.append('file', blob, 'edited-image.png')
-
-      console.log('📤 Uploading edited image to image server...')
-      const uploadResponse = await fetch('https://image.nearzoom.store/upload', {
-        method: 'POST',
-        body: formData,
+      
+      // 이미지 서버에 업로드 (기존 프로필 이미지 업로드와 동일한 방식)
+      const uploadResponse = await api.post(
+        'https://image.nearzoom.store/upload',
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          withCredentials: false,
+        }
+      )
+      
+      const uploadedImageUrl = uploadResponse.data?.data?.file_url
+      if (!uploadedImageUrl) {
+        throw new Error('이미지 URL을 받아올 수 없습니다.')
+      }
+      
+      // 11. 백엔드에 편집본 저장 요청
+      console.log('백엔드 저장 요청 데이터:', {
+        imgUrl: uploadedImageUrl,
+        originalPhotoId: parseInt(imageId!)
       })
-
-      if (!uploadResponse.ok) {
-        throw new Error(`이미지 업로드 실패: ${uploadResponse.status} ${uploadResponse.statusText}`)
-      }
-
-      const uploadResult = await uploadResponse.json()
-      const imageUrl = uploadResult?.data?.file_url || uploadResult?.url || uploadResult?.imageUrl
-
-      if (!imageUrl) {
-        throw new Error('업로드된 이미지 URL을 받아올 수 없습니다.')
-      }
-
-      console.log('✅ Image uploaded successfully:', imageUrl)
-
-      // 4단계: 백엔드에 편집본 저장 요청 (myroomService 사용)
-      console.log('📤 Saving edited photo to backend...')
+      
       await myroomService.saveEditedPhoto({
-        photoId: parseInt(imageId!)
+        imageUrl: uploadedImageUrl,
+        originalPhotoId: parseInt(imageId!)
       })
-
-      console.log('✅ Successfully saved edited photo to backend')
-
-      // 저장 성공 알림
+      
+      // 12. 저장 성공 알림
       alert('이미지가 성공적으로 저장되었습니다!')
 
-      // 저장 후 이전 페이지로 돌아가기
+      // 13. 저장 후 이전 페이지로 돌아가기
       const currentUrl = new URL(window.location.href)
       const returnUrl = currentUrl.searchParams.get('returnUrl') || '/'
       router.push(returnUrl)
 
     } catch (error) {
+      // 자세한 에러 로깅
       console.error('❌ Failed to save image:', error)
-      alert(`이미지 저장에 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
+      console.error('❌ Error type:', typeof error)
+      console.error('❌ Error constructor:', error?.constructor?.name)
+      
+      // 에러 객체의 모든 속성 로깅
+      if (error && typeof error === 'object') {
+        console.error('❌ Error properties:', Object.keys(error))
+        console.error('❌ Error values:', Object.values(error))
+        
+        // Error 객체의 속성들 안전하게 접근
+        const errorObj = error as any
+        if (errorObj.message) {
+          console.error('❌ Error message:', errorObj.message)
+        }
+        if (errorObj.stack) {
+          console.error('❌ Error stack:', errorObj.stack)
+        }
+      }
+      
+      // 사용자에게 명확한 에러 메시지 표시
+      let errorMessage = '이미지 저장에 실패했습니다.'
+      
+      if (error instanceof Error) {
+        errorMessage += `\n\n오류 내용: ${error.message}`
+      } else if (typeof error === 'string') {
+        errorMessage += `\n\n오류 내용: ${error}`
+      } else if (error && typeof error === 'object') {
+        // API 응답 에러인 경우
+        if ('response' in error && error.response) {
+          const response = error.response as any
+          errorMessage += `\n\nHTTP 상태: ${response.status}`
+          if (response.data) {
+            errorMessage += `\n\n서버 응답: ${JSON.stringify(response.data)}`
+          }
+        } else if ('request' in error) {
+          errorMessage += '\n\n네트워크 요청 실패'
+        } else {
+          errorMessage += `\n\n알 수 없는 오류: ${JSON.stringify(error)}`
+        }
+      }
+      
+      alert(errorMessage)
     }
   }
 

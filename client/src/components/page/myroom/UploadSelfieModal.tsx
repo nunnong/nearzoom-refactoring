@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { X, Edit } from 'lucide-react'
 import api from '@/lib/axios'
+import { API_ENDPOINTS } from '@/constants/api'
 
 interface UploadSelfieModalProps {
   isOpen: boolean
@@ -30,29 +31,27 @@ export default function UploadSelfieModal({
   const fetchUserProfile = async () => {
     try {
       const response = await api.get('/user/userInfo')
-      console.log('🔍 API 응답 전체:', response.data) // 디버깅용
+      console.log('API 응답 전체:', response.data)
       
       const profile = response.data.data
-      console.log('🔍 프로필 데이터:', profile) // 디버깅용
       
-      // pretty_face 필드 확인
-      const faceImageUrl = profile.prettyFaceUrl || profile.faceImageUrl || profile.pretty_face
-      console.log('🔍 모든 프로필 키:', Object.keys(profile)) // 디버깅용
-      console.log('🔍 prettyFaceUrl:', profile.prettyFaceUrl) // 디버깅용
-      console.log('🔍 pretty_face:', profile.pretty_face) // 디버깅용
-      console.log('🔍 찾은 이미지 URL:', faceImageUrl) // 디버깅용
+      // faceImageUrl 필드 확인 (통일)
+      const faceImageUrl = profile.faceImageUrl
+      console.log('모든 프로필 키:', Object.keys(profile)) // 디버깅용
+      console.log('faceImageUrl:', profile.faceImageUrl) // 디버깅용
+      console.log('찾은 이미지 URL:', faceImageUrl) // 디버깅용
       
       if (faceImageUrl) {
         setCurrentReferenceImage(faceImageUrl)
         setHasExistingImage(true)
-        console.log('✅ 기존 이미지 발견:', faceImageUrl)
+        console.log('기존 이미지 발견:', faceImageUrl)
       } else {
         setCurrentReferenceImage(null)
         setHasExistingImage(false)
-        console.log('❌ 기존 이미지 없음')
+        console.log('기존 이미지 없음')
       }
     } catch (error) {
-      console.error('❌ 사용자 프로필 가져오기 실패:', error)
+      console.error('사용자 프로필 가져오기 실패:', error)
     }
   }
 
@@ -95,13 +94,13 @@ export default function UploadSelfieModal({
       const imageUrl = uploadResponse.data?.data?.file_url
       if (!imageUrl) throw new Error('이미지 URL을 받아올 수 없습니다.')
 
-      console.log('📤 이미지 저장 요청:', imageUrl)
+      console.log('이미지 저장 요청:', imageUrl)
 
-      await api.put('/user/save-face-image', null, {
-        params: { prettyFaceUrl: imageUrl }
+      await api.put(API_ENDPOINTS.SAVE_FACE_IMAGE, null, {
+        params: { faceImageUrl: imageUrl }
       })
 
-      console.log('✅ 이미지 저장 완료')
+      console.log('이미지 저장 완료')
 
       setCurrentReferenceImage(imageUrl)
       setHasExistingImage(true)
@@ -111,8 +110,15 @@ export default function UploadSelfieModal({
       onClose()
       
     } catch (error: any) {
-      console.error('❌ 프로필 이미지 저장 실패:', error)
-      alert('프로필 이미지 저장에 실패했습니다.')
+      console.error('프로필 이미지 저장 실패:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        error
+      })
+      
+      const errorMessage = error?.response?.data?.message || error?.message || '알 수 없는 오류가 발생했습니다.'
+      alert(`참조 이미지 저장에 실패했습니다: ${errorMessage}`)
     } finally {
       setIsUploading(false)
     }
@@ -125,7 +131,6 @@ export default function UploadSelfieModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
       <div className="mx-4 w-96 max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl relative">
-        {/* X 버튼을 우측 상단에 절대 위치로 배치 */}
         <button 
           onClick={onClose} 
           className="absolute top-4 right-4 z-10 p-2 hover:bg-gray-100 rounded-full transition-colors"

@@ -46,12 +46,11 @@ export const useAuth = () => {
     setTokens({ accessToken })
   }
 
-  // 🔥 팀원의 간단한 fetchUserInfo 사용
   const fetchUserInfo = async () => {
     try {
       setLoading(true)
       const response = await userService.getUserInfo()
-      
+
       const rawData = response
       const userData = userTransformer.fromBackend(rawData)
       setUser(userData)
@@ -113,27 +112,31 @@ export const useAuth = () => {
 
     try {
       console.log('방 생성 시작...')
-      
+
       // 즉시 방 생성 API 호출
       const roomData = await roomAPI.createRoom()
-      
+
       console.log('방 생성 성공:', roomData)
-      
+
       // ✅ 수정: 이미 최상위에서 가져온 함수들 사용
       setRoomData(roomData)
       setIsHost(true)
-      
+
       // 생성된 방으로 이동
       const roomUrl = `/room/${roomData.roomId}?isHost=true&skipJoin=true`
       router.push(roomUrl)
-      
     } catch (error) {
       console.error('방 생성 실패:', error)
-      
+
       // 인증 관련 에러 처리
-      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류'
-      
-      if (errorMessage.includes('인증') || errorMessage.includes('로그인') || errorMessage.includes('토큰')) {
+      const errorMessage =
+        error instanceof Error ? error.message : '알 수 없는 오류'
+
+      if (
+        errorMessage.includes('인증') ||
+        errorMessage.includes('로그인') ||
+        errorMessage.includes('토큰')
+      ) {
         // 인증 에러인 경우 로그인 페이지로 이동
         alert('로그인이 필요합니다.')
         router.push('/login')
@@ -149,10 +152,10 @@ export const useAuth = () => {
   const handleDeleteAccount = async () => {
     try {
       await userService.deleteUser()
-      
+
       // 백엔드에서 세션/쿠키 정리가 완료된 후 클라이언트 토큰도 즉시 제거
       clearTokens()
-      
+
       // 카카오 로그아웃 (소셜 로그인 세션 제거)
       if (typeof window !== 'undefined' && window.Kakao?.Auth) {
         try {
@@ -161,7 +164,7 @@ export const useAuth = () => {
           console.warn('카카오 로그아웃 실패:', kakaoError)
         }
       }
-      
+
       // 구글 로그아웃
       if (typeof window !== 'undefined' && window.google?.accounts) {
         try {
@@ -170,7 +173,7 @@ export const useAuth = () => {
           console.warn('구글 로그아웃 실패:', googleError)
         }
       }
-      
+
       // router 대신 window.location으로 강제 새로고침하여 모든 상태 초기화
       if (typeof window !== 'undefined') {
         window.location.href = '/'
@@ -180,7 +183,7 @@ export const useAuth = () => {
         message: error?.message,
         status: error?.status,
         response: error?.response?.data,
-        error: error
+        error: error,
       })
       throw error
     }

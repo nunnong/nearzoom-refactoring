@@ -212,7 +212,9 @@ const togglePostLike = async (postId: number, currentlyLiked: boolean): Promise<
 // 🚀 메인 타임라인 훅 (백엔드 커서 기반 무한스크롤)
 // ============================================================================
 
-export const useTimeline = (options: UseTimelineOptions = {}): UseTimelineReturn => {
+export const useTimeline = (
+  options: UseTimelineOptions = {}
+): UseTimelineReturn => {
   const {
     type = 'timeline',
     limit,
