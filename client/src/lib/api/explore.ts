@@ -1,25 +1,155 @@
-// src/lib/api/explore.ts - 백엔드 연동 수정 버전
+// src/lib/api/explore.ts - 완전한 백엔드 연동 버전
+// 🔥 아키텍처 원칙: 로그인 필수 + 커서 기반 무한스크롤 + axios 인터셉터 위임
 
-import api from '@/lib/axios'
-import { useAuthStore } from '@/stores/authStore'
+import api from '@/lib/axios' // 인터셉터가 모든 인증 처리
 import {
   PostResponse,
+  PostListResponse,
   PostDetailResponse,
   FeedWithPostsResponse,
+  FeedSearchResponse,
   UserProfileResponse,
   ApiResponse,
   API_ENDPOINTS,
+  CursorPaginationParams,
+  buildPaginationQuery,
+  buildSearchQuery,
   formatTimeAgo,
   formatLikeCount,
 } from '@/lib/types/feed'
 
 // ============================================================================
-// 🎯 간소화된 타입 정의들 (백엔드 중심)
+// 🎯 백엔드 연동 타입들 (Long 타입 처리)
 // ============================================================================
 
-// ✅ 탐색 게시물 (백엔드 PostResponse 기반)
+type Long = number | string
+
+// 백엔드 실제 응답 타입들
+interface BackendPostResponse {
+  postId: Long
+  photoId: Long
+  imgUrl: string
+  caption: string | null
+  displayOrder: Long | null
+  createdAt: string
+  likeCount: Long
+  isLikedByMe: boolean
+  authorId: Long
+  authorAccountName: string
+  authorProfileImage: string | null
+}
+
+interface BackendPostListResponse {
+  posts: BackendPostResponse[]
+  hasNext: boolean
+  nextCursor: Long | null
+}
+
+interface BackendFeedWithPostsResponse {
+  feedId: Long
+  userId: Long
+  accountName: string
+  profileImage: string | null
+  createdAt: string
+  posts: BackendPostResponse[]
+  isFollowing: boolean
+  hasNext: boolean
+  nextCursor: Long | null
+}
+
+interface BackendFeedSearchResponse {
+  feeds: BackendFeedWithPostsResponse[]
+  hasNext: boolean
+  nextCursor: Long | null
+}
+
+interface BackendPostDetailResponse {
+  postId: Long
+  photoId: Long
+  imgUrl: string
+  caption: string | null
+  createdAt: string
+  likeCount: Long
+  isLikedByMe: boolean
+  authorId: Long
+  authorAccountName: string
+  authorProfileImage: string | null
+  authorFeedId: Long
+  isMyPost: boolean
+  isFollowingAuthor: boolean
+}
+
+interface BackendFollowCountsResponse {
+  followerCount: Long
+  followingCount: Long
+}
+
+// ============================================================================
+// 🔧 타입 변환 함수들 (Long → number)
+// ============================================================================
+
+const convertBackendPost = (backendPost: BackendPostResponse): PostResponse => {
+  return {
+    postId: Number(backendPost.postId),
+    photoId: Number(backendPost.photoId),
+    imgUrl: backendPost.imgUrl,
+    caption: backendPost.caption,
+    displayOrder: backendPost.displayOrder ? Number(backendPost.displayOrder) : null,
+    createdAt: backendPost.createdAt,
+    likeCount: Number(backendPost.likeCount),
+    isLikedByMe: backendPost.isLikedByMe,
+    authorId: Number(backendPost.authorId),
+    authorAccountName: backendPost.authorAccountName,
+    authorProfileImage: backendPost.authorProfileImage
+  }
+}
+
+const convertBackendPostList = (backendPostList: BackendPostListResponse): PostListResponse => {
+  return {
+    posts: backendPostList.posts.map(convertBackendPost),
+    hasNext: backendPostList.hasNext,
+    nextCursor: backendPostList.nextCursor ? Number(backendPostList.nextCursor) : null
+  }
+}
+
+const convertBackendFeed = (backendFeed: BackendFeedWithPostsResponse): FeedWithPostsResponse => {
+  return {
+    feedId: Number(backendFeed.feedId),
+    userId: Number(backendFeed.userId),
+    accountName: backendFeed.accountName,
+    profileImage: backendFeed.profileImage,
+    createdAt: backendFeed.createdAt,
+    posts: backendFeed.posts.map(convertBackendPost),
+    isFollowing: backendFeed.isFollowing,
+    hasNext: backendFeed.hasNext,
+    nextCursor: backendFeed.nextCursor ? Number(backendFeed.nextCursor) : null
+  }
+}
+
+const convertBackendPostDetail = (backendDetail: BackendPostDetailResponse): PostDetailResponse => {
+  return {
+    postId: Number(backendDetail.postId),
+    photoId: Number(backendDetail.photoId),
+    imgUrl: backendDetail.imgUrl,
+    caption: backendDetail.caption,
+    createdAt: backendDetail.createdAt,
+    likeCount: Number(backendDetail.likeCount),
+    isLikedByMe: backendDetail.isLikedByMe,
+    authorId: Number(backendDetail.authorId),
+    authorAccountName: backendDetail.authorAccountName,
+    authorProfileImage: backendDetail.authorProfileImage,
+    authorFeedId: Number(backendDetail.authorFeedId),
+    isMyPost: backendDetail.isMyPost,
+    isFollowingAuthor: backendDetail.isFollowingAuthor
+  }
+}
+
+// ============================================================================
+// 🎯 UI 타입 정의들
+// ============================================================================
+
 export interface ExplorePost {
-  // 백엔드 PostResponse 필드들
+  // 기본 PostResponse 필드들
   postId: number
   photoId: number
   imgUrl: string
@@ -37,11 +167,17 @@ export interface ExplorePost {
   discoverScore?: number
   
   // UI 편의 필드들
-  timeAgo?: string
-  formattedLikeCount?: string
+  timeAgo: string
+  formattedLikeCount: string
+  isLoading?: boolean
 }
 
-// ✅ 사용자 프로필 (백엔드 UserProfileResponse + 추가 정보)
+export interface ExplorePostsResult {
+  posts: ExplorePost[]
+  hasNext: boolean
+  nextCursor: number | null
+}
+
 export interface UserProfile {
   userId: number
   accountName: string
@@ -58,63 +194,49 @@ export interface UserProfile {
   isMe?: boolean
 }
 
-// ✅ 검색 결과
 export interface SearchResult {
   users: UserProfile[]
   feeds: FeedWithPostsResponse[]
   exactMatch?: UserProfile
-  hasMore: boolean
+  hasNext: boolean
+  nextCursor: number | null
   total: number
 }
 
-// ✅ 탐색 필터
-export interface ExploreFilters {
-  size?: number
-  query?: string
-}
-
 // ============================================================================
-// 🔥 유틸리티 함수들 - 수정
+// 🔧 유틸리티 함수들
 // ============================================================================
 
-// 🔧 수정: 인증 상태 체크 (클라이언트 사이드에서만 실행)
-const checkAuthState = (): boolean => {
-  if (typeof window === 'undefined') return false
-  
-  const authState = useAuthStore.getState()
-  const isAuthenticated = authState.isAuthenticated && !!authState.accessToken
-  
-  console.log('인증 상태 체크:', {
-    isAuthenticated: authState.isAuthenticated,
-    hasToken: !!authState.accessToken,
-    result: isAuthenticated
-  })
-  
-  return isAuthenticated
-}
-
-// 🔧 수정: 백엔드 실제 에러 응답 구조에 맞춘 에러 처리
+/**
+ * 🔥 통일된 에러 처리 (백엔드 ApiResponse 구조 기반)
+ */
 const handleApiError = (error: unknown): string => {
   if (error && typeof error === 'object' && 'response' in error) {
     const axiosError = error as any
     
-    // 🔥 백엔드 ApiResponse 구조: { error: boolean, message: string, data: null }
+    // 백엔드 ApiResponse.message 우선
     if (axiosError.response?.data?.message) {
       return axiosError.response.data.message
     }
     
-    // HTTP 상태코드 기반 처리 (백엔드 실제 응답)
+    // HTTP 상태코드 기반 폴백
     switch (axiosError.response?.status) {
       case 401:
-        return '토큰이 만료되었거나 인증에 실패했습니다.'
+        return '인증이 필요합니다. 다시 로그인해주세요.'
       case 403:
         return '접근 권한이 없습니다.'
       case 404:
         return '요청한 리소스를 찾을 수 없습니다.'
       case 409:
         return '이미 처리된 요청입니다.'
+      case 429:
+        return '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.'
       case 500:
         return '서버 오류가 발생했습니다.'
+      case 502:
+      case 503:
+      case 504:
+        return '서버가 일시적으로 응답하지 않습니다.'
       default:
         return '네트워크 오류가 발생했습니다.'
     }
@@ -127,7 +249,9 @@ const handleApiError = (error: unknown): string => {
   return '알 수 없는 오류가 발생했습니다.'
 }
 
-// 발견 점수 계산
+/**
+ * 발견 점수 계산 (탐색 알고리즘)
+ */
 const calculateDiscoverScore = (post: PostResponse, source: ExplorePost['source']): number => {
   const likes = post.likeCount || 0
   const ageInHours = (Date.now() - new Date(post.createdAt).getTime()) / (1000 * 60 * 60)
@@ -136,13 +260,18 @@ const calculateDiscoverScore = (post: PostResponse, source: ExplorePost['source'
 
   switch (source) {
     case 'timeline':
+      // 시간 기반 점수 (최신일수록 높음)
       if (ageInHours < 1) score = 100
       else if (ageInHours < 6) score = 80
       else if (ageInHours < 24) score = 60
-      else score = 30
+      else if (ageInHours < 72) score = 40
+      else score = 20
       break
     case 'explore':
-      score = Math.min(100, likes * 2 + (likes > 10 ? 20 : 0))
+      // 인기도 기반 점수 (좋아요 수 + 시간 가중치)
+      const baseScore = Math.min(80, likes * 2)
+      const timeWeight = ageInHours < 24 ? 20 : ageInHours < 72 ? 10 : 0
+      score = baseScore + timeWeight + (likes > 10 ? 10 : 0)
       break
     default:
       score = 50
@@ -151,11 +280,9 @@ const calculateDiscoverScore = (post: PostResponse, source: ExplorePost['source'
   return Math.max(0, Math.min(100, score))
 }
 
-// ============================================================================
-// 🔥 변환 함수들
-// ============================================================================
-
-// 백엔드 PostResponse를 ExplorePost로 변환
+/**
+ * PostResponse를 ExplorePost로 변환
+ */
 const transformPostToExplorePost = (
   post: PostResponse,
   source: ExplorePost['source'] = 'explore'
@@ -166,53 +293,78 @@ const transformPostToExplorePost = (
     discoverScore: calculateDiscoverScore(post, source),
     timeAgo: formatTimeAgo(post.createdAt),
     formattedLikeCount: formatLikeCount(post.likeCount),
+    isLoading: false,
   }
 }
 
-// 🔧 수정: 백엔드 FeedWithPostsResponse에서 UserProfile 추출
-const extractUserProfileFromFeed = (
-  feed: FeedWithPostsResponse,
-  currentUserId?: number
-): UserProfile => {
+/**
+ * PostListResponse를 ExplorePostsResult로 변환
+ */
+const transformPostListToExploreResult = (
+  postListResponse: PostListResponse,
+  source: ExplorePost['source'] = 'explore'
+): ExplorePostsResult => {
+  const posts = postListResponse.posts.map(post => 
+    transformPostToExplorePost(post, source)
+  )
+  
+  // 발견 점수에 따라 정렬 (높은 순)
+  posts.sort((a, b) => (b.discoverScore || 0) - (a.discoverScore || 0))
+  
+  return {
+    posts,
+    hasNext: postListResponse.hasNext,
+    nextCursor: postListResponse.nextCursor
+  }
+}
+
+/**
+ * FeedWithPostsResponse에서 UserProfile 추출
+ */
+const extractUserProfileFromFeed = (feed: FeedWithPostsResponse): UserProfile => {
   return {
     userId: feed.userId,
     accountName: feed.accountName,
-    userName: feed.accountName, // 🔥 백엔드에서 userName 필드가 없으므로 accountName 사용
-    userEmail: '', // 🔥 백엔드 FeedWithPostsResponse에 userEmail 없음
+    userName: feed.accountName, // 백엔드에서 userName 별도 필드 없음
+    userEmail: '', // 백엔드에서 제공되지 않음
     profileImage: feed.profileImage,
-    prettyFace: null, // 🔥 백엔드 FeedWithPostsResponse에 prettyFace 없음
+    prettyFace: null, // 백엔드에서 제공되지 않음
     postsCount: feed.posts.length,
-    followersCount: 0, // 🔥 별도 API 호출 필요 (GET /follows/count/{accountName})
-    followingCount: 0, // 🔥 별도 API 호출 필요 (GET /follows/count/{accountName})
+    followersCount: 0, // 별도 API 호출 필요
+    followingCount: 0, // 별도 API 호출 필요
     isFollowing: feed.isFollowing,
-    isMe: currentUserId ? feed.userId === currentUserId : false,
+    isMe: false, // 별도 로직으로 계산
   }
 }
 
 // ============================================================================
-// 🔥 메인 API 함수들 - 백엔드 실제 응답 구조에 맞춰 수정
+// 🔥 메인 API 함수들 - 커서 기반 무한 스크롤
 // ============================================================================
 
-// ✅ 랜덤 게시물 조회 (Explore) - 백엔드 GET /feeds/explore
+/**
+ * ✅ Explore 게시물 조회 (백엔드 GET /feeds/explore)
+ * 🔐 인증 필수 - axios 인터셉터가 자동 처리
+ */
 export const getExploreFeeds = async (
-  size: number = 20
+  params: CursorPaginationParams = { limit: 20 }
 ): Promise<{
   success: boolean
-  data?: { posts: ExplorePost[]; hasMore: boolean }
+  data?: ExplorePostsResult
   error?: string
 }> => {
   try {
-    // 🔥 인증 체크 제거 - 인터셉터에서 자동 처리
-    console.log('Explore 게시물 조회 시작...', { size })
+    console.log('🔥 Explore 게시물 조회 API 호출:', params)
 
-    // 🔥 수정: 백엔드 실제 응답 구조에 맞춤
-    const response = await api.get<ApiResponse<PostResponse[]>>(
-      `${API_ENDPOINTS.EXPLORE}?size=${size}`
-    )
+    // URL 파라미터 생성
+    const queryString = buildPaginationQuery(params)
+    const url = queryString ? `${API_ENDPOINTS.EXPLORE}?${queryString}` : API_ENDPOINTS.EXPLORE
+
+    // 🔐 인증은 axios 인터셉터가 자동 처리 (토큰 첨부 + 자동 갱신)
+    const response = await api.get<ApiResponse<BackendPostListResponse>>(url)
 
     console.log('Explore 응답:', response.data)
 
-    // 🔥 수정: 백엔드 ApiResponse 구조 체크
+    // 백엔드 ApiResponse 구조 체크
     if (response.data.error) {
       return {
         success: false,
@@ -220,29 +372,21 @@ export const getExploreFeeds = async (
       }
     }
 
-    // 🔥 수정: data가 null일 수 있음 처리
-    const postsData = response.data.data || []
-    
-    if (!Array.isArray(postsData)) {
+    const backendData = response.data.data
+    if (!backendData) {
       return {
         success: false,
-        error: '잘못된 응답 형식입니다.',
+        error: '게시물 데이터가 없습니다.',
       }
     }
 
-    const posts: ExplorePost[] = postsData.map(post => 
-      transformPostToExplorePost(post, 'explore')
-    )
-
-    // 발견 점수에 따라 정렬
-    posts.sort((a, b) => (b.discoverScore || 0) - (a.discoverScore || 0))
+    // 백엔드 타입 → 프론트엔드 타입 변환
+    const convertedPostList = convertBackendPostList(backendData)
+    const result = transformPostListToExploreResult(convertedPostList, 'explore')
 
     return {
       success: true,
-      data: {
-        posts,
-        hasMore: postsData.length >= size, // size만큼 받았으면 더 있을 가능성
-      },
+      data: result,
     }
   } catch (error) {
     console.error('Failed to get explore feeds:', error)
@@ -253,25 +397,28 @@ export const getExploreFeeds = async (
   }
 }
 
-// ✅ 타임라인 게시물 조회 (팔로잉) - 백엔드 GET /feeds/timeline
+/**
+ * ✅ 타임라인 게시물 조회 (백엔드 GET /feeds/timeline)
+ * 🔐 인증 필수 - 팔로잉한 사용자들의 게시물만
+ */
 export const getTimelineFeeds = async (
-  size: number = 20
+  params: CursorPaginationParams = { limit: 20 }
 ): Promise<{
   success: boolean
-  data?: { posts: ExplorePost[]; hasMore: boolean }
+  data?: ExplorePostsResult
   error?: string
 }> => {
   try {
-    console.log('Timeline 게시물 조회 시작...', { size })
+    console.log('🔥 Timeline 게시물 조회 API 호출:', params)
 
-    // 🔥 수정: 백엔드 실제 응답 구조에 맞춤
-    const response = await api.get<ApiResponse<PostResponse[]>>(
-      `${API_ENDPOINTS.TIMELINE}?size=${size}`
-    )
+    const queryString = buildPaginationQuery(params)
+    const url = queryString ? `${API_ENDPOINTS.TIMELINE}?${queryString}` : API_ENDPOINTS.TIMELINE
+
+    // 🔐 인증은 axios 인터셉터가 자동 처리
+    const response = await api.get<ApiResponse<BackendPostListResponse>>(url)
 
     console.log('Timeline 응답:', response.data)
 
-    // 🔥 수정: 백엔드 ApiResponse 구조 체크
     if (response.data.error) {
       return {
         success: false,
@@ -279,25 +426,20 @@ export const getTimelineFeeds = async (
       }
     }
 
-    const postsData = response.data.data || []
-    
-    if (!Array.isArray(postsData)) {
+    const backendData = response.data.data
+    if (!backendData) {
       return {
         success: false,
-        error: '잘못된 응답 형식입니다.',
+        error: '타임라인 데이터가 없습니다.',
       }
     }
 
-    const posts: ExplorePost[] = postsData.map(post => 
-      transformPostToExplorePost(post, 'timeline')
-    )
+    const convertedPostList = convertBackendPostList(backendData)
+    const result = transformPostListToExploreResult(convertedPostList, 'timeline')
 
     return {
       success: true,
-      data: {
-        posts,
-        hasMore: postsData.length >= size,
-      },
+      data: result,
     }
   } catch (error) {
     console.error('Failed to get timeline feeds:', error)
@@ -308,10 +450,13 @@ export const getTimelineFeeds = async (
   }
 }
 
-// ✅ 피드/사용자 검색 - 백엔드 GET /feeds/search
+/**
+ * ✅ 피드/사용자 검색 (백엔드 GET /feeds/search)
+ * 🔐 인증 필수
+ */
 export const searchFeeds = async (
   query: string,
-  size: number = 10
+  params: CursorPaginationParams = { limit: 10 }
 ): Promise<{
   success: boolean
   data?: SearchResult
@@ -324,22 +469,24 @@ export const searchFeeds = async (
         data: {
           users: [],
           feeds: [],
-          hasMore: false,
+          hasNext: false,
+          nextCursor: null,
           total: 0,
         },
       }
     }
 
-    console.log('피드 검색 시작:', query)
+    console.log('🔥 피드 검색 API 호출:', { query, params })
 
-    // 🔥 수정: 백엔드 실제 엔드포인트와 파라미터
-    const response = await api.get<ApiResponse<FeedWithPostsResponse[]>>(
-      `${API_ENDPOINTS.SEARCH_FEEDS}?query=${encodeURIComponent(query.trim())}&size=${size}`
-    )
+    const searchParams = { query: query.trim(), ...params }
+    const queryString = buildSearchQuery(searchParams)
+    const url = `${API_ENDPOINTS.SEARCH_FEEDS}?${queryString}`
+
+    // 🔐 인증은 axios 인터셉터가 자동 처리
+    const response = await api.get<ApiResponse<BackendFeedSearchResponse>>(url)
 
     console.log('검색 응답:', response.data)
 
-    // 🔥 수정: 백엔드 ApiResponse 구조 체크
     if (response.data.error) {
       return {
         success: false,
@@ -347,31 +494,23 @@ export const searchFeeds = async (
       }
     }
 
-    const feeds = response.data.data || []
-    
-    if (!Array.isArray(feeds)) {
+    const backendData = response.data.data
+    if (!backendData) {
       return {
         success: false,
-        error: '잘못된 응답 형식입니다.',
+        error: '검색 결과가 없습니다.',
       }
     }
 
-    // 🔥 수정: 현재 사용자 ID 가져오기 (인증된 상태에서)
-    let currentUserId: number | undefined
-    try {
-      const authState = useAuthStore.getState()
-      // authState에서 userId를 가져올 수 있다면 사용
-      // 없다면 별도 API 호출로 현재 사용자 정보 조회 필요
-    } catch (error) {
-      console.warn('현재 사용자 ID를 가져올 수 없습니다:', error)
-    }
+    // 백엔드 피드 목록을 프론트엔드 타입으로 변환
+    const convertedFeeds = backendData.feeds.map(convertBackendFeed)
     
     // 피드에서 사용자 정보 추출 (중복 제거)
     const usersMap = new Map<string, UserProfile>()
     
-    feeds.forEach(feed => {
+    convertedFeeds.forEach(feed => {
       if (!usersMap.has(feed.accountName)) {
-        const userProfile = extractUserProfileFromFeed(feed, currentUserId)
+        const userProfile = extractUserProfileFromFeed(feed)
         usersMap.set(feed.accountName, userProfile)
       }
     })
@@ -401,10 +540,11 @@ export const searchFeeds = async (
       success: true,
       data: {
         users: sortedUsers,
-        feeds,
+        feeds: convertedFeeds,
         exactMatch,
-        hasMore: feeds.length >= size,
-        total: sortedUsers.length + feeds.length,
+        hasNext: backendData.hasNext,
+        nextCursor: backendData.nextCursor ? Number(backendData.nextCursor) : null,
+        total: sortedUsers.length + convertedFeeds.length,
       },
     }
   } catch (error) {
@@ -416,25 +556,30 @@ export const searchFeeds = async (
   }
 }
 
-// ✅ 사용자 피드 조회 (계정명 기반) - 백엔드 GET /feeds/users/account/{accountName}
+/**
+ * ✅ 사용자 피드 조회 (백엔드 GET /feeds/users/account/{accountName})
+ * 🔐 인증 필수
+ */
 export const getUserFeedByAccountName = async (
-  accountName: string
+  accountName: string,
+  params: CursorPaginationParams = { limit: 20 }
 ): Promise<{
   success: boolean
   data?: FeedWithPostsResponse
   error?: string
 }> => {
   try {
-    console.log('사용자 피드 조회 시작:', accountName)
+    console.log('🔥 사용자 피드 조회 API 호출:', { accountName, params })
 
-    // 🔥 수정: 백엔드 실제 엔드포인트
-    const response = await api.get<ApiResponse<FeedWithPostsResponse>>(
-      API_ENDPOINTS.USER_FEED_BY_ACCOUNT(accountName)
-    )
+    const queryString = buildPaginationQuery(params)
+    const baseUrl = API_ENDPOINTS.USER_FEED_BY_ACCOUNT(accountName)
+    const url = queryString ? `${baseUrl}?${queryString}` : baseUrl
+
+    // 🔐 인증은 axios 인터셉터가 자동 처리
+    const response = await api.get<ApiResponse<BackendFeedWithPostsResponse>>(url)
 
     console.log('사용자 피드 응답:', response.data)
 
-    // 🔥 수정: 백엔드 ApiResponse 구조 체크
     if (response.data.error) {
       return {
         success: false,
@@ -442,16 +587,19 @@ export const getUserFeedByAccountName = async (
       }
     }
 
-    if (!response.data.data) {
+    const backendData = response.data.data
+    if (!backendData) {
       return {
         success: false,
         error: '피드 데이터가 없습니다.',
       }
     }
 
+    const convertedFeed = convertBackendFeed(backendData)
+
     return {
       success: true,
-      data: response.data.data,
+      data: convertedFeed,
     }
   } catch (error) {
     console.error('Failed to get user feed:', error)
@@ -462,7 +610,10 @@ export const getUserFeedByAccountName = async (
   }
 }
 
-// ✅ 게시물 상세 조회 - 백엔드 GET /feeds/posts/{postId}
+/**
+ * ✅ 게시물 상세 조회 (백엔드 GET /feeds/posts/{postId})
+ * 🔐 인증 필수
+ */
 export const getPostDetail = async (
   postId: number
 ): Promise<{
@@ -471,15 +622,15 @@ export const getPostDetail = async (
   error?: string
 }> => {
   try {
-    console.log('게시물 상세 조회 시작:', postId)
+    console.log('🔥 게시물 상세 조회 API 호출:', postId)
 
-    const response = await api.get<ApiResponse<PostDetailResponse>>(
+    // 🔐 인증은 axios 인터셉터가 자동 처리
+    const response = await api.get<ApiResponse<BackendPostDetailResponse>>(
       API_ENDPOINTS.POST_DETAIL(postId)
     )
 
     console.log('게시물 상세 응답:', response.data)
 
-    // 🔥 수정: 백엔드 ApiResponse 구조 체크
     if (response.data.error) {
       return {
         success: false,
@@ -487,16 +638,19 @@ export const getPostDetail = async (
       }
     }
 
-    if (!response.data.data) {
+    const backendData = response.data.data
+    if (!backendData) {
       return {
         success: false,
         error: '게시물 데이터가 없습니다.',
       }
     }
 
+    const convertedDetail = convertBackendPostDetail(backendData)
+
     return {
       success: true,
-      data: response.data.data,
+      data: convertedDetail,
     }
   } catch (error) {
     console.error('Failed to get post detail:', error)
@@ -507,7 +661,14 @@ export const getPostDetail = async (
   }
 }
 
-// ✅ 게시물 좋아요 토글 - 백엔드 POST/DELETE /likes/posts/{postId}
+// ============================================================================
+// 🔥 소셜 기능 API들
+// ============================================================================
+
+/**
+ * ✅ 게시물 좋아요 토글 (백엔드 POST/DELETE /likes/posts/{postId})
+ * 🔐 인증 필수
+ */
 export const togglePostLike = async (
   postId: number,
   isCurrentlyLiked: boolean
@@ -517,17 +678,32 @@ export const togglePostLike = async (
   error?: string
 }> => {
   try {
-    console.log('좋아요 토글:', { postId, isCurrentlyLiked })
+    console.log('🔥 좋아요 토글 API 호출:', { postId, isCurrentlyLiked })
 
-    // 🔥 수정: 백엔드 실제 엔드포인트 사용
-    const endpoint = `/likes/posts/${postId}`
-    
     if (isCurrentlyLiked) {
-      // 좋아요 취소
-      await api.delete<ApiResponse<void>>(endpoint)
+      // 좋아요 취소 (DELETE)
+      const response = await api.delete<ApiResponse<void>>(
+        API_ENDPOINTS.UNLIKE_POST(postId)
+      )
+      
+      if (response.data.error) {
+        return {
+          success: false,
+          error: response.data.message || '좋아요 취소에 실패했습니다.',
+        }
+      }
     } else {
-      // 좋아요
-      await api.post<ApiResponse<void>>(endpoint)
+      // 좋아요 추가 (POST)
+      const response = await api.post<ApiResponse<void>>(
+        API_ENDPOINTS.LIKE_POST(postId)
+      )
+      
+      if (response.data.error) {
+        return {
+          success: false,
+          error: response.data.message || '좋아요에 실패했습니다.',
+        }
+      }
     }
 
     console.log('좋아요 토글 성공')
@@ -547,7 +723,10 @@ export const togglePostLike = async (
   }
 }
 
-// ✅ 사용자 팔로우 토글 - 백엔드 POST/DELETE /follows/{accountName}
+/**
+ * ✅ 사용자 팔로우 토글 (백엔드 POST/DELETE /follows/{accountName})
+ * 🔐 인증 필수
+ */
 export const toggleUserFollow = async (
   accountName: string,
   isCurrentlyFollowing: boolean
@@ -557,17 +736,32 @@ export const toggleUserFollow = async (
   error?: string
 }> => {
   try {
-    console.log('팔로우 토글:', { accountName, isCurrentlyFollowing })
+    console.log('🔥 팔로우 토글 API 호출:', { accountName, isCurrentlyFollowing })
 
-    // 🔥 수정: 백엔드 실제 엔드포인트 사용 (accountName 기반)
-    const endpoint = `/follows/${accountName}`
-    
     if (isCurrentlyFollowing) {
-      // 언팔로우
-      await api.delete<ApiResponse<void>>(endpoint)
+      // 언팔로우 (DELETE)
+      const response = await api.delete<ApiResponse<void>>(
+        API_ENDPOINTS.UNFOLLOW(accountName)
+      )
+      
+      if (response.data.error) {
+        return {
+          success: false,
+          error: response.data.message || '언팔로우에 실패했습니다.',
+        }
+      }
     } else {
-      // 팔로우
-      await api.post<ApiResponse<void>>(endpoint)
+      // 팔로우 (POST)
+      const response = await api.post<ApiResponse<void>>(
+        API_ENDPOINTS.FOLLOW(accountName)
+      )
+      
+      if (response.data.error) {
+        return {
+          success: false,
+          error: response.data.message || '팔로우에 실패했습니다.',
+        }
+      }
     }
 
     console.log('팔로우 토글 성공')
@@ -587,23 +781,477 @@ export const toggleUserFollow = async (
   }
 }
 
+/**
+ * ✅ 팔로우 수 조회 (백엔드 GET /follows/count/{accountName})
+ * 🔐 인증 필수
+ */
+export const getFollowCounts = async (
+  accountName: string
+): Promise<{
+  success: boolean
+  data?: { followerCount: number; followingCount: number }
+  error?: string
+}> => {
+  try {
+    console.log('🔥 팔로우 수 조회 API 호출:', accountName)
+
+    // 🔐 인증은 axios 인터셉터가 자동 처리
+    const response = await api.get<ApiResponse<BackendFollowCountsResponse>>(
+      API_ENDPOINTS.GET_FOLLOW_COUNTS(accountName)
+    )
+
+    if (response.data.error) {
+      return {
+        success: false,
+        error: response.data.message || '팔로우 수를 불러올 수 없습니다.',
+      }
+    }
+
+    const backendData = response.data.data
+    if (!backendData) {
+      return {
+        success: false,
+        error: '팔로우 수 데이터가 없습니다.',
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        followerCount: Number(backendData.followerCount),
+        followingCount: Number(backendData.followingCount),
+      },
+    }
+  } catch (error) {
+    console.error('Failed to get follow counts:', error)
+    return {
+      success: false,
+      error: handleApiError(error),
+    }
+  }
+}
+
+/**
+ * ✅ 좋아요 수 조회 (백엔드 GET /likes/posts/{postId}/count)
+ * 🔐 인증 필수
+ */
+export const getPostLikeCount = async (
+  postId: number
+): Promise<{
+  success: boolean
+  data?: { count: number }
+  error?: string
+}> => {
+  try {
+    console.log('🔥 좋아요 수 조회 API 호출:', postId)
+
+    // 🔐 인증은 axios 인터셉터가 자동 처리
+    const response = await api.get<ApiResponse<Long>>(
+      API_ENDPOINTS.GET_LIKE_COUNT(postId)
+    )
+
+    if (response.data.error) {
+      return {
+        success: false,
+        error: response.data.message || '좋아요 수를 불러올 수 없습니다.',
+      }
+    }
+
+    const count = response.data.data !== null ? Number(response.data.data) : 0
+
+    return {
+      success: true,
+      data: { count },
+    }
+  } catch (error) {
+    console.error('Failed to get like count:', error)
+    return {
+      success: false,
+      error: handleApiError(error),
+    }
+  }
+}
+
 // ============================================================================
-// 🔄 기존 함수들 (하위 호환성)
+// 🔥 커서 기반 무한 스크롤 헬퍼 함수들
 // ============================================================================
 
-// 기존 getRandomFeeds 함수 (getExploreFeeds로 리다이렉트)
-export const getRandomFeeds = getExploreFeeds
+/**
+ * ✅ Explore 더보기 로딩 (커서 기반)
+ * 🔐 인증 필수 - axios 인터셉터가 자동 처리
+ */
+export const loadMoreExploreFeeds = async (
+  currentPosts: ExplorePost[],
+  limit: number = 20
+): Promise<{
+  success: boolean
+  data?: { posts: ExplorePost[]; hasNext: boolean; nextCursor: number | null }
+  error?: string
+}> => {
+  try {
+    // 마지막 포스트의 ID를 커서로 사용
+    const lastPost = currentPosts[currentPosts.length - 1]
+    const cursor = lastPost?.postId
 
-// 기존 getFollowingFeeds 함수 (getTimelineFeeds로 리다이렉트)
-export const getFollowingFeeds = getTimelineFeeds
+    if (!cursor) {
+      return {
+        success: false,
+        error: '커서를 찾을 수 없습니다.',
+      }
+    }
 
-// 🔧 수정: 기존 searchUsers 함수 (searchFeeds로 리다이렉트, cursor 파라미터 제거)
+    console.log('🔥 Explore 더보기 로딩:', { cursor, limit })
+
+    const result = await getExploreFeeds({ limit, cursor })
+    
+    if (!result.success || !result.data) {
+      return {
+        success: false,
+        error: result.error,
+      }
+    }
+
+    // 중복 제거 (혹시 모를 경우를 대비)
+    const existingIds = new Set(currentPosts.map(post => post.postId))
+    const newPosts = result.data.posts.filter(post => !existingIds.has(post.postId))
+
+    return {
+      success: true,
+      data: {
+        posts: [...currentPosts, ...newPosts],
+        hasNext: result.data.hasNext,
+        nextCursor: result.data.nextCursor,
+      },
+    }
+  } catch (error) {
+    console.error('Failed to load more explore feeds:', error)
+    return {
+      success: false,
+      error: handleApiError(error),
+    }
+  }
+}
+
+/**
+ * ✅ Timeline 더보기 로딩 (커서 기반)
+ * 🔐 인증 필수 - 팔로잉한 사용자들의 게시물만
+ */
+export const loadMoreTimelineFeeds = async (
+  currentPosts: ExplorePost[],
+  limit: number = 20
+): Promise<{
+  success: boolean
+  data?: { posts: ExplorePost[]; hasNext: boolean; nextCursor: number | null }
+  error?: string
+}> => {
+  try {
+    const lastPost = currentPosts[currentPosts.length - 1]
+    const cursor = lastPost?.postId
+
+    if (!cursor) {
+      return {
+        success: false,
+        error: '커서를 찾을 수 없습니다.',
+      }
+    }
+
+    console.log('🔥 Timeline 더보기 로딩:', { cursor, limit })
+
+    const result = await getTimelineFeeds({ limit, cursor })
+    
+    if (!result.success || !result.data) {
+      return {
+        success: false,
+        error: result.error,
+      }
+    }
+
+    // 중복 제거
+    const existingIds = new Set(currentPosts.map(post => post.postId))
+    const newPosts = result.data.posts.filter(post => !existingIds.has(post.postId))
+
+    return {
+      success: true,
+      data: {
+        posts: [...currentPosts, ...newPosts],
+        hasNext: result.data.hasNext,
+        nextCursor: result.data.nextCursor,
+      },
+    }
+  } catch (error) {
+    console.error('Failed to load more timeline feeds:', error)
+    return {
+      success: false,
+      error: handleApiError(error),
+    }
+  }
+}
+
+/**
+ * ✅ 사용자 피드 더보기 로딩 (커서 기반)
+ * 🔐 인증 필수
+ */
+export const loadMoreUserFeedPosts = async (
+  accountName: string,
+  currentFeed: FeedWithPostsResponse,
+  limit: number = 20
+): Promise<{
+  success: boolean
+  data?: FeedWithPostsResponse
+  error?: string
+}> => {
+  try {
+    const lastPost = currentFeed.posts[currentFeed.posts.length - 1]
+    const cursor = lastPost?.postId
+
+    if (!cursor) {
+      return {
+        success: false,
+        error: '커서를 찾을 수 없습니다.',
+      }
+    }
+
+    console.log('🔥 사용자 피드 더보기 로딩:', { accountName, cursor, limit })
+
+    const result = await getUserFeedByAccountName(accountName, { limit, cursor })
+    
+    if (!result.success || !result.data) {
+      return {
+        success: false,
+        error: result.error,
+      }
+    }
+
+    // 기존 포스트와 새 포스트 병합 (중복 제거)
+    const existingIds = new Set(currentFeed.posts.map(post => post.postId))
+    const newPosts = result.data.posts.filter(post => !existingIds.has(post.postId))
+
+    const mergedFeed: FeedWithPostsResponse = {
+      ...currentFeed,
+      posts: [...currentFeed.posts, ...newPosts],
+      hasNext: result.data.hasNext,
+      nextCursor: result.data.nextCursor,
+    }
+
+    return {
+      success: true,
+      data: mergedFeed,
+    }
+  } catch (error) {
+    console.error('Failed to load more user feed posts:', error)
+    return {
+      success: false,
+      error: handleApiError(error),
+    }
+  }
+}
+
+// ============================================================================
+// 🔄 새로고침 함수들 (커서 초기화)
+// ============================================================================
+
+/**
+ * ✅ Explore 새로고침 (처음부터 로드)
+ * 🔐 인증 필수
+ */
+export const refreshExploreFeeds = async (
+  limit: number = 20
+): Promise<{
+  success: boolean
+  data?: ExplorePostsResult
+  error?: string
+}> => {
+  console.log('🔥 Explore 새로고침')
+  return getExploreFeeds({ limit }) // cursor 없이 처음부터 로드
+}
+
+/**
+ * ✅ Timeline 새로고침 (처음부터 로드)
+ * 🔐 인증 필수
+ */
+export const refreshTimelineFeeds = async (
+  limit: number = 20
+): Promise<{
+  success: boolean
+  data?: ExplorePostsResult
+  error?: string
+}> => {
+  console.log('🔥 Timeline 새로고침')
+  return getTimelineFeeds({ limit }) // cursor 없이 처음부터 로드
+}
+
+/**
+ * ✅ 사용자 피드 새로고침 (처음부터 로드)
+ * 🔐 인증 필수
+ */
+export const refreshUserFeed = async (
+  accountName: string,
+  limit: number = 20
+): Promise<{
+  success: boolean
+  data?: FeedWithPostsResponse
+  error?: string
+}> => {
+  console.log('🔥 사용자 피드 새로고침:', accountName)
+  return getUserFeedByAccountName(accountName, { limit }) // cursor 없이 처음부터 로드
+}
+
+// ============================================================================
+// 🔥 낙관적 업데이트 헬퍼들
+// ============================================================================
+
+/**
+ * ✅ 낙관적 좋아요 토글 (즉시 UI 업데이트 + 실패시 롤백)
+ * 🔐 인증 필수
+ */
+export const togglePostLikeOptimistic = async (
+  postId: number,
+  isCurrentlyLiked: boolean,
+  onOptimisticUpdate: (newState: boolean) => void,
+  onError: (originalState: boolean) => void
+): Promise<void> => {
+  // 즉시 UI 업데이트 (낙관적 업데이트)
+  onOptimisticUpdate(!isCurrentlyLiked)
+  
+  try {
+    const result = await togglePostLike(postId, isCurrentlyLiked)
+    if (!result.success) {
+      // 실패시 롤백
+      onError(isCurrentlyLiked)
+      throw new Error(result.error)
+    }
+  } catch (error) {
+    // 에러 발생시 롤백
+    onError(isCurrentlyLiked)
+    throw error
+  }
+}
+
+/**
+ * ✅ 낙관적 팔로우 토글 (즉시 UI 업데이트 + 실패시 롤백)
+ * 🔐 인증 필수
+ */
+export const toggleUserFollowOptimistic = async (
+  accountName: string,
+  isCurrentlyFollowing: boolean,
+  onOptimisticUpdate: (newState: boolean) => void,
+  onError: (originalState: boolean) => void
+): Promise<void> => {
+  // 즉시 UI 업데이트 (낙관적 업데이트)
+  onOptimisticUpdate(!isCurrentlyFollowing)
+  
+  try {
+    const result = await toggleUserFollow(accountName, isCurrentlyFollowing)
+    if (!result.success) {
+      // 실패시 롤백
+      onError(isCurrentlyFollowing)
+      throw new Error(result.error)
+    }
+  } catch (error) {
+    // 에러 발생시 롤백
+    onError(isCurrentlyFollowing)
+    throw error
+  }
+}
+
+// ============================================================================
+// 🔧 무한 스크롤 상태 관리 헬퍼들
+// ============================================================================
+
+/**
+ * ✅ 무한 스크롤 상태 생성
+ */
+export const createInfiniteScrollState = () => {
+  return {
+    posts: [] as ExplorePost[],
+    loading: false,
+    refreshing: false,
+    hasNext: true,
+    nextCursor: null as number | null,
+    error: null as string | null,
+  }
+}
+
+/**
+ * ✅ 무한 스크롤 상태 업데이트
+ */
+export const updateInfiniteScrollState = (
+  currentState: ReturnType<typeof createInfiniteScrollState>,
+  newData: ExplorePostsResult,
+  isRefresh: boolean = false
+) => {
+  return {
+    ...currentState,
+    posts: isRefresh ? newData.posts : [...currentState.posts, ...newData.posts],
+    hasNext: newData.hasNext,
+    nextCursor: newData.nextCursor,
+    loading: false,
+    refreshing: false,
+    error: null,
+  }
+}
+
+// ============================================================================
+// 🔄 하위 호환성 함수들 (기존 코드 호환용)
+// ============================================================================
+
+/**
+ * ❌ Deprecated: getRandomFeeds (getExploreFeeds 사용 권장)
+ */
+export const getRandomFeeds = async (limit: number = 20) => {
+  console.warn('getRandomFeeds는 deprecated입니다. getExploreFeeds를 사용하세요.')
+  
+  const result = await getExploreFeeds({ limit })
+  if (!result.success || !result.data) {
+    return {
+      success: false,
+      error: result.error,
+    }
+  }
+
+  return {
+    success: true,
+    data: {
+      posts: result.data.posts,
+      hasMore: result.data.hasNext, // hasNext → hasMore로 변경
+    },
+  }
+}
+
+/**
+ * ❌ Deprecated: getFollowingFeeds (getTimelineFeeds 사용 권장)
+ */
+export const getFollowingFeeds = async (limit: number = 20) => {
+  console.warn('getFollowingFeeds는 deprecated입니다. getTimelineFeeds를 사용하세요.')
+  
+  const result = await getTimelineFeeds({ limit })
+  if (!result.success || !result.data) {
+    return {
+      success: false,
+      error: result.error,
+    }
+  }
+
+  return {
+    success: true,
+    data: {
+      posts: result.data.posts,
+      hasMore: result.data.hasNext, // hasNext → hasMore로 변경
+    },
+  }
+}
+
+/**
+ * ❌ Deprecated: searchUsers (searchFeeds 사용 권장)
+ */
 export const searchUsers = async (
   query: string,
-  cursor?: string, // 🔥 백엔드에서 cursor 페이징을 사용하지 않으므로 무시
+  cursor?: number,
   limit: number = 20
 ) => {
-  const result = await searchFeeds(query, limit)
+  console.warn('searchUsers는 deprecated입니다. searchFeeds를 사용하세요.')
+  
+  const result = await searchFeeds(query, { limit, cursor })
   if (!result.success || !result.data) {
     return {
       success: false,
@@ -616,84 +1264,217 @@ export const searchUsers = async (
     data: {
       users: result.data.users,
       exactMatch: result.data.exactMatch,
-      hasMore: result.data.hasMore,
+      hasMore: result.data.hasNext, // hasNext → hasMore로 변경
       total: result.data.total,
     },
   }
 }
 
 // ============================================================================
-// 🔥 추가: 백엔드 연동을 위한 유틸리티 함수들
+// 🔥 에러 복구 및 재시도 로직
 // ============================================================================
 
 /**
- * 팔로우 수 조회 (백엔드 GET /follows/count/{accountName})
+ * 재시도 로직 (지수 백오프)
  */
-export const getFollowCounts = async (
-  accountName: string
-): Promise<{
-  success: boolean
-  data?: { followerCount: number; followingCount: number }
-  error?: string
-}> => {
-  try {
-    const response = await api.get<ApiResponse<{ followerCount: number; followingCount: number }>>(
-      `/follows/count/${accountName}`
-    )
+export const withRetry = async <T>(
+  apiCall: () => Promise<T>,
+  maxRetries: number = 3,
+  delayMs: number = 1000
+): Promise<T> => {
+  let lastError: any
 
-    if (response.data.error || !response.data.data) {
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      return await apiCall()
+    } catch (error) {
+      lastError = error
+
+      // 마지막 재시도라면 실패
+      if (i === maxRetries) break
+
+      // 401 에러는 재시도하지 않음 (토큰 만료 - axios 인터셉터가 처리해야 함)
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as any
+        if (axiosError.response?.status === 401) {
+          console.log('401 에러 감지 - axios 인터셉터가 토큰 갱신을 처리해야 함')
+          break
+        }
+      }
+
+      // 지수 백오프로 재시도
+      const delay = delayMs * Math.pow(2, i)
+      console.log(`API 재시도 ${i + 1}/${maxRetries} (${delay}ms 후)`)
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+
+  throw lastError
+}
+
+/**
+ * 재시도를 포함한 Explore 조회
+ */
+export const getExploreFeedsWithRetry = async (
+  params: CursorPaginationParams = { limit: 20 }
+) => {
+  return withRetry(() => getExploreFeeds(params), 3, 1000)
+}
+
+/**
+ * 재시도를 포함한 Timeline 조회
+ */
+export const getTimelineFeedsWithRetry = async (
+  params: CursorPaginationParams = { limit: 20 }
+) => {
+  return withRetry(() => getTimelineFeeds(params), 3, 1000)
+}
+
+/**
+ * 재시도를 포함한 사용자 피드 조회
+ */
+export const getUserFeedWithRetry = async (
+  accountName: string, 
+  params: CursorPaginationParams = { limit: 20 }
+) => {
+  return withRetry(() => getUserFeedByAccountName(accountName, params), 3, 1000)
+}
+
+// ============================================================================
+// 🔥 디바이스 최적화 및 성능 개선
+// ============================================================================
+
+/**
+ * 디바이스별 최적 limit 계산
+ */
+export const getOptimalFeedLimit = (deviceType: 'mobile' | 'tablet' | 'desktop'): number => {
+  switch (deviceType) {
+    case 'mobile': 
+      return 12 // 모바일은 적게 로드하여 성능 최적화
+    case 'tablet': 
+      return 18 // 태블릿은 중간
+    case 'desktop': 
+      return 24 // 데스크탑은 많이 로드
+    default: 
+      return 20
+  }
+}
+
+/**
+ * 안전한 좋아요 토글 (중복 방지)
+ */
+export const safeTogglePostLike = async (
+  postId: number,
+  currentLikeState: boolean
+): Promise<{ success: boolean; newState: boolean; error?: string }> => {
+  try {
+    // 현재 상태로 토글 실행 (백엔드에서 실제 상태 확인)
+    const result = await togglePostLike(postId, currentLikeState)
+    
+    if (!result.success) {
       return {
         success: false,
-        error: response.data.message || '팔로우 수를 불러올 수 없습니다.',
+        newState: currentLikeState,
+        error: result.error
       }
     }
 
     return {
       success: true,
-      data: response.data.data,
+      newState: result.data?.isLiked ?? !currentLikeState,
+      error: undefined
     }
   } catch (error) {
-    console.error('Failed to get follow counts:', error)
     return {
       success: false,
-      error: handleApiError(error),
+      newState: currentLikeState,
+      error: handleApiError(error)
     }
   }
 }
 
 /**
- * 좋아요 수 조회 (백엔드 GET /likes/posts/{postId}/count)
+ * 안전한 팔로우 토글 (중복 방지)
  */
-export const getPostLikeCount = async (
-  postId: number
-): Promise<{
-  success: boolean
-  data?: { count: number }
-  error?: string
-}> => {
+export const safeToggleUserFollow = async (
+  accountName: string,
+  currentFollowState: boolean
+): Promise<{ success: boolean; newState: boolean; error?: string }> => {
   try {
-    const response = await api.get<ApiResponse<number>>(
-      `/likes/posts/${postId}/count`
-    )
-
-    if (response.data.error || response.data.data === null) {
+    const result = await toggleUserFollow(accountName, currentFollowState)
+    
+    if (!result.success) {
       return {
         success: false,
-        error: response.data.message || '좋아요 수를 불러올 수 없습니다.',
+        newState: currentFollowState,
+        error: result.error
       }
     }
 
     return {
       success: true,
-      data: {
-        count: response.data.data || 0,
-      },
+      newState: result.data?.isFollowing ?? !currentFollowState,
+      error: undefined
     }
   } catch (error) {
-    console.error('Failed to get like count:', error)
     return {
       success: false,
-      error: handleApiError(error),
+      newState: currentFollowState,
+      error: handleApiError(error)
     }
   }
+}
+
+// ============================================================================
+// 🔥 추가 유틸리티들
+// ============================================================================
+
+/**
+ * 게시물 시간 정보 새로고침
+ */
+export const refreshPostsTimeInfo = (posts: ExplorePost[]): ExplorePost[] => {
+  return posts.map(post => ({
+    ...post,
+    timeAgo: formatTimeAgo(post.createdAt),
+    formattedLikeCount: formatLikeCount(post.likeCount)
+  }))
+}
+
+/**
+ * 게시물 중복 제거
+ */
+export const deduplicatePosts = (posts: ExplorePost[]): ExplorePost[] => {
+  const seen = new Set<number>()
+  return posts.filter(post => {
+    if (seen.has(post.postId)) {
+      return false
+    }
+    seen.add(post.postId)
+    return true
+  })
+}
+
+/**
+ * 발견 점수에 따른 게시물 정렬
+ */
+export const sortPostsByDiscoverScore = (posts: ExplorePost[]): ExplorePost[] => {
+  return [...posts].sort((a, b) => (b.discoverScore || 0) - (a.discoverScore || 0))
+}
+
+/**
+ * 📱 네트워크 상태에 따른 최적화된 로딩
+ */
+export const getNetworkOptimizedLimit = (
+  baseLimit: number,
+  connectionType: 'slow-2g' | '2g' | '3g' | '4g' | 'wifi' = '4g'
+): number => {
+  const multipliers = {
+    'slow-2g': 0.3,
+    '2g': 0.5,
+    '3g': 0.7,
+    '4g': 1.0,
+    'wifi': 1.5
+  }
+  
+  return Math.max(1, Math.floor(baseLimit * multipliers[connectionType]))
 }

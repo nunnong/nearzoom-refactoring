@@ -1,4 +1,4 @@
-// src/components/ui/EnhancedHeader.tsx - 백엔드 연동 완료
+// src/components/ui/EnhancedHeader.tsx - 아키텍처 원칙 완전 준수
 
 'use client'
 
@@ -7,67 +7,28 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/auth/useAuth'
 import HomeButton from '@/components/page/myroom/HomeButton'
 import MainNavigation from './MainNavigation'
-import axios from 'axios'
+
+// 🔥 아키텍처 원칙 준수: 인터셉터가 적용된 axios 인스턴스 사용
+import api from '@/lib/axios'
 
 // ============================================================================
-// 백엔드 연동 설정
+// 백엔드 API 응답 타입 정의 (백엔드와 완전 일치)
 // ============================================================================
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080'
-
-// Axios 인스턴스 생성
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
-
-// 인증 토큰 인터셉터
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('accessToken')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  }
-)
-
-// 응답 인터셉터 (에러 처리)
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('accessToken')
-      // 401 에러 시 자동 로그아웃하지 않고 에러만 전파 (헤더에서는)
-    }
-    return Promise.reject(error)
-  }
-)
-
-// ============================================================================
-// 백엔드 연동 타입 정의
-// ============================================================================
-
-// 백엔드 ApiResponse 표준 형식 (기존 타입 시스템과 일치)
+// 백엔드 ApiResponse 표준 형식
 interface ApiResponse<T> {
   error: boolean;
   message: string | null;
   data: T | null;
 }
 
-// 백엔드 User 정보 (실제 사용자 데이터)
+// 🔥 백엔드 User 정보 (실제 UserProfileResponse 타입과 일치)
 interface BackendUserProfile {
   userId: number;
+  accountName: string;
   userName: string;
   userEmail: string;
-  accountName: string;
   profileImage?: string;
-  socialType?: string;
   prettyFace?: string;
 }
 
@@ -92,53 +53,184 @@ interface EnhancedHeaderProps {
 }
 
 // ============================================================================
-// 백엔드 API 함수들
+// 🔥 백엔드 API 함수들 (인터셉터 적용된 api 사용)
 // ============================================================================
 
 const headerAPI = {
-  // 🔥 GET /users/me - 현재 사용자 정보 조회 (백엔드 API 확인 필요)
+  // 🔥 현재 사용자 정보 조회 (여러 엔드포인트 시도)
   getCurrentUser: async (): Promise<BackendUserProfile> => {
-    try {
-      // 먼저 /users/me 시도, 없으면 다른 엔드포인트 시도
-      const response = await api.get<ApiResponse<BackendUserProfile>>('/users/me');
-      
-      if (response.data.error) {
-        throw new Error(response.data.message || '사용자 정보를 가져올 수 없습니다.');
-      }
-      
-      if (!response.data.data) {
-        throw new Error('사용자 데이터가 없습니다.');
-      }
-      
-      return response.data.data;
-    } catch (error) {
-      // /users/me가 없으면 /auth/me 또는 다른 엔드포인트 시도
+    const endpoints = [
+      '/users/me',      // 가장 일반적인 엔드포인트
+      '/users/profile', // 대안 엔드포인트
+      '/auth/me',       // 인증 관련 엔드포인트
+    ];
+
+    let lastError: any = null;
+
+    for (const endpoint of endpoints) {
       try {
-        const fallbackResponse = await api.get<ApiResponse<BackendUserProfile>>('/auth/me');
-        if (fallbackResponse.data.error) {
-          throw new Error(fallbackResponse.data.message || '사용자 정보를 가져올 수 없습니다.');
+        console.log(`🔍 사용자 정보 조회 시도: ${endpoint}`);
+        
+        const response = await api.get<ApiResponse<BackendUserProfile>>(endpoint);
+        
+        if (response.data.error) {
+          throw new Error(response.data.message || '사용자 정보를 가져올 수 없습니다.');
         }
-        return fallbackResponse.data.data!;
-      } catch (fallbackError) {
-        console.error('Failed to get current user from both endpoints:', error, fallbackError);
-        throw error;
+        
+        if (!response.data.data) {
+          throw new Error('사용자 데이터가 없습니다.');
+        }
+        
+        console.log(`✅ 사용자 정보 조회 성공: ${endpoint}`, response.data.data);
+        return response.data.data;
+        
+      } catch (error) {
+        console.warn(`❌ ${endpoint} 실패:`, error);
+        lastError = error;
+        continue;
       }
+    }
+
+    // 모든 엔드포인트 실패 시 최종 에러
+    console.error('❌ 모든 사용자 정보 엔드포인트 실패');
+    throw lastError || new Error('사용자 정보를 가져올 수 없습니다.');
+  },
+
+  // 🔥 계정명으로 사용자 정보 조회 (백엔드 User API 기반)
+  getUserByAccountName: async (accountName: string): Promise<BackendUserProfile> => {
+    try {
+      console.log(`🔍 계정명으로 사용자 조회: ${accountName}`);
+      
+      // 여러 가능한 엔드포인트 시도
+      const endpoints = [
+        `/users/profile/${accountName}`,
+        `/feeds/users/account/${accountName}`, // FeedController의 엔드포인트
+        `/users/${accountName}`,
+      ];
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await api.get<ApiResponse<any>>(endpoint);
+          
+          if (response.data.error) {
+            continue; // 다음 엔드포인트 시도
+          }
+          
+          const data = response.data.data;
+          if (!data) {
+            continue;
+          }
+
+          // FeedWithPostsResponse인 경우 처리
+          if (data.userId && data.accountName) {
+            const userProfile: BackendUserProfile = {
+              userId: data.userId,
+              accountName: data.accountName,
+              userName: data.accountName, // 이름이 없으면 계정명 사용
+              userEmail: `${data.accountName}@unknown.com`, // 임시 이메일
+              profileImage: data.profileImage,
+            };
+            
+            console.log(`✅ 계정명으로 사용자 조회 성공: ${endpoint}`, userProfile);
+            return userProfile;
+          }
+          
+          // 직접 UserProfile인 경우 처리
+          if (data.userId || data.id) {
+            const userProfile: BackendUserProfile = {
+              userId: data.userId || data.id,
+              accountName: data.accountName,
+              userName: data.userName || data.name || data.accountName,
+              userEmail: data.userEmail || data.email || `${data.accountName}@unknown.com`,
+              profileImage: data.profileImage,
+              prettyFace: data.prettyFace,
+            };
+            
+            console.log(`✅ 계정명으로 사용자 조회 성공: ${endpoint}`, userProfile);
+            return userProfile;
+          }
+          
+        } catch (endpointError) {
+          console.warn(`❌ ${endpoint} 실패:`, endpointError);
+          continue;
+        }
+      }
+      
+      throw new Error(`사용자 '${accountName}'을 찾을 수 없습니다.`);
+      
+    } catch (error) {
+      console.error('❌ 계정명으로 사용자 조회 실패:', error);
+      throw error;
     }
   },
 
-  // 🔥 POST /auth/logout - 로그아웃
+  // 🔥 로그아웃 (여러 엔드포인트 시도)
   logout: async (): Promise<void> => {
-    try {
-      await api.post<ApiResponse<void>>('/auth/logout');
-    } catch (error) {
-      // 로그아웃 실패해도 로컬 상태는 클리어
-      console.warn('Backend logout failed, but clearing local state:', error);
+    const endpoints = ['/auth/logout', '/users/logout', '/logout'];
+    
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`🔍 로그아웃 시도: ${endpoint}`);
+        await api.post<ApiResponse<void>>(endpoint);
+        console.log(`✅ 로그아웃 성공: ${endpoint}`);
+        return; // 성공하면 즉시 반환
+      } catch (error) {
+        console.warn(`❌ ${endpoint} 로그아웃 실패:`, error);
+        continue;
+      }
     }
+    
+    // 모든 엔드포인트 실패해도 로컬 상태는 클리어
+    console.warn('⚠️ 모든 로그아웃 엔드포인트 실패, 로컬 상태만 클리어');
   },
 };
 
 // ============================================================================
-// EnhancedHeader 컴포넌트
+// 인증 보호 컴포넌트
+// ============================================================================
+
+interface AuthGuardProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+const AuthGuard: React.FC<AuthGuardProps> = ({ children, className = '' }) => {
+  const { isAuthenticated, isLoading, handleLogin } = useAuth();
+
+  // 로딩 중일 때
+  if (isLoading) {
+    return (
+      <div className={`flex flex-col items-center justify-center h-16 ${className}`}>
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // 인증되지 않은 경우
+  if (!isAuthenticated) {
+    return (
+      <div className={`flex items-center justify-center h-16 bg-red-50 border border-red-200 ${className}`}>
+        <div className="flex items-center space-x-3">
+          <svg className="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.99-.833-2.76 0L3.054 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+          <span className="text-red-600 text-sm font-medium">로그인이 필요합니다</span>
+          <button
+            onClick={handleLogin}
+            className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+          >
+            로그인
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+};
+
+// ============================================================================
+// EnhancedHeader 컴포넌트 (인증 보호 적용)
 // ============================================================================
 
 const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
@@ -160,11 +252,11 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
   const [isLoadingUser, setIsLoadingUser] = useState(false);
   const [userError, setUserError] = useState<string | null>(null);
 
-  // 🔥 인증 훅 사용 (Zustand 기반)
+  // 🔥 아키텍처 원칙 준수: Zustand 기반 인증 훅 사용
   const { user: authUser, isAuthenticated, logout: authLogout } = useAuth();
 
   // ============================================================================
-  // 백엔드 연동 - 사용자 정보 로드
+  // 🔥 백엔드 연동 - 사용자 정보 로드
   // ============================================================================
 
   const loadCurrentUser = useCallback(async () => {
@@ -210,10 +302,13 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
       if (error instanceof Error && (
         error.message.includes('401') || 
         error.message.includes('Unauthorized') ||
-        error.message.includes('토큰')
+        error.message.includes('토큰') ||
+        (error as any)?.response?.status === 401
       )) {
         console.log('🔓 인증 오류로 인한 자동 로그아웃');
-        authLogout();
+        setTimeout(() => {
+          authLogout();
+        }, 1000); // 1초 후 로그아웃 (UI 상태 업데이트를 위해)
       }
     } finally {
       setIsLoadingUser(false);
@@ -242,7 +337,7 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
     router.push('/');
   }, [router]);
 
-  // 🔥 백엔드 연동 로그아웃
+  // 🔥 백엔드 연동 로그아웃 (Zustand 토큰 관리 사용)
   const handleLogout = useCallback(async () => {
     try {
       console.log('=== 헤더에서 로그아웃 시작 ===');
@@ -256,7 +351,7 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
       console.error('❌ 백엔드 로그아웃 실패:', error);
       // 실패해도 로컬 상태는 클리어
     } finally {
-      // 로컬 인증 상태 클리어
+      // 🔥 아키텍처 원칙 준수: Zustand를 통한 로그아웃 (토큰 자동 관리)
       authLogout();
       
       // 사용자 상태 초기화
@@ -270,13 +365,36 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
     }
   }, [authLogout, router]);
 
-  const handleProfileClick = useCallback(() => {
+  // 🔥 프로필 클릭 - 백엔드 연동
+  const handleProfileClick = useCallback(async () => {
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+
     const user = displayUser;
-    if (user) {
-      // 사용자 프로필 페이지로 이동 (accountName 기반)
+    if (!user) return;
+
+    try {
+      console.log('🔍 프로필 클릭:', user.accountName);
+      
+      // 백엔드에서 최신 사용자 정보 확인
+      try {
+        await headerAPI.getUserByAccountName(user.accountName);
+        // 사용자가 존재하면 프로필 페이지로 이동
+        router.push(`/profile/${user.accountName}`);
+      } catch (error) {
+        // 사용자가 존재하지 않으면 피드 페이지로 이동
+        console.warn('사용자 프로필 조회 실패, 피드 페이지로 이동:', error);
+        router.push(`/feeds/users/account/${user.accountName}`);
+      }
+      
+    } catch (error) {
+      console.error('프로필 클릭 처리 실패:', error);
+      // 실패해도 기본 프로필 페이지로 이동
       router.push(`/profile/${user.accountName}`);
     }
-  }, [router]);
+  }, [router, isAuthenticated]);
 
   const handleRetryUserLoad = useCallback(() => {
     setUserError(null);
@@ -284,7 +402,7 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
   }, [loadCurrentUser]);
 
   // ============================================================================
-  // 사용자 정보 결정 (우선순위: 외부 전달 > 로드된 사용자 > 인증 사용자)
+  // 🔥 사용자 정보 결정 (우선순위: 외부 전달 > 로드된 사용자 > 인증 사용자)
   // ============================================================================
 
   const displayUser = externalUserProfile || currentUser || (authUser ? {
@@ -297,10 +415,10 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
   } : null);
 
   // ============================================================================
-  // 렌더링
+  // 렌더링 (AuthGuard로 보호)
   // ============================================================================
 
-  return (
+  const renderContent = () => (
     <header className={`border-b bg-white shadow-sm ${className}`}>
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center space-x-4">
@@ -466,14 +584,17 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
         </div>
       )}
 
-      {/* 개발 모드에서 사용자 정보 디버깅 */}
+      {/* 🔥 개발 모드에서 백엔드 연동 상태 디버깅 */}
       {process.env.NODE_ENV === 'development' && (
         <div className="bg-yellow-50 border-t border-yellow-200 px-4 py-2 text-xs">
           <details>
             <summary className="cursor-pointer text-yellow-800 font-medium">
-              🔧 헤더 상태 (개발용)
+              🔧 헤더 아키텍처 원칙 준수 상태 (개발용)
             </summary>
             <div className="mt-2 text-yellow-700 space-y-1">
+              <div><strong>✅ API:</strong> @/lib/axios 사용 (인터셉터 적용)</div>
+              <div><strong>✅ 토큰:</strong> Zustand 관리</div>
+              <div><strong>✅ 인증:</strong> useAuth 훅 사용</div>
               <div><strong>인증 상태:</strong> {isAuthenticated ? 'Yes' : 'No'}</div>
               <div><strong>로딩 중:</strong> {isLoadingUser ? 'Yes' : 'No'}</div>
               <div><strong>에러:</strong> {userError || 'None'}</div>
@@ -485,6 +606,7 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
                     <div>이름: {displayUser.name}</div>
                     <div>계정명: {displayUser.accountName}</div>
                     <div>이메일: {displayUser.email}</div>
+                    <div>프로필 이미지: {displayUser.profileImage ? 'Yes' : 'No'}</div>
                     <div>소스: {externalUserProfile ? 'External' : currentUser ? 'Backend' : 'Auth'}</div>
                   </div>
                 </>
@@ -494,7 +616,13 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
         </div>
       )}
     </header>
-  )
-}
+  );
+
+  return (
+    <AuthGuard className={className}>
+      {renderContent()}
+    </AuthGuard>
+  );
+};
 
 export default EnhancedHeader

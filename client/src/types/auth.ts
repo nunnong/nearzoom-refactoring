@@ -6,6 +6,7 @@ export interface User {
   id: number
   name: string
   email: string
+  accountName: string 
   profileImage?: string
   faceImageUrl?: string
   socialType: SocialType

@@ -1,57 +1,69 @@
 // =============================================================================
-// 📁 FeedViewer.tsx - 백엔드 완벽 연동 버전
+// 📁 FeedViewer.tsx - 인증된 사용자 전용 + 완전한 백엔드 연동 버전
 // =============================================================================
 
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { 
   HeartIcon, 
   ShareIcon,
   EllipsisHorizontalIcon,
   UserPlusIcon,
-  UserMinusIcon
+  UserMinusIcon,
+  LockClosedIcon,
+  ExclamationTriangleIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline'
 import { 
   HeartIcon as HeartSolidIcon 
 } from '@heroicons/react/24/solid'
-import { useAuth } from '@/hooks/auth/useAuth'
 
-// 🔥 올바른 백엔드 연동 - api from '@/lib/axios' 사용
+// 🔥 인증 및 API 연동
+import { useAuth } from '@/hooks/auth/useAuth'
 import api from '@/lib/axios'
 
 // ============================================================================
-// 백엔드 DTO 기반 타입 정의 (Java 백엔드와 완벽 일치)
+// 백엔드 API 응답 타입 정의 (백엔드와 완전 일치)
 // ============================================================================
 
 // 백엔드 ApiResponse 표준 형식
 interface ApiResponse<T> {
   error: boolean;
-  message: string;
+  message: string | null;
   data: T;
 }
 
-// PostResponse.java 기반
+// 🔥 PostResponse.java 기반 (백엔드와 100% 일치)
 interface PostResponse {
-  postId: number;
+  postId: number;              // 🔑 커서로 사용
   photoId: number;
   imgUrl: string;
-  caption: string;
+  caption: string | null;
   displayOrder: number | null;
   createdAt: string;
+  // 📊 좋아요 관련 정보
   likeCount: number;
   isLikedByMe: boolean;
+  // 👤 작성자 정보
   authorId: number;
   authorAccountName: string;
   authorProfileImage: string | null;
 }
 
-// PostDetailResponse.java 기반
+// 🔥 PostListResponse.java 기반 (마이룸과 동일한 구조)
+interface PostListResponse {
+  posts: PostResponse[];       // 게시물 목록
+  hasNext: boolean;           // 다음 페이지 존재 여부
+  nextCursor: number | null;  // 다음 커서 (마지막 postId)
+}
+
+// 🔥 PostDetailResponse.java 기반
 interface PostDetailResponse {
   postId: number;
   photoId: number;
   imgUrl: string;
-  caption: string;
+  caption: string | null;
   createdAt: string;
   likeCount: number;
   isLikedByMe: boolean;
@@ -63,7 +75,7 @@ interface PostDetailResponse {
   isFollowingAuthor: boolean;
 }
 
-// FeedWithPostsResponse.java 기반
+// 🔥 FeedWithPostsResponse.java 기반
 interface FeedWithPostsResponse {
   feedId: number;
   userId: number;
@@ -72,199 +84,203 @@ interface FeedWithPostsResponse {
   createdAt: string;
   posts: PostResponse[];
   isFollowing: boolean;
+  // 📱 마이룸 방식: 페이징 정보
+  hasNext: boolean;
+  nextCursor: number | null;
 }
 
-// MyFeedStatsResponse.java 기반
-interface MyFeedStatsResponse {
-  postCount: number;
-  totalLikes: number;
-  followerCount: number;
-  followingCount: number;
+// 🔥 FeedSearchResponse.java 기반
+interface FeedSearchResponse {
+  feeds: FeedWithPostsResponse[];
+  hasNext: boolean;
+  nextCursor: number | null;
 }
 
 interface FeedViewerProps {
-  userId?: number;          // 특정 사용자 피드 조회용
-  accountName?: string;     // 계정명으로 피드 조회용
-  isMyFeed?: boolean;       // 내 피드 여부
-  feedId?: number;          // 단일 게시물 조회용 (postId)
-  searchQuery?: string;     // 검색어
-  type?: 'timeline' | 'explore' | 'user' | 'search';
+  userId?: number;
+  accountName?: string;
+  isMyFeed?: boolean;
+  postId?: number;              // 단일 게시물 조회용
+  searchQuery?: string;
+  type?: 'timeline' | 'explore' | 'user' | 'search' | 'single';
   className?: string;
+  initialLimit?: number;        // 🔥 초기 로드 개수
 }
 
 // ============================================================================
-// 백엔드 API 엔드포인트 상수 (실제 Java Controller 엔드포인트와 일치)
+// 디바이스별 최적화된 limit 계산
 // ============================================================================
 
-const FEED_ENDPOINTS = {
-  // FeedController.java 기반
-  EXPLORE: '/feeds/explore',
-  TIMELINE: '/feeds/timeline',
-  USER_FEED: (userId: number) => `/feeds/users/${userId}`,
-  USER_FEED_BY_ACCOUNT: (accountName: string) => `/feeds/users/account/${accountName}`,
-  POST_DETAIL: (postId: number) => `/feeds/posts/${postId}`,
-  SEARCH_FEEDS: '/feeds/search',
+const getOptimalLimit = (): number => {
+  if (typeof window === 'undefined') return 20;
   
-  // LikesController.java 기반
-  LIKE_POST: (postId: number) => `/likes/posts/${postId}`,
-  UNLIKE_POST: (postId: number) => `/likes/posts/${postId}`,
+  const width = window.innerWidth;
   
-  // FollowController.java 기반
-  FOLLOW_USER: (accountName: string) => `/follows/${accountName}`,
-  UNFOLLOW_USER: (accountName: string) => `/follows/${accountName}`,
-  CHECK_FOLLOW: (accountName: string) => `/follows/check/${accountName}`,
+  if (width < 640) return 12;      // mobile
+  if (width < 1024) return 18;     // tablet  
+  return 24;                       // desktop
 };
 
 // ============================================================================
-// 백엔드 API 함수들 (실제 Java Controller 엔드포인트 사용)
+// 백엔드 API 함수들 (커서 기반 무한스크롤 + 자동 인증 처리)
 // ============================================================================
 
 const feedViewerAPI = {
-  // 🔥 GET /feeds/timeline - 타임라인 조회
-  getTimelinePosts: async (size: number = 20): Promise<PostResponse[]> => {
-    const response = await api.get<ApiResponse<PostResponse[]>>(
-      `${FEED_ENDPOINTS.TIMELINE}?size=${size}`
+  // 🔥 GET /feeds/timeline?limit=20&cursor=12345 - 타임라인 조회
+  getTimelinePosts: async (limit: number = 20, cursor?: number): Promise<PostListResponse> => {
+    const params: Record<string, any> = { limit };
+    if (cursor) params.cursor = cursor;
+
+    console.log('🔥 API 요청 - GET /feeds/timeline:', params);
+
+    const response = await api.get<ApiResponse<PostListResponse>>(
+      '/feeds/timeline',
+      { params }
     );
     
     if (response.data.error) {
       throw new Error(response.data.message || '타임라인을 불러올 수 없습니다.');
     }
     
+    console.log('🔥 API 응답 - 타임라인:', response.data.data);
     return response.data.data;
   },
 
-  // 🔥 GET /feeds/explore - 탐색 피드 조회
-  getExplorePosts: async (size: number = 20): Promise<PostResponse[]> => {
-    const response = await api.get<ApiResponse<PostResponse[]>>(
-      `${FEED_ENDPOINTS.EXPLORE}?size=${size}`
+  // 🔥 GET /feeds/explore?limit=20&cursor=12345 - 탐색 피드 조회
+  getExplorePosts: async (limit: number = 20, cursor?: number): Promise<PostListResponse> => {
+    const params: Record<string, any> = { limit };
+    if (cursor) params.cursor = cursor;
+
+    console.log('🔥 API 요청 - GET /feeds/explore:', params);
+
+    const response = await api.get<ApiResponse<PostListResponse>>(
+      '/feeds/explore',
+      { params }
     );
     
     if (response.data.error) {
       throw new Error(response.data.message || '탐색 피드를 불러올 수 없습니다.');
     }
     
+    console.log('🔥 API 응답 - 탐색 피드:', response.data.data);
     return response.data.data;
   },
 
-  // 🔥 GET /feeds/users/{userId} - 사용자 피드 조회
-  getUserFeedWithPosts: async (userId: number): Promise<FeedWithPostsResponse> => {
+  // 🔥 GET /feeds/users/{userId}?limit=20&cursor=12345 - 사용자 피드 조회
+  getUserFeedWithPosts: async (userId: number, limit: number = 20, cursor?: number): Promise<FeedWithPostsResponse> => {
+    const params: Record<string, any> = { limit };
+    if (cursor) params.cursor = cursor;
+
+    console.log('🔥 API 요청 - GET /feeds/users/' + userId, params);
+
     const response = await api.get<ApiResponse<FeedWithPostsResponse>>(
-      FEED_ENDPOINTS.USER_FEED(userId)
+      `/feeds/users/${userId}`,
+      { params }
     );
     
     if (response.data.error) {
       throw new Error(response.data.message || '사용자 피드를 불러올 수 없습니다.');
     }
     
+    console.log('🔥 API 응답 - 사용자 피드:', response.data.data);
     return response.data.data;
   },
 
-  // 🔥 GET /feeds/users/account/{accountName} - 계정명으로 사용자 피드 조회
-  getUserFeedByAccountName: async (accountName: string): Promise<FeedWithPostsResponse> => {
+  // 🔥 GET /feeds/users/account/{accountName}?limit=20&cursor=12345 - 계정명으로 사용자 피드 조회
+  getUserFeedByAccountName: async (accountName: string, limit: number = 20, cursor?: number): Promise<FeedWithPostsResponse> => {
+    const params: Record<string, any> = { limit };
+    if (cursor) params.cursor = cursor;
+
+    console.log('🔥 API 요청 - GET /feeds/users/account/' + accountName, params);
+
     const response = await api.get<ApiResponse<FeedWithPostsResponse>>(
-      FEED_ENDPOINTS.USER_FEED_BY_ACCOUNT(accountName)
+      `/feeds/users/account/${accountName}`,
+      { params }
     );
     
     if (response.data.error) {
       throw new Error(response.data.message || '사용자 피드를 불러올 수 없습니다.');
     }
     
+    console.log('🔥 API 응답 - 계정명 기반 피드:', response.data.data);
     return response.data.data;
   },
 
   // 🔥 GET /feeds/posts/{postId} - 단일 게시물 상세 조회
   getPostDetail: async (postId: number): Promise<PostDetailResponse> => {
+    console.log('🔥 API 요청 - GET /feeds/posts/' + postId);
+
     const response = await api.get<ApiResponse<PostDetailResponse>>(
-      FEED_ENDPOINTS.POST_DETAIL(postId)
+      `/feeds/posts/${postId}`
     );
     
     if (response.data.error) {
       throw new Error(response.data.message || '게시물을 불러올 수 없습니다.');
     }
     
+    console.log('🔥 API 응답 - 게시물 상세:', response.data.data);
     return response.data.data;
   },
 
-  // 🔥 GET /feeds/search - 피드 검색
-  searchFeeds: async (query: string, size: number = 10): Promise<FeedWithPostsResponse[]> => {
-    const response = await api.get<ApiResponse<FeedWithPostsResponse[]>>(
-      `${FEED_ENDPOINTS.SEARCH_FEEDS}?query=${encodeURIComponent(query)}&size=${size}`
+  // 🔥 GET /feeds/search?query=user&limit=10&cursor=12345 - 피드 검색
+  searchFeeds: async (query: string, limit: number = 10, cursor?: number): Promise<FeedSearchResponse> => {
+    const params: Record<string, any> = { query, limit };
+    if (cursor) params.cursor = cursor;
+
+    console.log('🔥 API 요청 - GET /feeds/search:', params);
+
+    const response = await api.get<ApiResponse<FeedSearchResponse>>(
+      '/feeds/search',
+      { params }
     );
     
     if (response.data.error) {
       throw new Error(response.data.message || '검색에 실패했습니다.');
     }
     
+    console.log('🔥 API 응답 - 피드 검색:', response.data.data);
     return response.data.data;
   },
 
   // 🔥 POST/DELETE /likes/posts/{postId} - 좋아요 토글
   togglePostLike: async (postId: number, isCurrentlyLiked: boolean): Promise<void> => {
     if (isCurrentlyLiked) {
-      // DELETE /likes/posts/{postId}
-      const response = await api.delete<ApiResponse<void>>(
-        FEED_ENDPOINTS.UNLIKE_POST(postId)
-      );
-      
+      console.log('🔥 API 요청 - DELETE /likes/posts/' + postId);
+      const response = await api.delete<ApiResponse<void>>(`/likes/posts/${postId}`);
       if (response.data.error) {
         throw new Error(response.data.message || '좋아요 취소에 실패했습니다.');
       }
     } else {
-      // POST /likes/posts/{postId}
-      const response = await api.post<ApiResponse<void>>(
-        FEED_ENDPOINTS.LIKE_POST(postId)
-      );
-      
+      console.log('🔥 API 요청 - POST /likes/posts/' + postId);
+      const response = await api.post<ApiResponse<void>>(`/likes/posts/${postId}`);
       if (response.data.error) {
         throw new Error(response.data.message || '좋아요에 실패했습니다.');
       }
     }
+    console.log('🔥 API 응답 - 좋아요 토글 완료');
   },
 
   // 🔥 POST/DELETE /follows/{accountName} - 팔로우 토글
   toggleFollow: async (accountName: string, isCurrentlyFollowing: boolean): Promise<void> => {
     if (isCurrentlyFollowing) {
-      // DELETE /follows/{accountName}
-      const response = await api.delete<ApiResponse<void>>(
-        FEED_ENDPOINTS.UNFOLLOW_USER(accountName)
-      );
-      
+      console.log('🔥 API 요청 - DELETE /follows/' + accountName);
+      const response = await api.delete<ApiResponse<void>>(`/follows/${accountName}`);
       if (response.data.error) {
         throw new Error(response.data.message || '언팔로우에 실패했습니다.');
       }
     } else {
-      // POST /follows/{accountName}
-      const response = await api.post<ApiResponse<void>>(
-        FEED_ENDPOINTS.FOLLOW_USER(accountName)
-      );
-      
+      console.log('🔥 API 요청 - POST /follows/' + accountName);
+      const response = await api.post<ApiResponse<void>>(`/follows/${accountName}`);
       if (response.data.error) {
         throw new Error(response.data.message || '팔로우에 실패했습니다.');
       }
     }
+    console.log('🔥 API 응답 - 팔로우 토글 완료');
   },
-
-  // 🔥 GET /follows/check/{accountName} - 팔로우 상태 확인
-  checkFollowStatus: async (accountName: string): Promise<boolean> => {
-    try {
-      const response = await api.get<ApiResponse<boolean>>(
-        FEED_ENDPOINTS.CHECK_FOLLOW(accountName)
-      );
-      
-      if (response.data.error) {
-        return false; // 에러 시 팔로우하지 않은 것으로 간주
-      }
-      
-      return response.data.data;
-    } catch (error) {
-      console.error('Failed to check follow status:', error);
-      return false;
-    }
-  }
 };
 
 // ============================================================================
-// LoadingSpinner 컴포넌트 (간단한 로딩 스피너)
+// LoadingSpinner 컴포넌트
 // ============================================================================
 
 interface LoadingSpinnerProps {
@@ -305,20 +321,95 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ size = 'md', className 
 };
 
 // ============================================================================
-// FeedViewer 컴포넌트 (백엔드 완벽 연동)
+// 인증 보호 컴포넌트
+// ============================================================================
+
+interface AuthGuardProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+const AuthGuard: React.FC<AuthGuardProps> = ({ children, className = '' }) => {
+  const { isAuthenticated, isLoading, handleLogin } = useAuth();
+
+  // 로딩 중일 때
+  if (isLoading) {
+    return (
+      <div className={`flex flex-col items-center justify-center h-64 ${className}`}>
+        <LoadingSpinner size="lg" />
+        <p className="mt-4 text-gray-600">인증 상태를 확인하는 중...</p>
+      </div>
+    );
+  }
+
+  // 인증되지 않은 경우
+  if (!isAuthenticated) {
+    return (
+      <div className={`flex flex-col items-center justify-center min-h-64 text-center p-8 ${className}`}>
+        <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <LockClosedIcon className="h-10 w-10 text-red-600" />
+        </div>
+        
+        <h2 className="text-2xl font-bold text-gray-900 mb-3">
+          로그인이 필요합니다
+        </h2>
+        
+        <p className="text-gray-600 mb-6 max-w-md">
+          피드를 보시려면 먼저 로그인해주세요. <br />
+          로그인 후 다양한 사용자들의 게시물을 확인하고 상호작용할 수 있습니다.
+        </p>
+        
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={handleLogin}
+            className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            로그인하러 가기
+          </button>
+          
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition-colors"
+          >
+            <ArrowPathIcon className="h-5 w-5 inline mr-2" />
+            새로고침
+          </button>
+        </div>
+        
+        <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-start space-x-3">
+            <ExclamationTriangleIcon className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-blue-800">
+              <strong>안전한 서비스:</strong> 모든 피드 기능은 로그인한 사용자만 이용할 수 있습니다.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 인증된 경우 자식 컴포넌트 렌더링
+  return <>{children}</>;
+};
+
+// ============================================================================
+// FeedViewer 컴포넌트 (인증 보호 + 백엔드 완전 연동)
 // ============================================================================
 
 const FeedViewer: React.FC<FeedViewerProps> = ({ 
   userId,
   accountName, 
   isMyFeed = false,
-  feedId,
+  postId,
   searchQuery,
   type = 'timeline',
-  className = ''
+  className = '',
+  initialLimit
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { user, isAuthenticated } = useAuth();
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const { user, isAuthenticated, handleLogin } = useAuth();
   
   // ============================================================================
   // 상태 관리
@@ -330,46 +421,62 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // 현재 피드 통계
+  const [feedStats, setFeedStats] = useState<{
+    totalLoaded: number;
+    totalLikes: number;
+    hasMore: boolean;
+  }>({
+    totalLoaded: 0,
+    totalLikes: 0,
+    hasMore: false
+  });
 
   // ============================================================================
   // 유틸리티 함수들
   // ============================================================================
 
   // 토스트 메시지 표시
-  const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToastMessage({ message, type });
     setTimeout(() => setToastMessage(null), 3000);
   }, []);
 
+  // 최적화된 limit 계산
+  const optimalLimit = useMemo(() => {
+    return initialLimit || getOptimalLimit();
+  }, [initialLimit]);
+
   // ============================================================================
-  // 데이터 로드 함수들
+  // 백엔드 API 연동 - 첫 페이지 로드 (인증 체크 포함)
   // ============================================================================
 
-  // 피드 목록 로드
-  const loadFeeds = useCallback(async (refresh: boolean = false) => {
-    if (refresh) {
-      setIsRefreshing(true);
-    } else {
-      setIsLoading(true);
+  const loadInitialFeeds = useCallback(async () => {
+    if (!isAuthenticated) {
+      console.log('🔒 사용자가 인증되지 않음, 로딩 중단');
+      setIsLoading(false);
+      return;
     }
+
+    setIsLoading(true);
     setError(null);
 
     try {
-      let posts: PostResponse[] = [];
-
-      console.log(`=== ${type} 피드 로딩 시작 ===`, { 
-        userId, 
-        accountName, 
-        feedId, 
-        searchQuery 
+      console.log(`=== ${type} 첫 페이지 로딩 시작 (인증된 사용자: ${user?.accountName}) ===`, { 
+        userId, accountName, postId, searchQuery, limit: optimalLimit
       });
 
-      if (feedId) {
-        // 🔥 단일 게시물 조회 (GET /feeds/posts/{postId})
-        const postDetail = await feedViewerAPI.getPostDetail(feedId);
-        // PostDetailResponse를 PostResponse 형태로 변환
+      let response: PostListResponse | FeedWithPostsResponse | FeedSearchResponse;
+      let posts: PostResponse[] = [];
+
+      if (postId) {
+        // 🔥 단일 게시물 조회
+        const postDetail = await feedViewerAPI.getPostDetail(postId);
         posts = [{
           postId: postDetail.postId,
           photoId: postDetail.photoId,
@@ -383,58 +490,211 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
           authorAccountName: postDetail.authorAccountName,
           authorProfileImage: postDetail.authorProfileImage
         }];
+        setHasNextPage(false);
+        setNextCursor(null);
       } else if (type === 'user' && accountName) {
-        // 🔥 계정명으로 사용자 피드 조회 (GET /feeds/users/account/{accountName})
-        const feedWithPosts = await feedViewerAPI.getUserFeedByAccountName(accountName);
-        posts = feedWithPosts.posts;
+        // 🔥 계정명으로 사용자 피드 조회
+        response = await feedViewerAPI.getUserFeedByAccountName(accountName, optimalLimit);
+        posts = response.posts;
+        setHasNextPage(response.hasNext);
+        setNextCursor(response.nextCursor);
       } else if (type === 'user' && userId) {
-        // 🔥 userId로 사용자 피드 조회 (GET /feeds/users/{userId})
-        const feedWithPosts = await feedViewerAPI.getUserFeedWithPosts(userId);
-        posts = feedWithPosts.posts;
+        // 🔥 userId로 사용자 피드 조회
+        response = await feedViewerAPI.getUserFeedWithPosts(userId, optimalLimit);
+        posts = response.posts;
+        setHasNextPage(response.hasNext);
+        setNextCursor(response.nextCursor);
       } else if (type === 'timeline') {
-        // 🔥 타임라인 조회 (GET /feeds/timeline)
-        posts = await feedViewerAPI.getTimelinePosts(20);
+        // 🔥 타임라인 조회
+        response = await feedViewerAPI.getTimelinePosts(optimalLimit);
+        posts = response.posts;
+        setHasNextPage(response.hasNext);
+        setNextCursor(response.nextCursor);
       } else if (type === 'explore') {
-        // 🔥 Explore 조회 (GET /feeds/explore)
-        posts = await feedViewerAPI.getExplorePosts(20);
+        // 🔥 Explore 조회
+        response = await feedViewerAPI.getExplorePosts(optimalLimit);
+        posts = response.posts;
+        setHasNextPage(response.hasNext);
+        setNextCursor(response.nextCursor);
       } else if (type === 'search' && searchQuery) {
-        // 🔥 피드 검색 (GET /feeds/search)
-        const searchResults = await feedViewerAPI.searchFeeds(searchQuery, 20);
-        // 검색 결과의 모든 피드의 게시물들을 합침
-        posts = searchResults.flatMap(feed => feed.posts);
+        // 🔥 피드 검색
+        response = await feedViewerAPI.searchFeeds(searchQuery, optimalLimit);
+        posts = response.feeds.flatMap(feed => feed.posts);
+        setHasNextPage(response.hasNext);
+        setNextCursor(response.nextCursor);
       }
 
-      if (refresh) {
-        setFeedItems(posts);
-      } else {
-        setFeedItems(prev => [...prev, ...posts]);
-      }
+      setFeedItems(posts);
 
-      // 🔥 hasMore 판단 (백엔드에서 페이징 정보가 없으므로 단순하게 처리)
-      if (posts.length < 20) {
-        setHasMore(false);
-      }
-
-      console.log(`=== ${type} 피드 로딩 완료 ===`, {
-        count: posts.length,
-        posts: posts
+      // 통계 업데이트
+      setFeedStats({
+        totalLoaded: posts.length,
+        totalLikes: posts.reduce((sum, post) => sum + post.likeCount, 0),
+        hasMore: hasNextPage
       });
 
-    } catch (err) {
-      console.error('Failed to load feeds:', err);
-      const errorMessage = err instanceof Error ? err.message : '피드를 불러오는데 실패했습니다.';
-      setError(errorMessage);
-      showToast(errorMessage, 'error');
+      console.log(`=== ${type} 첫 페이지 로딩 완료 ===`, {
+        count: posts.length,
+        hasNext: hasNextPage,
+        nextCursor
+      });
+
+    } catch (err: any) {
+      console.error('첫 페이지 로딩 실패:', err);
+      
+      // 인증 관련 에러 처리
+      if (err?.response?.status === 401 || err?.response?.status === 403) {
+        setError('인증이 만료되었습니다. 다시 로그인해주세요.');
+        showToast('로그인이 필요합니다. 로그인 페이지로 이동합니다.', 'error');
+        setTimeout(() => handleLogin(), 2000);
+      } else {
+        const errorMessage = err instanceof Error ? err.message : '피드를 불러오는데 실패했습니다.';
+        setError(errorMessage);
+        showToast(errorMessage, 'error');
+      }
+      
+      setFeedItems([]);
+      setHasNextPage(false);
+      setNextCursor(null);
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false);
     }
-  }, [feedId, type, userId, accountName, searchQuery, showToast]);
+  }, [type, userId, accountName, postId, searchQuery, optimalLimit, hasNextPage, showToast, isAuthenticated, user, handleLogin]);
 
-  // 초기 로드
+  // ============================================================================
+  // 백엔드 API 연동 - 다음 페이지 로드 (무한스크롤)
+  // ============================================================================
+
+  const loadMoreFeeds = useCallback(async () => {
+    if (!isAuthenticated || !hasNextPage || !nextCursor || isLoadingMore || type === 'single' || postId) {
+      return;
+    }
+
+    setIsLoadingMore(true);
+
+    try {
+      console.log(`=== ${type} 다음 페이지 로딩 시작 ===`, { cursor: nextCursor });
+
+      let response: PostListResponse | FeedWithPostsResponse | FeedSearchResponse;
+      let newPosts: PostResponse[] = [];
+
+      if (type === 'user' && accountName) {
+        response = await feedViewerAPI.getUserFeedByAccountName(accountName, optimalLimit, nextCursor);
+        newPosts = response.posts;
+        setHasNextPage(response.hasNext);
+        setNextCursor(response.nextCursor);
+      } else if (type === 'user' && userId) {
+        response = await feedViewerAPI.getUserFeedWithPosts(userId, optimalLimit, nextCursor);
+        newPosts = response.posts;
+        setHasNextPage(response.hasNext);
+        setNextCursor(response.nextCursor);
+      } else if (type === 'timeline') {
+        response = await feedViewerAPI.getTimelinePosts(optimalLimit, nextCursor);
+        newPosts = response.posts;
+        setHasNextPage(response.hasNext);
+        setNextCursor(response.nextCursor);
+      } else if (type === 'explore') {
+        response = await feedViewerAPI.getExplorePosts(optimalLimit, nextCursor);
+        newPosts = response.posts;
+        setHasNextPage(response.hasNext);
+        setNextCursor(response.nextCursor);
+      } else if (type === 'search' && searchQuery) {
+        response = await feedViewerAPI.searchFeeds(searchQuery, optimalLimit, nextCursor);
+        newPosts = response.feeds.flatMap(feed => feed.posts);
+        setHasNextPage(response.hasNext);
+        setNextCursor(response.nextCursor);
+      }
+
+      // 🔥 새로운 피드들을 기존 목록에 추가
+      setFeedItems(prev => [...prev, ...newPosts]);
+
+      // 통계 업데이트
+      setFeedStats(prev => ({
+        totalLoaded: prev.totalLoaded + newPosts.length,
+        totalLikes: prev.totalLikes + newPosts.reduce((sum, post) => sum + post.likeCount, 0),
+        hasMore: hasNextPage
+      }));
+
+      console.log(`=== ${type} 다음 페이지 로딩 완료 ===`, {
+        newCount: newPosts.length,
+        totalCount: feedItems.length + newPosts.length,
+        hasNext: hasNextPage,
+        nextCursor
+      });
+
+    } catch (err: any) {
+      console.error('다음 페이지 로딩 실패:', err);
+      
+      // 인증 관련 에러 처리
+      if (err?.response?.status === 401 || err?.response?.status === 403) {
+        showToast('인증이 만료되었습니다. 다시 로그인해주세요.', 'error');
+        setTimeout(() => handleLogin(), 2000);
+      } else {
+        showToast('추가 피드를 불러오는데 실패했습니다.', 'error');
+      }
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [type, userId, accountName, searchQuery, hasNextPage, nextCursor, isLoadingMore, optimalLimit, feedItems.length, showToast, isAuthenticated, handleLogin]);
+
+  // ============================================================================
+  // 무한스크롤 설정
+  // ============================================================================
+
   useEffect(() => {
-    loadFeeds();
-  }, [loadFeeds]);
+    if (!isAuthenticated || !hasNextPage || isLoadingMore || type === 'single' || postId) {
+      return;
+    }
+
+    const loadMoreElement = loadMoreTriggerRef.current;
+    if (!loadMoreElement) {
+      return;
+    }
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          console.log('🔥 무한스크롤 트리거됨');
+          loadMoreFeeds();
+        }
+      },
+      {
+        threshold: 0.1,
+        rootMargin: '200px',
+      }
+    );
+
+    observerRef.current.observe(loadMoreElement);
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [hasNextPage, isLoadingMore, type, loadMoreFeeds, isAuthenticated]);
+
+  // ============================================================================
+  // 첫 로드 및 새로고침 시 실행
+  // ============================================================================
+
+  useEffect(() => {
+    loadInitialFeeds();
+  }, [refreshKey, loadInitialFeeds]);
+
+  // ============================================================================
+  // 화면 크기 변경 감지 (반응형 limit)
+  // ============================================================================
+
+  useEffect(() => {
+    const handleResize = () => {
+      console.log('🔥 화면 크기 변경 감지, 새로고침');
+      setRefreshKey(prev => prev + 1);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // ============================================================================
   // 이벤트 핸들러들
@@ -442,40 +702,34 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
 
   // 피드 클릭 핸들러
   const handleFeedClick = useCallback(async (post: PostResponse) => {
+    if (!isAuthenticated) {
+      showToast('로그인이 필요합니다.', 'error');
+      return;
+    }
+
     try {
-      // 게시물 상세 정보 조회
+      console.log('🔥 게시물 클릭:', post.postId);
       const postDetail = await feedViewerAPI.getPostDetail(post.postId);
       setSelectedFeed(postDetail);
-    } catch (error) {
-      console.error('Failed to load post detail:', error);
-      showToast('게시물 상세 정보를 불러올 수 없습니다.', 'error');
+    } catch (error: any) {
+      console.error('게시물 상세 로딩 실패:', error);
       
-      // 에러 시에도 기본 정보로 모달 열기
-      const basicDetail: PostDetailResponse = {
-        postId: post.postId,
-        photoId: post.photoId,
-        imgUrl: post.imgUrl,
-        caption: post.caption,
-        createdAt: post.createdAt,
-        likeCount: post.likeCount,
-        isLikedByMe: post.isLikedByMe,
-        authorId: post.authorId,
-        authorAccountName: post.authorAccountName,
-        authorProfileImage: post.authorProfileImage,
-        authorFeedId: 0, // 기본값
-        isMyPost: false, // 기본값
-        isFollowingAuthor: false // 기본값
-      };
-      setSelectedFeed(basicDetail);
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        showToast('인증이 만료되었습니다. 다시 로그인해주세요.', 'error');
+        setTimeout(() => handleLogin(), 2000);
+      } else {
+        showToast('게시물 상세 정보를 불러올 수 없습니다.', 'error');
+      }
     }
-  }, [showToast]);
+  }, [showToast, isAuthenticated, handleLogin]);
 
-  // 🔥 백엔드 연동 - 좋아요 토글
+  // 🔥 백엔드 연동 - 좋아요 토글 (인증 체크 포함)
   const handleLikeToggle = useCallback(async (post: PostResponse | PostDetailResponse, e: React.MouseEvent) => {
     e.stopPropagation();
 
     if (!isAuthenticated) {
       showToast('로그인이 필요합니다.', 'error');
+      setTimeout(() => handleLogin(), 1500);
       return;
     }
 
@@ -484,10 +738,7 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
     const originalLikeCount = post.likeCount;
 
     try {
-      console.log(`=== 좋아요 토글 시작 ===`, { 
-        postId, 
-        currentLiked: originalIsLiked 
-      });
+      console.log('🔥 좋아요 토글 시작:', { postId, currentLiked: originalIsLiked });
 
       // 낙관적 업데이트
       setFeedItems(prev => prev.map(item => 
@@ -500,7 +751,6 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
           : item
       ));
 
-      // 선택된 피드도 업데이트
       if (selectedFeed?.postId === postId) {
         setSelectedFeed(prev => prev ? { 
           ...prev, 
@@ -509,18 +759,14 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
         } : null);
       }
 
-      // 🔥 실제 백엔드 API 호출
+      // 🔥 실제 백엔드 API 호출 (자동 인증 처리)
       await feedViewerAPI.togglePostLike(postId, originalIsLiked);
 
-      console.log(`=== 좋아요 토글 성공 ===`, { 
-        postId, 
-        newLiked: !originalIsLiked 
-      });
-
+      console.log('🔥 좋아요 토글 성공:', { postId, newLiked: !originalIsLiked });
       showToast(originalIsLiked ? '좋아요를 취소했습니다.' : '좋아요를 눌렀습니다.');
 
-    } catch (error) {
-      console.error('Failed to toggle like:', error);
+    } catch (error: any) {
+      console.error('좋아요 토글 실패:', error);
       
       // 실패 시 롤백
       setFeedItems(prev => prev.map(item => 
@@ -537,36 +783,39 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
         } : null);
       }
 
-      showToast('좋아요 처리에 실패했습니다.', 'error');
+      // 인증 관련 에러 처리
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        showToast('인증이 만료되었습니다. 다시 로그인해주세요.', 'error');
+        setTimeout(() => handleLogin(), 2000);
+      } else {
+        showToast('좋아요 처리에 실패했습니다.', 'error');
+      }
     }
-  }, [selectedFeed, isAuthenticated, showToast]);
+  }, [selectedFeed, isAuthenticated, showToast, handleLogin]);
 
-  // 🔥 백엔드 연동 - 팔로우 토글
+  // 🔥 백엔드 연동 - 팔로우 토글 (인증 체크 포함)
   const handleFollowToggle = useCallback(async (post: PostResponse | PostDetailResponse, e: React.MouseEvent) => {
     e.stopPropagation();
 
     if (!isAuthenticated) {
       showToast('로그인이 필요합니다.', 'error');
+      setTimeout(() => handleLogin(), 1500);
       return;
     }
 
     try {
-      console.log(`=== 팔로우 토글 시작 ===`, { 
-        accountName: post.authorAccountName 
-      });
+      console.log('🔥 팔로우 토글 시작:', { accountName: post.authorAccountName });
 
-      // 현재 팔로우 상태 확인 (PostDetailResponse에만 있음)
       const isCurrentlyFollowing = 'isFollowingAuthor' in post ? post.isFollowingAuthor : false;
 
-      // 🔥 실제 백엔드 API 호출
+      // 🔥 실제 백엔드 API 호출 (자동 인증 처리)
       await feedViewerAPI.toggleFollow(post.authorAccountName, isCurrentlyFollowing);
       
-      console.log(`=== 팔로우 토글 성공 ===`, { 
+      console.log('🔥 팔로우 토글 성공:', { 
         accountName: post.authorAccountName,
         newFollowing: !isCurrentlyFollowing
       });
 
-      // 선택된 피드 업데이트
       if (selectedFeed?.authorAccountName === post.authorAccountName && 'isFollowingAuthor' in selectedFeed) {
         setSelectedFeed(prev => prev ? { 
           ...prev, 
@@ -576,17 +825,33 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
 
       showToast(isCurrentlyFollowing ? '언팔로우했습니다.' : '팔로우했습니다.');
 
-    } catch (error) {
-      console.error('Failed to toggle follow:', error);
-      showToast('팔로우 처리에 실패했습니다.', 'error');
+    } catch (error: any) {
+      console.error('팔로우 토글 실패:', error);
+      
+      // 인증 관련 에러 처리
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        showToast('인증이 만료되었습니다. 다시 로그인해주세요.', 'error');
+        setTimeout(() => handleLogin(), 2000);
+      } else {
+        showToast('팔로우 처리에 실패했습니다.', 'error');
+      }
     }
-  }, [selectedFeed, isAuthenticated, showToast]);
+  }, [selectedFeed, isAuthenticated, showToast, handleLogin]);
 
   // 새로고침
   const handleRefresh = useCallback(() => {
-    setHasMore(true);
-    loadFeeds(true);
-  }, [loadFeeds]);
+    if (!isAuthenticated) {
+      showToast('로그인이 필요합니다.', 'error');
+      return;
+    }
+    
+    console.log('🔥 피드 새로고침 요청');
+    setIsRefreshing(true);
+    setRefreshKey(prev => prev + 1);
+    
+    // 새로고침 상태 해제
+    setTimeout(() => setIsRefreshing(false), 1000);
+  }, [isAuthenticated, showToast]);
 
   // 공유 핸들러
   const handleShare = useCallback((post: PostResponse | PostDetailResponse, e: React.MouseEvent) => {
@@ -620,15 +885,15 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
     return (
       <div
         key={post.postId}
-        className="relative group cursor-pointer bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200"
+        className="relative group cursor-pointer bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
         onClick={() => handleFeedClick(post)}
       >
         {/* 피드 이미지 */}
-        <div className="aspect-square relative overflow-hidden rounded-t-lg">
+        <div className="aspect-square relative overflow-hidden">
           <img
             src={post.imgUrl || '/api/placeholder/400/400'}
             alt={post.caption || '게시물 이미지'}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             loading="lazy"
             onError={(e) => {
               const target = e.target as HTMLImageElement;
@@ -638,33 +903,44 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
           
           {/* 호버 오버레이 */}
           <div className="absolute inset-0 bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-            <div className="flex space-x-4 text-white">
-              <div className="flex items-center space-x-1">
+            <div className="flex space-x-6 text-white">
+              <div className="flex items-center space-x-2">
                 {post.isLikedByMe ? (
                   <HeartSolidIcon className="h-6 w-6 text-red-500" />
                 ) : (
                   <HeartIcon className="h-6 w-6" />
                 )}
-                <span>{post.likeCount}</span>
+                <span className="font-medium">{post.likeCount}</span>
               </div>
             </div>
           </div>
 
           {/* 피드 타입 배지 */}
           <div className="absolute top-2 left-2">
-            <span className="bg-black/50 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
+            <span className="bg-black/60 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
               {type === 'timeline' ? '👥 타임라인' : 
                type === 'explore' ? '🎲 탐색' : 
-               type === 'user' ? '👤 사용자' : '🔍 검색'}
+               type === 'user' ? '👤 사용자' : 
+               type === 'search' ? '🔍 검색' : 
+               type === 'single' ? '📌 단일' : '📱 피드'}
             </span>
           </div>
+
+          {/* 게시물 ID (개발 환경에서만) */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="absolute top-2 right-2">
+              <span className="bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm font-mono">
+                #{post.postId}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* 피드 정보 */}
         <div className="p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center space-x-2 flex-1">
-              <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-2 flex-1 min-w-0">
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
                 {post.authorProfileImage ? (
                   <img
                     src={post.authorProfileImage}
@@ -673,49 +949,67 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
+                      const parent = target.parentElement;
+                      if (parent) {
+                        parent.innerHTML = `<div class="w-full h-full flex items-center justify-center text-gray-500 text-xs font-medium">${post.authorAccountName.charAt(0).toUpperCase()}</div>`;
+                      }
                     }}
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                  <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs font-medium">
                     {post.authorAccountName.charAt(0).toUpperCase()}
                   </div>
                 )}
               </div>
               <span className="text-sm font-medium text-gray-900 truncate">
-                {post.authorAccountName}
+                @{post.authorAccountName}
               </span>
             </div>
             <span className="text-xs text-gray-500 flex-shrink-0">
-              {new Date(post.createdAt).toLocaleDateString('ko-KR')}
+              {new Date(post.createdAt).toLocaleDateString('ko-KR', { 
+                month: 'short', 
+                day: 'numeric' 
+              })}
             </span>
           </div>
           
-          <p className="text-sm text-gray-800 line-clamp-2 mb-2">
+          <p className="text-sm text-gray-800 line-clamp-2 mb-3 leading-relaxed">
             {post.caption || '캡션이 없습니다'}
           </p>
-        </div>
 
-        {/* 액션 버튼들 */}
-        <div className="flex items-center justify-between p-4 pt-0">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={(e) => handleLikeToggle(post, e)}
-              className="flex items-center space-x-1 text-gray-600 hover:text-red-500 transition-colors"
-            >
-              {post.isLikedByMe ? (
-                <HeartSolidIcon className="h-5 w-5 text-red-500" />
-              ) : (
-                <HeartIcon className="h-5 w-5" />
-              )}
-              <span className="text-sm">{post.likeCount}</span>
-            </button>
-            
+          {/* 액션 버튼들 */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={(e) => handleLikeToggle(post, e)}
+                className="flex items-center space-x-1 text-gray-600 hover:text-red-500 transition-colors"
+              >
+                {post.isLikedByMe ? (
+                  <HeartSolidIcon className="h-5 w-5 text-red-500" />
+                ) : (
+                  <HeartIcon className="h-5 w-5" />
+                )}
+                <span className="text-sm font-medium">{post.likeCount}</span>
+              </button>
+              
+              <button 
+                onClick={(e) => handleShare(post, e)}
+                className="flex items-center space-x-1 text-gray-600 hover:text-blue-500 transition-colors"
+              >
+                <ShareIcon className="h-5 w-5" />
+                <span className="text-sm">공유</span>
+              </button>
+            </div>
+
+            {/* 더보기 버튼 */}
             <button 
-              onClick={(e) => handleShare(post, e)}
-              className="flex items-center space-x-1 text-gray-600 hover:text-green-500 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                // TODO: 더보기 메뉴 구현
+              }}
+              className="text-gray-600 hover:text-gray-800 transition-colors p-1"
             >
-              <ShareIcon className="h-5 w-5" />
-              <span className="text-sm">공유</span>
+              <EllipsisHorizontalIcon className="h-5 w-5" />
             </button>
           </div>
         </div>
@@ -724,161 +1018,247 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
   }, [handleFeedClick, handleLikeToggle, handleShare, type]);
 
   // ============================================================================
-  // 렌더링
+  // 메인 렌더링 - AuthGuard로 감싸기
   // ============================================================================
 
-  // 로딩 상태 (첫 로드)
-  if (isLoading && feedItems.length === 0) {
-    return (
-      <div className={`flex items-center justify-center h-64 ${className}`}>
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
-
-  // 에러 상태 (첫 로드)
-  if (error && feedItems.length === 0) {
-    return (
-      <div className={`flex flex-col items-center justify-center h-64 text-center ${className}`}>
-        <div className="text-red-500 text-lg font-medium mb-2">오류가 발생했습니다</div>
-        <p className="text-gray-600 mb-4">{error}</p>
-        <button 
-          onClick={() => loadFeeds(true)}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-        >
-          다시 시도
-        </button>
-      </div>
-    );
-  }
-
-  // 피드가 없는 경우
-  if (feedItems.length === 0) {
-    return (
-      <div className={`flex flex-col items-center justify-center h-64 text-center ${className}`}>
-        <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-4xl">📷</span>
+  const renderContent = () => {
+    // 첫 로딩 상태 (인증된 사용자)
+    if (isLoading && feedItems.length === 0 && isAuthenticated) {
+      return (
+        <div className={`flex flex-col items-center justify-center h-64 ${className}`}>
+          <LoadingSpinner size="lg" />
+          <p className="mt-4 text-gray-600">
+            {type === 'timeline' ? '타임라인을 불러오는 중...' :
+             type === 'explore' ? '탐색 피드를 불러오는 중...' :
+             type === 'user' ? '사용자 피드를 불러오는 중...' :
+             type === 'search' ? '검색 중...' : 
+             type === 'single' ? '게시물을 불러오는 중...' : '피드를 불러오는 중...'}
+          </p>
         </div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">
-          게시물이 없습니다
-        </h2>
-        <p className="text-gray-600 mb-4">
-          {isMyFeed ? '첫 번째 게시물을 만들어보세요!' : '아직 업로드된 게시물이 없습니다.'}
-        </p>
-        <button 
-          onClick={handleRefresh}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-        >
-          새로고침
-        </button>
+      );
+    }
+
+    // 에러 상태 (첫 로드)
+    if (error && feedItems.length === 0) {
+      return (
+        <div className={`flex flex-col items-center justify-center h-64 text-center ${className}`}>
+          <div className="text-red-500 text-lg font-medium mb-2">오류가 발생했습니다</div>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <div className="flex space-x-3">
+            <button 
+              onClick={handleRefresh}
+              className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              다시 시도
+            </button>
+            {error.includes('인증') && (
+              <button 
+                onClick={handleLogin}
+                className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+              >
+                로그인하기
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // 피드가 없는 경우
+    if (feedItems.length === 0 && isAuthenticated) {
+      return (
+        <div className={`flex flex-col items-center justify-center h-64 text-center ${className}`}>
+          <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-4xl">
+              {type === 'timeline' ? '📰' :
+               type === 'explore' ? '🔍' :
+               type === 'user' ? '👤' :
+               type === 'search' ? '🔎' : 
+               type === 'single' ? '📌' : '📷'}
+            </span>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            {type === 'timeline' ? '타임라인이 비어있습니다' :
+             type === 'explore' ? '탐색할 피드가 없습니다' :
+             type === 'user' ? '게시물이 없습니다' :
+             type === 'search' ? '검색 결과가 없습니다' : 
+             type === 'single' ? '게시물을 찾을 수 없습니다' : '게시물이 없습니다'}
+          </h2>
+          <p className="text-gray-600 mb-4">
+            {type === 'timeline' ? '팔로우하는 사용자들의 게시물이 나타납니다' :
+             type === 'explore' ? '새로운 피드들을 발견해보세요' :
+             type === 'user' && isMyFeed ? '첫 번째 게시물을 만들어보세요!' :
+             type === 'user' ? '아직 업로드된 게시물이 없습니다' :
+             type === 'search' ? `"${searchQuery}"와 일치하는 결과가 없습니다` : 
+             type === 'single' ? '요청한 게시물이 존재하지 않거나 삭제되었습니다' : '게시물이 없습니다'}
+          </p>
+          <button 
+            onClick={handleRefresh}
+            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            새로고침
+          </button>
+        </div>
+      );
+    }
+
+    // 메인 피드 콘텐츠
+    return (
+      <div ref={containerRef} className={`h-full overflow-y-auto ${className}`}>
+        {/* 헤더 정보 */}
+        <div className="sticky top-0 z-10 p-4 bg-white/95 backdrop-blur-sm border-b">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">
+                {type === 'timeline' ? '타임라인' : 
+                 type === 'explore' ? '탐색' : 
+                 type === 'user' ? `${accountName || '사용자'}의 게시물` : 
+                 type === 'search' ? `"${searchQuery}" 검색 결과` : 
+                 type === 'single' ? '게시물 상세' : '게시물'}
+              </h1>
+              <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                <span>총 {feedStats.totalLoaded}개</span>
+                <span>•</span>
+                <span>좋아요 {feedStats.totalLikes}개</span>
+                {hasNextPage && (
+                  <>
+                    <span>•</span>
+                    <span className="text-blue-600">더 많은 피드 로딩 가능</span>
+                  </>
+                )}
+                {user && (
+                  <>
+                    <span>•</span>
+                    <span className="text-green-600">@{user.accountName}로 로그인됨</span>
+                  </>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="bg-blue-500 text-white px-3 py-2 text-sm rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+            >
+              {isRefreshing ? '새로고침 중...' : '새로고침'}
+            </button>
+          </div>
+        </div>
+
+        {/* 에러 경고 메시지 (부분 로드 성공) */}
+        {error && feedItems.length > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 mx-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-800">{error}</p>
+                <div className="flex space-x-3 mt-2">
+                  <button
+                    onClick={() => setError(null)}
+                    className="text-sm text-yellow-700 underline hover:text-yellow-900"
+                  >
+                    닫기
+                  </button>
+                  {error.includes('인증') && (
+                    <button
+                      onClick={handleLogin}
+                      className="text-sm text-yellow-700 underline hover:text-yellow-900"
+                    >
+                      로그인하기
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 피드 그리드 (반응형) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 p-4">
+          {feedItems.map((post, index) => renderFeedItem(post, index))}
+        </div>
+
+        {/* 무한스크롤 트리거 요소 */}
+        {hasNextPage && isAuthenticated && (
+          <div 
+            ref={loadMoreTriggerRef}
+            className="flex items-center justify-center py-8"
+          >
+            {isLoadingMore ? (
+              <div className="flex flex-col items-center space-y-2">
+                <LoadingSpinner size="md" />
+                <p className="text-sm text-gray-600">더 많은 피드를 불러오는 중...</p>
+              </div>
+            ) : (
+              <div className="text-center">
+                <p className="text-sm text-gray-400">스크롤하여 더 많은 피드 보기</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 더 이상 로드할 피드가 없을 때 */}
+        {!hasNextPage && feedItems.length > 0 && (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <p className="text-sm text-gray-500 mb-2">🎉 모든 피드를 확인했습니다!</p>
+              <p className="text-xs text-gray-400">새로고침하여 새로운 피드를 찾아보세요</p>
+            </div>
+          </div>
+        )}
+
+        {/* 피드 상세 모달 */}
+        {selectedFeed && (
+          <FeedDetailModal
+            feed={selectedFeed}
+            onClose={() => setSelectedFeed(null)}
+            onLike={handleLikeToggle}
+            onShare={handleShare}
+            onFollow={handleFollowToggle}
+          />
+        )}
+
+        {/* 토스트 메시지 */}
+        {toastMessage && (
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
+            <div className={`px-4 py-2 rounded-lg text-white font-medium shadow-lg transition-all duration-300 ${
+              toastMessage.type === 'success' ? 'bg-green-500' : 
+              toastMessage.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+            }`}>
+              {toastMessage.message}
+            </div>
+          </div>
+        )}
+
+        {/* 개발 정보 (개발 모드에서만) */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="fixed bottom-4 right-4 bg-black bg-opacity-80 text-white text-xs rounded-lg p-3 z-30 max-w-xs">
+            <div className="font-semibold mb-2">🔥 피드뷰어 디버그</div>
+            <div className="space-y-1">
+              <div>타입: {type}</div>
+              <div>사용자: {userId || accountName || 'None'}</div>
+              <div>게시물 ID: {postId || 'None'}</div>
+              <div>검색어: {searchQuery || 'None'}</div>
+              <div>로드된 피드: {feedStats.totalLoaded}개</div>
+              <div>총 좋아요: {feedStats.totalLikes}개</div>
+              <div>다음 페이지: {hasNextPage ? 'Yes' : 'No'}</div>
+              <div>다음 커서: {nextCursor || 'None'}</div>
+              <div>로딩 중: {isLoadingMore ? 'Yes' : 'No'}</div>
+              <div>인증: {isAuthenticated ? 'Yes' : 'No'}</div>
+              <div>사용자: {user?.accountName || 'None'}</div>
+              <div>현재 limit: {optimalLimit}</div>
+            </div>
+          </div>
+        )}
       </div>
     );
-  }
+  };
 
   return (
-    <div ref={containerRef} className={`h-full overflow-y-auto ${className}`}>
-      {/* 헤더 정보 */}
-      <div className="p-4 bg-white border-b">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">
-              {type === 'timeline' ? '타임라인' : 
-               type === 'explore' ? '탐색' : 
-               type === 'user' ? `${accountName || '사용자'}의 게시물` : 
-               type === 'search' ? `"${searchQuery}" 검색 결과` : '게시물'}
-            </h1>
-            <p className="text-sm text-gray-500">
-              총 {feedItems.length}개의 게시물
-            </p>
-          </div>
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="bg-blue-500 text-white px-3 py-1 text-sm rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
-          >
-            {isRefreshing ? '새로고침...' : '새로고침'}
-          </button>
-        </div>
-      </div>
-
-      {/* 에러 경고 메시지 (부분 로드 성공) */}
-      {error && feedItems.length > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 mx-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-yellow-800">{error}</p>
-              <button
-                onClick={() => setError(null)}
-                className="text-sm text-yellow-700 underline hover:text-yellow-900"
-              >
-                닫기
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 피드 그리드 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
-        {feedItems.map((post, index) => renderFeedItem(post, index))}
-      </div>
-
-      {/* 더 로드하기 버튼 */}
-      {hasMore && feedItems.length > 0 && (
-        <div className="flex justify-center p-4">
-          <button
-            onClick={() => loadFeeds(false)}
-            disabled={isLoadingMore}
-            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
-          >
-            {isLoadingMore ? '로딩 중...' : '더 보기'}
-          </button>
-        </div>
-      )}
-
-      {/* 피드 상세 모달 */}
-      {selectedFeed && (
-        <FeedDetailModal
-          feed={selectedFeed}
-          onClose={() => setSelectedFeed(null)}
-          onLike={handleLikeToggle}
-          onShare={handleShare}
-          onFollow={handleFollowToggle}
-        />
-      )}
-
-      {/* 토스트 메시지 */}
-      {toastMessage && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
-          <div className={`px-4 py-2 rounded-lg text-white font-medium shadow-lg transition-all duration-300 ${
-            toastMessage.type === 'success' ? 'bg-green-500' : 'bg-red-500'
-          }`}>
-            {toastMessage.message}
-          </div>
-        </div>
-      )}
-
-      {/* 개발 정보 (개발 모드에서만) */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-4 right-4 bg-black bg-opacity-70 text-white text-xs rounded p-3 z-30 max-w-xs">
-          <div className="font-semibold mb-1">🔥 개발 정보</div>
-          <div>타입: {type}</div>
-          <div>사용자 ID: {userId || 'None'}</div>
-          <div>계정명: {accountName || 'None'}</div>
-          <div>피드 ID: {feedId || 'None'}</div>
-          <div>검색어: {searchQuery || 'None'}</div>
-          <div>게시물 수: {feedItems.length}</div>
-          <div>인증: {isAuthenticated ? 'Yes' : 'No'}</div>
-          <div>로딩: {isLoading ? 'Yes' : 'No'}</div>
-          <div>에러: {error ? 'Yes' : 'No'}</div>
-        </div>
-      )}
-    </div>
+    <AuthGuard className={className}>
+      {renderContent()}
+    </AuthGuard>
   );
 };
 
@@ -919,11 +1299,11 @@ const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="flex">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl max-w-5xl max-h-[90vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-col lg:flex-row">
           {/* 피드 이미지 영역 */}
-          <div className="flex-1 bg-black flex items-center justify-center min-h-[500px]">
+          <div className="flex-1 bg-black flex items-center justify-center min-h-[300px] lg:min-h-[600px]">
             <img
               src={feed.imgUrl || '/api/placeholder/600/600'}
               alt={feed.caption || '게시물 이미지'}
@@ -936,11 +1316,11 @@ const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
           </div>
           
           {/* 피드 정보 영역 */}
-          <div className="w-80 flex flex-col">
+          <div className="w-full lg:w-96 flex flex-col">
             {/* 헤더 */}
             <div className="flex items-center justify-between p-4 border-b">
-              <div className="flex items-center space-x-3 flex-1">
-                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
+              <div className="flex items-center space-x-3 flex-1 min-w-0">
+                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
                   {feed.authorProfileImage ? (
                     <img
                       src={feed.authorProfileImage}
@@ -948,13 +1328,13 @@ const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                    <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm font-medium">
                       {feed.authorAccountName.charAt(0).toUpperCase()}
                     </div>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{feed.authorAccountName}</div>
+                  <div className="font-semibold text-gray-900 truncate">@{feed.authorAccountName}</div>
                   <div className="text-sm text-gray-500">
                     {new Date(feed.createdAt).toLocaleDateString('ko-KR', {
                       year: 'numeric',
@@ -968,7 +1348,7 @@ const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
               </div>
               <button
                 onClick={onClose}
-                className="text-gray-500 hover:text-gray-700 ml-2 p-1"
+                className="text-gray-500 hover:text-gray-700 ml-2 p-2 rounded-full hover:bg-gray-100 transition-colors"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -978,56 +1358,84 @@ const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
 
             {/* 피드 내용 */}
             <div className="flex-1 overflow-y-auto p-4">
-              <p className="text-gray-700 whitespace-pre-wrap">
-                {feed.caption || '캡션이 없습니다'}
-              </p>
+              <div className="prose prose-sm max-w-none">
+                <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">
+                  {feed.caption || '캡션이 없습니다'}
+                </p>
+              </div>
 
               {/* 피드 정보 */}
-              <div className="mt-6 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">계정:</span>
-                  <span className="text-gray-700">@{feed.authorAccountName}</span>
+              <div className="mt-6 space-y-3 text-sm">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-gray-500">계정:</span>
+                    <span className="text-gray-900 font-medium ml-2">@{feed.authorAccountName}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">좋아요:</span>
+                    <span className="text-gray-900 font-medium ml-2">{feed.likeCount}개</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-gray-500">게시물 ID:</span>
+                    <span className="text-gray-900 font-mono text-xs ml-2">{feed.postId}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">사진 ID:</span>
+                    <span className="text-gray-900 font-mono text-xs ml-2">{feed.photoId}</span>
+                  </div>
+                </div>
+
+                <div>
                   <span className="text-gray-500">작성일:</span>
-                  <span className="text-gray-700">
-                    {new Date(feed.createdAt).toLocaleDateString('ko-KR')}
+                  <span className="text-gray-900 ml-2">
+                    {new Date(feed.createdAt).toLocaleDateString('ko-KR', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">좋아요:</span>
-                  <span className="text-gray-700">{feed.likeCount}개</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">게시물 ID:</span>
-                  <span className="text-gray-700">{feed.postId}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">사진 ID:</span>
-                  <span className="text-gray-700">{feed.photoId}</span>
+
+                {/* 관계 정보 */}
+                <div className="pt-3 border-t space-y-2">
+                  <div className="flex items-center space-x-3 text-xs">
+                    <span className={`px-2 py-1 rounded-full ${feed.isMyPost ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                      {feed.isMyPost ? '내 게시물' : '다른 사용자 게시물'}
+                    </span>
+                    {!feed.isMyPost && (
+                      <span className={`px-2 py-1 rounded-full ${feed.isFollowingAuthor ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}`}>
+                        {feed.isFollowingAuthor ? '팔로잉 중' : '팔로우 안함'}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* 액션 버튼들 */}
-            <div className="border-t p-4">
+            <div className="border-t p-4 bg-gray-50">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <button
                     onClick={(e) => onLike(feed, e)}
-                    className="flex items-center space-x-1 text-gray-600 hover:text-red-500 transition-colors"
+                    className="flex items-center space-x-2 text-gray-600 hover:text-red-500 transition-colors"
                   >
                     {feed.isLikedByMe ? (
                       <HeartSolidIcon className="h-6 w-6 text-red-500" />
                     ) : (
                       <HeartIcon className="h-6 w-6" />
                     )}
-                    <span>{feed.likeCount}</span>
+                    <span className="font-medium">{feed.likeCount}</span>
                   </button>
                   
                   <button 
                     onClick={(e) => onShare(feed, e)}
-                    className="flex items-center space-x-1 text-gray-600 hover:text-green-500 transition-colors"
+                    className="flex items-center space-x-2 text-gray-600 hover:text-blue-500 transition-colors"
                   >
                     <ShareIcon className="h-6 w-6" />
                     <span>공유</span>
@@ -1038,13 +1446,23 @@ const FeedDetailModal: React.FC<FeedDetailModalProps> = ({
                 {!feed.isMyPost && (
                   <button
                     onClick={(e) => onFollow(feed, e)}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
                       feed.isFollowingAuthor
                         ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                         : 'bg-blue-600 text-white hover:bg-blue-700'
                     }`}
                   >
-                    {feed.isFollowingAuthor ? '언팔로우' : '팔로우'}
+                    {feed.isFollowingAuthor ? (
+                      <>
+                        <UserMinusIcon className="h-4 w-4 inline mr-1" />
+                        언팔로우
+                      </>
+                    ) : (
+                      <>
+                        <UserPlusIcon className="h-4 w-4 inline mr-1" />
+                        팔로우
+                      </>
+                    )}
                   </button>
                 )}
               </div>
