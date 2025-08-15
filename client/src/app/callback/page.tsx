@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/auth'
 import { API_BASE_URL } from '@/constants/api'
 
 type PageState = 'loading' | 'success' | 'error'
 
-export default function CallbackPage() {
+function CallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { handleLoginSuccess, fetchUserInfo } = useAuth()
@@ -221,5 +221,23 @@ export default function CallbackPage() {
         <p className="text-sm text-gray-500">잠시 후 자동으로 이동합니다.</p>
       </div>
     </div>
+  )
+}
+
+export default function CallbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+          <h2 className="mb-2 text-xl font-semibold text-gray-900">
+            로그인 처리 중...
+          </h2>
+          <p className="text-gray-600">잠시만 기다려 주세요.</p>
+        </div>
+      </div>
+    }>
+      <CallbackContent />
+    </Suspense>
   )
 }

@@ -1,12 +1,12 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { X, Edit } from 'lucide-react'
 import api from '@/lib/axios'
 import { resizeImage } from '@/utils/imageOptimizer'
 
-export default function UploadPhotoPage() {
+function UploadPhotoContent() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [optimizedBlob, setOptimizedBlob] = useState<Blob | null>(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -334,5 +334,17 @@ export default function UploadPhotoPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function UploadPhotoPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-gray-600">로딩 중...</div>
+      </div>
+    }>
+      <UploadPhotoContent />
+    </Suspense>
   )
 }
