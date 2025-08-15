@@ -15,12 +15,13 @@ import LogoutButton from './LogoutButton'
 import UploadSelfieModal from './UploadSelfieModal'
 import { useAuth } from '@/hooks/auth'
 
-interface ImageItem {
-  id: string
-  src: string
-  alt: string
+export interface ImageItem {
+  photoId: string
+  imgUrl: string
+  alt?: string
   isLiked?: boolean
   isEdited?: boolean
+  editable?: number         // 1: 편집 가능, 0: 편집 불가능
   hashtags?: string[]
 }
 
@@ -37,83 +38,78 @@ interface DashboardProps {
   onRefresh?: (condition?: MyPhotoListCondition) => Promise<void>
   onLoadMore?: () => Promise<void>
   hasMore?: boolean
+  onLike?: (photoId: string) => Promise<void>
+  onShareKakao?: (photoId: string) => void
+  onDelete?: (photoId: string) => Promise<void>
+  onEdit?: (photoId: string, editedImageUrl: string) => Promise<void>
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefresh, onLoadMore, hasMore }) => {
-  // userProfile이 이미 User 타입이므로 직접 사용
+const Dashboard: React.FC<DashboardProps> = ({ 
+  images = [], 
+  userProfile, 
+  onRefresh, 
+  onLoadMore, 
+  hasMore,
+  onLike,
+  onShareKakao,
+  onDelete,
+  onEdit
+}) => {
   const actualUser = userProfile
-  
   const { handleLogout, handleDeleteAccount, isLoading } = useAuth()
   
   const router = useRouter()
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true) // 기본값을 true로 변경
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true) // 사이드바 계속 열어 놓기
   const [activeModal, setActiveModal] = useState<string | null>(null)
   const [imageList, setImageList] = useState<ImageItem[]>([])
-  const [filteredImages, setFilteredImages] = useState<ImageItem[]>([])
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false)
   const [isMyFeedOpen, setIsMyFeedOpen] = useState<boolean>(false)
   const [isUploadSelfieModalOpen, setIsUploadSelfieModalOpen] = useState<boolean>(false)
 
-  // props로 받은 사용자별 이미지 데이터 사용
+  // props로 받은 이미지 데이터 사용 (두 번째 코드 로직)
   useEffect(() => {
+    console.log('📸 Dashboard received images:', images)
     setImageList(images)
-    setFilteredImages(images)
   }, [images])
 
-  // 현재 활성화된 필터들을 추적
-  const [activeFilters, setActiveFilters] = useState<Filter[]>([])
-
-  // imageList가 변경될 때 필터를 다시 적용
-  useEffect(() => {
-    if (activeFilters.length === 0) {
-      setFilteredImages(imageList)
-    } else {
-      const filtered = imageList.filter(image => {
-        return activeFilters.every(filter => {
-          switch (filter.type) {
-            case 'heart':
-              return image.isLiked === true
-            case 'name':
-              return image.hashtags?.some(tag => 
-                tag.toLowerCase().includes(filter.value.toLowerCase())
-              )
-            case 'date':
-              return image.hashtags?.some(tag => {
-                // 날짜 범위 검색인 경우
-                if (filter.value.includes('~')) {
-                  const [startDate, endDate] = filter.value.split('~').map(d => d.trim())
-                  return tag >= startDate && tag <= endDate
-                }
-                // 단일 날짜 검색인 경우
-                return tag === filter.value
-              })
-            case 'edited':
-              return filter.value === 'edited' ? image.isEdited === true : image.isEdited !== true
-            default:
-              return false
-          }
-        })
-      })
-      setFilteredImages(filtered)
-    }
-  }, [imageList, activeFilters])
-
   const handleFiltersChange = async (filters: Filter[]) => {
-    setActiveFilters(filters)
+    console.log('🔍 Filter change requested:', filters)
 
-    // 필터를 백엔드 API 파라미터로 변환
+    if (filters.length === 0) {
+      console.log('🧹 No filters - loading all photos')
+      if (onRefresh) {
+        try {
+          await onRefresh({})
+          console.log('✅ Filter refresh completed (all photos)')
+        } catch (error) {
+          console.error('❌ Filter refresh failed:', error)
+          alert('전체 사진 로딩 중 오류가 발생했습니다. 다시 시도해주세요.')
+        }
+      }
+      return
+    }
+
     const condition: MyPhotoListCondition = {
       limit: 20
     }
 
     filters.forEach(filter => {
+      console.log(`🏷️ Processing filter: ${filter.type} = ${filter.value}`)
+      
       switch (filter.type) {
         case 'heart':
-          condition.heart = true
+          // heart 필터 값을 boolean으로 변환
+          condition.heart = filter.value === 'liked' ? true : false
+          console.log(`Heart filter value: ${filter.value} → ${condition.heart}`)
           break
         case 'name':
-          // partnerEmails로 전송 (쉼표로 구분)
-          condition.partnerEmails = filter.value
+          if (!condition.partnerEmails) {
+            condition.partnerEmails = []
+          }
+          const emailValue = filter.value.trim()
+          if (emailValue) {
+            condition.partnerEmails.push(emailValue)
+          }
           break
         case 'date':
           if (filter.value.includes('~')) {
@@ -121,24 +117,33 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefre
             condition.startDate = start
             condition.endDate = end
           } else {
-            condition.startDate = filter.value.replace(/\./g, '-')
-            condition.endDate = filter.value.replace(/\./g, '-')
+            const dateValue = filter.value.replace(/\./g, '-')
+            condition.startDate = dateValue
+            condition.endDate = dateValue
           }
+          break
+        case 'edited':
+          console.log('Edited filter not implemented in backend')
           break
       }
     })
 
-    // 백엔드에서 필터된 데이터 가져오기
+    console.log('Sending condition to backend:', condition)
+
     if (onRefresh) {
-      await onRefresh(condition)
+      try {
+        await onRefresh(condition)
+        console.log('Filter refresh completed')
+      } catch (error) {
+        console.error('Filter refresh failed:', error)
+        alert('필터 적용 중 오류가 발생했습니다. 다시 시도해주세요.')
+      }
     }
   }
 
   const handleUploadSelfie = (): void => {
-    // 마이룸에서는 항상 모달 열기 (참조 사진 유무와 관계없이)
     setIsUploadSelfieModalOpen(true)
   }
-
 
   const handleAccount = (): void => {
     setActiveModal('account')
@@ -152,110 +157,27 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefre
     setIsSidebarOpen(!isSidebarOpen)
   }
 
-  const handleLike = async (imageId: string): Promise<void> => {
-    const targetImage = imageList.find(img => img.id === imageId)
-    const newIsLiked = !targetImage?.isLiked
-
-    try {
-      // API 호출
-      await myroomService.updateHeart({
-        photoId: parseInt(imageId),
-        heart: newIsLiked
-      })
-
-      // 로컬 상태 업데이트
-      setImageList(prevImages =>
-        prevImages.map(img =>
-          img.id === imageId ? { ...img, isLiked: newIsLiked } : img
-        )
-      )
-    } catch (error) {
-      console.error('하트 상태 업데이트 실패:', error)
+  const handleLike = async (photoId: string): Promise<void> => {
+    if (onLike) {
+      await onLike(photoId)
     }
   }
 
-  const handleShareKakao = (imageId: string): void => {
-  const targetImage = imageList.find(img => img.id === imageId)
-  if (!targetImage) {
-    console.error('Image not found:', imageId)
-    return
-  }
-
-  if (typeof window !== 'undefined' && (window as any).Kakao && (window as any).Kakao.Share) {
-    if (!(window as any).Kakao.isInitialized()) {
-      console.error('Kakao SDK not initialized')
-      alert('카카오톡 공유 기능을 사용할 수 없습니다.')
-      return
-    }
-
-    try {
-      (window as any).Kakao.Share.sendDefault({
-        objectType: 'feed',
-        content: {
-          title: targetImage.alt || '내가 그린 그림',
-          description: '이어줌에서 함께 그린 특별한 추억이에요!',
-          imageUrl: targetImage.src,
-          link: {
-            webUrl: window.location.href,
-            mobileWebUrl: window.location.href,
-          },
-        },
-      })
-    } catch (error) {
-      console.error('카카오톡 공유 실패:', error)
-      alert('카카오톡 공유에 실패했습니다. 다시 시도해주세요.')
-    }
-  } else {
-    console.error('Kakao SDK not loaded')
-    alert('카카오톡 공유 기능을 사용할 수 없습니다.')
-  }
-}
-
-  const handleDelete = async (imageId: string): Promise<void> => {
-    try {
-      // API 호출
-      await myroomService.deletePhoto({
-        photoId: parseInt(imageId)
-      })
-
-      // 로컬 상태 업데이트
-      setImageList(prevImages => prevImages.filter(img => img.id !== imageId))
-    } catch (error) {
-      console.error('사진 삭제 실패:', error)
+  const handleShareKakao = (photoId: string): void => {
+    if (onShareKakao) {
+      onShareKakao(photoId)
     }
   }
 
-  const handleSaveEdited = async (imageId: string): Promise<void> => {
-    try {
-      // API 호출로 편집본 저장 (원본을 수정 불가 상태로 전환)
-      await myroomService.saveEditedPhoto({
-        photoId: parseInt(imageId)
-      })
-
-      // 로컬 상태 업데이트 - 해당 이미지를 편집됨으로 표시
-      setImageList(prevImages =>
-        prevImages.map(img =>
-          img.id === imageId ? { ...img, isEdited: true } : img
-        )
-      )
-
-      console.log('편집본이 저장되었습니다.')
-    } catch (error) {
-      console.error('편집본 저장 실패:', error)
+  const handleDelete = async (photoId: string): Promise<void> => {
+    if (onDelete) {
+      await onDelete(photoId)
     }
   }
 
-  const handleEdit = (imageId: string): void => {
-    const imageToEdit = imageList.find(img => img.id === imageId)
-
-    if (imageToEdit && !imageToEdit.isEdited) {
-      // drawing 페이지로 라우팅 (이미지 ID와 src, returnUrl을 쿼리 파라미터로 전달)
-      const encodedSrc = encodeURIComponent(imageToEdit.src)
-      const currentPath = window.location.pathname
-      const encodedReturnUrl = encodeURIComponent(currentPath)
-      router.push(
-        `/drawing?id=${imageId}&src=${encodedSrc}&returnUrl=${encodedReturnUrl}&saveCallback=true`
-      )
+  const handleEdit = async (photoId: string, editedImageUrl: string): Promise<void> => {
+    if (onEdit) {
+      await onEdit(photoId, editedImageUrl)
     }
   }
 
@@ -275,6 +197,14 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefre
         <header className="border-b bg-white shadow-sm">
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center space-x-4">
+              <button
+                onClick={toggleSidebar}
+                className="lg:hidden p-2 rounded-md hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
               <h1 className="text-2xl font-bold text-gray-900"></h1>
             </div>
             <div className="flex items-center space-x-3">
@@ -317,7 +247,6 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefre
                           <div className="ml-4 border-l-2 border-gray-100">
                             <button
                               onClick={() => {
-                                /* Home.png 관련 새로운 기능 */
                                 setIsMyFeedOpen(false)
                                 setIsMenuOpen(false)
                               }}
@@ -328,7 +257,6 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefre
                             </button>
                             <button
                               onClick={() => {
-                                /* Search.png 관련 새로운 기능 */
                                 setIsMyFeedOpen(false)
                                 setIsMenuOpen(false)
                               }}
@@ -339,7 +267,6 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefre
                             </button>
                             <button
                               onClick={() => {
-                                /* User.png 관련 새로운 기능 */
                                 setIsMyFeedOpen(false)
                                 setIsMenuOpen(false)
                               }}
@@ -381,7 +308,7 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefre
             <SearchBox onFiltersChange={handleFiltersChange} />
           </div>
           <ImageArchive
-            images={filteredImages}
+            images={imageList}
             onLike={handleLike}
             onShareKakao={handleShareKakao}
             onDelete={handleDelete}
@@ -391,8 +318,6 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefre
           />
         </main>
       </div>
-
-
 
       {activeModal === 'account' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -493,7 +418,6 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefre
         isOpen={isUploadSelfieModalOpen}
         onClose={() => setIsUploadSelfieModalOpen(false)}
         onImageUpdated={() => {
-          // 참조 이미지 업데이트 후 추가 작업이 필요하면 여기에 작성
           console.log('참조 이미지가 업데이트되었습니다.')
         }}
       />

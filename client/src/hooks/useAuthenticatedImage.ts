@@ -1,19 +1,32 @@
-// hooks/useAuthenticatedImage.ts
 import { useState, useEffect } from 'react'
 import api from '@/lib/axios'
+import { API_ENDPOINTS } from '@/constants/api'
 
-export const useAuthenticatedImage = (photoId: string) => {
+interface UseAuthenticatedImageResult {
+  imageSrc: string | null
+  loading: boolean
+  error: string | null
+}
+
+export const useAuthenticatedImage = (
+  photoId: string
+): UseAuthenticatedImageResult => {
   const [imageSrc, setImageSrc] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
 
+  // Photo ID로 링크 가져오기
   useEffect(() => {
-    if (!photoId) return
+    if (!photoId) {
+      setError('Photo ID가 필요합니다.')
+      setLoading(false)
+      return
+    }
 
-    const loadImage = async () => {
+    const fetchImage = async () => {
       try {
         setLoading(true)
-        setError(false)
+        setError(null)
 
         console.log('🔄 이미지 로딩 시작:', photoId)
         console.log('📤 요청 URL:', `/myroom/image/${photoId}`)
@@ -24,51 +37,72 @@ export const useAuthenticatedImage = (photoId: string) => {
         console.log('🔑 인증 상태:', {
           isAuthenticated: authState.isAuthenticated,
           hasToken: !!authState.accessToken,
-          tokenPreview: authState.accessToken?.substring(0, 20) + '...'
+          tokenPreview: authState.accessToken?.substring(0, 20) + '...',
         })
-
-        // 인증된 API 요청으로 이미지 바이너리 가져오기 (자동으로 Bearer 토큰 포함)
+        // 인증이 포함된 이미지 요청
         const response = await api.get(`/myroom/image/${photoId}`, {
-          responseType: 'blob' // 바이너리 데이터로 받기
+          responseType: 'blob', // 이미지 데이터를 blob으로 받기
+          timeout: 15000, // 15초 타임아웃
         })
 
-        console.log('✅ 응답 성공:', response.status)
-
-        // Blob을 URL로 변환
+        // Blob을 Object URL로 변환
         const imageBlob = response.data
-        const imageUrl = URL.createObjectURL(imageBlob)
-        
-        setImageSrc(imageUrl)
-      } catch (err: any) {
-        console.error('이미지 로드 실패 - 상세 정보:')
-        console.error('photoId:', photoId)
-        console.error('요청 URL:', `/myroom/image/${photoId}`)
-        console.error('에러 객체:', err)
-        console.error('응답 상태:', err?.response?.status)
-        console.error('응답 데이터:', err?.response?.data)
-        console.error('에러 메시지:', err?.message)
-        console.error('네트워크 에러:', err?.code)
-        
-        if (err.response?.status === 401) {
-          console.warn('이미지 접근 권한 없음:', photoId)
-        } else if (err.response?.status === 404) {
-          console.warn('이미지를 찾을 수 없음:', photoId)
+        const imageObjectURL = URL.createObjectURL(imageBlob)
+
+        setImageSrc(imageObjectURL)
+
+        // 메모리 누수 방지를 위해 cleanup 등록
+        return () => {
+          if (imageObjectURL) {
+            URL.revokeObjectURL(imageObjectURL)
+          }
         }
-        setError(true)
+      } catch (err: any) {
+        console.error('이미지 로드 실패:', {
+          error: err,
+          message: err?.message,
+          status: err?.response?.status,
+          data: err?.response?.data,
+          config: err?.config,
+          photoId,
+        })
+
+        // 에러 타입별 처리
+        if (err.response?.status === 401) {
+          setError('로그인이 필요합니다.')
+        } else if (err.response?.status === 403) {
+          setError('접근 권한이 없습니다.')
+        } else if (err.response?.status === 404) {
+          setError('이미지를 찾을 수 없습니다.')
+        } else if (err.response?.status === 502) {
+          setError('이미지 서버에 일시적 문제가 발생했습니다.')
+        } else if (err.code === 'ECONNABORTED') {
+          setError('이미지 로드 시간이 초과되었습니다.')
+        } else {
+          setError('이미지를 불러오는데 실패했습니다.')
+        }
       } finally {
         setLoading(false)
       }
     }
 
-    loadImage()
+    let cleanup: (() => void) | undefined
 
-    // 컴포넌트 언마운트 시 메모리 정리
+    fetchImage().then(cleanupFn => {
+      cleanup = cleanupFn
+    })
+
+    // cleanup 함수 반환
     return () => {
-      if (imageSrc) {
-        URL.revokeObjectURL(imageSrc)
+      if (cleanup) {
+        cleanup()
       }
     }
   }, [photoId])
 
-  return { imageSrc, loading, error }
+  return {
+    imageSrc,
+    loading,
+    error,
+  }
 }

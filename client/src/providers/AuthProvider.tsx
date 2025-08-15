@@ -4,15 +4,13 @@ import { useEffect } from 'react'
 
 import { useIdleTimer } from '@/hooks/auth'
 import { useAuthStore } from '@/stores/authStore'
-import { tokenStorage } from '@/lib/auth'
-import { userService } from '@/services/userService'
 
 interface AuthProviderProps {
   children: React.ReactNode
 }
 
 export default function AuthProvider({ children }: AuthProviderProps) {
-  const { isAuthenticated, setTokens, setUser, setLoading } = useAuthStore()
+  const { isAuthenticated, initializeAuth } = useAuthStore()
 
   // 인증된 사용자의 비활성화 타이머
   useIdleTimer({
@@ -27,7 +25,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
         const savedToken = tokenStorage.get()
         if (savedToken) {
           setTokens({ accessToken: savedToken })
-          
+
           // 저장된 토큰으로 사용자 정보 가져오기
           try {
             const userInfo = await userService.getUserInfo()
@@ -46,7 +44,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     }
 
     initializeAuth()
-  }, [setTokens, setUser, setLoading])
+  }, [initializeAuth])
 
   return <>{children}</>
 }

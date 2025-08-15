@@ -4,9 +4,11 @@ import { XMarkIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import React from 'react'
 
 interface ImageItem {
-  id: string
-  src: string
-  alt: string
+  photoId: string
+  imgUrl: string
+  isLiked?: boolean
+  isEdited?: boolean
+  hashtags?: string[]
 }
 
 interface DeleteConfirmModalProps {
@@ -50,8 +52,8 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
           <div className="mb-4 flex justify-center">
             <div className="overflow-hidden rounded-lg">
               <img
-                src={image.src}
-                alt={image.alt}
+                src={image.imgUrl}
+                alt={image.imgUrl}
                 className="h-32 w-32 object-cover"
               />
             </div>
@@ -60,7 +62,7 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
           {/* Message */}
           <div className="text-center">
             <p className="mb-2 text-sm font-medium text-gray-900">
-              {image.alt}
+              {image.imgUrl}
             </p>
             <p className="text-sm text-gray-600">
               이 사진을 영구적으로 삭제하시겠습니까?

@@ -41,15 +41,19 @@ function CallbackContent() {
       try {
         setState('loading')
 
-        // 🔍 디버깅: 모든 URL 파라미터 확인
-        console.log('=== OAuth Callback Debug ===')
-        console.log('전체 URL:', window.location.href)
-        console.log('모든 URL 파라미터:', Object.fromEntries(searchParams.entries()))
-
         // OAuth2 인증 실패 체크
         const error = searchParams.get('error')
         if (error) {
           throw new Error(`OAuth2 인증 실패: ${error}`)
+        }
+
+        // refresh token으로 access token 요청
+        const tokenResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+        })
+        if (!tokenResponse.ok) {
+          throw new Error('Access token 요청 실패')
         }
 
         // 다양한 토큰 파라미터 이름 확인
@@ -80,18 +84,14 @@ function CallbackContent() {
           }
 
           const tokenData = await tokenResponse.json()
-          console.log('Refresh 응답:', tokenData)
-          
-          accessToken = tokenData.data?.accessToken || tokenData.accessToken
+          accessToken = tokenData.data?.accessToken
           if (!accessToken) {
             console.error('토큰 응답 구조:', tokenData)
             throw new Error('Access token이 응답에 없습니다')
           }
-          
-          console.log('✅ Refresh 엔드포인트에서 토큰 획득')
         }
 
-        // Zustand 스토어에 토큰 저장
+        // 토큰 저장
         handleLoginSuccess(accessToken)
 
         // 사용자 정보 불러오기
@@ -113,6 +113,15 @@ function CallbackContent() {
           const userData = await userInfo.json()
           const hasReferencePhoto = userData.data?.faceImageUrl
 
+          console.log('🔍 콜백에서 받은 사용자 정보:', userData)
+          console.log('🔍 userData.data:', userData.data)
+          console.log('🔍 userData.data?.userName:', userData.data?.userName)
+          console.log(
+            '🔍 userData.data?.userProfileImage:',
+            userData.data?.userProfileImage
+          )
+
+          // 참조 사진이 없으면 업로드 페이지로, 있으면 메인 페이지로
           setTimeout(() => {
             if (!hasReferencePhoto) {
               // 참조사진 없으면 업로드 페이지로, 원래 URL을 returnUrl 파라미터로 전달

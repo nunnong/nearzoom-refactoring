@@ -33,9 +33,9 @@ export default function RoomTestSocialPage() {
     // 1. 로그인되지 않은 경우
     if (!isAuthenticated) {
       console.log('❌ 로그인되지 않음 - 로그인 페이지로 리다이렉트')
-      
+
       const currentUrl = `/room/${roomId}`
-      
+
       console.log('💾 저장할 리다이렉트 URL:', currentUrl)
       localStorage.setItem('redirectAfterLogin', currentUrl)
       router.push('/login')
@@ -46,7 +46,6 @@ export default function RoomTestSocialPage() {
     console.log('✅ 로그인됨 - 참조사진 모달 표시')
     setPageState('photo_upload')
     setShowPhotoModal(true)
-
   }, [authLoading, isAuthenticated, roomId, router])
 
   // 방 참가 로직
@@ -67,7 +66,6 @@ export default function RoomTestSocialPage() {
 
       setRoomData(response)
       setPageState('success')
-
     } catch (error: any) {
       console.error('방 참가 실패:', error)
       const message = getErrorMessage(error)
@@ -86,11 +84,10 @@ export default function RoomTestSocialPage() {
   const handlePhotoComplete = () => {
     console.log('✅ 참조 사진 모달 완료')
     setShowPhotoModal(false)
-    
+
     // 방 참가 진행
     handleRoomJoin()
   }
-
 
   // 로딩 중
   if (pageState === 'loading' || authLoading) {
@@ -143,7 +140,7 @@ export default function RoomTestSocialPage() {
             AI 사진 합성을 위한 참조 사진을 설정해주세요
           </div>
         </div>
-        
+
         {/* 참조 사진 업로드 모달 */}
         <UploadPhotoModal
           isOpen={showPhotoModal}

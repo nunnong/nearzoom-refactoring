@@ -2,6 +2,7 @@ import api from '@/lib/axios'
 
 // axios interceptor가 자동으로 토큰 처리하므로 getAuthHeaders 함수 제거
 
+// 🔥 API Response 타입 (백엔드 응답 형식에 맞춤)
 interface ApiResponse<T> {
   error: boolean
   message: string
@@ -133,6 +134,7 @@ export const roomAPI = {
   },
 }
 
+// 🔥 유틸리티 함수들 (기존과 동일)
 export const generateRoomUrl = (roomId: number | string): string => {
   if (typeof window !== 'undefined') {
     return `${window.location.origin}/room/${roomId}`

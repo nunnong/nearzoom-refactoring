@@ -49,14 +49,19 @@ const SearchBox: React.FC<SearchBoxProps> = ({
   }
   // 하트 필터 여부
   const addHeartFilter = () => {
+    console.log('🔥 addHeartFilter 호출됨, 현재 필터들:', filters)
+    
     // 이미 하트 필터가 있는지 확인
     const existingHeartFilter = filters.find(f => f.type === 'heart')
     
     if (existingHeartFilter) {
-      // 이미 있으면 추가하지 않음
-      return
+      console.log('⚠️ 이미 하트 필터가 적용되어 있습니다')
+      return // 이미 있으면 아무것도 하지 않음
     }
-
+    
+    console.log('➕ 새로운 하트 필터 추가')
+    
+    // 새로운 하트 필터 추가 (좋아요한 사진만 보기)
     const newFilter: Filter = {
       id: Date.now().toString(),
       type: 'heart',
@@ -65,6 +70,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({
     }
 
     const updatedFilters = [...filters, newFilter]
+    console.log('➕ 추가된 필터들:', updatedFilters)
     setFilters(updatedFilters)
     onFiltersChange?.(updatedFilters)
   }

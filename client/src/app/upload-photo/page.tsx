@@ -58,7 +58,7 @@ function UploadPhotoContent() {
       return decodedUrl
     } else if (fallbackRedirect) {
       // 혹시라도 남은 게 있으면 보조로 이동
-      // localStorage는 실제 이동 시 삭제
+      localStorage.removeItem('redirectAfterLogin')
       return fallbackRedirect
     } else if (action === 'createRoom') {
       // 메인페이지로 이동 (방 생성을 위해)
@@ -71,16 +71,24 @@ function UploadPhotoContent() {
     }
   }
 
-  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0]
     if (file) {
       try {
-        console.log('원본 이미지 크기:', (file.size / 1024 / 1024).toFixed(2) + 'MB')
-        
+        console.log(
+          '원본 이미지 크기:',
+          (file.size / 1024 / 1024).toFixed(2) + 'MB'
+        )
+
         // 이미지 최적화
         const optimizedImage = await resizeImage(file)
-        console.log('최적화된 이미지 크기:', (optimizedImage.size / 1024 / 1024).toFixed(2) + 'MB')
-        
+        console.log(
+          '최적화된 이미지 크기:',
+          (optimizedImage.size / 1024 / 1024).toFixed(2) + 'MB'
+        )
+
         // 미리보기용 base64 변환
         const reader = new FileReader()
         reader.onload = e => {
@@ -88,10 +96,9 @@ function UploadPhotoContent() {
           setSelectedImage(result)
         }
         reader.readAsDataURL(optimizedImage)
-        
+
         // 업로드용 Blob 저장
         setOptimizedBlob(optimizedImage)
-        
       } catch (error) {
         console.error('이미지 최적화 실패:', error)
         // 실패시 원본 사용
@@ -140,7 +147,6 @@ function UploadPhotoContent() {
         throw new Error('이미지 URL을 받아올 수 없습니다.')
       }
 
-      // 3단계: 받은 URL을 프로필 이미지로 저장
       await api.put('/user/save-face-image', null, {
         params: {
           prettyFaceUrl: imageUrl,
@@ -154,10 +160,10 @@ function UploadPhotoContent() {
 
       // 업로드 처리 후 반드시 목적지로 이동
       const destination = getRedirectDestination()
-      
+
       // localStorage 정리
       localStorage.removeItem('redirectAfterLogin')
-      
+
       router.replace(destination)
     } catch (error: any) {
       console.error('참조 이미지 저장 실패:', error)
@@ -170,19 +176,19 @@ function UploadPhotoContent() {
   // '시작하기', '취소', '나중에 등록', '닫기' 모두 동일하게 목적지로 이동
   const handleSkip = () => {
     const destination = getRedirectDestination()
-    
+
     // localStorage 정리
     localStorage.removeItem('redirectAfterLogin')
-    
+
     router.replace(destination)
   }
 
   const handleClose = () => {
     const destination = getRedirectDestination()
-    
+
     // localStorage 정리
     localStorage.removeItem('redirectAfterLogin')
-    
+
     router.replace(destination)
   }
 
@@ -339,11 +345,13 @@ function UploadPhotoContent() {
 
 export default function UploadPhotoPage() {
   return (
-    <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-gray-600">로딩 중...</div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+          <div className="text-gray-600">로딩 중...</div>
+        </div>
+      }
+    >
       <UploadPhotoContent />
     </Suspense>
   )
