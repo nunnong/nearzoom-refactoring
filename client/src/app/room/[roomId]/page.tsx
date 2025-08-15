@@ -153,10 +153,6 @@ export default function RoomJoinPage() {
     return () => clearInterval(interval)
   }, [pageState, isAuthenticated, roomId, lastParticipantCount])
 
-<<<<<<< HEAD
-=======
-  // 브라우저 포커스 시 갱신
->>>>>>> 4b630cc2cb88a469c63eb1e054f65be169a4447e
   useEffect(() => {
     const handleFocus = () => {
       if (pageState === 'success' && isAuthenticated && roomId) {
@@ -169,10 +165,6 @@ export default function RoomJoinPage() {
     return () => window.removeEventListener('focus', handleFocus)
   }, [pageState, isAuthenticated, roomId])
 
-<<<<<<< HEAD
-=======
-  // 가시성 변경 시 갱신 (탭 전환)
->>>>>>> 4b630cc2cb88a469c63eb1e054f65be169a4447e
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && pageState === 'success' && isAuthenticated && roomId) {
