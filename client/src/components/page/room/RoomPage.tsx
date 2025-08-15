@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { useUserStore } from './providers/AuthProvider'
+import { useAuthStore } from '@/stores/authStore'
 import { PhotoBoothProvider } from './providers/PhotoBoothProvider'
 import { CursorProvider } from './providers/CursorProvider'
 import PhotoBooth from './components/PhotoBooth'
@@ -25,7 +25,8 @@ export default function RoomPage({ roomName }: RoomPageProps) {
   const [isConnecting, setIsConnecting] = useState(false)
   const [connectionError, setConnectionError] = useState<string | null>(null)
 
-  const username = useUserStore(state => state.username)
+  const user = useAuthStore(state => state.user)
+  const username = user?.name
   const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -47,7 +48,7 @@ export default function RoomPage({ roomName }: RoomPageProps) {
 
       const url = new URL(CONN_DETAILS_ENDPOINT, window.location.origin)
       url.searchParams.append('roomName', roomName)
-      url.searchParams.append('participantName', username)
+      url.searchParams.append('participantName', username || 'Guest')
 
       const response = await fetch(url.toString())
       if (!response.ok) {
@@ -73,13 +74,12 @@ export default function RoomPage({ roomName }: RoomPageProps) {
     setMounted(true)
   }, [])
 
-  // username이 없으면 리다이렉트
+  // 사용자가 없으면 에러 로그 (room-test-social에서 이미 체크함)
   useEffect(() => {
-    if (mounted && !username) {
-      const redirectUrl = `/room-test/${roomName}`
-      router.push(`/signin/test?redirect=${encodeURIComponent(redirectUrl)}`)
+    if (mounted && !user) {
+      console.error('User not authenticated in RoomPage')
     }
-  }, [mounted, username, roomName, router])
+  }, [mounted, user])
 
   // 토큰 가져오기
   useEffect(() => {

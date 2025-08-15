@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 
 import './globals.css'
 import AuthProvider from '@/providers/AuthProvider'
-import { AuthProvider as RoomAuthProvider } from '@/components/page/room/providers/AuthProvider'
 // TODO: 로컬 폰트 변경
 // import {
 //   Geist,
@@ -92,7 +91,7 @@ export default function RootLayout({
         className={`antialiased`}
       >
         <AuthProvider>
-          <RoomAuthProvider>{children}</RoomAuthProvider>
+          {children}
         </AuthProvider>
       </body>
     </html>

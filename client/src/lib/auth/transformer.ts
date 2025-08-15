@@ -9,6 +9,7 @@ interface BackendUserResponse {
   email?: string
   userProfileImage?: string
   profileImage?: string
+  faceImageUrl?: string
   socialType?: string
   createdAt?: string
   updatedAt?: string
@@ -21,6 +22,7 @@ export const userTransformer = {
       name: rawData.userName || rawData.name || '',
       email: rawData.userEmail || rawData.email || '',
       profileImage: rawData.userProfileImage || rawData.profileImage,
+      faceImageUrl: rawData.faceImageUrl,
       socialType: (rawData.socialType as 'GOOGLE' | 'KAKAO') || 'GOOGLE',
       createdAt: rawData.createdAt || new Date().toISOString(),
       updatedAt: rawData.updatedAt || new Date().toISOString(),

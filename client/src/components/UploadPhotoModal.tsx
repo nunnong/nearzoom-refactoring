@@ -1,28 +1,35 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
 import { X, Edit } from 'lucide-react'
 import api from '@/lib/axios'
 import { resizeImage } from '@/utils/imageOptimizer'
 
-export default function UploadPhotoPage() {
+interface UploadPhotoModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onComplete?: () => void
+}
+
+export default function UploadPhotoModal({
+  isOpen,
+  onClose,
+  onComplete
+}: UploadPhotoModalProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [optimizedBlob, setOptimizedBlob] = useState<Blob | null>(null)
   const [isUploading, setIsUploading] = useState(false)
-  const [currentReferenceImage, setCurrentReferenceImage] = useState<
-    string | null
-  >(null)
+  const [currentReferenceImage, setCurrentReferenceImage] = useState<string | null>(null)
   const [hasExistingImage, setHasExistingImage] = useState(false)
   const [loading, setLoading] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const router = useRouter()
-  const searchParams = useSearchParams()
 
-  // 페이지 로드 시 기존 참조 이미지 확인
+  // 모달이 열릴 때마다 기존 이미지 확인
   useEffect(() => {
-    checkExistingImage()
-  }, [])
+    if (isOpen) {
+      checkExistingImage()
+    }
+  }, [isOpen])
 
   const checkExistingImage = async () => {
     try {
@@ -37,37 +44,6 @@ export default function UploadPhotoPage() {
       console.error('Failed to check existing image:', error)
     } finally {
       setLoading(false)
-    }
-  }
-
-  // returnUrl 파라미터를 항상 URL 그대로, localStorage에도 혹시 값 있으면 보조로 체크하게 설계
-  const getRedirectDestination = () => {
-    const returnUrl = searchParams.get('returnUrl')
-    const action = searchParams.get('action')
-
-    // [변경 포인트1]: localStorage 예비 체크 (콜백구간 잘못된 전달 대비)
-    const fallbackRedirect =
-      typeof window !== 'undefined'
-        ? localStorage.getItem('redirectAfterLogin')
-        : null
-
-    if (returnUrl) {
-      // 공유받은 URL로 돌아가기
-      const decodedUrl = decodeURIComponent(returnUrl)
-      console.log('공유받은 URL로 이동:', decodedUrl)
-      return decodedUrl
-    } else if (fallbackRedirect) {
-      // 혹시라도 남은 게 있으면 보조로 이동
-      // localStorage는 실제 이동 시 삭제
-      return fallbackRedirect
-    } else if (action === 'createRoom') {
-      // 메인페이지로 이동 (방 생성을 위해)
-      console.log('메인페이지로 이동 (방 생성 예정)')
-      return '/'
-    } else {
-      // 기본값: 메인페이지
-      console.log('기본 메인페이지로 이동')
-      return '/'
     }
   }
 
@@ -110,7 +86,7 @@ export default function UploadPhotoPage() {
     fileInputRef.current?.click()
   }
 
-  // 저장/업로드 성공 후 리턴URL로 이동
+  // 저장/업로드 성공 후 완료 처리
   const handleSave = async () => {
     if (!selectedImage || !optimizedBlob) return
 
@@ -122,7 +98,7 @@ export default function UploadPhotoPage() {
       formData.append('file', optimizedBlob, 'profile.png')
       formData.append('type', 'profile')
 
-      // 2단계: 이미지 업로드 API 호출 (URL을 반환받음)
+      // 이미지 업로드 API 호출
       const uploadResponse = await api.post(
         'https://image.nearzoom.store/upload',
         formData,
@@ -140,7 +116,7 @@ export default function UploadPhotoPage() {
         throw new Error('이미지 URL을 받아올 수 없습니다.')
       }
 
-      // 3단계: 받은 URL을 프로필 이미지로 저장
+      // 받은 URL을 프로필 이미지로 저장
       await api.put('/user/save-face-image', null, {
         params: {
           prettyFaceUrl: imageUrl,
@@ -152,13 +128,9 @@ export default function UploadPhotoPage() {
 
       console.log('참조 이미지 저장 완료:', imageUrl)
 
-      // 업로드 처리 후 반드시 목적지로 이동
-      const destination = getRedirectDestination()
+      // 완료 처리
+      onComplete?.()
       
-      // localStorage 정리
-      localStorage.removeItem('redirectAfterLogin')
-      
-      router.replace(destination)
     } catch (error: any) {
       console.error('참조 이미지 저장 실패:', error)
       alert('참조 이미지 저장에 실패했습니다. 다시 시도해주세요.')
@@ -167,41 +139,21 @@ export default function UploadPhotoPage() {
     }
   }
 
-  // '시작하기', '취소', '나중에 등록', '닫기' 모두 동일하게 목적지로 이동
-  const handleSkip = () => {
-    const destination = getRedirectDestination()
-    
-    // localStorage 정리
-    localStorage.removeItem('redirectAfterLogin')
-    
-    router.replace(destination)
+  // 시작하기/완료 버튼
+  const handleComplete = () => {
+    onComplete?.()
   }
 
-  const handleClose = () => {
-    const destination = getRedirectDestination()
-    
-    // localStorage 정리
-    localStorage.removeItem('redirectAfterLogin')
-    
-    router.replace(destination)
-  }
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-gray-600">로딩 중...</div>
-      </div>
-    )
-  }
+  if (!isOpen) return null
 
   const displayImage = selectedImage || currentReferenceImage
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div className="relative mx-4 w-96 max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl">
         {/* X 버튼을 우측 상단에 절대 위치로 배치 */}
         <button
-          onClick={handleClose}
+          onClick={onClose}
           className="absolute top-4 right-4 z-10 rounded-full p-2 transition-colors hover:bg-gray-100"
         >
           <X size={20} className="text-gray-600" />
@@ -300,14 +252,14 @@ export default function UploadPhotoPage() {
           {/* 시작하기 버튼 (기존 이미지가 있을 때) */}
           {hasExistingImage && !selectedImage && (
             <button
-              onClick={handleSkip}
+              onClick={handleComplete}
               className="mb-3 w-full rounded-full bg-blue-600 py-3 font-medium text-white transition-colors hover:bg-blue-700"
             >
               시작하기
             </button>
           )}
 
-          {/* 취소/계속하기 버튼 */}
+          {/* 취소/나중에 버튼 */}
           {selectedImage ? (
             <button
               onClick={() => setSelectedImage(null)}
@@ -317,7 +269,7 @@ export default function UploadPhotoPage() {
             </button>
           ) : (
             <button
-              onClick={handleSkip}
+              onClick={handleComplete}
               className="w-full rounded-full py-3 font-medium text-gray-600 transition-colors hover:bg-gray-100"
             >
               {hasExistingImage ? '현재 사진 유지' : '나중에 등록'}

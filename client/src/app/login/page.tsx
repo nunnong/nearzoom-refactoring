@@ -63,9 +63,11 @@ const LoginContent = (): JSX.Element => {
   // 로그인 상태 확인 및 리다이렉트 처리
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
-      handleLoginSuccess()
+      // 이미 로그인된 상태라면 메인페이지로 이동
+      console.log('✅ 이미 로그인된 상태 - 메인페이지로 이동')
+      router.push('/')
     }
-  }, [isAuthenticated, isLoading])
+  }, [isAuthenticated, isLoading, router])
 
   // 로그아웃 상태 정리 함수
   const clearLoginData = () => {
@@ -73,30 +75,6 @@ const LoginContent = (): JSX.Element => {
     localStorage.removeItem('actionAfterLogin')
   }
 
-  // 🔥 수정된 로그인 성공 후 처리
-  const handleLoginSuccess = () => {
-    console.log('🎉 handleLoginSuccess 실행')
-    console.log('현재 상태:', { redirectUrl, actionAfterLogin })
-    
-    // 🔥 항상 참조사진 페이지를 거치도록 수정
-    if (redirectUrl) {
-      console.log('✅ 로그인 완료 - 참조사진 페이지로 이동 (공유 URL 보존)')
-      const encodedRedirectUrl = encodeURIComponent(redirectUrl)
-      router.push(`/upload-photo?returnUrl=${encodedRedirectUrl}`)
-    } else if (actionAfterLogin === 'createRoom') {
-      console.log('✅ 로그인 완료 - 참조사진 페이지로 이동 (방 생성 예정)')
-      router.push('/upload-photo?action=createRoom')
-    } else {
-      // 🔥 기본값도 참조사진 페이지로 변경 (사용자가 직접 로그인한 경우)
-      console.log('✅ 로그인 완료 - 참조사진 페이지로 이동 (기본)')
-      router.push('/upload-photo')
-    }
-    
-    // 🔥 이동 후에 localStorage 정리
-    setTimeout(() => {
-      clearLoginData()
-    }, 1000)
-  }
 
   // 메인페이지로 강제 이동
   const handleGoToMain = () => {
@@ -164,7 +142,7 @@ const LoginContent = (): JSX.Element => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p>리다이렉트 중...</p>
+          <p>메인페이지로 이동 중...</p>
         </div>
       </div>
     )

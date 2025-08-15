@@ -1,15 +1,29 @@
 "use client"
 
 import { Suspense, useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import LandingPage from '@/app/landing/page'
 import MainPage from '@/components/page/main/MainPage'
 
 function HomeContent() {
   const [showLanding, setShowLanding] = useState(false)
   const searchParams = useSearchParams()
+  const router = useRouter()
   
   useEffect(() => {
+    // OAuth 콜백 후 저장된 리다이렉트 URL 확인
+    const redirectUrl = localStorage.getItem('redirectAfterLogin')
+    
+    if (redirectUrl) {
+      console.log('🔄 소셜 로그인 후 리다이렉트 감지:', redirectUrl)
+      console.log('📍 원래 목적지로 바로 이동:', redirectUrl)
+      
+      // localStorage 정리 후 원래 목적지로 바로 이동
+      localStorage.removeItem('redirectAfterLogin')
+      router.replace(redirectUrl)
+      return
+    }
+    
     // 로그인 리다이렉트로 왔는지 확인 (callback에서 온 경우)
     const fromCallback = searchParams.get('from') === 'callback'
     const hasToken = searchParams.get('token')
@@ -34,7 +48,7 @@ function HomeContent() {
       
       return () => clearTimeout(timer)
     }
-  }, [searchParams])
+  }, [searchParams, router])
   
   if (showLanding) {
     return <LandingPage />

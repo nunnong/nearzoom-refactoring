@@ -19,7 +19,7 @@ import {
   type CursorDataPacket,
   generateUserColor,
 } from '../stores/cursorStore'
-import { useUserStore } from './AuthProvider'
+import { useAuthStore } from '@/stores/authStore'
 
 export type CursorStoreApi = ReturnType<typeof createCursorStore>
 
@@ -48,7 +48,8 @@ export const CursorProvider = ({
   containerRef,
 }: CursorProviderProps) => {
   const room = useContext(RoomContext)
-  const username = useUserStore(state => state.username)
+  const user = useAuthStore(state => state.user)
+  const username = user?.name
 
   // 통합된 커서 상태 (로컬/원격 구분 없이)
   const [localCursor, setLocalCursor] = useState<CursorPosition | null>(null)

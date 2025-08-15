@@ -120,8 +120,8 @@ export const useAuth = () => {
       setRoomData(roomData)
       setIsHost(true)
       
-      // 생성된 방으로 이동
-      const roomUrl = `/room/${roomData.roomId}?isHost=true&skipJoin=true`
+      // 생성된 방으로 이동 (LiveKit metadata로 방장 확인)
+      const roomUrl = `/room-test-social/${roomData.roomId}`
       router.push(roomUrl)
       
     } catch (error) {
