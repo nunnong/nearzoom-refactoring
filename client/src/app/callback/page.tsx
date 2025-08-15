@@ -41,29 +41,57 @@ function CallbackContent() {
       try {
         setState('loading')
 
-        // 에러 파라미터 확인
+        // 🔍 디버깅: 모든 URL 파라미터 확인
+        console.log('=== OAuth Callback Debug ===')
+        console.log('전체 URL:', window.location.href)
+        console.log('모든 URL 파라미터:', Object.fromEntries(searchParams.entries()))
+
+        // OAuth2 인증 실패 체크
         const error = searchParams.get('error')
         if (error) {
           throw new Error(`OAuth2 인증 실패: ${error}`)
         }
 
-        // refresh token으로 access token 요청
-        const tokenResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
-          method: 'POST',
-          credentials: 'include',
-        })
-        if (!tokenResponse.ok) {
-          throw new Error('Access token 요청 실패')
+        // 다양한 토큰 파라미터 이름 확인
+        const token = searchParams.get('token') || 
+                     searchParams.get('access_token') || 
+                     searchParams.get('accessToken')
+        
+        console.log('URL에서 찾은 토큰:', token ? '토큰 있음' : '토큰 없음')
+
+        let accessToken: string
+
+        if (token) {
+          // 1단계: URL에 토큰이 있으면 사용
+          console.log('✅ URL 파라미터에서 토큰 사용')
+          accessToken = token
+        } else {
+          // 2단계: 토큰이 없으면 refresh 엔드포인트 호출
+          console.log('🔄 URL에 토큰이 없어서 refresh 엔드포인트 호출')
+          
+          const tokenResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
+            method: 'POST',
+            credentials: 'include',
+          })
+          
+          if (!tokenResponse.ok) {
+            console.error('Refresh 응답 실패:', tokenResponse.status, tokenResponse.statusText)
+            throw new Error('Access token 요청 실패')
+          }
+
+          const tokenData = await tokenResponse.json()
+          console.log('Refresh 응답:', tokenData)
+          
+          accessToken = tokenData.data?.accessToken || tokenData.accessToken
+          if (!accessToken) {
+            console.error('토큰 응답 구조:', tokenData)
+            throw new Error('Access token이 응답에 없습니다')
+          }
+          
+          console.log('✅ Refresh 엔드포인트에서 토큰 획득')
         }
 
-        const tokenData = await tokenResponse.json()
-        const accessToken = tokenData.data?.accessToken
-        if (!accessToken) {
-          console.error('토큰 응답 구조:', tokenData)
-          throw new Error('Access token이 응답에 없습니다')
-        }
-
-        // 토큰 저장
+        // Zustand 스토어에 토큰 저장
         handleLoginSuccess(accessToken)
 
         // 사용자 정보 불러오기

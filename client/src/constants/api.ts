@@ -3,10 +3,7 @@
 export const API_BASE_URL = 'https://api.nearzoom.store'
 
 // 프론트엔드 콜백 URL
-export const FRONTEND_BASE_URL =
-  process.env.NODE_ENV === 'production'
-    ? 'http://localhost:3000'
-    : 'https://nearzoom.store' // 프론트엔드 포트
+export const FRONTEND_BASE_URL = 'https://nearzoom.store'
 
 export const API_ENDPOINTS = {
   // Auth
