@@ -34,20 +34,6 @@ export default function Header({
           className="h-8 w-8 md:h-10 md:w-10"
         />
       </div>
-      {/* <div className="absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2"> */}
-      <Link
-        href="/room-test/test"
-        className="ml-20 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 px-8 py-4 font-semibold text-white shadow-md transition-transform duration-200 hover:scale-105"
-      >
-        테스트
-      </Link>
-      <Link
-        href="/edit-test"
-        className="ml-20 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 px-8 py-4 font-semibold text-white shadow-md transition-transform duration-200 hover:scale-105"
-      >
-        합성테스트
-      </Link>
-      {/* </div> */}
 
       <IsLogin
         isLoggedIn={isLoggedIn}
