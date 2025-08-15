@@ -49,6 +49,13 @@ export default function RoomPage({ roomName }: RoomPageProps) {
       const url = new URL(CONN_DETAILS_ENDPOINT, window.location.origin)
       url.searchParams.append('roomName', roomName)
       url.searchParams.append('participantName', username || 'Guest')
+      url.searchParams.append('faceImageUrl', user?.faceImageUrl || '')
+      
+      console.log('🔗 Requesting connection details with face image URL:', {
+        roomName,
+        participantName: username,
+        faceImageUrl: user?.faceImageUrl ? 'provided' : 'empty'
+      })
 
       const response = await fetch(url.toString())
       if (!response.ok) {

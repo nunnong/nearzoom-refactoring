@@ -13,11 +13,10 @@ import {
 import { Track, VideoTrack } from 'livekit-client'
 import { useVirtualBackgroundReady } from '../../providers/PhotoBoothProvider'
 import Konva from 'konva'
-import { downloadImage } from '../../utils/imageDownload'
 
 interface PhotoCanvasProps {
   className?: string
-  onCapture?: (imageData: string) => void
+  onCapture?: (imageData: string, personIds?: string[]) => void
 }
 
 export default function PhotoCanvas({
@@ -147,18 +146,41 @@ export default function PhotoCanvas({
 
         console.log('✅ Canvas captured successfully')
 
-        // 자동 다운로드 (컷 정보 포함한 파일명)
-        const cutInfo = `cut${currentCutIndex + 1}-of-${cutCount}`
-        const filename = `photobooth-${cutInfo}.png`
-        downloadImage(dataURL, filename)
+        // 참가자들을 왼쪽에서 오른쪽 순서로 정렬하여 faceImageUrl 추출
+        const sortedPersonIds = Object.entries(participants)
+          .sort(([, a], [, b]) => a.x - b.x)  // x 좌표 기준 정렬 (왼쪽 → 오른쪽)
+          .map(([participantId]) => {
+            console.log(`🔍 Processing participant: ${participantId}, position: (${participants[participantId]?.x}, ${participants[participantId]?.y})`)
+            
+            // LiveKit 참가자 찾기 (identity가 participantId를 포함하는 것 찾기)
+            const livekitParticipant = allParticipants.find(p => 
+              p.identity.includes(participantId)
+            )
+            
+            if (livekitParticipant?.metadata) {
+              try {
+                const metadata = JSON.parse(livekitParticipant.metadata)
+                console.log(`👤 Found metadata for ${participantId}:`, {
+                  faceImageUrl: metadata.faceImageUrl ? 'provided' : 'null'
+                })
+                return metadata.faceImageUrl
+              } catch (error) {
+                console.error(`❌ Failed to parse metadata for ${participantId}:`, error)
+              }
+            }
+            return null
+          })
+          .filter(url => url !== null)
 
-        // 기존 onCapture 콜백도 호출
-        onCapture(dataURL)
+        console.log(`🎯 Extracted ${sortedPersonIds.length} face image URLs in left-to-right order:`, sortedPersonIds)
+
+        // onCapture에 정렬된 personIds도 함께 전달
+        onCapture(dataURL, sortedPersonIds)
       } catch (error) {
         console.error('❌ Failed to capture canvas:', error)
       }
     }
-  }, [onCapture, currentCutIndex, cutCount])
+  }, [onCapture, currentCutIndex, cutCount, participants, allParticipants])
 
   // isCapturing 상태 변화 감지하여 자동 캡쳐
   useEffect(() => {

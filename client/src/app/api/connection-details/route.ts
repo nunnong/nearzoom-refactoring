@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     const roomName = request.nextUrl.searchParams.get('roomName')
     const participantName = request.nextUrl.searchParams.get('participantName')
     const metadata = request.nextUrl.searchParams.get('metadata') ?? ''
+    const faceImageUrl = request.nextUrl.searchParams.get('faceImageUrl') ?? ''
     const region = request.nextUrl.searchParams.get('region')
     if (!LIVEKIT_URL) {
       throw new Error('LIVEKIT_URL is not defined')
@@ -50,10 +51,16 @@ export async function GET(request: NextRequest) {
     // Check if this is the first participant (to assign host role)
     const isFirstParticipant = await checkIfFirstParticipant(roomName)
     
-    // Set role metadata
+    // Set role metadata with face image URL
     const roleMetadata = {
-      role: isFirstParticipant ? "host" : "participant"
+      role: isFirstParticipant ? "host" : "participant",
+      faceImageUrl: faceImageUrl || null
     }
+    
+    console.log(`🎭 Setting metadata for ${participantName}:`, {
+      role: roleMetadata.role,
+      faceImageUrl: roleMetadata.faceImageUrl ? 'provided' : 'null'
+    })
 
     const participantToken = await createParticipantToken(
       {

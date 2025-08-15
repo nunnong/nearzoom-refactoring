@@ -43,9 +43,10 @@ export default function PhotoshootComponent({
   const completeCapture = usePhotoBoothStore(state => state.completeCapture)
 
   // 캔버스 캡쳐 완료 핸들러
-  const handleCaptureComplete = async (imageData: string) => {
+  const handleCaptureComplete = async (imageData: string, personIds?: string[]) => {
     console.log('📷 Photo captured, completing capture process')
-    await completeCapture(imageData)
+    console.log('🎭 Person IDs received:', personIds)
+    await completeCapture(imageData, personIds)
     // shootingSlice에서 자동으로 컷 증가 및 상태 전환 처리
   }
 

@@ -34,9 +34,9 @@ export default function PhotoShootButton({ className }: PhotoShootButtonProps) {
       return
     }
 
-    // 평상시에는 촬영 시작
-    if (photoBoothState === PhotoBoothState.WAITING) {
-      console.log('📸 Starting PhotoShoot session')
+    // SHOOTING 상태일 때만 촬영 시작
+    if (photoBoothState === PhotoBoothState.SHOOTING) {
+      console.log('📸 Starting PhotoShoot countdown')
       startShooting(5) // 5초 카운트다운
     }
   }
@@ -55,26 +55,21 @@ export default function PhotoShootButton({ className }: PhotoShootButtonProps) {
     if (isCapturing) return '📸 캡쳐 중...'
     if (isSaving) return '💾 저장 중...'
 
-    // 기본 PhotoBooth 상태
-    // switch (photoBoothState) {
-    //   case PhotoBoothState.WAITING:
-    //     return '📸 촬영 시작'
-    //   case PhotoBoothState.SHOOTING:
-    //     return `📷 촬영 중... (${currentCutIndex + 1}/${cutCount})`
-    //   case PhotoBoothState.SELECTING:
-    //     return '🎨 사진 선택'
-    //   default:
-    //     return 'PhotoShoot'
-    // }
+    // PhotoBooth 상태별 텍스트
+    switch (photoBoothState) {
+      case PhotoBoothState.WAITING:
+        return '대기방'
+      case PhotoBoothState.SHOOTING:
+        return '📸 촬영 시작'
+      case PhotoBoothState.SELECTING:
+        return '🎨 사진 선택'
+      default:
+        return '📸 촬영'
+    }
   }
 
-  // 버튼 비활성화 조건
-  const isDisabled =
-    !isRoomLeader ||
-    isCapturing || // 캡쳐 중에는 취소 불가
-    isFlashing || // 플래시 중에는 취소 불가
-    isSaving || // 저장 중에는 취소 불가
-    (photoBoothState === PhotoBoothState.SHOOTING && !isShooting) // SHOOTING 상태지만 카운트다운이 아닌 경우
+  // 버튼 비활성화 조건 - 방장이 아니거나 SHOOTING 상태가 아닌 경우
+  const isDisabled = !isRoomLeader || photoBoothState !== PhotoBoothState.SHOOTING
 
   console.log('isRoomLeader', isRoomLeader)
   console.log('isShooting', isShooting)

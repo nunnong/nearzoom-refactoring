@@ -106,9 +106,15 @@ export default function DebugPanel({ className = '' }: DebugPanelProps) {
   }
 
   const handleAddTestPhoto = () => {
-    const testPhoto = `test-photo-${Date.now()}.jpg`
+    const testPhoto = {
+      imgUrl: `test-photo-${Date.now()}.jpg`,
+      personIds: [],
+      cutIndex: currentCutIndex,
+      roomId: roomName,
+      timestamp: Date.now()
+    }
     setSelectedPhotos([...selectedPhotos, testPhoto])
-    console.log(`🐛 Debug: Added test photo: ${testPhoto}`)
+    console.log(`🐛 Debug: Added test photo:`, testPhoto)
   }
 
   const handleCanvasSizePreset = (width: number, height: number) => {
@@ -439,7 +445,12 @@ export default function DebugPanel({ className = '' }: DebugPanelProps) {
                         key={index}
                         className="truncate text-xs text-gray-400"
                       >
-                        {index + 1}. {photo}
+                        {index + 1}. {typeof photo === 'string' ? photo : photo.imgUrl}
+                        {typeof photo === 'object' && (
+                          <div className="ml-2 text-xs text-gray-500">
+                            Cut: {photo.cutIndex}, Faces: {photo.personIds.length}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -478,20 +489,26 @@ export default function DebugPanel({ className = '' }: DebugPanelProps) {
                       {capturedImages.length} photo(s) in localStorage
                     </div>
                     <div className="grid max-h-32 grid-cols-2 gap-1 overflow-y-auto">
-                      {capturedImages.map((imageData, index) => (
-                        <div key={index} className="group relative">
-                          <img
-                            src={imageData}
-                            alt={`Captured ${index + 1}`}
-                            className="h-16 w-full rounded border border-gray-600 object-cover transition-colors hover:border-cyan-400"
-                          />
-                          <div className="absolute inset-0 flex items-center justify-center rounded bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                            <span className="text-xs text-white">
-                              #{index + 1}
-                            </span>
+                      {capturedImages.map((imageData, index) => {
+                        // Handle both string and Photo object
+                        const imgSrc = typeof imageData === 'string' 
+                          ? imageData 
+                          : imageData.imgUrl
+                        return (
+                          <div key={index} className="group relative">
+                            <img
+                              src={imgSrc}
+                              alt={`Captured ${index + 1}`}
+                              className="h-16 w-full rounded border border-gray-600 object-cover transition-colors hover:border-cyan-400"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center rounded bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                              <span className="text-xs text-white">
+                                #{index + 1}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                     <button
                       onClick={clearCapturedImages}

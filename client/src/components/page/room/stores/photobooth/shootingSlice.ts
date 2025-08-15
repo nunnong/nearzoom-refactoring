@@ -16,7 +16,7 @@ export interface ShootingSliceActions {
   stopShooting: () => void
   updateShootingTimer: (seconds: number) => void
   startCapture: () => void
-  completeCapture: (imageData: string) => Promise<void>
+  completeCapture: (imageData: string, personIds?: string[]) => Promise<void>
   clearCapturedImages: () => void
   cleanupTimer: () => void
 }
@@ -162,10 +162,11 @@ export const createShootingSlice = (set: any, get: any, roomName: string) => ({
     }
   },
   
-  completeCapture: async (imageData: string) => {
+  completeCapture: async (imageData: string, personIds: string[] = []) => {
     const { capturedImages, isRoomLeader, timerInterval, currentCutIndex, cutCount, roomName, handleCutProgress } = get()
     
     console.log(`✅ Capture completed! Cut ${currentCutIndex + 1}/${cutCount}`)
+    console.log(`👥 Person IDs (left to right):`, personIds)
     
     // 타이머 정리 (혹시 남아있다면)
     if (timerInterval) {
@@ -185,34 +186,56 @@ export const createShootingSlice = (set: any, get: any, roomName: string) => ({
       try {
         console.log(`📡 Processing image... (Cut ${currentCutIndex + 1}/${cutCount})`)
         
-        // TODO: 실제 API 호출 (현재는 Mock 처리)
-        /*
-        const response = await fetch('/api/photos/upload', {
+        // base64 데이터를 blob으로 변환
+        const response = await fetch(imageData)
+        const blob = await response.blob()
+        
+        // 스마트 파일명 생성: {roomId}_{cutIndex}.png
+        const filename = `${roomName}_${currentCutIndex}.png`
+        
+        // FormData 생성
+        const formData = new FormData()
+        formData.append('file', blob, filename)
+        formData.append('type', 'group')
+        
+        console.log(`⬆️ Uploading image: ${filename}`)
+        
+        // 이미지 업로드 API 호출
+        const uploadResponse = await fetch('https://image.nearzoom.store/upload', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            imageData,
-            roomName,
-            cutIndex: currentCutIndex
-          })
+          body: formData
         })
         
-        const result = await response.json()
-        */
-        
-        // Mock API 응답 (실제 API 구현 전까지 사용)
-        const mockResult = {
-          success: true,
-          imageUrl: `mock-photo-${roomName}-cut${currentCutIndex + 1}.jpg`
+        if (!uploadResponse.ok) {
+          throw new Error(`Upload failed: ${uploadResponse.statusText}`)
         }
         
-        if (mockResult.success) {
-          console.log(`💾 Image processed successfully! URL: ${mockResult.imageUrl}`)
+        const uploadResult = await uploadResponse.json()
+        console.log('📤 Upload response:', uploadResult)
+        
+        if (uploadResult.success && uploadResult.data?.file_url) {
+          console.log(`💾 Image uploaded successfully! URL: ${uploadResult.data.file_url}`)
           
-          // 성공 시: 로컬 상태에 URL 저장
-          const newImages = [...capturedImages, mockResult.imageUrl]
+          // Photo 객체 생성
+          const photo = {
+            imgUrl: uploadResult.data.file_url,
+            personIds: personIds,
+            cutIndex: currentCutIndex,
+            roomId: roomName,
+            timestamp: Date.now()
+          }
+          
+          // selectSlice에 Photo 객체 추가
+          const state = get()
+          if (state.addSelectedPhoto) {
+            state.addSelectedPhoto(photo)
+            console.log('📸 Photo added to selection:', photo)
+          } else {
+            console.error('❌ addSelectedPhoto function not available in state')
+          }
+          
+          // 기존 localStorage 저장도 유지 (backwards compatibility)
+          const newImages = [...capturedImages, uploadResult.data.file_url]
           set({ capturedImages: newImages })
           
           // 저장 완료 - 모든 상태 해제
@@ -227,23 +250,12 @@ export const createShootingSlice = (set: any, get: any, roomName: string) => ({
           handleCutProgress()
           
         } else {
-          console.error('❌ API returned failure:', mockResult)
-          // API 실패 시: 재시도를 위해 현재 상태 유지
-          alert('사진 업로드에 실패했습니다. 다시 시도해주세요.')
-          
-          // 실패 시에도 일단 모든 상태 해제 (재촬영 가능하게)
-          updateShootingState(roomName, { 
-            isCapturing: false,
-            isSaving: false,
-            isShooting: false,
-            shootingTimer: 0
-          })
+          throw new Error('Upload response missing file_url')
         }
         
       } catch (error) {
-        console.error('❌ Image processing network error:', error)
-        // 네트워크 에러 등: 현재 상태 유지하여 재시도 가능하게
-        alert('네트워크 오류가 발생했습니다. 다시 시도해주세요.')
+        console.error('❌ Image upload error:', error)
+        alert('사진 업로드에 실패했습니다. 다시 시도해주세요.')
         
         // 에러 시에도 일단 모든 상태 해제
         updateShootingState(roomName, { 
