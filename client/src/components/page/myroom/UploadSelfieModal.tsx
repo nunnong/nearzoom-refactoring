@@ -31,16 +31,14 @@ export default function UploadSelfieModal({
   const fetchUserProfile = async () => {
     try {
       const response = await api.get('/user/userInfo')
-      console.log('API 응답 전체:', response.data) // 디버깅용
+      console.log('API 응답 전체:', response.data)
       
       const profile = response.data.data
-      console.log('프로필 데이터:', profile) // 디버깅용
       
-      // pretty_face 필드 확인
-      const faceImageUrl = profile.prettyFaceUrl || profile.faceImageUrl || profile.pretty_face
+      // faceImageUrl 필드 확인 (통일)
+      const faceImageUrl = profile.faceImageUrl
       console.log('모든 프로필 키:', Object.keys(profile)) // 디버깅용
-      console.log('prettyFaceUrl:', profile.prettyFaceUrl) // 디버깅용
-      console.log('pretty_face:', profile.pretty_face) // 디버깅용
+      console.log('faceImageUrl:', profile.faceImageUrl) // 디버깅용
       console.log('찾은 이미지 URL:', faceImageUrl) // 디버깅용
       
       if (faceImageUrl) {
@@ -99,7 +97,7 @@ export default function UploadSelfieModal({
       console.log('이미지 저장 요청:', imageUrl)
 
       await api.put(API_ENDPOINTS.SAVE_FACE_IMAGE, null, {
-        params: { prettyFaceUrl: imageUrl }
+        params: { faceImageUrl: imageUrl }
       })
 
       console.log('이미지 저장 완료')
@@ -120,7 +118,7 @@ export default function UploadSelfieModal({
       })
       
       const errorMessage = error?.response?.data?.message || error?.message || '알 수 없는 오류가 발생했습니다.'
-      alert(`프로필 이미지 저장에 실패했습니다: ${errorMessage}`)
+      alert(`참조 이미지 저장에 실패했습니다: ${errorMessage}`)
     } finally {
       setIsUploading(false)
     }

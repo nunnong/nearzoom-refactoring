@@ -82,7 +82,7 @@ export default function CallbackPage() {
 
         if (userInfo.ok) {
           const userData = await userInfo.json()
-          const hasReferencePhoto = userData.data?.pretty_face
+          const hasReferencePhoto = userData.data?.faceImageUrl
           
           // 참조 사진이 없으면 업로드 페이지로, 있으면 메인 페이지로
           setTimeout(() => {

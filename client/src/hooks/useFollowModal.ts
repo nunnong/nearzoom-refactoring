@@ -141,7 +141,7 @@ export const useFollowModal = (): UseFollowModalReturn => {
       displayName: backendUser.userName,            // 표시명
       email: backendUser.userEmail,                 // 이메일
       profileImageUrl: backendUser.profileImage,    // 프로필 이미지
-      prettyFaceUrl: backendUser.prettyFace,        // 예쁜 얼굴 이미지
+      prettyFaceUrl: backendUser.faceImageUrl,        // 예쁜 얼굴 이미지
       isFollowing: false                            // 초기값, 별도로 조회 필요
     }
   }, [])

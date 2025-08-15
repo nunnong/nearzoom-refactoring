@@ -14,9 +14,8 @@ import {
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import React, { useState, useRef, useEffect } from 'react'
-
-import { saveImageToLocal, updateImageInLocal } from '@/utils/localStorage'
 import { myroomService } from '@/services/myroomService'
+import api from '@/lib/axios'
 
 
 // Konva 컴포넌트들을 동적으로 import
@@ -152,7 +151,10 @@ const DrawingPage: React.FC = () => {
       // 이미지 URL이 같은 도메인인지 확인
       const isCurrentDomain = imgSrc.startsWith(window.location.origin) || imgSrc.startsWith('/')
       
-      // crossOrigin 설정 제거 (CORS 문제로 이미지 로드 실패)
+      // CORS 문제 해결을 위한 crossOrigin 설정
+      if (!isCurrentDomain) {
+        img.crossOrigin = 'anonymous'
+      }
       
       img.onload = () => {
         console.log('✅ 이미지 로드 성공:', {
@@ -187,7 +189,7 @@ const DrawingPage: React.FC = () => {
       img.onerror = (error) => {
         console.error('❌ 이미지 로드 실패:', {
           error: error,
-          errorType: error?.type,
+          errorType: error instanceof Event ? error.type : 'unknown',
           imgSrc: imgSrc,
           originalSrc: src,
           imgCurrentSrc: img.currentSrc,
@@ -543,14 +545,54 @@ const DrawingPage: React.FC = () => {
     }
 
     try {
-      // 백엔드에 편집본 저장 요청 -> "/photos/save-edited" 여기로 
-      await myroomService.saveEditedPhoto({
-        photoId: parseInt(imageId!)
+      // 1. 캔버스를 이미지로 변환
+      const canvas = stageRef.current.toCanvas({
+        width: originalImageSize.width,
+        height: originalImageSize.height,
+        pixelRatio: 1
       })
-      // 저장 성공 알림
+      
+      // 2. 캔버스를 Blob으로 변환
+      const blob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((blob: Blob | null) => {
+          if (blob) resolve(blob)
+        }, 'image/png', 1.0)
+      })
+
+      // 3. FormData로 이미지 서버에 업로드
+      const formData = new FormData()
+      formData.append('file', blob, 'edited-image.png')
+      
+      // 이미지 서버에 업로드 (기존 프로필 이미지 업로드와 동일한 방식)
+      const uploadResponse = await api.post(
+        'https://image.nearzoom.store/upload',
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          withCredentials: false,
+        }
+      )
+      
+      const uploadedImageUrl = uploadResponse.data?.data?.file_url
+      if (!uploadedImageUrl) {
+        throw new Error('이미지 URL을 받아올 수 없습니다.')
+      }
+      
+      // 4. 백엔드에 편집본 저장 요청
+      console.log('백엔드 저장 요청 데이터:', {
+        imgUrl: uploadedImageUrl,
+        originalPhotoId: parseInt(imageId!)
+      })
+      
+      await myroomService.saveEditedPhoto({
+        imgUrl: uploadedImageUrl,
+        originalPhotoId: parseInt(imageId!)
+      })
+      
+      // 5. 저장 성공 알림
       alert('이미지가 성공적으로 저장되었습니다!')
 
-      // 저장 후 이전 페이지로 돌아가기
+      // 6. 저장 후 이전 페이지로 돌아가기
       const currentUrl = new URL(window.location.href)
       const returnUrl = currentUrl.searchParams.get('returnUrl') || '/'
       router.push(returnUrl)

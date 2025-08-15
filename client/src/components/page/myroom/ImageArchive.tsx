@@ -20,7 +20,7 @@ interface ImageItem {
   src: string
   alt: string
   isLiked?: boolean
-  isEdited?: boolean
+  editable?: number         // 1: 편집 가능, 0: 편집 불가능
   hashtags?: string[]
   createdAt?: string        // 원본 날짜 데이터
   partnerEmails?: string    // 함께 찍은 사람들 이메일
@@ -114,8 +114,10 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
         src: photo.imageUrl, // 실제 이미지 URL 사용
         alt: `Photo ${photo.photoId}`,        // 기본값
         isLiked: photo.heart === 1,          // DB heart (1: true, 0: false)
-        isEdited: photo.editable === 0,      // DB editable (0: 편집 완료/불가, 1: 편집 가능)
-        hashtags: []                         // hashtags 필드 없음
+        editable: photo.editable,            // DB editable (1: 편집 가능, 0: 편집 불가능)
+        hashtags: [],                        // hashtags 필드 없음
+        createdAt: photo.createdAt,          // 생성 날짜
+        partnerEmails: photo.partnerEmails   // 함께 찍은 사람들
       }))
 
       // hasNext가 false면 더 이상 불러올 데이터가 없음
@@ -212,6 +214,8 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
   const [imageToShare, setImageToShare] = useState<ImageItem | null>(null)
   const [editModalOpen, setEditModalOpen] = useState<boolean>(false)
   const [imageToEdit, setImageToEdit] = useState<ImageItem | null>(null)
+  const [editSaving, setEditSaving] = useState<boolean>(false)
+  const [editSuccess, setEditSuccess] = useState<boolean>(false)
 
   const handleDeleteClick = (image: ImageItem): void => {
     setImageToDelete(image)
@@ -253,14 +257,9 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
   const handleEditConfirm = async (): Promise<void> => {
     if (imageToEdit) {
       try {
-        // TODO: 실제 편집 페이지에서 편집된 이미지 URL을 받아와야 함
-        // 여기서는 편집 프로세스를 시작하는 것으로 가정
-        // 편집이 완료되면 saveEditedPhotoWithUrl을 호출해야 함
-        
-        // 임시: 편집 페이지로 이동하거나 편집 프로세스 시작
-        if (onEdit) {
-          await onEdit(imageToEdit.id, "")  // 편집된 URL은 나중에 받아옴
-        }
+        // 편집 페이지로 이동 (id와 src 파라미터 전달)
+        const editUrl = `/drawing?id=${imageToEdit.id}&src=${encodeURIComponent(imageToEdit.src)}&returnUrl=${encodeURIComponent('/myroom')}`
+        window.location.href = editUrl
         
         setEditModalOpen(false)
         setImageToEdit(null)
@@ -273,33 +272,39 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
   // 편집 완료 후 호출되는 함수 (편집 페이지에서 호출)
   const handleEditComplete = async (originalPhotoId: string, editedImageUrl: string): Promise<void> => {
     try {
-      // 백엔드에 편집된 이미지 저장 요청
-      await myroomService.saveEditedPhotoWithUrl({
-        editedImageUrl,
+      // 1. 로딩 상태 시작
+      setEditSaving(true)
+      
+      // 2. 백엔드에 편집된 이미지 저장 요청
+      await myroomService.saveEditedImageUrl({
+        imgUrl: editedImageUrl,
         originalPhotoId: parseInt(originalPhotoId)
       })
       
-      // 로컬 상태에서 원본 이미지를 편집 불가능으로 변경
-      setImages(prev => prev.map(img => 
-        img.id === originalPhotoId ? { ...img, isEdited: true } : img
-      ))
+      // 3. 로딩 완료, 성공 메시지 표시
+      setEditSaving(false)
+      setEditSuccess(true)
       
-      // 새로운 편집본 이미지를 목록에 추가 (편집 불가능 상태로)
-      const newEditedImage: ImageItem = {
-        id: `edited_${Date.now()}`, // 임시 ID, 실제로는 백엔드에서 받아온 ID 사용
-        src: editedImageUrl,
-        alt: `Edited Photo from ${originalPhotoId}`,
-        isLiked: false,
-        isEdited: true, // 편집본은 편집 불가능
-        hashtags: []
-      }
-      
-      setImages(prev => [newEditedImage, ...prev])
+      // 4. 1초 후 목록 새로고침
+      setTimeout(async () => {
+        setEditSuccess(false)
+        await refreshPhotos()
+      }, 1000)
       
     } catch (error) {
+      setEditSaving(false)
       console.error('편집 저장 실패:', error)
       throw error
     }
+  }
+
+  // 사진 목록 새로고침 함수
+  const refreshPhotos = async (): Promise<void> => {
+    setImages([])
+    setCursor(null)
+    setHasMore(true)
+    setError(null)
+    await fetchPhotos(null, true)
   }
 
   const handleEditCancel = (): void => {
@@ -535,6 +540,30 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
       {!hasMore && images.length > 0 && (
         <div className="flex items-center justify-center py-8">
           <p className="text-sm text-gray-500">모든 사진을 불러왔습니다</p>
+        </div>
+      )}
+
+      {/* 편집 저장 상태 표시 */}
+      {(editSaving || editSuccess) && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-sm mx-4 text-center">
+            {editSaving && (
+              <>
+                <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+                <p className="text-lg font-medium text-gray-800">편집본을 저장하고 있습니다...</p>
+              </>
+            )}
+            {editSuccess && (
+              <>
+                <div className="h-12 w-12 bg-green-500 rounded-full mx-auto mb-4 flex items-center justify-center">
+                  <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <p className="text-lg font-medium text-gray-800">편집본이 저장되었습니다!</p>
+              </>
+            )}
+          </div>
         </div>
       )}
 

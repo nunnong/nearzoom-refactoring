@@ -24,15 +24,9 @@ export default function UploadPhotoPage() {
     try {
       const response = await api.get('/user/userInfo')
       const profile = response.data.data
-<<<<<<< HEAD
       
-      if (profile.pretty_face) {
-        setCurrentReferenceImage(profile.pretty_face)
-=======
-
       if (profile.faceImageUrl) {
         setCurrentReferenceImage(profile.faceImageUrl)
->>>>>>> 4b630cc2cb88a469c63eb1e054f65be169a4447e
         setHasExistingImage(true)
       }
     } catch (error) {
@@ -120,7 +114,7 @@ export default function UploadPhotoPage() {
       // 3단계: 받은 URL을 프로필 이미지로 저장
       await api.put('/user/save-face-image', null, {
         params: {
-          prettyFaceUrl: imageUrl
+          faceImageUrl: imageUrl
         },
         headers: {
           'Content-Type': 'application/json',

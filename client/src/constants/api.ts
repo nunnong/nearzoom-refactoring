@@ -19,7 +19,7 @@ export const API_ENDPOINTS = {
   PHOTOS: '/myroom/photos',
   HEART: '/myroom/photos/heart',
   DELETE_PHOTO: '/myroom/photos',
-  SAVE_EDITED: '/photos/save-edited-with-url', // 1 편집 사진 -> 2, 4 백엔드(주소 받아와서 저장까지) -> 3. 이미지 서버
+  SAVE_EDITED_URL: '/myroom/photos/save-edited-url', // imageUrl, originalPhotoId
   SAVE_FACE_IMAGE: '/user/save-face-image',
 
   // PhotoPrompt
@@ -44,5 +44,4 @@ export const API_ENDPOINTS = {
   SIGNOUT: '/user/signout',
 }
 
-// 🔥 타입 안전성을 위한 타입 export
 export type ApiEndpoint = typeof API_ENDPOINTS[keyof typeof API_ENDPOINTS]

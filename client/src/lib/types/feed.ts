@@ -112,7 +112,7 @@ export interface BackendUserInfoResponse {
   userName: string
   userEmail: string
   profileImage: string
-  prettyFace: string
+  faceImageUrl: string
 }
 
 // 🔥 새로 추가: 백엔드 UserProfileResponse
