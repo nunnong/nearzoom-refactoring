@@ -594,7 +594,7 @@ const DrawingPage = () => {
 
       // 6. 저장 후 이전 페이지로 돌아가기
       const currentUrl = new URL(window.location.href)
-      const returnUrl = currentUrl.searchParams.get('returnUrl') || '/'
+      const returnUrl = currentUrl.searchParams.get('return`Url') || '/'
       router.push(returnUrl)
 
     } catch (error) {
