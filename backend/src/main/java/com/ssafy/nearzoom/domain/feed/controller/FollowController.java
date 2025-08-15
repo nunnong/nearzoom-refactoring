@@ -83,8 +83,8 @@ public class FollowController {
      */
     @GetMapping("/mutual/{accountName}")
     public ResponseEntity<ApiResponse<List<UserProfileResponse>>> getMutualFollows(
-        Authentication authentication,
-        @PathVariable String accountName) {
+            Authentication authentication,
+            @PathVariable String accountName) {
         return ApiResponse.ok(followService.getMutualFollowsByAccountName(authentication, accountName));
     }
 }

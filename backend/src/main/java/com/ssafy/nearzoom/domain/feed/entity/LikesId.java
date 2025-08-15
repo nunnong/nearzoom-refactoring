@@ -37,7 +37,7 @@ public class LikesId implements Serializable {
             return false;
         }
         return Objects.equals(postId, that.postId) &&
-            Objects.equals(userId, that.userId);
+                Objects.equals(userId, that.userId);
     }
 
     @Override

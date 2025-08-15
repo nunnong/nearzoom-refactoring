@@ -24,7 +24,7 @@ public class LikesController {
      */
     @PostMapping("/posts/{postId}")
     public ResponseEntity<ApiResponse<Void>> likePost(Authentication authentication,
-        @PathVariable Long postId) {
+                                                      @PathVariable Long postId) {
         likesService.likePost(authentication, postId);
         return ApiResponse.ok();
     }
@@ -34,7 +34,7 @@ public class LikesController {
      */
     @DeleteMapping("/posts/{postId}")
     public ResponseEntity<ApiResponse<Void>> unlikePost(Authentication authentication,
-        @PathVariable Long postId) {
+                                                        @PathVariable Long postId) {
         likesService.unlikePost(authentication, postId);
         return ApiResponse.ok();
     }
@@ -44,7 +44,7 @@ public class LikesController {
      */
     @GetMapping("/posts/{postId}/check")
     public ResponseEntity<ApiResponse<Boolean>> isPostLikedByMe(Authentication authentication,
-        @PathVariable Long postId) {
+                                                                @PathVariable Long postId) {
         return ApiResponse.ok(likesService.isPostLikedByMe(authentication, postId));
     }
 
@@ -65,7 +65,7 @@ public class LikesController {
     @Deprecated
     @PostMapping("/{feedId}")
     public ResponseEntity<ApiResponse<Void>> like(Authentication authentication,
-        @PathVariable Long feedId) {
+                                                  @PathVariable Long feedId) {
         // 기존 프론트엔드 호환성을 위해 임시로 유지
         // feedId를 postId로 해석하여 처리
         likesService.likePost(authentication, feedId);
@@ -79,7 +79,7 @@ public class LikesController {
     @Deprecated
     @DeleteMapping("/{feedId}")
     public ResponseEntity<ApiResponse<Void>> unlike(Authentication authentication,
-        @PathVariable Long feedId) {
+                                                    @PathVariable Long feedId) {
         // 기존 프론트엔드 호환성을 위해 임시로 유지
         likesService.unlikePost(authentication, feedId);
         return ApiResponse.ok();
@@ -92,7 +92,7 @@ public class LikesController {
     @Deprecated
     @GetMapping("/check/{feedId}")
     public ResponseEntity<ApiResponse<Boolean>> likedByMe(Authentication authentication,
-        @PathVariable Long feedId) {
+                                                          @PathVariable Long feedId) {
         // 기존 프론트엔드 호환성을 위해 임시로 유지
         return ApiResponse.ok(likesService.isPostLikedByMe(authentication, feedId));
     }

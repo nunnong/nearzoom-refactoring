@@ -3,7 +3,6 @@ package com.ssafy.nearzoom.domain.myroom.controller;
 import com.ssafy.nearzoom.domain.myroom.dto.*;
 import com.ssafy.nearzoom.domain.myroom.service.MyRoomService;
 import com.ssafy.nearzoom.global.response.ApiResponse;
-import com.ssafy.nearzoom.domain.myroom.dto.PhotoForFeedUploadResponse;
 import com.ssafy.nearzoom.global.swagger.response.ApiResponseConstants.DeleteApiResponses;
 import com.ssafy.nearzoom.global.swagger.response.ApiResponseConstants.GetApiResponses;
 import com.ssafy.nearzoom.global.swagger.response.ApiResponseConstants.PostApiResponses;
@@ -66,20 +65,6 @@ public class MyRoomController {
         return ApiResponse.ok("사진이 삭제되었습니다.");
     }
 
-    @PostMapping("/photos/save-edited")
-    @Operation(
-            summary = "수정본 저장",
-            description = "편집본 저장, 원본은 수정 불가 상태로 전환"
-    )
-    @PostApiResponses
-    public ResponseEntity<ApiResponse<String>> saveEditedPhoto(
-            @RequestBody PhotoEditSaveRequest request,
-            Authentication authentication
-    ) {
-        myRoomService.saveEditedPhoto(authentication, request);
-        return ApiResponse.ok("수정본이 저장되었습니다.");
-    }
-
     @PostMapping("/photos/save-edited-url")
     @Operation(
             summary = "편집된 이미지 URL 저장",
@@ -87,11 +72,10 @@ public class MyRoomController {
     )
     @PostApiResponses
     public ResponseEntity<ApiResponse<String>> saveEditedImageUrl(
-            @RequestParam("imageUrl") String imageUrl,
-            @RequestParam("originalPhotoId") Long originalPhotoId,
+            @RequestBody PhotoEditSaveRequest request,
             Authentication authentication
     ) {
-        String savedUrl = myRoomService.saveEditedImageUrl(imageUrl, originalPhotoId, authentication);
+        String savedUrl = myRoomService.saveEditedImageUrl(request, authentication);
         return ApiResponse.ok("편집된 이미지 URL이 저장되었습니다. URL: " + savedUrl);
     }
 

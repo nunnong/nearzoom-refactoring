@@ -29,9 +29,9 @@ public class FeedController {
      */
     @GetMapping("/explore")
     public ResponseEntity<ApiResponse<PostListResponse>> getExplorePosts(
-        Authentication authentication,
-        @RequestParam(defaultValue = "20") int limit,
-        @RequestParam(required = false) Long cursor) {
+            Authentication authentication,
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(required = false) Long cursor) {
         return ApiResponse.ok(feedService.getRandomPosts(authentication, limit, cursor));
     }
 
@@ -44,9 +44,9 @@ public class FeedController {
      */
     @GetMapping("/timeline")
     public ResponseEntity<ApiResponse<PostListResponse>> getTimelinePosts(
-        Authentication authentication,
-        @RequestParam(defaultValue = "20") int limit,
-        @RequestParam(required = false) Long cursor) {
+            Authentication authentication,
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(required = false) Long cursor) {
         return ApiResponse.ok(feedService.getFollowingLatestPosts(authentication, limit, cursor));
     }
 
@@ -59,10 +59,10 @@ public class FeedController {
      */
     @GetMapping("/users/{userId}")
     public ResponseEntity<ApiResponse<FeedWithPostsResponse>> getUserFeed(
-        Authentication authentication,
-        @PathVariable Long userId,
-        @RequestParam(defaultValue = "20") int limit,
-        @RequestParam(required = false) Long cursor) {
+            Authentication authentication,
+            @PathVariable Long userId,
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(required = false) Long cursor) {
         return ApiResponse.ok(feedService.getUserFeedWithPosts(authentication, userId, limit, cursor));
     }
 
@@ -71,10 +71,10 @@ public class FeedController {
      */
     @GetMapping("/users/account/{accountName}")
     public ResponseEntity<ApiResponse<FeedWithPostsResponse>> getUserFeedByAccountName(
-        Authentication authentication,
-        @PathVariable String accountName,
-        @RequestParam(defaultValue = "20") int limit,
-        @RequestParam(required = false) Long cursor) {
+            Authentication authentication,
+            @PathVariable String accountName,
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(required = false) Long cursor) {
         return ApiResponse.ok(feedService.getUserFeedByAccountName(authentication, accountName, limit, cursor));
     }
 
@@ -87,8 +87,8 @@ public class FeedController {
      */
     @PostMapping("/posts/from-myroom")
     public ResponseEntity<ApiResponse<Long>> createPostFromMyRoom(
-        Authentication authentication,
-        @RequestBody CreatePostFromMyRoomRequest req) {
+            Authentication authentication,
+            @RequestBody CreatePostFromMyRoomRequest req) {
         return ApiResponse.create(feedService.createPostFromMyRoom(authentication, req));
     }
 
@@ -97,8 +97,8 @@ public class FeedController {
      */
     @GetMapping("/posts/{postId}")
     public ResponseEntity<ApiResponse<PostDetailResponse>> getPostDetail(
-        Authentication authentication,
-        @PathVariable Long postId) {
+            Authentication authentication,
+            @PathVariable Long postId) {
         return ApiResponse.ok(feedService.getPostDetail(authentication, postId));
     }
 
@@ -107,9 +107,9 @@ public class FeedController {
      */
     @PutMapping("/posts/{postId}")
     public ResponseEntity<ApiResponse<Void>> updatePost(
-        Authentication authentication,
-        @PathVariable Long postId,
-        @RequestBody UpdatePostRequest req) {
+            Authentication authentication,
+            @PathVariable Long postId,
+            @RequestBody UpdatePostRequest req) {
         feedService.updatePost(authentication, postId, req);
         return ApiResponse.ok();
     }
@@ -119,8 +119,8 @@ public class FeedController {
      */
     @DeleteMapping("/posts/{postId}")
     public ResponseEntity<ApiResponse<Void>> deletePost(
-        Authentication authentication,
-        @PathVariable Long postId) {
+            Authentication authentication,
+            @PathVariable Long postId) {
         feedService.deletePost(authentication, postId);
         return ApiResponse.ok();
     }
@@ -134,10 +134,10 @@ public class FeedController {
      */
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<FeedSearchResponse>> searchFeeds(
-        Authentication authentication,
-        @RequestParam String query,
-        @RequestParam(defaultValue = "10") int limit,
-        @RequestParam(required = false) Long cursor) {
+            Authentication authentication,
+            @RequestParam String query,
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(required = false) Long cursor) {
         return ApiResponse.ok(feedService.searchFeeds(authentication, query, limit, cursor));
     }
 }

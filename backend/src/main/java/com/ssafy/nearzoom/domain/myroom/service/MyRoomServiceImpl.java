@@ -13,6 +13,7 @@ import com.ssafy.nearzoom.domain.feed.repository.PostRepository;
 import com.ssafy.nearzoom.domain.myroom.dto.*;
 import com.ssafy.nearzoom.domain.photo.entity.Photo;
 import com.ssafy.nearzoom.domain.photo.repository.PhotoRepository;
+import com.ssafy.nearzoom.domain.photo.service.PhotoService;
 import com.ssafy.nearzoom.domain.user.entity.User;
 import com.ssafy.nearzoom.global.auth.util.AuthUtil;
 import com.ssafy.nearzoom.global.exception.ApiException;
@@ -34,6 +35,7 @@ public class MyRoomServiceImpl implements MyRoomService {
     private final UserRepository userRepository;
     private final PhotoRepository photoRepository;
     private final PostRepository postRepository;
+    private final PhotoService photoService;
 
     private User getLoginUser(Authentication authentication) {
         UserAuthInfoResponse loginUserInfo = AuthUtil.getUserAuthInfo(authentication);
@@ -96,49 +98,43 @@ public class MyRoomServiceImpl implements MyRoomService {
         UserAuthInfoResponse userInfo = AuthUtil.getUserAuthInfo(authentication);
         Long userId = userRepository.getByEmailAndSocial(userInfo.email(), userInfo.social()).getUserId();
 
-        myPhotoMapper.markAsEdited(userId, request.photoId());
+        myPhotoMapper.markAsEdited(userId, request.originalPhotoId());
     }
 
     @Override
-    public String saveEditedImageUrl(String imageUrl, Long originalPhotoId, Authentication authentication) {
-        log.info(">>> [MyRoomServiceImpl] 편집된 이미지 URL 저장 처리 시작 - originalPhotoId: {}, imageUrl: {}", originalPhotoId, imageUrl);
+    public String saveEditedImageUrl(PhotoEditSaveRequest request, Authentication authentication) {
+        log.info(">>> [MyRoomServiceImpl] 편집된 이미지 URL 저장 처리 시작 - originalPhotoId: {}, imageUrl: {}",
+                request.originalPhotoId(), request.imgUrl());
 
         try {
             // 1. 사용자 정보 조회
             UserAuthInfoResponse userInfo = AuthUtil.getUserAuthInfo(authentication);
             Long userId = userRepository.getByEmailAndSocial(userInfo.email(), userInfo.social()).getUserId();
-            String userEmail = userInfo.email();
 
             // 2. 편집 권한 확인 (원본 사진이 편집 가능한지 확인)
-            boolean canEdit = myPhotoMapper.checkEditPermission(userId, originalPhotoId);
+            boolean canEdit = myPhotoMapper.checkEditPermission(userId, request.originalPhotoId());
             if (!canEdit) {
                 throw new RuntimeException("해당 사진은 편집할 수 없습니다.");
             }
 
-            // 3. photo 테이블에 편집본 저장
-//            PhotoInsertDto photoDto = new PhotoInsertDto(imageUrl, null, null, originalPhotoId);
-//            photoRepository.savePhotoToMyPhoto(photoDto);
+            // 3. PhotoService를 통해 편집본을 Photo 테이블에 저장 (원본 정보 포함)
+            Photo savedPhoto = photoService.saveEditedPhoto(request.imgUrl(), request.originalPhotoId());
+            log.debug(">>> PhotoService를 통한 편집본 저장 완료 - photoId: {}", savedPhoto.getPhotoId());
 
-            Photo photo = new Photo(imageUrl, null, null, originalPhotoId);
-            photoRepository.save(photo);
-
-            Long newPhotoId = photo.getPhotoId();
-            log.debug(">>> photo 테이블에 편집본 저장 완료 - photoId: {}", newPhotoId);
-            // 4. archive 테이블에 편집본 저장 (편집 불가 상태로)
-            myPhotoMapper.saveToArchive(userId, newPhotoId);
+            // 4. Archive 테이블에 편집본 저장 (편집 불가 상태로)
+            myPhotoMapper.saveToArchive(userId, savedPhoto.getPhotoId());
             log.debug(">>> archive 테이블에 편집본 저장 완료");
 
-
             // 5. 원본 사진을 편집 불가 상태로 변경
-            myPhotoMapper.markAsEdited(userId, originalPhotoId);
+            myPhotoMapper.markAsEdited(userId, request.originalPhotoId());
             log.debug(">>> 원본 사진을 편집 불가 상태로 변경 완료");
 
-            log.info("편집된 이미지 URL 저장 처리 완료 - originalPhotoId: {}, imageUrl: {}", originalPhotoId, imageUrl);
-            return imageUrl;
-
+            log.info("편집된 이미지 URL 저장 처리 완료 - originalPhotoId: {}, imageUrl: {}",
+                    request.originalPhotoId(), request.imgUrl());
+            return request.imgUrl();
 
         } catch (Exception e) {
-            log.error("편집된 이미지 URL 저장 처리 실패 - originalPhotoId: {}", originalPhotoId, e);
+            log.error("편집된 이미지 URL 저장 처리 실패 - originalPhotoId: {}", request.originalPhotoId(), e);
             throw new RuntimeException("편집된 이미지 처리 중 오류가 발생했습니다: " + e.getMessage(), e);
         }
     }
