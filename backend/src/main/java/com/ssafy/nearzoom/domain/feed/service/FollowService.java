@@ -122,7 +122,7 @@ public class FollowService {
     @Transactional(readOnly = true)
     public FollowCountsResponse getCountsByAccountName(String accountName) {
         User user = userRepository.findByAccountName(accountName)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
         // int → long 타입 변경
         long followers = followRepository.countByFollowee_UserId(user.getUserId());
@@ -142,19 +142,19 @@ public class FollowService {
 
         // accountName으로 대상 사용자 찾기
         User targetUser = userRepository.findByAccountName(accountName)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
         // 상호 팔로우 목록 조회
         return followRepository.findMutualFollows(loginUser.getUserId(), targetUser.getUserId())
-            .stream()
-            .map(mutualUser -> new UserProfileResponse(
-                mutualUser.getUserId(),
-                mutualUser.getAccountName(),
-                mutualUser.getUserName(),
-                mutualUser.getUserEmail(),
-                mutualUser.getProfileImage(),
-                mutualUser.getPrettyFace()
-            ))
-            .toList();
+                .stream()
+                .map(mutualUser -> new UserProfileResponse(
+                        mutualUser.getUserId(),
+                        mutualUser.getAccountName(),
+                        mutualUser.getUserName(),
+                        mutualUser.getUserEmail(),
+                        mutualUser.getProfileImage(),
+                        mutualUser.getPrettyFace()
+                ))
+                .toList();
     }
 }

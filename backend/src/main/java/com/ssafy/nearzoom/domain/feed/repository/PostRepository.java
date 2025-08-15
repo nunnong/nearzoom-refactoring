@@ -70,9 +70,9 @@ public interface PostRepository extends JpaRepository<Post, Long> {
         order by p.postId desc
         """)
     List<Post> findFollowingLatestPosts(
-        @Param("userId") Long userId,
-        @Param("cursor") Long cursor,
-        Pageable pageable
+            @Param("userId") Long userId,
+            @Param("cursor") Long cursor,
+            Pageable pageable
     );
 
     /**
@@ -88,8 +88,8 @@ public interface PostRepository extends JpaRepository<Post, Long> {
         order by p.postId desc
         """)
     List<Post> findRandomPosts(
-        @Param("cursor") Long cursor,
-        Pageable pageable
+            @Param("cursor") Long cursor,
+            Pageable pageable
     );
 
     /**
@@ -104,9 +104,9 @@ public interface PostRepository extends JpaRepository<Post, Long> {
         order by p.displayOrder asc, p.postId desc
         """)
     List<Post> findByFeedIdWithCursor(
-        @Param("feedId") Long feedId,
-        @Param("cursor") Long cursor,
-        Pageable pageable
+            @Param("feedId") Long feedId,
+            @Param("cursor") Long cursor,
+            Pageable pageable
     );
 
     /**
@@ -121,9 +121,9 @@ public interface PostRepository extends JpaRepository<Post, Long> {
         order by p.postId desc
         """)
     List<Post> findByUserIdWithCursor(
-        @Param("userId") Long userId,
-        @Param("cursor") Long cursor,
-        Pageable pageable
+            @Param("userId") Long userId,
+            @Param("cursor") Long cursor,
+            Pageable pageable
     );
 
     /**
@@ -139,8 +139,8 @@ public interface PostRepository extends JpaRepository<Post, Long> {
         order by p.postId desc
         """)
     List<Post> findLatestPostsWithCursor(
-        @Param("cursor") Long cursor,
-        Pageable pageable
+            @Param("cursor") Long cursor,
+            Pageable pageable
     );
 
     // =========================================

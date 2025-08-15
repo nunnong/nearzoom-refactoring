@@ -39,7 +39,7 @@ public class LikesService {
         }
 
         Post post = postRepository.findById(postId)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 게시물입니다."));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 게시물입니다."));
 
         try {
             likesRepository.save(Likes.of(post, user));

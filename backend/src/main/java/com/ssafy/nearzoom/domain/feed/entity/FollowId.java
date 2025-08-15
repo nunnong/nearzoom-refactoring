@@ -36,7 +36,7 @@ public class FollowId implements Serializable {
             return false;
         }
         return Objects.equals(followerId, that.followerId)
-            && Objects.equals(followeeId, that.followeeId);
+                && Objects.equals(followeeId, that.followeeId);
     }
 
     @Override

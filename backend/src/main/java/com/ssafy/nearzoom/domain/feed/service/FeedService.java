@@ -54,12 +54,12 @@ public class FeedService {
 
         // PostResponse로 변환
         List<PostResponse> postResponses = actualPosts.stream()
-            .map(p -> toPostResponse(p, viewerId))
-            .toList();
+                .map(p -> toPostResponse(p, viewerId))
+                .toList();
 
         // 다음 커서 계산 (마지막 postId)
         Long nextCursor = hasNext && !actualPosts.isEmpty() ?
-            actualPosts.get(actualPosts.size() - 1).getPostId() : null;
+                actualPosts.get(actualPosts.size() - 1).getPostId() : null;
 
         return PostListResponse.of(postResponses, hasNext, nextCursor);
     }
@@ -70,20 +70,20 @@ public class FeedService {
     private PostResponse toPostResponse(Post post, Long viewerId) {
         long likeCount = likesRepository.countByPost_PostId(post.getPostId());
         boolean isLikedByMe = (viewerId != null) &&
-            likesRepository.existsByPost_PostIdAndUser_UserId(post.getPostId(), viewerId);
+                likesRepository.existsByPost_PostIdAndUser_UserId(post.getPostId(), viewerId);
 
         return new PostResponse(
-            post.getPostId(),
-            post.getPhoto().getPhotoId(),
-            post.getPhoto().getImgUrl(),
-            post.getCaption(),
-            post.getDisplayOrder(),
-            post.getCreatedAt(),
-            likeCount,
-            isLikedByMe,
-            post.getFeed().getUser().getUserId(),
-            post.getFeed().getUser().getAccountName(),
-            post.getFeed().getUser().getProfileImage()
+                post.getPostId(),
+                post.getPhoto().getPhotoId(),
+                post.getPhoto().getImgUrl(),
+                post.getCaption(),
+                post.getDisplayOrder(),
+                post.getCreatedAt(),
+                likeCount,
+                isLikedByMe,
+                post.getFeed().getUser().getUserId(),
+                post.getFeed().getUser().getAccountName(),
+                post.getFeed().getUser().getProfileImage()
         );
     }
 
@@ -113,58 +113,58 @@ public class FeedService {
 
     @Transactional(readOnly = true)
     public PostListResponse getFollowingLatestPosts(Authentication authentication, int limit,
-        Long cursor) {
+                                                    Long cursor) {
         User loginUser = getLoginUser(authentication);
 
         // ✅ PageRequest 생성하고 Repository에 전달
         PageRequest pageRequest = PageRequest.ofSize(limit + 1);
         List<Post> posts = postRepository.findFollowingLatestPosts(loginUser.getUserId(), cursor,
-            pageRequest);
+                pageRequest);
 
         return buildPostListResponse(posts, limit, loginUser.getUserId());
     }
 
     @Transactional(readOnly = true)
     public FeedWithPostsResponse getUserFeedWithPosts(Authentication authentication, Long userId,
-        int limit, Long cursor) {
+                                                      int limit, Long cursor) {
         User loginUser = getLoginUser(authentication);
 
         Feed feed = feedRepository.findByUser_UserId(userId)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "피드가 존재하지 않습니다."));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "피드가 존재하지 않습니다."));
 
         // ✅ PageRequest 생성하고 Repository에 전달
         PageRequest pageRequest = PageRequest.ofSize(limit + 1);
         List<Post> posts = postRepository.findByFeedIdWithCursor(feed.getFeedId(), cursor,
-            pageRequest);
+                pageRequest);
 
         boolean hasNext = posts.size() > limit;
         List<Post> actualPosts = hasNext ? posts.subList(0, limit) : posts;
         Long nextCursor = hasNext && !actualPosts.isEmpty() ?
-            actualPosts.get(actualPosts.size() - 1).getPostId() : null;
+                actualPosts.get(actualPosts.size() - 1).getPostId() : null;
 
         boolean isFollowing = followRepository.existsByFollower_UserIdAndFollowee_UserId(
-            loginUser.getUserId(), userId);
+                loginUser.getUserId(), userId);
 
         List<PostResponse> postResponses = actualPosts.stream()
-            .map(p -> toPostResponse(p, loginUser.getUserId()))
-            .toList();
+                .map(p -> toPostResponse(p, loginUser.getUserId()))
+                .toList();
 
         return FeedWithPostsResponse.withPaging(
-            feed.getFeedId(),
-            feed.getUser().getUserId(),
-            feed.getUser().getAccountName(),
-            feed.getUser().getProfileImage(),
-            feed.getCreatedAt(),
-            postResponses,
-            isFollowing,
-            hasNext,
-            nextCursor
+                feed.getFeedId(),
+                feed.getUser().getUserId(),
+                feed.getUser().getAccountName(),
+                feed.getUser().getProfileImage(),
+                feed.getCreatedAt(),
+                postResponses,
+                isFollowing,
+                hasNext,
+                nextCursor
         );
     }
 
     @Transactional(readOnly = true)
     public FeedSearchResponse searchFeeds(Authentication authentication, String query, int limit,
-        Long cursor) {
+                                          Long cursor) {
         if (query == null || query.trim().length() < 2) {
             return FeedSearchResponse.empty();
         }
@@ -179,40 +179,40 @@ public class FeedService {
         boolean hasNext = users.size() > limit;
         List<User> actualUsers = hasNext ? users.subList(0, limit) : users;
         Long nextCursor = hasNext && !actualUsers.isEmpty() ?
-            actualUsers.get(actualUsers.size() - 1).getUserId() : null;
+                actualUsers.get(actualUsers.size() - 1).getUserId() : null;
 
         List<FeedWithPostsResponse> feedResponses = actualUsers.stream()
-            .map(user -> {
-                Feed feed = feedRepository.findByUser_UserId(user.getUserId()).orElse(null);
-                if (feed != null) {
-                    // 미리보기용 게시물 조회 시에도 Pageable 사용
-                    PageRequest previewPageRequest = PageRequest.ofSize(6);
-                    List<Post> posts = postRepository.findByFeedIdWithCursor(feed.getFeedId(), null,
-                        previewPageRequest);
+                .map(user -> {
+                    Feed feed = feedRepository.findByUser_UserId(user.getUserId()).orElse(null);
+                    if (feed != null) {
+                        // 미리보기용 게시물 조회 시에도 Pageable 사용
+                        PageRequest previewPageRequest = PageRequest.ofSize(6);
+                        List<Post> posts = postRepository.findByFeedIdWithCursor(feed.getFeedId(), null,
+                                previewPageRequest);
 
-                    boolean isFollowing = followRepository.existsByFollower_UserIdAndFollowee_UserId(
-                        loginUser.getUserId(), user.getUserId());
+                        boolean isFollowing = followRepository.existsByFollower_UserIdAndFollowee_UserId(
+                                loginUser.getUserId(), user.getUserId());
 
-                    List<PostResponse> postResponses = posts.stream()
-                        .map(p -> toPostResponse(p, loginUser.getUserId()))
-                        .toList();
+                        List<PostResponse> postResponses = posts.stream()
+                                .map(p -> toPostResponse(p, loginUser.getUserId()))
+                                .toList();
 
-                    return new FeedWithPostsResponse(
-                        feed.getFeedId(),
-                        user.getUserId(),
-                        user.getAccountName(),
-                        user.getProfileImage(),
-                        feed.getCreatedAt(),
-                        postResponses,
-                        isFollowing,
-                        false,
-                        null
-                    );
-                }
-                return null;
-            })
-            .filter(feedResponse -> feedResponse != null)
-            .toList();
+                        return new FeedWithPostsResponse(
+                                feed.getFeedId(),
+                                user.getUserId(),
+                                user.getAccountName(),
+                                user.getProfileImage(),
+                                feed.getCreatedAt(),
+                                postResponses,
+                                isFollowing,
+                                false,
+                                null
+                        );
+                    }
+                    return null;
+                })
+                .filter(feedResponse -> feedResponse != null)
+                .toList();
 
         return FeedSearchResponse.of(feedResponses, hasNext, nextCursor);
     }
@@ -222,9 +222,9 @@ public class FeedService {
      */
     @Transactional(readOnly = true)
     public FeedWithPostsResponse getUserFeedByAccountName(Authentication authentication,
-        String accountName, int limit, Long cursor) {
+                                                          String accountName, int limit, Long cursor) {
         User targetUser = userRepository.findByAccountName(accountName)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
         return getUserFeedWithPosts(authentication, targetUser.getUserId(), limit, cursor);
     }
@@ -234,22 +234,22 @@ public class FeedService {
      */
     @Transactional
     public Long createPostFromMyRoom(Authentication authentication,
-        CreatePostFromMyRoomRequest req) {
+                                     CreatePostFromMyRoomRequest req) {
         User loginUser = getLoginUser(authentication);
 
         Photo photo = photoRepository.findById(req.photoId())
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사진이 존재하지 않습니다."));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사진이 존재하지 않습니다."));
 
         if (postRepository.existsByFeed_User_UserIdAndPhoto_PhotoId(loginUser.getUserId(),
-            req.photoId())) {
+                req.photoId())) {
             throw new ApiException(HttpStatus.CONFLICT, "이미 피드에 올린 사진입니다.");
         }
 
         Feed userFeed = feedRepository.findByUser_UserId(loginUser.getUserId())
-            .orElseGet(() -> {
-                Feed newFeed = Feed.of(loginUser);
-                return feedRepository.save(newFeed);
-            });
+                .orElseGet(() -> {
+                    Feed newFeed = Feed.of(loginUser);
+                    return feedRepository.save(newFeed);
+                });
 
         Integer nextOrder = postRepository.getNextDisplayOrder(userFeed.getFeedId());
         Post post = Post.of(userFeed, photo, req.caption(), nextOrder);
@@ -266,32 +266,32 @@ public class FeedService {
         User loginUser = getLoginUser(authentication);
 
         Post post = postRepository.findPostWithDetails(postId)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "게시물이 존재하지 않습니다."));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "게시물이 존재하지 않습니다."));
 
         // 좋아요 정보
         long likeCount = likesRepository.countByPost_PostId(postId);
         boolean isLikedByMe = likesRepository.existsByPost_PostIdAndUser_UserId(postId,
-            loginUser.getUserId());
+                loginUser.getUserId());
 
         // 관계 정보
         boolean isMyPost = post.getFeed().getUser().getUserId().equals(loginUser.getUserId());
         boolean isFollowingAuthor = followRepository.existsByFollower_UserIdAndFollowee_UserId(
-            loginUser.getUserId(), post.getFeed().getUser().getUserId());
+                loginUser.getUserId(), post.getFeed().getUser().getUserId());
 
         return new PostDetailResponse(
-            post.getPostId(),
-            post.getPhoto().getPhotoId(),
-            post.getPhoto().getImgUrl(),
-            post.getCaption(),
-            post.getCreatedAt(),
-            likeCount,
-            isLikedByMe,
-            post.getFeed().getUser().getUserId(),
-            post.getFeed().getUser().getAccountName(),
-            post.getFeed().getUser().getProfileImage(),
-            post.getFeed().getFeedId(),
-            isMyPost,
-            isFollowingAuthor
+                post.getPostId(),
+                post.getPhoto().getPhotoId(),
+                post.getPhoto().getImgUrl(),
+                post.getCaption(),
+                post.getCreatedAt(),
+                likeCount,
+                isLikedByMe,
+                post.getFeed().getUser().getUserId(),
+                post.getFeed().getUser().getAccountName(),
+                post.getFeed().getUser().getProfileImage(),
+                post.getFeed().getFeedId(),
+                isMyPost,
+                isFollowingAuthor
         );
     }
 
@@ -302,7 +302,7 @@ public class FeedService {
     public void updatePost(Authentication authentication, Long postId, UpdatePostRequest req) {
         User loginUser = getLoginUser(authentication);
         Post post = postRepository.findPostWithDetails(postId)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "게시물이 존재하지 않습니다."));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "게시물이 존재하지 않습니다."));
 
         if (!post.getFeed().getUser().getUserId().equals(loginUser.getUserId())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "본인의 게시물만 수정할 수 있습니다.");
@@ -317,7 +317,7 @@ public class FeedService {
     public void deletePost(Authentication authentication, Long postId) {
         User loginUser = getLoginUser(authentication);
         Post post = postRepository.findPostWithDetails(postId)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "게시물이 존재하지 않습니다."));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "게시물이 존재하지 않습니다."));
 
         if (!post.getFeed().getUser().getUserId().equals(loginUser.getUserId())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "본인의 게시물만 삭제할 수 있습니다.");

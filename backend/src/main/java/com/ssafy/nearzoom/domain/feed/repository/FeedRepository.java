@@ -62,9 +62,9 @@ public interface FeedRepository extends JpaRepository<Feed, Long> {
         order by f.feedId desc
         """)
     List<Feed> findByUserAccountNameContaining(
-        @Param("accountName") String accountName,
-        @Param("cursor") Long cursor,
-        Pageable pageable
+            @Param("accountName") String accountName,
+            @Param("cursor") Long cursor,
+            Pageable pageable
     );
 
     /**
@@ -81,8 +81,8 @@ public interface FeedRepository extends JpaRepository<Feed, Long> {
         order by f.feedId desc
         """)
     List<Feed> findActiveFeedsWithPosts(
-        @Param("cursor") Long cursor,
-        Pageable pageable
+            @Param("cursor") Long cursor,
+            Pageable pageable
     );
 
     /**
@@ -96,8 +96,8 @@ public interface FeedRepository extends JpaRepository<Feed, Long> {
         order by f.feedId desc
         """)
     List<Feed> findLatestFeedsWithCursor(
-        @Param("cursor") Long cursor,
-        Pageable pageable
+            @Param("cursor") Long cursor,
+            Pageable pageable
     );
 
     /**
@@ -112,9 +112,9 @@ public interface FeedRepository extends JpaRepository<Feed, Long> {
         order by f.feedId desc
         """)
     List<Feed> findByUserIdsWithCursor(
-        @Param("userIds") List<Long> userIds,
-        @Param("cursor") Long cursor,
-        Pageable pageable
+            @Param("userIds") List<Long> userIds,
+            @Param("cursor") Long cursor,
+            Pageable pageable
     );
 
     /**
@@ -133,9 +133,9 @@ public interface FeedRepository extends JpaRepository<Feed, Long> {
         order by f.feedId desc
         """)
     List<Feed> findFollowingFeedsWithCursor(
-        @Param("userId") Long userId,
-        @Param("cursor") Long cursor,
-        Pageable pageable
+            @Param("userId") Long userId,
+            @Param("cursor") Long cursor,
+            Pageable pageable
     );
 
     /**
@@ -151,9 +151,9 @@ public interface FeedRepository extends JpaRepository<Feed, Long> {
     order by f.feedId desc
     """)
     List<Feed> findRecentlyActiveFeedsWithCursor(
-        @Param("cursor") Long cursor,
-        @Param("weekAgo") LocalDateTime weekAgo,
-        Pageable pageable
+            @Param("cursor") Long cursor,
+            @Param("weekAgo") LocalDateTime weekAgo,
+            Pageable pageable
     );
 
     // =========================================
@@ -196,8 +196,8 @@ public interface FeedRepository extends JpaRepository<Feed, Long> {
         order by f.createdAt desc
         """)
     List<Feed> findByUserAccountNameContainingLegacy(
-        @Param("accountName") String accountName,
-        Pageable pageable
+            @Param("accountName") String accountName,
+            Pageable pageable
     );
 
     /**
@@ -231,7 +231,7 @@ public interface FeedRepository extends JpaRepository<Feed, Long> {
         order by f.updatedAt desc
         """)
     List<Feed> findFollowingFeedsLegacy(
-        @Param("userId") Long userId,
-        Pageable pageable
+            @Param("userId") Long userId,
+            Pageable pageable
     );
 }
