@@ -100,7 +100,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         case 'heart':
           // heart 필터 값을 boolean으로 변환
           condition.heart = filter.value === 'liked' ? true : false
-          console.log(`💖 Heart filter value: ${filter.value} → ${condition.heart}`)
+          console.log(`Heart filter value: ${filter.value} → ${condition.heart}`)
           break
         case 'name':
           if (!condition.partnerEmails) {
@@ -123,19 +123,19 @@ const Dashboard: React.FC<DashboardProps> = ({
           }
           break
         case 'edited':
-          console.log('⚠️ Edited filter not implemented in backend')
+          console.log('Edited filter not implemented in backend')
           break
       }
     })
 
-    console.log('🚀 Sending condition to backend:', condition)
+    console.log('Sending condition to backend:', condition)
 
     if (onRefresh) {
       try {
         await onRefresh(condition)
-        console.log('✅ Filter refresh completed')
+        console.log('Filter refresh completed')
       } catch (error) {
-        console.error('❌ Filter refresh failed:', error)
+        console.error('Filter refresh failed:', error)
         alert('필터 적용 중 오류가 발생했습니다. 다시 시도해주세요.')
       }
     }

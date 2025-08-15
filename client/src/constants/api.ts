@@ -9,7 +9,7 @@ export const API_BASE_URL =
 export const FRONTEND_BASE_URL =
   process.env.NODE_ENV === 'production'
     ? 'https://nearzoom.store' // 프론트엔드 포트
-    : 'http://localhost:3000' 
+    : 'http://localhost:3000'
 
 export const API_ENDPOINTS = {
   // Auth
@@ -20,7 +20,7 @@ export const API_ENDPOINTS = {
   HEART: '/myroom/photos/heart',
   DELETE_PHOTO: '/myroom/photos',
   SAVE_EDITED: '/myroom/photos/save-edited',
-  SAVE_EDITED_URL: '/myroom/photos/save-edited-url',  // 추가
+  SAVE_EDITED_URL: '/myroom/photos/save-edited-url', // 추가
   FEED_UPLOAD_INFO: '/myroom/photos',
   SAVE_FACE_IMAGE: '/user/save-face-image',
 
@@ -41,9 +41,9 @@ export const API_ENDPOINTS = {
   LIKE_COUNT: '/likes',
 
   // User Management
-  USER_INFO: '/user/userInfo', // (닉네임, 프로필, 참고 사진)
+  USER_INFO: '/user/userInfo', // (닉네임, 이메일, 프로필, 참고 사진)
   LOGOUT: '/user/logout',
   SIGNOUT: '/user/signout',
 }
 
-export type ApiEndpoint = typeof API_ENDPOINTS[keyof typeof API_ENDPOINTS]
+export type ApiEndpoint = (typeof API_ENDPOINTS)[keyof typeof API_ENDPOINTS]

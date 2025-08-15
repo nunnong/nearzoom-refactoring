@@ -35,14 +35,11 @@ export default function UploadPhotoPage() {
       setLoading(false)
     }
   }
-
   
-  // returnUrl 파라미터를 항상 URL 그대로, localStorage에도 혹시 값 있으면 보조로 체크하게 설계
   const getRedirectDestination = () => {
     const returnUrl = searchParams.get('returnUrl')
     const action = searchParams.get('action')
 
-    // [변경 포인트1]: localStorage 예비 체크 (콜백구간 잘못된 전달 대비)
     const fallbackRedirect = typeof window !== "undefined" ? localStorage.getItem('redirectAfterLogin') : null
 
     if (returnUrl) {
@@ -114,7 +111,7 @@ export default function UploadPhotoPage() {
       // 3단계: 받은 URL을 프로필 이미지로 저장
       await api.put('/user/save-face-image', null, {
         params: {
-          faceImageUrl: imageUrl
+          prettyFaceUrl: imageUrl
         },
         headers: {
           'Content-Type': 'application/json',

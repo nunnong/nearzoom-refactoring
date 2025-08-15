@@ -7,9 +7,8 @@ import {
   getTimeline,
   loadMoreTimeline, // 🔥 이제 API 파일에 있음
   toggleTimelinePostLike,
-} from '@/lib/api/timeline''
+} from '@/lib/api/timeline'
 
-// 🔥 타입들과 유틸리티 함수들은 /lib/types/timeline에서
 import {
   TimelinePost,
   TimelineApiResponse,
@@ -134,62 +133,68 @@ export const useTimeline = (
   }, [refreshPosts])
 
   // 좋아요 처리
-  const likePost = useCallback(async (postId: string) => {
-    const post = posts.find(p => p.id === postId)
-    if (!post || post.isLiked) return
+  const likePost = useCallback(
+    async (postId: string) => {
+      const post = posts.find(p => p.id === postId)
+      if (!post || post.isLiked) return
 
-    // 낙관적 업데이트
-    setPosts(prevPosts => 
-      updateTimelinePost(prevPosts, post.feedId, { isLiked: true })
-    )
-
-    try {
-      const result = await toggleTimelinePostLike(post.feedId)
-      
-      if (!result.success) {
-        // 실패 시 롤백
-        setPosts(prevPosts => 
-          updateTimelinePost(prevPosts, post.feedId, { isLiked: false })
-        )
-        console.error('좋아요 처리 실패:', result.error)
-      }
-    } catch (error) {
-      // 에러 시 롤백
-      setPosts(prevPosts => 
-        updateTimelinePost(prevPosts, post.feedId, { isLiked: false })
-      )
-      console.error('좋아요 처리 중 오류:', error)
-    }
-  }, [posts])
-
-  // 좋아요 취소
-  const unlikePost = useCallback(async (postId: string) => {
-    const post = posts.find(p => p.id === postId)
-    if (!post || !post.isLiked) return
-
-    // 낙관적 업데이트
-    setPosts(prevPosts => 
-      updateTimelinePost(prevPosts, post.feedId, { isLiked: false })
-    )
-
-    try {
-      const result = await toggleTimelinePostLike(post.feedId)
-      
-      if (!result.success) {
-        // 실패 시 롤백
-        setPosts(prevPosts => 
-          updateTimelinePost(prevPosts, post.feedId, { isLiked: true })
-        )
-        console.error('좋아요 취소 실패:', result.error)
-      }
-    } catch (error) {
-      // 에러 시 롤백
-      setPosts(prevPosts => 
+      // 낙관적 업데이트
+      setPosts(prevPosts =>
         updateTimelinePost(prevPosts, post.feedId, { isLiked: true })
       )
-      console.error('좋아요 취소 중 오류:', error)
-    }
-  }, [posts])
+
+      try {
+        const result = await toggleTimelinePostLike(post.feedId)
+
+        if (!result.success) {
+          // 실패 시 롤백
+          setPosts(prevPosts =>
+            updateTimelinePost(prevPosts, post.feedId, { isLiked: false })
+          )
+          console.error('좋아요 처리 실패:', result.error)
+        }
+      } catch (error) {
+        // 에러 시 롤백
+        setPosts(prevPosts =>
+          updateTimelinePost(prevPosts, post.feedId, { isLiked: false })
+        )
+        console.error('좋아요 처리 중 오류:', error)
+      }
+    },
+    [posts]
+  )
+
+  // 좋아요 취소
+  const unlikePost = useCallback(
+    async (postId: string) => {
+      const post = posts.find(p => p.id === postId)
+      if (!post || !post.isLiked) return
+
+      // 낙관적 업데이트
+      setPosts(prevPosts =>
+        updateTimelinePost(prevPosts, post.feedId, { isLiked: false })
+      )
+
+      try {
+        const result = await toggleTimelinePostLike(post.feedId)
+
+        if (!result.success) {
+          // 실패 시 롤백
+          setPosts(prevPosts =>
+            updateTimelinePost(prevPosts, post.feedId, { isLiked: true })
+          )
+          console.error('좋아요 취소 실패:', result.error)
+        }
+      } catch (error) {
+        // 에러 시 롤백
+        setPosts(prevPosts =>
+          updateTimelinePost(prevPosts, post.feedId, { isLiked: true })
+        )
+        console.error('좋아요 취소 중 오류:', error)
+      }
+    },
+    [posts]
+  )
 
   // 컴포넌트 마운트 시 초기 로드
   useEffect(() => {

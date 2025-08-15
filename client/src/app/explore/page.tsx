@@ -24,7 +24,6 @@ const ExplorePage: React.FC = () => {
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
-  // 🔥 요구사항대로 수정된 네비게이션 메뉴 항목들
   const navigationItems = [
     {
       name: 'Timeline',

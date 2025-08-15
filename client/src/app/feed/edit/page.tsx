@@ -7,9 +7,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useAuth } from '@/hooks/auth/useAuth'
 
-// ============================================================================
-// 🔥 백엔드 API 연동 함수들
-// ============================================================================
 import api from '@/lib/axios'
 
 // API 응답 타입 (백엔드 ApiResponse와 일치)
@@ -71,10 +68,6 @@ const createFeed = async (photoId: number, caption: string): Promise<number> => 
     throw error
   }
 }
-
-// ============================================================================
-// 🔥 SearchParams를 사용하는 컴포넌트 분리 (Suspense 경계 적용)
-// ============================================================================
 
 const PostCreateContent: React.FC = () => {
   const router = useRouter()

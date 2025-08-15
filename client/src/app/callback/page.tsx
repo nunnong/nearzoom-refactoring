@@ -20,9 +20,10 @@ export default function CallbackPage() {
   const getRedirectAfterLogin = () => {
     const returnUrl = searchParams.get('returnUrl')
     // 콜백까지 오기 전에 localStorage에 저장한 값
-    const storedRedirect = typeof window !== 'undefined'
-      ? localStorage.getItem('redirectAfterLogin')
-      : null
+    const storedRedirect =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('redirectAfterLogin')
+        : null
 
     if (returnUrl) {
       return decodeURIComponent(returnUrl)
@@ -73,8 +74,8 @@ export default function CallbackPage() {
         // 참조 사진 여부 확인
         const userInfo = await fetch(`${API_BASE_URL}/user/userInfo`, {
           headers: {
-            'Authorization': `Bearer ${accessToken}`
-          }
+            Authorization: `Bearer ${accessToken}`,
+          },
         })
 
         // 리다이렉트 목적지 읽기
@@ -83,13 +84,23 @@ export default function CallbackPage() {
         if (userInfo.ok) {
           const userData = await userInfo.json()
           const hasReferencePhoto = userData.data?.faceImageUrl
-          
+
+          console.log('🔍 콜백에서 받은 사용자 정보:', userData)
+          console.log('🔍 userData.data:', userData.data)
+          console.log('🔍 userData.data?.userName:', userData.data?.userName)
+          console.log(
+            '🔍 userData.data?.userProfileImage:',
+            userData.data?.userProfileImage
+          )
+
           // 참조 사진이 없으면 업로드 페이지로, 있으면 메인 페이지로
           setTimeout(() => {
             if (!hasReferencePhoto) {
               // 참조사진 없으면 업로드 페이지로, 원래 URL을 returnUrl 파라미터로 전달
               if (redirectDest) {
-                router.replace(`/upload-photo?returnUrl=${encodeURIComponent(redirectDest)}`)
+                router.replace(
+                  `/upload-photo?returnUrl=${encodeURIComponent(redirectDest)}`
+                )
               } else {
                 router.replace('/upload-photo')
               }
@@ -106,7 +117,6 @@ export default function CallbackPage() {
             localStorage.removeItem('redirectAfterLogin')
             localStorage.removeItem('actionAfterLogin')
           }, 500)
-
         } else {
           // 사용자 정보 조회 실패 → fallback
           setTimeout(() => {
@@ -119,7 +129,6 @@ export default function CallbackPage() {
             localStorage.removeItem('actionAfterLogin')
           }, 500)
         }
-
       } catch (error: any) {
         console.error('OAuth2 로그인 콜백 처리 중 오류:', error)
         setState('error')
@@ -154,10 +163,12 @@ export default function CallbackPage() {
   // 로딩 UI
   if (state === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">로그인 처리 중...</h2>
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+          <h2 className="mb-2 text-xl font-semibold text-gray-900">
+            로그인 처리 중...
+          </h2>
           <p className="text-gray-600">잠시만 기다려 주세요.</p>
         </div>
       </div>
@@ -167,14 +178,26 @@ export default function CallbackPage() {
   // 성공 UI
   if (state === 'success') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+            <svg
+              className="h-6 w-6 text-green-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">로그인 성공!</h2>
+          <h2 className="mb-2 text-xl font-semibold text-gray-900">
+            로그인 성공!
+          </h2>
           <p className="text-gray-600">이동 준비 중...</p>
         </div>
       </div>
@@ -183,15 +206,27 @@ export default function CallbackPage() {
 
   // 에러 UI
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50">
       <div className="text-center">
-        <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
-          <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+          <svg
+            className="h-6 w-6 text-red-600"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">로그인 실패</h2>
-        <p className="text-gray-600 mb-4">{errorMessage}</p>
+        <h2 className="mb-2 text-xl font-semibold text-gray-900">
+          로그인 실패
+        </h2>
+        <p className="mb-4 text-gray-600">{errorMessage}</p>
         <p className="text-sm text-gray-500">잠시 후 자동으로 이동합니다.</p>
       </div>
     </div>
