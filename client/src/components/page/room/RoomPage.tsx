@@ -81,7 +81,7 @@ export default function RoomPage({ roomName }: RoomPageProps) {
     setMounted(true)
   }, [])
 
-  // 사용자가 없으면 에러 로그 (room-test-social에서 이미 체크함)
+  // 사용자가 없으면 에러 로그 (상위 page.tsx에서 이미 체크함)
   useEffect(() => {
     if (mounted && !user) {
       console.error('User not authenticated in RoomPage')
