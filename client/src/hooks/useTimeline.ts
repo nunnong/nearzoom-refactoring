@@ -3,11 +3,11 @@
 import { useState, useEffect, useCallback } from 'react'
 
 // 🔥 API 함수들은 /lib/api/timeline에서
-import { 
-  getTimeline, 
+import {
+  getTimeline,
   loadMoreTimeline, // 🔥 이제 API 파일에 있음
-  toggleTimelinePostLike
-} from '@/lib/api/timeline'
+  toggleTimelinePostLike,
+} from '@/lib/api/timeline''
 
 // 🔥 타입들과 유틸리티 함수들은 /lib/types/timeline에서
 import {
@@ -15,7 +15,7 @@ import {
   TimelineApiResponse,
   TIMELINE_DEFAULTS,
   mergeTimelinePosts,
-  updateTimelinePost
+  updateTimelinePost,
 } from '@/lib/types/timeline'
 
 interface UseTimelineOptions {
@@ -30,24 +30,26 @@ interface UseTimelineReturn {
   isLoading: boolean
   hasMore: boolean
   error: string | null
-  
+
   // 액션 함수들
   loadMorePosts: () => Promise<void>
   refreshPosts: () => Promise<void>
   likePost: (postId: string) => Promise<void>
   unlikePost: (postId: string) => Promise<void>
-  
+
   // 상태 관리
   clearError: () => void
   retry: () => Promise<void>
 }
 
-export const useTimeline = (options: UseTimelineOptions = {}): UseTimelineReturn => {
+export const useTimeline = (
+  options: UseTimelineOptions = {}
+): UseTimelineReturn => {
   const {
     type = 'timeline',
     size = TIMELINE_DEFAULTS.PAGE_SIZE,
     autoRefresh = false,
-    refreshInterval = TIMELINE_DEFAULTS.REFRESH_INTERVAL
+    refreshInterval = TIMELINE_DEFAULTS.REFRESH_INTERVAL,
   } = options
 
   // 상태 관리
@@ -72,7 +74,7 @@ export const useTimeline = (options: UseTimelineOptions = {}): UseTimelineReturn
       setError(null)
 
       const result = await getTimeline(type, { size })
-      
+
       if (result.success && result.data) {
         setPosts(result.data.posts)
         setHasMore(result.data.hasMore)
@@ -103,7 +105,7 @@ export const useTimeline = (options: UseTimelineOptions = {}): UseTimelineReturn
 
       // 🔥 이제 loadMoreTimeline 함수 사용 가능
       const result = await loadMoreTimeline(nextCursor, { size })
-      
+
       if (result.success && result.data) {
         setPosts(prevPosts => mergeTimelinePosts(prevPosts, result.data!.posts))
         setHasMore(result.data.hasMore)
@@ -210,13 +212,13 @@ export const useTimeline = (options: UseTimelineOptions = {}): UseTimelineReturn
     isLoading,
     hasMore,
     error,
-    
+
     loadMorePosts,
     refreshPosts,
     likePost,
     unlikePost,
-    
+
     clearError,
-    retry
+    retry,
   }
 }

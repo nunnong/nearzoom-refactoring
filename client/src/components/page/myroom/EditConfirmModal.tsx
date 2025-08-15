@@ -4,14 +4,14 @@ import { PencilIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import React from 'react'
 
 interface ImageItem {
-  id: string
-  src: string
-  alt: string
+  photoId: string
+  imgUrl: string
   isLiked?: boolean
   isEdited?: boolean
+  editable?: number
   hashtags?: string[]
-  createdAt?: string        // 원본 날짜 데이터
-  partnerEmails?: string    // 함께 찍은 사람들 이메일
+  createdAt?: string    
+  partnerEmails?: string | string[]
 }
 
 interface EditConfirmModalProps {
@@ -46,8 +46,8 @@ const EditConfirmModal: React.FC<EditConfirmModalProps> = ({
         {/* Image Preview */}
         <div className="mb-4">
           <img
-            src={image.src}
-            alt={image.alt}
+            src={image.imgUrl}
+            alt={image.imgUrl}
             className="w-full h-48 object-cover rounded-lg"
           />
         </div>
@@ -77,9 +77,31 @@ const EditConfirmModal: React.FC<EditConfirmModalProps> = ({
             <h4 className="text-sm font-medium text-gray-700 mb-2">With</h4>
             <div className="text-sm text-gray-600">
               {image.partnerEmails ? (
-                <span className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full">
-                  {image.partnerEmails}
-                </span>
+                <div className="space-y-2">
+                  {typeof image.partnerEmails === 'string' ? (
+                    image.partnerEmails.split(',').map((email, index) => (
+                      <span 
+                        key={index}
+                        className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full mr-2 mb-1"
+                      >
+                        {email.trim()}
+                      </span>
+                    ))
+                  ) : Array.isArray(image.partnerEmails) ? (
+                    image.partnerEmails.map((email, index) => (
+                      <span 
+                        key={index}
+                        className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full mr-2 mb-1"
+                      >
+                        {email}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full">
+                      {image.partnerEmails}
+                    </span>
+                  )}
+                </div>
               ) : (
                 'ME'
               )}
@@ -97,7 +119,11 @@ const EditConfirmModal: React.FC<EditConfirmModalProps> = ({
             취소
           </button>
           <button
-            onClick={onConfirm}
+            onClick={() => {
+              console.log('EditConfirmModal 편집하기 버튼 클릭됨')
+              console.log('onConfirm 함수 호출 시도')
+              onConfirm()
+            }}
             className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
             <PencilIcon className="h-4 w-4" />

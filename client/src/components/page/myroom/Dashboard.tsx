@@ -15,12 +15,13 @@ import LogoutButton from './LogoutButton'
 import UploadSelfieModal from './UploadSelfieModal'
 import { useAuth } from '@/hooks/auth'
 
-interface ImageItem {
-  id: string
-  src: string
-  alt: string
+export interface ImageItem {
+  photoId: string
+  imgUrl: string
+  alt?: string
   isLiked?: boolean
   isEdited?: boolean
+  editable?: number         // 1: 편집 가능, 0: 편집 불가능
   hashtags?: string[]
 }
 
@@ -37,9 +38,23 @@ interface DashboardProps {
   onRefresh?: (condition?: MyPhotoListCondition) => Promise<void>
   onLoadMore?: () => Promise<void>
   hasMore?: boolean
+  onLike?: (photoId: string) => Promise<void>
+  onShareKakao?: (photoId: string) => void
+  onDelete?: (photoId: string) => Promise<void>
+  onEdit?: (photoId: string, editedImageUrl: string) => Promise<void>
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefresh, onLoadMore, hasMore }) => {
+const Dashboard: React.FC<DashboardProps> = ({ 
+  images = [], 
+  userProfile, 
+  onRefresh, 
+  onLoadMore, 
+  hasMore,
+  onLike,
+  onShareKakao,
+  onDelete,
+  onEdit
+}) => {
   const actualUser = userProfile
   const { handleLogout, handleDeleteAccount, isLoading } = useAuth()
   
@@ -58,72 +73,73 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefre
   }, [images])
 
   const handleFiltersChange = async (filters: Filter[]) => {
-  console.log('🔍 Filter change requested:', filters)
+    console.log('🔍 Filter change requested:', filters)
 
-  if (filters.length === 0) {
-    console.log('🧹 No filters - loading all photos')
+    if (filters.length === 0) {
+      console.log('🧹 No filters - loading all photos')
+      if (onRefresh) {
+        try {
+          await onRefresh({})
+          console.log('✅ Filter refresh completed (all photos)')
+        } catch (error) {
+          console.error('❌ Filter refresh failed:', error)
+          alert('전체 사진 로딩 중 오류가 발생했습니다. 다시 시도해주세요.')
+        }
+      }
+      return
+    }
+
+    const condition: MyPhotoListCondition = {
+      limit: 20
+    }
+
+    filters.forEach(filter => {
+      console.log(`🏷️ Processing filter: ${filter.type} = ${filter.value}`)
+      
+      switch (filter.type) {
+        case 'heart':
+          // heart 필터 값을 boolean으로 변환
+          condition.heart = filter.value === 'liked' ? true : false
+          console.log(`💖 Heart filter value: ${filter.value} → ${condition.heart}`)
+          break
+        case 'name':
+          if (!condition.partnerEmails) {
+            condition.partnerEmails = []
+          }
+          const emailValue = filter.value.trim()
+          if (emailValue) {
+            condition.partnerEmails.push(emailValue)
+          }
+          break
+        case 'date':
+          if (filter.value.includes('~')) {
+            const [start, end] = filter.value.split('~').map(d => d.trim().replace(/\./g, '-'))
+            condition.startDate = start
+            condition.endDate = end
+          } else {
+            const dateValue = filter.value.replace(/\./g, '-')
+            condition.startDate = dateValue
+            condition.endDate = dateValue
+          }
+          break
+        case 'edited':
+          console.log('⚠️ Edited filter not implemented in backend')
+          break
+      }
+    })
+
+    console.log('🚀 Sending condition to backend:', condition)
+
     if (onRefresh) {
       try {
-        // undefined 대신 빈 객체를 전달
-        await onRefresh({})  // ← 이렇게 수정
-        console.log('✅ Filter refresh completed (all photos)')
+        await onRefresh(condition)
+        console.log('✅ Filter refresh completed')
       } catch (error) {
         console.error('❌ Filter refresh failed:', error)
-        alert('전체 사진 로딩 중 오류가 발생했습니다. 다시 시도해주세요.')
+        alert('필터 적용 중 오류가 발생했습니다. 다시 시도해주세요.')
       }
     }
-    return
   }
-
-  const condition: MyPhotoListCondition = {
-    limit: 20
-  }
-
-  filters.forEach(filter => {
-    console.log(`🏷️ Processing filter: ${filter.type} = ${filter.value}`)
-    
-    switch (filter.type) {
-      case 'heart':
-        condition.heart = true
-        break
-      case 'name':
-        if (!condition.partnerEmails) {
-          condition.partnerEmails = []
-        }
-        const emailValue = filter.value.trim()
-        if (emailValue) {
-          condition.partnerEmails.push(emailValue)
-        }
-        break
-      case 'date':
-        if (filter.value.includes('~')) {
-          const [start, end] = filter.value.split('~').map(d => d.trim().replace(/\./g, '-'))
-          condition.startDate = start
-          condition.endDate = end
-        } else {
-          const dateValue = filter.value.replace(/\./g, '-')
-          condition.startDate = dateValue
-          condition.endDate = dateValue
-        }
-        break
-      case 'edited':
-        console.log('⚠️ Edited filter not implemented in backend')
-        break
-    }
-  })
-
-  console.log('🚀 Sending condition to backend:', condition)
-
-  if (onRefresh) {
-    try {
-      await onRefresh(condition)
-      console.log('✅ Filter refresh completed')
-    } catch (error) {
-      console.error('❌ Filter refresh failed:', error)
-      alert('필터 적용 중 오류가 발생했습니다. 다시 시도해주세요.')
-    }
-  }
-}
 
   const handleUploadSelfie = (): void => {
     setIsUploadSelfieModalOpen(true)
@@ -141,126 +157,27 @@ const Dashboard: React.FC<DashboardProps> = ({ images = [], userProfile, onRefre
     setIsSidebarOpen(!isSidebarOpen)
   }
 
-  const handleLike = async (imageId: string): Promise<void> => {
-    const targetImage = imageList.find(img => img.id === imageId)
-    const newIsLiked = !targetImage?.isLiked
-
-    console.log(`💖 Toggling heart for image ${imageId}: ${targetImage?.isLiked} → ${newIsLiked}`)
-
-    try {
-      await myroomService.updateHeart({
-        photoId: parseInt(imageId),
-        heart: newIsLiked
-      })
-
-      setImageList(prevImages =>
-        prevImages.map(img =>
-          img.id === imageId ? { ...img, isLiked: newIsLiked } : img
-        )
-      )
-
-      console.log('✅ Heart update success')
-    } catch (error) {
-      console.error('❌ 하트 상태 업데이트 실패:', error)
-      alert('좋아요 상태 변경에 실패했습니다. 다시 시도해주세요.')
+  const handleLike = async (photoId: string): Promise<void> => {
+    if (onLike) {
+      await onLike(photoId)
     }
   }
 
-  const handleShareKakao = (imageId: string): void => {
-    const targetImage = imageList.find(img => img.id === imageId)
-    if (!targetImage) {
-      console.error('Image not found:', imageId)
-      return
-    }
-
-    if (typeof window !== 'undefined' && (window as any).Kakao && (window as any).Kakao.Share) {
-      if (!(window as any).Kakao.isInitialized()) {
-        console.error('Kakao SDK not initialized')
-        alert('카카오톡 공유 기능을 사용할 수 없습니다.')
-        return
-      }
-
-      try {
-        (window as any).Kakao.Share.sendDefault({
-          objectType: 'feed',
-          content: {
-            title: targetImage.alt || '내가 그린 그림',
-            description: '이어줌에서 함께 그린 특별한 추억이에요!',
-            imageUrl: targetImage.src,
-            link: {
-              webUrl: window.location.href,
-              mobileWebUrl: window.location.href,
-            },
-          },
-        })
-      } catch (error) {
-        console.error('카카오톡 공유 실패:', error)
-        alert('카카오톡 공유에 실패했습니다. 다시 시도해주세요.')
-      }
-    } else {
-      console.error('Kakao SDK not loaded')
-      alert('카카오톡 공유 기능을 사용할 수 없습니다.')
+  const handleShareKakao = (photoId: string): void => {
+    if (onShareKakao) {
+      onShareKakao(photoId)
     }
   }
 
-  const handleDelete = async (imageId: string): Promise<void> => {
-    if (!confirm('정말로 이 사진을 삭제하시겠습니까?')) {
-      return
-    }
-
-    console.log(`🗑️ Deleting image ${imageId}`)
-
-    try {
-      await myroomService.deletePhoto({
-        photoId: parseInt(imageId)
-      })
-
-      setImageList(prevImages => prevImages.filter(img => img.id !== imageId))
-      
-      console.log('✅ Delete success')
-      alert('사진이 삭제되었습니다.')
-    } catch (error) {
-      console.error('❌ 사진 삭제 실패:', error)
-      alert('사진 삭제에 실패했습니다. 다시 시도해주세요.')
+  const handleDelete = async (photoId: string): Promise<void> => {
+    if (onDelete) {
+      await onDelete(photoId)
     }
   }
 
-  const handleSaveEdited = async (imageId: string): Promise<void> => {
-    console.log(`✏️ Saving edited version of image ${imageId}`)
-
-    try {
-      await myroomService.saveEditedPhoto({
-        photoId: parseInt(imageId)
-      })
-
-      setImageList(prevImages =>
-        prevImages.map(img =>
-          img.id === imageId ? { ...img, isEdited: true } : img
-        )
-      )
-
-      console.log('✅ Save edited success')
-      alert('편집본이 저장되었습니다.')
-    } catch (error) {
-      console.error('❌ 편집본 저장 실패:', error)
-      alert('편집본 저장에 실패했습니다. 다시 시도해주세요.')
-    }
-  }
-
-  const handleEdit = async (imageId: string, editedImageUrl?: string): Promise<void> => {
-    const imageToEdit = imageList.find(img => img.id === imageId)
-
-    if (imageToEdit && !imageToEdit.isEdited) {
-      console.log(`🎨 Navigating to edit page for image ${imageId}`)
-      
-      const encodedSrc = encodeURIComponent(imageToEdit.src)
-      const currentPath = window.location.pathname
-      const encodedReturnUrl = encodeURIComponent(currentPath)
-      router.push(
-        `/drawing?id=${imageId}&src=${encodedSrc}&returnUrl=${encodedReturnUrl}&saveCallback=true`
-      )
-    } else if (imageToEdit?.isEdited) {
-      alert('이미 편집된 사진은 다시 편집할 수 없습니다.')
+  const handleEdit = async (photoId: string, editedImageUrl: string): Promise<void> => {
+    if (onEdit) {
+      await onEdit(photoId, editedImageUrl)
     }
   }
 

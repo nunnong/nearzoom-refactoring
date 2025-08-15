@@ -13,22 +13,14 @@ import DeleteConfirmModal from './DeleteConfirmModal'
 import EditConfirmModal from './EditConfirmModal'
 import ShareModal from './ShareModal'
 import { myroomService } from '@/services/myroomService'
-
-interface ImageItem {
-  id: string
-  src: string
-  alt: string
-  isLiked?: boolean
-  editable?: number         // 1: 편집 가능, 0: 편집 불가능
-  hashtags?: string[]
-}
+import { ImageItem } from './Dashboard'
 
 interface ImageArchiveProps {
   images?: ImageItem[]
-  onLike?: (imageId: string) => void
-  onShareKakao?: (imageId: string) => void
-  onDelete?: (imageId: string) => void
-  onEdit?: (imageId: string, editedImageUrl: string) => Promise<void>
+  onLike?: (photoId: string) => void
+  onShareKakao?: (photoId: string) => void
+  onDelete?: (photoId: string) => void
+  onEdit?: (photoId: string, editedImageUrl: string) => Promise<void>
   onLoadMore?: () => Promise<void>
   hasMore?: boolean
 }
@@ -116,7 +108,7 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
 
   const handleDeleteConfirm = (): void => {
     if (imageToDelete) {
-      onDelete?.(imageToDelete.id)
+      onDelete?.(imageToDelete.photoId)
       setDeleteModalOpen(false)
       setImageToDelete(null)
     }
@@ -147,8 +139,8 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
   const handleEditConfirm = async (): Promise<void> => {
     if (imageToEdit) {
       try {
-        // 편집 페이지로 이동 (id와 src 파라미터 전달)
-        const editUrl = `/drawing?id=${imageToEdit.id}&src=${encodeURIComponent(imageToEdit.src)}&returnUrl=${encodeURIComponent('/myroom')}`
+        // 편집 페이지로 이동 (photoId와 imgUrl 파라미터 전달)
+        const editUrl = `/drawing?id=${imageToEdit.photoId}&src=${encodeURIComponent(imageToEdit.imgUrl)}&returnUrl=${encodeURIComponent('/myroom')}`
         window.location.href = editUrl
         
         setEditModalOpen(false)
@@ -164,8 +156,8 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
     setImageToEdit(null)
   }
 
-  const handleLikeClick = (imageId: string): void => {
-    onLike?.(imageId)
+  const handleLikeClick = (photoId: string): void => {
+    onLike?.(photoId)
   }
 
   const breakpointColumnsObj = {
@@ -215,18 +207,18 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
       >
         {images.map(image => (
           <div
-            key={image.id}
-            data-image-id={image.id}
+            key={image.photoId}
+            data-image-id={image.photoId}
             className="group relative mb-4 overflow-hidden rounded-lg"
           >
             <img
-              src={image.src}
-              alt={image.alt}
+              src={image.imgUrl}
+              alt={image.alt || '이미지'}
               className="w-full cursor-pointer rounded-lg shadow-md transition-all duration-300 ease-in-out group-hover:scale-105"
               loading="lazy"
               onError={() => {
                 // 에러 처리
-                const parent = document.querySelector(`[data-image-id="${image.id}"]`) as HTMLElement
+                const parent = document.querySelector(`[data-image-id="${image.photoId}"]`) as HTMLElement
                 if (parent && !parent.dataset.errorHandled) {
                   parent.dataset.errorHandled = 'true'
                   parent.style.display = 'none'
@@ -238,7 +230,7 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
 
             <div className="absolute top-3 right-3 opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100">
               <button
-                onClick={() => handleLikeClick(image.id)}
+                onClick={() => handleLikeClick(image.photoId)}
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-white/30"
                 aria-label={image.isLiked ? 'Unlike image' : 'Like image'}
               >
@@ -259,18 +251,7 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
               >
                 <ShareIcon className="h-4 w-4 text-white" />
               </button>
-
-              {/* Share.png Button - Left Center */}
-              <button
-                onClick={() => {
-                  console.log('Share.png 버튼 클릭:', image.id)
-                }}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-white/30"
-                aria-label="Share with Share.png"
-              >
-                <img src="/Share.png" alt="Share" className="h-5 w-5 object-contain" />
-              </button>
-
+              
               {/* Delete Button - Center */}
               <button
                 onClick={() => handleDeleteClick(image)}
@@ -310,7 +291,7 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
                   <div className="flex flex-wrap gap-1">
                     {image.hashtags.slice(0, 3).map((tag, index) => (
                       <span
-                        key={index}
+                        key={`${image.photoId}-tag-${index}`}
                         className="text-xs font-medium text-white"
                       >
                         #{tag}
@@ -323,7 +304,7 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
                     )}
                   </div>
                 ) : (
-                  <p className="text-xs font-medium text-white">{image.alt}</p>
+                  <p className="text-xs font-medium text-white">{image.alt || '이미지'}</p>
                 )}
               </div>
             </div>

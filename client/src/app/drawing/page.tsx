@@ -598,8 +598,49 @@ const DrawingPage = () => {
       router.push(returnUrl)
 
     } catch (error) {
+      // 자세한 에러 로깅
       console.error('❌ Failed to save image:', error)
-      alert(`이미지 저장에 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
+      console.error('❌ Error type:', typeof error)
+      console.error('❌ Error constructor:', error?.constructor?.name)
+      
+      // 에러 객체의 모든 속성 로깅
+      if (error && typeof error === 'object') {
+        console.error('❌ Error properties:', Object.keys(error))
+        console.error('❌ Error values:', Object.values(error))
+        
+        // Error 객체의 속성들 안전하게 접근
+        const errorObj = error as any
+        if (errorObj.message) {
+          console.error('❌ Error message:', errorObj.message)
+        }
+        if (errorObj.stack) {
+          console.error('❌ Error stack:', errorObj.stack)
+        }
+      }
+      
+      // 사용자에게 명확한 에러 메시지 표시
+      let errorMessage = '이미지 저장에 실패했습니다.'
+      
+      if (error instanceof Error) {
+        errorMessage += `\n\n오류 내용: ${error.message}`
+      } else if (typeof error === 'string') {
+        errorMessage += `\n\n오류 내용: ${error}`
+      } else if (error && typeof error === 'object') {
+        // API 응답 에러인 경우
+        if ('response' in error && error.response) {
+          const response = error.response as any
+          errorMessage += `\n\nHTTP 상태: ${response.status}`
+          if (response.data) {
+            errorMessage += `\n\n서버 응답: ${JSON.stringify(response.data)}`
+          }
+        } else if ('request' in error) {
+          errorMessage += '\n\n네트워크 요청 실패'
+        } else {
+          errorMessage += `\n\n알 수 없는 오류: ${JSON.stringify(error)}`
+        }
+      }
+      
+      alert(errorMessage)
     }
   }
 

@@ -5,9 +5,11 @@ import React from 'react'
 import { useRouter } from 'next/navigation'
 
 interface ImageItem {
-  id: string
-  src: string
-  alt: string
+  photoId: string
+  imgUrl: string
+  isLiked?: boolean
+  isEdited?: boolean
+  hashtags?: string[]
 }
 
 interface ShareModalProps {
@@ -28,15 +30,15 @@ const ShareModal: React.FC<ShareModalProps> = ({
   if (!isOpen || !image) return null
 
   const handleKakaoShare = () => {
-    onShareKakao(image.id)
+    onShareKakao(image.photoId)
     onClose()
   }
 
   const handleFeedCreate = () => {
     const params = new URLSearchParams({
-      imageId: image.id,
-      imageSrc: encodeURIComponent(image.src),
-      imageAlt: image.alt
+      imageId: image.photoId,
+      imageSrc: encodeURIComponent(image.imgUrl),
+      imageAlt: '' // alt is removed from ImageItem, so pass empty string or remove if not needed
     })
     router.push(`/feeds?${params.toString()}`)
     onClose()
@@ -68,8 +70,8 @@ const ShareModal: React.FC<ShareModalProps> = ({
           <div className="mb-4 flex justify-center">
             <div className="overflow-hidden rounded-lg">
               <img
-                src={image.src}
-                alt={image.alt}
+                src={image.imgUrl}
+                alt={image.imgUrl} // alt is removed from ImageItem, so pass imgUrl
                 className="h-20 w-20 object-cover"
               />
             </div>
@@ -78,7 +80,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
           {/* Image Info */}
           <div className="mb-6 text-center">
             <p className="text-sm font-medium text-gray-900">
-              "{image.alt}"
+              "{image.imgUrl}"
             </p>
             <p className="mt-1 text-xs text-gray-500">
               이 사진을 공유해보세요
