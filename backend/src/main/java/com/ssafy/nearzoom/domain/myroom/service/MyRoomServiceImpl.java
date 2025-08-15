@@ -49,11 +49,11 @@ public class MyRoomServiceImpl implements MyRoomService {
         System.out.println(">>> [DEBUG] 🔍 Found userId: " + userId);
 
         System.out.println(">>> [DEBUG] 📋 Condition - limit: " + cond.limit() +
-            ", cursor: " + cond.cursor() +
-            ", heart: " + cond.heart() +
-            ", partnerEmails: " + cond.partnerEmails() +
-            ", startDate: " + cond.startDate() +
-            ", endDate: " + cond.endDate());
+                ", cursor: " + cond.cursor() +
+                ", heart: " + cond.heart() +
+                ", partnerEmails: " + cond.partnerEmails() +
+                ", startDate: " + cond.startDate() +
+                ", endDate: " + cond.endDate());
 
         List<MyPhotoResponse> photos = myPhotoMapper.findPhotosByCondition(userId, cond);
         System.out.println(">>> [DEBUG] 📸 MyBatis 쿼리 결과: " + photos.size() + "개");
@@ -62,15 +62,15 @@ public class MyRoomServiceImpl implements MyRoomService {
             System.out.println(">>> [DEBUG] ❌ 사진이 없습니다!");
         } else {
             System.out.println(">>> [DEBUG] ✅ 첫 번째 사진: photoId=" + photos.get(0).photoId() +
-                ", imageUrl=" + photos.get(0).imageUrl());
+                    ", imageUrl=" + photos.get(0).imageUrl());
         }
 
         boolean hasNext = photos.size() == cond.limit();
         Long nextCursor = hasNext ? photos.get(photos.size() - 1).photoId() : null;
 
         System.out.println(">>> [DEBUG] 📊 최종 응답: photos=" + photos.size() +
-            ", hasNext=" + hasNext +
-            ", nextCursor=" + nextCursor);
+                ", hasNext=" + hasNext +
+                ", nextCursor=" + nextCursor);
 
         return new MyPhotoListResponse(photos, hasNext, nextCursor);
     }
@@ -127,7 +127,7 @@ public class MyRoomServiceImpl implements MyRoomService {
             // 4. archive 테이블에 편집본 저장 (편집 불가 상태로)
             myPhotoMapper.saveToArchive(userId, newPhotoId);
             log.debug(">>> archive 테이블에 편집본 저장 완료");
-            
+
 
             // 5. 원본 사진을 편집 불가 상태로 변경
             myPhotoMapper.markAsEdited(userId, originalPhotoId);
@@ -135,7 +135,7 @@ public class MyRoomServiceImpl implements MyRoomService {
 
             log.info("편집된 이미지 URL 저장 처리 완료 - originalPhotoId: {}, imageUrl: {}", originalPhotoId, imageUrl);
             return imageUrl;
-            
+
 
         } catch (Exception e) {
             log.error("편집된 이미지 URL 저장 처리 실패 - originalPhotoId: {}", originalPhotoId, e);
@@ -153,18 +153,18 @@ public class MyRoomServiceImpl implements MyRoomService {
 
         // 사진 존재 확인 및 소유권 검증
         Photo photo = photoRepository.findById(photoId)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사진이 존재하지 않습니다."));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사진이 존재하지 않습니다."));
 
         // 이미 피드에 올렸는지 확인
         boolean alreadyInFeed = postRepository.existsByFeed_User_UserIdAndPhoto_PhotoId(
-            loginUser.getUserId(), photoId);
+                loginUser.getUserId(), photoId);
 
         // 🔥 DTO와 일치하도록 4개 필드만 반환
         return new PhotoForFeedUploadResponse(
-            photo.getPhotoId(),
-            photo.getImgUrl(),      // ✅ 존재하는 필드
-            photo.getCreatedAt(),   // ✅ BaseEntity에서 상속받은 필드
-            alreadyInFeed
+                photo.getPhotoId(),
+                photo.getImgUrl(),      // ✅ 존재하는 필드
+                photo.getCreatedAt(),   // ✅ BaseEntity에서 상속받은 필드
+                alreadyInFeed
         );
     }
 }

@@ -3,6 +3,7 @@ package com.ssafy.nearzoom.domain.myroom.service;
 import com.ssafy.nearzoom.domain.myroom.dto.HeartUpdateRequest;
 import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoListCondition;
 import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoListResponse;
+import com.ssafy.nearzoom.domain.myroom.dto.PhotoForFeedUploadResponse;
 import com.ssafy.nearzoom.domain.myroom.dto.PhotoDeleteRequest;
 import com.ssafy.nearzoom.domain.myroom.dto.PhotoEditSaveRequest;
 import org.springframework.security.core.Authentication;
@@ -26,4 +27,5 @@ public interface MyRoomService {
      */
     String saveEditedImageUrl(String imageUrl, Long originalPhotoId, Authentication authentication);
 
+    PhotoForFeedUploadResponse getPhotoForFeedUpload(Long photoId, Authentication authentication);
 }
