@@ -77,6 +77,7 @@ export const myroomService = {
     if (condition.endDate) {
       params.append('endDate', condition.endDate)
     }
+
     if (condition.cursor) {
       params.append('cursor', condition.cursor.toString())
     }

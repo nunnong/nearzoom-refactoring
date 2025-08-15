@@ -21,8 +21,6 @@ interface ImageItem {
   isLiked?: boolean
   editable?: number         // 1: 편집 가능, 0: 편집 불가능
   hashtags?: string[]
-  createdAt?: string        // 원본 날짜 데이터
-  partnerEmails?: string    // 함께 찍은 사람들 이메일
 }
 
 interface ImageArchiveProps {
@@ -325,15 +323,7 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
                     )}
                   </div>
                 ) : (
-                  <div className="text-xs font-medium text-white space-y-1">
-                    <p>ID: {image.id}</p>
-                    {image.createdAt && (
-                      <p>{new Date(image.createdAt).toLocaleDateString('ko-KR')}</p>
-                    )}
-                    {image.partnerEmails && (
-                      <p>👥 {image.partnerEmails}</p>
-                    )}
-                  </div>
+                  <p className="text-xs font-medium text-white">{image.alt}</p>
                 )}
               </div>
             </div>
