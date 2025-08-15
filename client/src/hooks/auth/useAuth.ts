@@ -49,7 +49,7 @@ export const useAuth = () => {
       setLoading(true)
       const response = await userService.getUserInfo()
       
-      const rawData = response
+      const rawData = response.data
       const userData = userTransformer.fromBackend(rawData)
       setUser(userData)
     } catch (error) {

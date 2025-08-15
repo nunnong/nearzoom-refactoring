@@ -31,7 +31,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
           // 저장된 토큰으로 사용자 정보 가져오기
           try {
             const userInfo = await userService.getUserInfo()
-            setUser(userInfo)
+            setUser(userInfo.data)
           } catch (error) {
             // 토큰이 유효하지 않은 경우
             tokenStorage.remove()
