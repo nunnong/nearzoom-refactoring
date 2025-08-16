@@ -82,28 +82,30 @@ const EditConfirmModal: React.FC<EditConfirmModalProps> = ({
                     image.partnerEmails.split(',').map((email, index) => (
                       <span 
                         key={index}
-                        className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full mr-2 mb-1"
+                        className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full mr-2 mb-1 text-sm font-medium"
                       >
-                        {email.trim()}
+                        @{email.trim()}
                       </span>
                     ))
                   ) : Array.isArray(image.partnerEmails) ? (
                     image.partnerEmails.map((email, index) => (
                       <span 
                         key={index}
-                        className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full mr-2 mb-1"
+                        className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full mr-2 mb-1 text-sm font-medium"
                       >
-                        {email}
+                        @{email}
                       </span>
                     ))
                   ) : (
-                    <span className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full">
-                      {image.partnerEmails}
+                    <span className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                      @{image.partnerEmails}
                     </span>
                   )}
                 </div>
               ) : (
-                'ME'
+                <span className="inline-block bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-sm font-medium">
+                  ME
+                </span>
               )}
             </div>
           </div>

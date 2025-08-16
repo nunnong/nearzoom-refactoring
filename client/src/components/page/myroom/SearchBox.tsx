@@ -1,7 +1,7 @@
 'use client'
 
 import { MagnifyingGlassIcon, XMarkIcon, HeartIcon, CalendarIcon, PencilIcon } from '@heroicons/react/24/outline'
-import React, { useState, ChangeEvent } from 'react'
+import React, { useState, ChangeEvent, useCallback, useMemo } from 'react'
 
 interface Filter {
   id: string
@@ -15,7 +15,7 @@ interface SearchBoxProps {
   placeholder?: string
 }
 
-const SearchBox: React.FC<SearchBoxProps> = ({
+const SearchBox: React.FC<SearchBoxProps> = React.memo(({
   onFiltersChange,
   placeholder = '친구 메일로 검색하세요 (스페이스바로 필터 추가)',
 }) => {
@@ -26,7 +26,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({
   const [endDate, setEndDate] = useState<string>('')
 
   // 날짜 관련 함수
-  const addDateFilter = (start: string, end?: string) => {
+  const addDateFilter = useCallback((start: string, end?: string) => {
     const dateValue = end ? `${start} ~ ${end}` : start
     const newFilter: Filter = {
       id: Date.now().toString(),
@@ -41,14 +41,14 @@ const SearchBox: React.FC<SearchBoxProps> = ({
     setShowDatePicker(false)
     setStartDate('')
     setEndDate('')
-  }
+  }, [filters, onFiltersChange])
 
   // 좋아요
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement>): void => {
+  const handleInputChange = useCallback((e: ChangeEvent<HTMLInputElement>): void => {
     setSearchValue(e.target.value)
-  }
+  }, [])
   // 하트 필터 여부
-  const addHeartFilter = () => {
+  const addHeartFilter = useCallback(() => {
     console.log('🔥 addHeartFilter 호출됨, 현재 필터들:', filters)
     
     // 이미 하트 필터가 있는지 확인
@@ -73,10 +73,10 @@ const SearchBox: React.FC<SearchBoxProps> = ({
     console.log('➕ 추가된 필터들:', updatedFilters)
     setFilters(updatedFilters)
     onFiltersChange?.(updatedFilters)
-  }
+  }, [filters, onFiltersChange])
 
   // 편집 되어 있는지 확인
-  const addEditedFilter = () => {
+  const addEditedFilter = useCallback(() => {
     // 기존 편집 필터가 있는지 확인
     const existingEditFilter = filters.find(f => f.type === 'edited')
     
@@ -105,7 +105,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({
       setFilters(updatedFilters)
       onFiltersChange?.(updatedFilters)
     }
-  }
+  }, [filters, onFiltersChange])
 
   const detectFilterType = (value: string): 'heart' | 'name' | 'date' => {
     // 날짜 범위 패턴 감지 (YYYY.MM.DD ~ YYYY.MM.DD 형식)
@@ -167,6 +167,17 @@ const SearchBox: React.FC<SearchBoxProps> = ({
     }
   }
 
+  // 메모이제이션된 값들
+  const hasFilters = useMemo(() => filters.length > 0, [filters])
+  
+  const heartFilterCount = useMemo(() => 
+    filters.filter(f => f.type === 'heart').length, [filters]
+  )
+  
+  const editedFilterCount = useMemo(() => 
+    filters.filter(f => f.type === 'edited').length, [filters]
+  )
+
   return (
     <div className="w-full max-w-2xl">
       {/* 검색 입력창 */}
@@ -221,7 +232,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({
       </div>
 
       {/* 필터 버튼들 */}
-      {filters.length > 0 && (
+      {hasFilters && (
         <div className="flex flex-wrap gap-2 mt-3">
           {filters.map((filter) => (
             <div
@@ -305,6 +316,6 @@ const SearchBox: React.FC<SearchBoxProps> = ({
       )}
     </div>
   )
-}
+})
 
 export default SearchBox

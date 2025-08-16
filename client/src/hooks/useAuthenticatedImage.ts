@@ -8,7 +8,9 @@ interface UseAuthenticatedImageResult {
   error: string | null
 }
 
-export const useAuthenticatedImage = (photoId: string): UseAuthenticatedImageResult => {
+export const useAuthenticatedImage = (
+  photoId: string
+): UseAuthenticatedImageResult => {
   const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -27,7 +29,7 @@ export const useAuthenticatedImage = (photoId: string): UseAuthenticatedImageRes
         setError(null)
 
         // 인증이 포함된 이미지 요청
-        const response = await api.get(`${API_ENDPOINTS.IMAGE_PROXY}/${photoId}`, {
+        const response = await api.get(`${API_ENDPOINTS.PHOTOS}/${photoId}`, {
           responseType: 'blob', // 이미지 데이터를 blob으로 받기
           timeout: 15000, // 15초 타임아웃
         })
@@ -35,16 +37,15 @@ export const useAuthenticatedImage = (photoId: string): UseAuthenticatedImageRes
         // Blob을 Object URL로 변환
         const imageBlob = response.data
         const imageObjectURL = URL.createObjectURL(imageBlob)
-        
+
         setImageSrc(imageObjectURL)
-        
+
         // 메모리 누수 방지를 위해 cleanup 등록
         return () => {
           if (imageObjectURL) {
             URL.revokeObjectURL(imageObjectURL)
           }
         }
-
       } catch (err: any) {
         console.error('이미지 로드 실패:', {
           error: err,
@@ -52,9 +53,9 @@ export const useAuthenticatedImage = (photoId: string): UseAuthenticatedImageRes
           status: err?.response?.status,
           data: err?.response?.data,
           config: err?.config,
-          photoId
+          photoId,
         })
-        
+
         // 에러 타입별 처리
         if (err.response?.status === 401) {
           setError('로그인이 필요합니다.')
@@ -91,6 +92,6 @@ export const useAuthenticatedImage = (photoId: string): UseAuthenticatedImageRes
   return {
     imageSrc,
     loading,
-    error
+    error,
   }
 }

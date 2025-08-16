@@ -61,9 +61,6 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
 
           {/* Message */}
           <div className="text-center">
-            <p className="mb-2 text-sm font-medium text-gray-900">
-              {image.imgUrl}
-            </p>
             <p className="text-sm text-gray-600">
               이 사진을 영구적으로 삭제하시겠습니까?
             </p>

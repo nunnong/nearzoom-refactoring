@@ -47,6 +47,12 @@ export const useAuth = () => {
   }
 
   const fetchUserInfo = async () => {
+    // 이미 사용자 정보가 있으면 API 호출하지 않음
+    if (user) {
+      console.log('사용자 정보가 이미 존재합니다.')
+      return
+    }
+
     try {
       setLoading(true)
       const response = await userService.getUserInfo()

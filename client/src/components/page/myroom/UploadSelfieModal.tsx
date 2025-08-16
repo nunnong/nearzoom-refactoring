@@ -97,7 +97,7 @@ export default function UploadSelfieModal({
       console.log('이미지 저장 요청:', imageUrl)
 
       await api.put(API_ENDPOINTS.SAVE_FACE_IMAGE, null, {
-        params: { faceImageUrl: imageUrl }
+        params: { prettyFaceUrl: imageUrl }
       })
 
       console.log('이미지 저장 완료')

@@ -199,7 +199,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                   
                   {/* 이미지 로드 실패 시 표시될 fallback */}
                   {user.profileImage && (
-                    <div className="hidden w-full h-full flex items-center justify-center text-gray-400">
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
                       <UserIcon className="w-12 h-12" />
                     </div>
                   )}

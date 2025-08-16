@@ -1,8 +1,9 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import React, { useEffect } from 'react'
+import React, { useEffect, useCallback, useMemo } from 'react'
 import { useState } from 'react'
+import Image from 'next/image'
 
 import { User } from '@/types/auth'
 import { myroomService, MyPhotoListCondition } from '@/services/myroomService'
@@ -55,10 +56,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   onDelete,
   onEdit
 }) => {
-  const actualUser = userProfile
-  const { handleLogout, handleDeleteAccount, isLoading } = useAuth()
-  
   const router = useRouter()
+  const { handleLogout, handleDeleteAccount, isLoading } = useAuth()
+  const actualUser = userProfile
+  
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true) // 사이드바 계속 열어 놓기
   const [activeModal, setActiveModal] = useState<string | null>(null)
   const [imageList, setImageList] = useState<ImageItem[]>([])
@@ -72,7 +73,32 @@ const Dashboard: React.FC<DashboardProps> = ({
     setImageList(images)
   }, [images])
 
-  const handleFiltersChange = async (filters: Filter[]) => {
+  // 메모이제이션된 콜백 함수들
+  const handleLike = useCallback(async (photoId: string): Promise<void> => {
+    if (onLike) {
+      await onLike(photoId)
+    }
+  }, [onLike])
+
+  const handleShareKakao = useCallback((photoId: string): void => {
+    if (onShareKakao) {
+      onShareKakao(photoId)
+    }
+  }, [onShareKakao])
+
+  const handleDelete = useCallback(async (photoId: string): Promise<void> => {
+    if (onDelete) {
+      await onDelete(photoId)
+    }
+  }, [onDelete])
+
+  const handleEdit = useCallback(async (photoId: string, editedImageUrl: string): Promise<void> => {
+    if (onEdit) {
+      await onEdit(photoId, editedImageUrl)
+    }
+  }, [onEdit])
+
+  const handleFiltersChange = useCallback(async (filters: Filter[]) => {
     console.log('🔍 Filter change requested:', filters)
 
     if (filters.length === 0) {
@@ -80,9 +106,9 @@ const Dashboard: React.FC<DashboardProps> = ({
       if (onRefresh) {
         try {
           await onRefresh({})
-          console.log('✅ Filter refresh completed (all photos)')
+          console.log('Filter refresh completed (all photos)')
         } catch (error) {
-          console.error('❌ Filter refresh failed:', error)
+          console.error('Filter refresh failed:', error)
           alert('전체 사진 로딩 중 오류가 발생했습니다. 다시 시도해주세요.')
         }
       }
@@ -98,9 +124,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       
       switch (filter.type) {
         case 'heart':
-          // heart 필터 값을 boolean으로 변환
-          condition.heart = filter.value === 'liked' ? true : false
-          console.log(`Heart filter value: ${filter.value} → ${condition.heart}`)
+          condition.heart = filter.value === 'true'
           break
         case 'name':
           if (!condition.partnerEmails) {
@@ -128,58 +152,78 @@ const Dashboard: React.FC<DashboardProps> = ({
       }
     })
 
-    console.log('Sending condition to backend:', condition)
+    console.log('🔧 Final filter condition:', condition)
 
     if (onRefresh) {
       try {
         await onRefresh(condition)
-        console.log('Filter refresh completed')
+        console.log('✅ Filter refresh completed')
       } catch (error) {
-        console.error('Filter refresh failed:', error)
-        alert('필터 적용 중 오류가 발생했습니다. 다시 시도해주세요.')
+        console.error('❌ Filter refresh failed:', error)
+        alert('필터링 중 오류가 발생했습니다. 다시 시도해주세요.')
       }
     }
-  }
+  }, [onRefresh])
 
-  const handleUploadSelfie = (): void => {
-    setIsUploadSelfieModalOpen(true)
-  }
+  const handleLoadMore = useCallback(async () => {
+    if (onLoadMore) {
+      await onLoadMore()
+    }
+  }, [onLoadMore])
 
-  const handleAccount = (): void => {
-    setActiveModal('account')
-  }
+  const handleRefresh = useCallback(async (condition?: MyPhotoListCondition) => {
+    if (onRefresh) {
+      await onRefresh(condition)
+    }
+  }, [onRefresh])
 
-  const closeModal = (): void => {
-    setActiveModal(null)
-  }
-
-  const toggleSidebar = (): void => {
+  const toggleSidebar = useCallback(() => {
     setIsSidebarOpen(!isSidebarOpen)
-  }
+  }, [isSidebarOpen])
 
-  const handleLike = async (photoId: string): Promise<void> => {
-    if (onLike) {
-      await onLike(photoId)
-    }
-  }
+  const toggleMenu = useCallback(() => {
+    setIsMenuOpen(!isMenuOpen)
+  }, [isMenuOpen])
 
-  const handleShareKakao = (photoId: string): void => {
-    if (onShareKakao) {
-      onShareKakao(photoId)
-    }
-  }
+  const toggleMyFeed = useCallback(() => {
+    setIsMyFeedOpen(!isMyFeedOpen)
+  }, [isMyFeedOpen])
 
-  const handleDelete = async (photoId: string): Promise<void> => {
-    if (onDelete) {
-      await onDelete(photoId)
-    }
-  }
+  const openUploadSelfieModal = useCallback(() => {
+    setIsUploadSelfieModalOpen(true)
+  }, [])
 
-  const handleEdit = async (photoId: string, editedImageUrl: string): Promise<void> => {
-    if (onEdit) {
-      await onEdit(photoId, editedImageUrl)
-    }
-  }
+  const closeUploadSelfieModal = useCallback(() => {
+    setIsUploadSelfieModalOpen(false)
+  }, [])
+
+  const openModal = useCallback((modalType: string) => {
+    setActiveModal(modalType)
+  }, [])
+
+  const closeModal = useCallback(() => {
+    setActiveModal(null)
+  }, [])
+
+  // 메모이제이션된 값들
+  const sidebarWidth = useMemo(() => isSidebarOpen ? 'w-64' : 'w-16', [isSidebarOpen])
+  
+  const filteredImages = useMemo(() => {
+    return imageList.filter(image => {
+      // 여기에 필터링 로직을 추가할 수 있습니다
+      return true
+    })
+  }, [imageList])
+
+  const hasImages = useMemo(() => filteredImages.length > 0, [filteredImages])
+
+  const handleUploadSelfie = useCallback((): void => {
+    setIsUploadSelfieModalOpen(true)
+  }, [])
+
+  const handleAccount = useCallback((): void => {
+    setActiveModal('account')
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -313,7 +357,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             onShareKakao={handleShareKakao}
             onDelete={handleDelete}
             onEdit={handleEdit}
-            onLoadMore={onLoadMore}
+            onLoadMore={handleLoadMore}
             hasMore={hasMore}
           />
         </main>
@@ -342,12 +386,14 @@ const Dashboard: React.FC<DashboardProps> = ({
               <div className="space-y-6">
                 {/* Profile Section */}
                 <div className="flex items-center space-x-4">
-                  <div className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center">
+                  <div className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
                     {actualUser?.profileImage ? (
-                      <img
+                      <Image
                         src={actualUser.profileImage}
                         alt="Profile"
-                        className="h-full w-full rounded-full object-cover"
+                        width={64}
+                        height={64}
+                        className="h-full w-full rounded-full object-cover transition-opacity duration-300"
                       />
                     ) : (
                       <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

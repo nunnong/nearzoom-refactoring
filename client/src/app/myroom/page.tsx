@@ -59,6 +59,8 @@ export default function MyRoom() {
     } catch (error: any) {
       console.error('Failed to fetch images:', error)
       setUserImages([])
+      // 에러 발생 시 로딩 상태 해제
+      setLoading(false)
     } finally {
       setLoading(false)
     }
@@ -173,7 +175,19 @@ export default function MyRoom() {
     if (!authLoading && isAuthenticated && user) {
       fetchUserImages()
     }
-  }, [authLoading, isAuthenticated])
+  }, [authLoading, isAuthenticated, user])
+
+  // 페이지 포커스 시 데이터 새로고침
+  useEffect(() => {
+    const handleFocus = () => {
+      if (isAuthenticated && user && !loading) {
+        fetchUserImages()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [isAuthenticated, user, loading])
 
   // 인증 로딩 중이거나 사용자 정보가 없을 때
   if (authLoading || !user) {
@@ -195,24 +209,19 @@ export default function MyRoom() {
     )
   }
 
-  // 프로필 이미지가 준비되지 않았을 때
-  if (!user.profileImage) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-          <p className="text-gray-600">프로필 정보를 불러오는 중...</p>
-        </div>
-      </div>
-    )
-  }
-
+  // 프로필 이미지 로딩 중일 때는 메인 컨텐츠를 먼저 표시하고, 프로필 이미지가 로딩되면 업데이트
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
           <p className="text-gray-600">사진을 불러오는 중...</p>
+          <button 
+            onClick={() => fetchUserImages()}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            새로고침
+          </button>
         </div>
       </div>
     )
@@ -221,8 +230,14 @@ export default function MyRoom() {
   return (
     <Dashboard
       images={userImages}
-      userProfile={user}
-      onRefresh={fetchUserImages}
+      userProfile={{
+        ...user,
+        profileImage: user.profileImage, // 로딩 중이면 undefined로 전달
+      }}
+      onRefresh={async () => {
+        setLoading(true)
+        await fetchUserImages()
+      }}
       onLoadMore={loadMoreImages}
       hasMore={hasMore}
       onLike={handleLike}

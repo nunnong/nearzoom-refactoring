@@ -252,10 +252,12 @@ const KonvaCanvas: React.FC<KonvaCanvasProps> = ({
             image={originalImage}
             width={stageSize.width}
             height={stageSize.height}
+            // 원본 이미지의 비율을 유지하면서 스테이지 크기에 맞게 조정
+            scaleX={stageSize.width / (originalImage.naturalWidth || originalImage.width)}
+            scaleY={stageSize.height / (originalImage.naturalHeight || originalImage.height)}
           />
         )}
 
-        {/* Drawing Lines */}
         {lines.map((line, i) => (
           <Line
             key={i}

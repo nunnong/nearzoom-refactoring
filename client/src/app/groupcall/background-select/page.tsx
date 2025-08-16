@@ -284,7 +284,7 @@ export default function BackgroundSelectPage({
       )}
     >
       {/* Header */}
-      <Header roomInfo={roomInfo} onLeaveRoom={handleLeaveRoom} />
+      <Header roomInfo={roomInfo} />
 
       <div className="block md:hidden">
         <WebcamBar

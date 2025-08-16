@@ -6,7 +6,7 @@ import {
   PencilIcon,
 } from '@heroicons/react/24/outline'
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid'
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Masonry from 'react-masonry-css'
 
 import DeleteConfirmModal from './DeleteConfirmModal'
@@ -37,7 +37,7 @@ const debounce = (func: Function, wait: number) => {
   }
 }
 
-const ImageArchive: React.FC<ImageArchiveProps> = ({
+const ImageArchive: React.FC<ImageArchiveProps> = React.memo(({
   images = [],
   onLike,
   onShareKakao,
@@ -61,17 +61,77 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
 
   // 더 많은 이미지 로드
   const fetchMoreImages = useCallback(async () => {
-    if (!hasMore || loadingMore) return
+    if (!hasMore || loadingMore || !onLoadMore) return
     
     setLoadingMore(true)
     try {
-      await onLoadMore?.()
+      await onLoadMore()
     } catch (error) {
       console.error('Failed to load more images:', error)
     } finally {
       setLoadingMore(false)
     }
   }, [hasMore, loadingMore, onLoadMore])
+
+  // 모달 열기/닫기 함수들
+  const openDeleteModal = useCallback((image: ImageItem) => {
+    setImageToDelete(image)
+    setDeleteModalOpen(true)
+  }, [])
+
+  const closeDeleteModal = useCallback(() => {
+    setDeleteModalOpen(false)
+    setImageToDelete(null)
+  }, [])
+
+  const openShareModal = useCallback((image: ImageItem) => {
+    setImageToShare(image)
+    setShareModalOpen(true)
+  }, [])
+
+  const closeShareModal = useCallback(() => {
+    setShareModalOpen(false)
+    setImageToShare(null)
+  }, [])
+
+  const openEditModal = useCallback((image: ImageItem) => {
+    setImageToEdit(image)
+    setEditModalOpen(true)
+  }, [])
+
+  const closeEditModal = useCallback(() => {
+    setEditModalOpen(false)
+    setImageToEdit(null)
+  }, [])
+
+  // 이미지 액션 핸들러들
+  const handleLike = useCallback((photoId: string) => {
+    onLike?.(photoId)
+  }, [onLike])
+
+  const handleShareKakao = useCallback((photoId: string) => {
+    onShareKakao?.(photoId)
+  }, [onShareKakao])
+
+  const handleDelete = useCallback((photoId: string) => {
+    onDelete?.(photoId)
+  }, [onDelete])
+
+  const handleEdit = useCallback(async (photoId: string, editedImageUrl: string) => {
+    await onEdit?.(photoId, editedImageUrl)
+  }, [onEdit])
+
+  // 메모이제이션된 값들
+  const breakpointColumns = useMemo(() => ({
+    default: 5,
+    1400: 4,
+    1100: 4,
+    900: 3,
+    600: 2,
+    400: 1
+  }), [])
+
+  const imageCount = useMemo(() => images.length, [images])
 
   // 무한 스크롤 설정
   useEffect(() => {
@@ -99,7 +159,7 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
         observerRef.current.unobserve(currentRef)
       }
     }
-  }, [hasMore, loadingMore, fetchMoreImages])
+  }, [hasMore, loadingMore, fetchMoreImages, onLoadMore])
 
   const handleDeleteClick = (image: ImageItem): void => {
     setImageToDelete(image)
@@ -160,15 +220,6 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
     onLike?.(photoId)
   }
 
-  const breakpointColumnsObj = {
-    default: 6,
-    1536: 5,
-    1280: 4,
-    1024: 3,
-    768: 2,
-    640: 1,
-  }
-
   // 이미지가 없을 때 표시할 메시지
   if (images.length === 0) {
     return (
@@ -201,20 +252,20 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
   return (
     <>
       <Masonry
-        breakpointCols={breakpointColumnsObj}
-        className="-ml-4 flex w-auto"
-        columnClassName="pl-4 bg-clip-padding"
+        breakpointCols={breakpointColumns}
+        className="-ml-2 flex w-auto px-6"
+        columnClassName="pl-2 bg-clip-padding"
       >
         {images.map(image => (
           <div
             key={image.photoId}
             data-image-id={image.photoId}
-            className="group relative mb-4 overflow-hidden rounded-lg"
+            className="group relative mb-2 overflow-hidden rounded-lg"
           >
             <img
               src={image.imgUrl}
               alt={image.alt || '이미지'}
-              className="w-full cursor-pointer rounded-lg shadow-md transition-all duration-300 ease-in-out group-hover:scale-105"
+              className="w-full h-auto cursor-pointer rounded-lg shadow-sm transition-all duration-300 ease-in-out group-hover:scale-105"
               loading="lazy"
               onError={() => {
                 // 에러 처리
@@ -228,44 +279,44 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
 
             <div className="absolute inset-0 bg-black/0 transition-all duration-300 ease-in-out group-hover:bg-black/40" />
 
-            <div className="absolute top-3 right-3 opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100">
+            <div className="absolute top-2 right-2 opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100">
               <button
                 onClick={() => handleLikeClick(image.photoId)}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-white/30"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-white/30"
                 aria-label={image.isLiked ? 'Unlike image' : 'Like image'}
               >
                 {image.isLiked ? (
-                  <HeartSolidIcon className="h-5 w-5 text-red-500" />
+                  <HeartSolidIcon className="h-4 w-4 text-red-500" />
                 ) : (
-                  <HeartIcon className="h-5 w-5 text-white" />
+                  <HeartIcon className="h-4 w-4 text-white" />
                 )}
               </button>
             </div>
 
-            <div className="absolute right-3 bottom-3 left-3 flex justify-between opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100">
+            <div className="absolute right-2 bottom-2 left-2 flex justify-between opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100">
               {/* Share Button - Left */}
               <button
                 onClick={() => handleShareClick(image)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-white/30"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-white/30"
                 aria-label="Share image"
               >
-                <ShareIcon className="h-4 w-4 text-white" />
+                <ShareIcon className="h-3 w-3 text-white" />
               </button>
               
               {/* Delete Button - Center */}
               <button
                 onClick={() => handleDeleteClick(image)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-red-500/80"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-red-500/80"
                 aria-label="Delete image"
               >
-                <TrashIcon className="h-4 w-4 text-white" />
+                <TrashIcon className="h-3 w-3 text-white" />
               </button>
 
               {/* Edit Button - Right */}
               <button
                 onClick={() => handleEditClick(image)}
                 disabled={image.editable === 0}
-                className={`flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-sm transition-all duration-200 ${
+                className={`flex h-7 w-7 items-center justify-center rounded-full backdrop-blur-sm transition-all duration-200 ${
                   image.editable === 0
                     ? 'cursor-not-allowed bg-gray-500/60'
                     : 'bg-white/20 hover:scale-110 hover:bg-blue-500/80'
@@ -279,16 +330,16 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
                     edited
                   </span>
                 ) : (
-                  <PencilIcon className="h-4 w-4 text-white" />
+                  <PencilIcon className="h-3 w-3 text-white" />
                 )}
               </button>
             </div>
 
             {/* Hashtags Overlay - Top Left */}
-            <div className="absolute top-3 left-3 opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100">
-              <div className="max-w-[200px] rounded-md bg-black/60 px-2 py-1 backdrop-blur-sm">
+            <div className="absolute top-2 left-2 opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100">
+              <div className="max-w-[150px] rounded-md bg-black/60 px-1.5 py-0.5 backdrop-blur-sm">
                 {image.hashtags && image.hashtags.length > 0 ? (
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-0.5">
                     {image.hashtags.slice(0, 3).map((tag, index) => (
                       <span
                         key={`${image.photoId}-tag-${index}`}
@@ -377,6 +428,6 @@ const ImageArchive: React.FC<ImageArchiveProps> = ({
       />
     </>
   )
-}
+})
 
 export default ImageArchive
