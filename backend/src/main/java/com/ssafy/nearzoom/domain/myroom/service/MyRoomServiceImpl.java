@@ -45,34 +45,12 @@ public class MyRoomServiceImpl implements MyRoomService {
     @Override
     public MyPhotoListResponse getMyPhotos(Authentication authentication, MyPhotoListCondition cond) {
         UserAuthInfoResponse userInfo = AuthUtil.getUserAuthInfo(authentication);
-        System.out.println(">>> [DEBUG] 👤 UserInfo - Email: " + userInfo.email() + ", Social: " + userInfo.social());
-
         Long userId = userRepository.getByEmailAndSocial(userInfo.email(), userInfo.social()).getUserId();
-        System.out.println(">>> [DEBUG] 🔍 Found userId: " + userId);
-
-        System.out.println(">>> [DEBUG] 📋 Condition - limit: " + cond.limit() +
-                ", cursor: " + cond.cursor() +
-                ", heart: " + cond.heart() +
-                ", partnerEmails: " + cond.partnerEmails() +
-                ", startDate: " + cond.startDate() +
-                ", endDate: " + cond.endDate());
 
         List<MyPhotoResponse> photos = myPhotoMapper.findPhotosByCondition(userId, cond);
-        System.out.println(">>> [DEBUG] 📸 MyBatis 쿼리 결과: " + photos.size() + "개");
-
-        if (photos.isEmpty()) {
-            System.out.println(">>> [DEBUG] ❌ 사진이 없습니다!");
-        } else {
-            System.out.println(">>> [DEBUG] ✅ 첫 번째 사진: photoId=" + photos.get(0).photoId() +
-                    ", imageUrl=" + photos.get(0).imageUrl());
-        }
 
         boolean hasNext = photos.size() == cond.limit();
         Long nextCursor = hasNext ? photos.get(photos.size() - 1).photoId() : null;
-
-        System.out.println(">>> [DEBUG] 📊 최종 응답: photos=" + photos.size() +
-                ", hasNext=" + hasNext +
-                ", nextCursor=" + nextCursor);
 
         return new MyPhotoListResponse(photos, hasNext, nextCursor);
     }
@@ -102,10 +80,8 @@ public class MyRoomServiceImpl implements MyRoomService {
     }
 
     @Override
+    @Transactional
     public String saveEditedImageUrl(PhotoEditSaveRequest request, Authentication authentication) {
-        log.info(">>> [MyRoomServiceImpl] 편집된 이미지 URL 저장 처리 시작 - originalPhotoId: {}, imageUrl: {}",
-                request.originalPhotoId(), request.imgUrl());
-
         try {
             // 1. 사용자 정보 조회
             UserAuthInfoResponse userInfo = AuthUtil.getUserAuthInfo(authentication);
@@ -114,28 +90,27 @@ public class MyRoomServiceImpl implements MyRoomService {
             // 2. 편집 권한 확인 (원본 사진이 편집 가능한지 확인)
             boolean canEdit = myPhotoMapper.checkEditPermission(userId, request.originalPhotoId());
             if (!canEdit) {
-                throw new RuntimeException("해당 사진은 편집할 수 없습니다.");
+                throw new ApiException(HttpStatus.FORBIDDEN, "해당 사진은 편집할 수 없습니다.");
             }
 
-            // 3. PhotoService를 통해 편집본을 Photo 테이블에 저장 (원본 정보 포함)
+            // 3. Photo 테이블에 편집본 저장 (원본 정보 포함)
             Photo savedPhoto = photoService.saveEditedPhoto(request.imgUrl(), request.originalPhotoId());
-            log.debug(">>> PhotoService를 통한 편집본 저장 완료 - photoId: {}", savedPhoto.getPhotoId());
 
             // 4. Archive 테이블에 편집본 저장 (편집 불가 상태로)
-            myPhotoMapper.saveToArchive(userId, savedPhoto.getPhotoId());
-            log.debug(">>> archive 테이블에 편집본 저장 완료");
+            // 편집본은 편집한 사용자만 Archive에 저장
+            // 원본 사진의 생성 시간을 전달하여 created_at 설정
+            Photo originalPhoto = photoService.getOriginalPhotoInfo(request.originalPhotoId());
+            myPhotoMapper.saveToArchive(userId, savedPhoto.getPhotoId(), originalPhoto.getCreatedAt());
 
             // 5. 원본 사진을 편집 불가 상태로 변경
             myPhotoMapper.markAsEdited(userId, request.originalPhotoId());
-            log.debug(">>> 원본 사진을 편집 불가 상태로 변경 완료");
-
-            log.info("편집된 이미지 URL 저장 처리 완료 - originalPhotoId: {}, imageUrl: {}",
-                    request.originalPhotoId(), request.imgUrl());
+            
             return request.imgUrl();
 
+        } catch (ApiException e) {
+            throw e;
         } catch (Exception e) {
-            log.error("편집된 이미지 URL 저장 처리 실패 - originalPhotoId: {}", request.originalPhotoId(), e);
-            throw new RuntimeException("편집된 이미지 처리 중 오류가 발생했습니다: " + e.getMessage(), e);
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "편집된 이미지 처리 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
 

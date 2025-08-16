@@ -88,13 +88,14 @@
 
   <!-- Archive 테이블에 저장 -->
   <insert id="saveToArchive">
-    INSERT INTO archive (user_id, photo_id, heart, editable, created_at)
+    INSERT INTO archive (user_id, photo_id, heart, editable, created_at, updated_at)
     VALUES (
       #{userId},
       #{photoId},
       0,  -- 기본값: 좋아요 안함
       0,  -- 편집본은 편집 불가
-      NOW()
+      #{originalCreatedAt},  -- 원본 사진의 생성 시간
+      NOW()  -- 편집한 시간
     )
   </insert>
 

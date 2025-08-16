@@ -81,7 +81,7 @@ public class WebhookService {
             log.info("🔥🔥🔥 photoService.saveCompletedPhoto 호출 🔥🔥🔥");
             photoService.saveIndividualImageToDB(webhook);
 
-            log.info("✅✅✅✅✅ 개별 사진 Photo 테이블에 저장 완료 ✅✅✅✅✅");
+            log.info("개별 사진 Photo 테이블에 저장 완료");
 
             if (webhook.data() != null && webhook.data().processedImageUrl() != null) {
                 try {
@@ -151,13 +151,12 @@ public class WebhookService {
         log.info("🔥🔥🔥 photoService.saveFinalComposedPhoto 호출 🔥🔥🔥");
         photoService.saveFinalImageToDB(webhook);
 
-        log.info("✅✅✅✅✅ 최종 사진 Photo 테이블에 저장 완료 ✅✅✅✅✅");
+        log.info("최종 사진 Photo 테이블에 저장 완료");
 
         // 4️⃣ ImageProcessingService에 완료 알림
         log.info("=== 4️⃣ ImageProcessingService 완료 알림 ===");
         imageProcessingService.handleFrameCompositionCompleted(jobId, webhook.data().finalImageUrl());
     }
-
 
     // 프레임 합성 실패 웹훅 상세 로깅
     public void webhookFrameFailed(FrameCompositionFailedWebhook webhook) {

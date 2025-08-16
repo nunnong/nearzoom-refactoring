@@ -3,6 +3,7 @@ package com.ssafy.nearzoom.domain.myroom.repository;
 import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoListCondition;
 import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoResponse;
 import com.ssafy.nearzoom.domain.myroom.dto.PhotoInsertDto;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -32,7 +33,9 @@ public interface MyPhotoMapper {
     void savePhotoToMyPhoto(PhotoInsertDto photoDto);
     
     // Archive 테이블에 저장
-    void saveToArchive(@Param("userId") Long userId, @Param("photoId") Long photoId);
+    void saveToArchive(@Param("userId") Long userId, 
+                       @Param("photoId") Long photoId, 
+                       @Param("originalCreatedAt") LocalDateTime originalCreatedAt);
 
     // 편집 권한 확인
     boolean checkEditPermission(@Param("userId") Long userId, @Param("photoId") Long photoId);
