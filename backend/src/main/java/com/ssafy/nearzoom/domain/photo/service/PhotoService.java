@@ -68,23 +68,6 @@ public class PhotoService {
     }
 
     /**
-     * 개별 처리된 이미지 저장 (명시적 메소드명) - 호환성을 위해 수정
-     */
-    @Transactional
-    public void saveIndividualProcessedPhoto(ImageProcessingCompletedWebhook webhook) {
-        // 새로운 메소드로 변경
-        saveIndividualImageToDB(webhook);
-    }
-
-    /**
-     * 최종 합성된 이미지 저장 (호환성을 위한 별칭)
-     */
-    @Transactional
-    public void saveFinalComposedPhoto(FrameCompositionCompletedWebhook webhook) {
-        saveFinalImageToDB(webhook);
-    }
-
-    /**
      * 활성 참가자 이메일 목록 조회 (새로운 Redis 구조 사용)
      */
     private String getActiveParticipantEmails(Long roomId) {
@@ -140,7 +123,7 @@ public class PhotoService {
     }
 
     /**
-     * 편집본 Photo 저장
+     * 편집본 Photo 테이블 저장
      */
     @Transactional
     public Photo saveEditedPhoto(String editedImageUrl, Long originalPhotoId) {
@@ -168,25 +151,11 @@ public class PhotoService {
     }
 
     /**
-     * 방 생성 시간을 포함한 Photo 객체 생성 (편집 기능에서 필요)
+     * (편집 후) Photo 저장 후 각 사용자별로 Archive 테이블에도 저장
      */
-    private Photo createPhotoWithTimestamp(String imageUrl, Long roomId, String userList,
-                                           LocalDateTime roomCreatedAt) {
-        // 기본 생성자 사용
-        Photo photo = new Photo(imageUrl, roomId, userList, null);
 
-        // 리플렉션을 사용하여 방 생성 시간으로 설정
-        try {
-            setFieldValue(photo, "createdAt", roomCreatedAt);
-            setFieldValue(photo, "updatedAt", roomCreatedAt);
 
-            log.debug("Photo 시간 정보 설정 완료 - 방 생성 시간: {}", roomCreatedAt);
-        } catch (Exception e) {
-            log.warn("Photo 시간 정보 설정 실패, JPA Auditing에 의존: {}", e.getMessage());
-        }
 
-        return photo;
-    }
 
     /**
      * 리플렉션을 사용하여 필드 값 설정
@@ -214,53 +183,22 @@ public class PhotoService {
         return null;
     }
 
+
+
+
+
+
+
+
+
+
     /**
-     * Photo 저장 후 각 사용자별로 MyPhoto 테이블에도 저장
+     * (합성 후) Photo 저장 후 각 사용자별로 Archive 테이블에도 저장
      */
     private void saveToMyPhotoForAllUsers(String imageUrl, String userList, Long roomId) {
-        if (userList == null || userList.trim().isEmpty()) {
-            log.warn("⚠️ userList가 비어있어서 MyPhoto 저장을 건너뜁니다.");
-            return;
-        }
 
-        try {
-            // userList에서 이메일 추출 (쉼표로 구분)
-            List<String> userEmails = Arrays.asList(userList.split(","));
 
-            for (String email : userEmails) {
-                String trimmedEmail = email.trim();
-                if (trimmedEmail.isEmpty()) {
-                    continue;
-                }
-
-                try {
-                    // 사용자 ID 조회
-                    Long userId = userRepository.findByUserEmail(trimmedEmail)
-                            .map(user -> user.getUserId())
-                            .orElse(null);
-
-                    if (userId != null) {
-                        // Photo 테이블에 저장
-                        PhotoInsertDto photoDto = new PhotoInsertDto(imageUrl, userList, roomId, null);
-                        myPhotoMapper.savePhotoToMyPhoto(photoDto);
-
-                        // Archive 테이블에 저장
-                        myPhotoMapper.saveToArchive(userId, photoDto.getPhotoId());
-                        log.debug("✅ Photo 및 Archive 저장 성공 - userId: {}, email: {}, imageUrl: {}",
-                                userId, trimmedEmail, imageUrl);
-                    } else {
-                        log.warn("⚠️ 사용자를 찾을 수 없습니다 - email: {}", trimmedEmail);
-                    }
-
-                } catch (Exception e) {
-                    log.error("❌ 개별 사용자 MyPhoto 저장 실패 - email: {}, error: {}", trimmedEmail, e.getMessage());
-                }
-            }
-
-            log.info("✅ 모든 사용자 MyPhoto 저장 완료 - userCount: {}, imageUrl: {}", userEmails.size(), imageUrl);
-
-        } catch (Exception e) {
-            log.error("❌ MyPhoto 저장 중 전체 오류 - imageUrl: {}, userList: {}, error: {}", imageUrl, userList, e.getMessage());
-        }
     }
+
+
 }
