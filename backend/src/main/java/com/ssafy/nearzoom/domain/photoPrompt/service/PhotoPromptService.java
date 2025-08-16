@@ -15,6 +15,7 @@ import com.ssafy.nearzoom.global.exception.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -35,12 +36,13 @@ public class PhotoPromptService {
   private final ImageProcessingService imageProcessingService;
 
   // 1단계: 기본 설정 저장 (프레임 색상만)
-  public void saveBasicSettings(HttpServletRequest request, Long roomId, String frameColor) {
+  public void saveBasicSettings(HttpServletRequest request, Long roomId, int cutCount, String frameColor) {
     validateUser(request);
 
     String roomKey = "room:" + roomId;
 
     // 수정: putAll() 대신 개별 put() 사용
+    redisTemplate.opsForHash().put(roomKey, "total_images", String.valueOf(cutCount));
     redisTemplate.opsForHash().put(roomKey, "frame_color", frameColor);
     redisTemplate.opsForHash().put(roomKey, "photo_status", "basic_settings_saved");
 
@@ -61,7 +63,8 @@ public class PhotoPromptService {
       throw new ApiException(HttpStatus.BAD_REQUEST, "방 정보를 찾을 수 없습니다.");
     }
 
-    int imageOrder = backgroundRequest.imageOrder();
+    String totalImagesStr = (String) roomData.get("total_images");
+
     String backgroundType = backgroundRequest.backgroundType();
 
     // ProcessingOptions 생성
@@ -82,37 +85,39 @@ public class PhotoPromptService {
       processingOptions = new ProcessingOptions("color", null, color);
     }
 
+    String uniqueKey = System.currentTimeMillis() + "_" + (int)(Math.random() * 1000);
+
     // 수정: Map 생성하지 말고 개별 put() 사용
-    redisTemplate.opsForHash().put(roomKey, "image_url_" + imageOrder, backgroundRequest.imageUrl());
-    redisTemplate.opsForHash().put(roomKey, "background_type_" + imageOrder, backgroundType);
+    redisTemplate.opsForHash().put(roomKey, "image_url_" + uniqueKey, backgroundRequest.imageUrl());
+    redisTemplate.opsForHash().put(roomKey, "background_type_" + uniqueKey, backgroundType);
 
     if (promptId != null) {
-      redisTemplate.opsForHash().put(roomKey, "prompt_id_" + imageOrder, promptId);
+      redisTemplate.opsForHash().put(roomKey, "prompt_id_" + uniqueKey, promptId);
     }
 
-    // 총 이미지 수 업데이트 (동적으로 증가)
-    String currentMaxOrder = (String) roomData.get("max_image_order");
-    int maxOrder = currentMaxOrder != null ? Integer.parseInt(currentMaxOrder) : -1;
-    if (imageOrder > maxOrder) {
-      redisTemplate.opsForHash().put(roomKey, "max_image_order", String.valueOf(imageOrder));
-      redisTemplate.opsForHash().put(roomKey, "total_images", String.valueOf(imageOrder + 1));
-    }
+//    // 총 이미지 수 업데이트 (동적으로 증가)
+//    String currentMaxOrder = (String) roomData.get("max_image_order");
+//    int maxOrder = currentMaxOrder != null ? Integer.parseInt(currentMaxOrder) : -1;
+//    if (imageOrder > maxOrder) {
+//      redisTemplate.opsForHash().put(roomKey, "max_image_order", String.valueOf(imageOrder));
+//      redisTemplate.opsForHash().put(roomKey, "total_images", String.valueOf(imageOrder + 1));
+//    }
 
     // 즉시 이미지 서버로 전송
     try {
       imageProcessingService.processIndividualStart(
               roomId,
-              imageOrder,
+          uniqueKey,
               backgroundRequest.imageUrl(),
               backgroundRequest.personIds(),
               processingOptions,
               promptId
       );
 
-      log.info("이미지 서버 전송 완료 - RoomId: {}, Order: {}", roomId, imageOrder);
+      log.info("이미지 서버 전송 완료 - RoomId: {}, Order: {}", roomId, uniqueKey);
 
     } catch (Exception e) {
-      log.error("이미지 서버 전송 실패 - RoomId: {}, Order: {}, Error: {}", roomId, imageOrder, e.getMessage());
+      log.error("이미지 서버 전송 실패 - RoomId: {}, Order: {}, Error: {}", roomId, uniqueKey, e.getMessage());
 
       // 프롬프트 상태를 실패로 업데이트
       if (promptId != null) {
