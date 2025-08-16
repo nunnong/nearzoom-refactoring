@@ -10,6 +10,7 @@ import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingResult;
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PhotoPrompt;
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PromptStatus;
 import com.ssafy.nearzoom.domain.photoPrompt.repository.PhotoPromptRepository;
+import com.ssafy.nearzoom.domain.photoPrompt.repository.RedisPhotoPromptRepository;
 import com.ssafy.nearzoom.domain.room.constants.RedisKeyConstants;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import java.time.Duration;
@@ -32,37 +33,29 @@ public class ImageProcessingService {
 
   @Qualifier("imageServerWebClient")
   private final WebClient imageServerWebClient;
+  private final RedisPhotoPromptRepository redisPromptRepository;
   private final PhotoPromptRepository photoPromptRepository;
   private final RedisTemplate<String, String> redisTemplate;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   // 개별 이미지 즉시 처리
-  public void processIndividualStart(Long roomId, String uniqueKey,
+  public void processIndividualStart(Long roomId,
                                      String imageUrl, List<String> personIds, ProcessingOptions options,
                                      String promptId) {
     try {
-      // 이미지 서버 요청 생성
       ImageServerRequest request = new ImageServerRequest(imageUrl, personIds, options);
 
-      // 이미지 서버로 전송
       ImageServerResponse response = sendToImageServer("/jobs", request);
 
       String jobId = response.data().jobId();
-      log.info("이미지 서버로부터 받은 JobId: {}", jobId);
+      log.info("이미지 서버로부터 받은 JobId:{}", jobId);
 
-      saveIndividualJobInfoToRedis(jobId, roomId, uniqueKey, imageUrl, options, promptId);
+      redisPromptRepository.saveIndividualJobInfo(jobId, roomId, imageUrl, options, promptId);
 
     } catch (Exception e) {
-      log.error("개별 이미지 즉시 처리 실패 - RoomId: {}, uniqueKey: {}, Error: {}",
-              roomId, uniqueKey, e.getMessage());
+      log.error("개별 이미지 처리 실패 - RoomId: {}, Error: {}", roomId, e.getMessage());
 
-      // 프롬프트 상태 업데이트
-      if (promptId != null) {
-        updatePromptStatus(Long.valueOf(promptId), PromptStatus.FAIL);
-      }
-
-      throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
-              "이미지 처리 중 오류가 발생했습니다: " + e.getMessage());
+      if (promptId != null) updatePromptStatus(Long.valueOf(promptId), PromptStatus.FAIL);
     }
   }
 
@@ -71,21 +64,14 @@ public class ImageProcessingService {
     Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries("individual_job:" + jobId);
 
     Long roomId = Long.valueOf((String) jobInfo.get("room_id"));
-    String uniqueKey = (String) jobInfo.get("uniqueKey");
-    String promptId = (String) jobInfo.get("prompt_id");
 
-    log.info("개별 이미지 처리 완료 - JobId: {}, RoomId: {}, ProcessedUrl: {}",
-            jobId, roomId, processedImageUrl);
+    redisPromptRepository.saveIndividualCompletedInRoom("room:" + roomId, processedImageUrl);
+
+    String promptId = (String) jobInfo.get("prompt_id");
 
     if (promptId != null) {
       updatePromptStatus(Long.valueOf(promptId), PromptStatus.SUCCESS);
     }
-
-    // 처리된 이미지 URL 저장
-    String roomKey = "room:" + roomId;
-    redisTemplate.opsForHash().put(roomKey, "processed_image_" + uniqueKey, processedImageUrl);
-
-    redisTemplate.opsForHash().increment(roomKey, "completed_individual_count", 1);
 
     checkAndStartFrameComposition(roomId);
   }
@@ -95,43 +81,22 @@ public class ImageProcessingService {
     String roomKey = "room:" + roomId;
     Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
 
-    // null 체크 추가 (500 오류 방지)
-    String totalImagesStr = (String) roomData.get("total_images");
-    String completedImagesStr = (String) roomData.get("completed_individual_count");
-
-    int totalImages = totalImagesStr != null ? Integer.parseInt(totalImagesStr) : 0;
-    int completedImages = completedImagesStr != null ? Integer.parseInt(completedImagesStr) : 0;
+    int totalImages = Integer.parseInt((String) roomData.get("total_images"));
+    int completedImages = Integer.parseInt((String) roomData.get("completed_count"));
 
     log.info("개별 처리 진행률 확인 - RoomId: {}, Completed: {}/{}", roomId, completedImages, totalImages);
 
     // 모든 개별 처리가 완료되면 프레임 합성 시작
-    if (completedImages == totalImages && totalImages > 0) {
+    if (completedImages == totalImages) {
       log.info("모든 개별 처리 완료 - 프레임 합성 시작 - RoomId: {}", roomId);
       startFrameComposition(roomId, roomData, totalImages);
     }
   }
 
   // 프레임 합성 시작
-  // 프레임 합성 시작 (uniqueKey 기반으로 이미지 수집)
   private void startFrameComposition(Long roomId, Map<Object, Object> roomData, int totalImages) {
     try {
-      String roomKey = "room:" + roomId;
-      List<String> processedImageUrls = new ArrayList<>();
-
-      // Redis에서 처리된 이미지들 수집 (processed_image_로 시작하는 키들)
-      for (Map.Entry<Object, Object> entry : roomData.entrySet()) {
-        String key = (String) entry.getKey();
-        if (key.startsWith("processed_image_")) {
-          String processedUrl = (String) entry.getValue();
-          processedImageUrls.add(processedUrl);
-        }
-      }
-
-      if (processedImageUrls.size() != totalImages) {
-        log.error("처리된 이미지 수 불일치 - RoomId: {}, Expected: {}, Found: {}",
-            roomId, totalImages, processedImageUrls.size());
-        return;
-      }
+      List<String> processedImageUrls = redisTemplate.opsForList().range("room:" + roomId + ":processed_urls", 0, -1);
 
       String frameColor = (String) roomData.get("frame_color");
 
@@ -141,21 +106,17 @@ public class ImageProcessingService {
           frameColor
       );
 
-      log.info("프레임 합성 요청 시작 - ImageCount: {}, FrameColor: {}", totalImages, frameColor);
+      log.info("프레임 합성 요청 시작");
 
       // 프레임 합성 전용 엔드포인트로 전송
       ImageServerResponse response = sendToImageServer("/frame", composeRequest);
 
-      String composeJobId = response.data().jobId();
+      String JobId = response.data().jobId();
 
-      // 프레임 합성 Job 정보 저장
-      saveFrameComposeJobInfoToRedis(composeJobId, roomId, processedImageUrls, frameColor);
+      log.info("프레임 합성 요청 완료 - frame_job:{}", JobId);
 
-      redisTemplate.opsForHash().put("room:" + roomId, "compose_job_id", composeJobId);
-      redisTemplate.opsForHash().put("room:" + roomId, "photo_status", "frame_composing");
-
-      log.info("프레임 합성 요청 완료 - ComposeJobId: {}, RoomId: {}", composeJobId, roomId);
-
+      redisPromptRepository.saveFrameJobInfo(JobId, roomId, processedImageUrls, frameColor);
+      redisPromptRepository.saveFinalInfoToRoom(JobId, roomId);
     } catch (Exception e) {
       log.error("프레임 합성 시작 실패 - RoomId: {}, Error: {}", roomId, e.getMessage());
       redisTemplate.opsForHash().put("room:" + roomId, "photo_status", "frame_compose_failed");
@@ -165,20 +126,13 @@ public class ImageProcessingService {
   }
 
   // 프레임 합성 완료 처리 (웹훅에서 호출)
-  public void handleFrameCompositionCompleted(String jobId, String finalImageUrl) {
+  public void FrameCompleted(String jobId, String finalImageUrl) {
     Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries("frame_job:" + jobId);
 
     Long roomId = Long.valueOf((String) jobInfo.get("room_id"));
 
-    log.info("프레임 합성 완료 - JobId: {}, RoomId: {}, FinalUrl: {}", jobId, roomId, finalImageUrl);
-
-    // photo_status 키 사용
-    String roomKey = "room:" + roomId;
-    redisTemplate.opsForHash().put(roomKey, "final_image_url", finalImageUrl);
-    redisTemplate.opsForHash().put(roomKey, "photo_status", "all_completed");
-    redisTemplate.opsForValue().set("final_result:" + roomId, finalImageUrl, Duration.ofDays(1));
-
-    log.info("✅✅✅✅✅ 최종 사진 Redis에 저장 완료 -> frame_job:{} ✅✅✅✅✅", jobId);
+    redisPromptRepository.saveResultToRoom("room:" + roomId, finalImageUrl);
+    log.info("✅✅✅✅✅ 프레임 합성 완료 ✅✅✅✅✅");
   }
 
   // 처리 결과 조회
@@ -277,57 +231,6 @@ public class ImageProcessingService {
       throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
               "이미지 서버 요청 실패: " + e.getMessage());
     }
-  }
-
-  private void saveIndividualJobInfoToRedis(String jobId, Long roomId, String uniqueKey,
-                                            String imageUrl, ProcessingOptions options, String promptId) {
-
-    String redisKey = "individual_job:" + jobId;
-    log.info("📝 Redis 저장 시작 () - Key: {}", redisKey);
-
-    Map<String, String> jobInfo = new HashMap<>();
-    jobInfo.put("room_id", String.valueOf(roomId));
-    jobInfo.put("unique_key", uniqueKey);
-    jobInfo.put("image_url", imageUrl);
-    jobInfo.put("background_type", options.backgroundType());
-    jobInfo.put("job_type", "individual");
-    // ✅ 개별 job에서는 status 그대로 유지 (room의 photo_status와 구분)
-    jobInfo.put("status", "processing");
-
-    if (promptId != null) {
-      jobInfo.put("prompt_id", promptId);
-    }
-    if (options.promptText() != null) {
-      jobInfo.put("prompt_text", options.promptText());
-    }
-    if (options.backgroundColor() != null) {
-      jobInfo.put("background_color", options.backgroundColor());
-    }
-
-    redisTemplate.opsForHash().putAll(redisKey, jobInfo);
-    redisTemplate.expire(redisKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
-    log.info("✅ Redis individual_job 완료");
-  }
-
-  // 프레임 합성 Job 정보 저장
-  private void saveFrameComposeJobInfoToRedis(String jobId, Long roomId,
-                                              List<String> processedImageUrls, String frameColor) {
-
-    String redisKey = "frame_job:" + jobId;
-    log.info("📝 Redis 저장 시작 () - Key: {}", redisKey);
-
-    Map<String, String> jobInfo = new HashMap<>();
-    jobInfo.put("room_id", String.valueOf(roomId));
-    jobInfo.put("processed_image_urls", String.join(",", processedImageUrls));
-    jobInfo.put("frame_color", frameColor);
-    jobInfo.put("job_type", "frame_compose");
-    // frame job에서도 status 그대로 유지 (room의 photo_status와 구분)
-    jobInfo.put("status", "processing");
-    jobInfo.put("created_at", String.valueOf(System.currentTimeMillis()));
-
-    redisTemplate.opsForHash().putAll(redisKey, jobInfo);
-    redisTemplate.expire(redisKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
-    log.info("✅ Redis frame_job 완료");
   }
 
   private ApiException handleImageServerError(String errorBody) {
