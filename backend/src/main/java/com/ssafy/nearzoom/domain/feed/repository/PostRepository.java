@@ -52,27 +52,27 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     // =========================================
 
     /**
-     * 팔로잉하는 사용자들의 최신 게시물들 - 마이룸 방식
+     * 팔로잉하는 사용자들의 최신 게시물들 + 자신의 게시물 - 마이룸 방식
      * Service에서 PageRequest.ofSize(limit + 1) 전달
      */
     @Query("""
-        select p 
-        from Post p 
-        join fetch p.feed f
-        join fetch f.user u
-        join fetch p.photo ph
-        where f.user.userId in (
-            select fo.followee.userId 
-            from Follow fo 
-            where fo.follower.userId = :userId
-        )
-        and (:cursor is null or p.postId < :cursor)
-        order by p.postId desc
-        """)
+    select p 
+    from Post p 
+    join fetch p.feed f
+    join fetch f.user u
+    join fetch p.photo ph
+    where (f.user.userId in (
+        select fo.followee.userId 
+        from Follow fo 
+        where fo.follower.userId = :userId
+    ) OR f.user.userId = :userId)
+    and (:cursor is null or p.postId < :cursor)
+    order by p.postId desc
+    """)
     List<Post> findFollowingLatestPosts(
-            @Param("userId") Long userId,
-            @Param("cursor") Long cursor,
-            Pageable pageable
+        @Param("userId") Long userId,
+        @Param("cursor") Long cursor,
+        Pageable pageable
     );
 
     /**
@@ -101,7 +101,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
         join fetch p.photo ph
         where p.feed.feedId = :feedId 
         and (:cursor is null or p.postId < :cursor)
-        order by p.displayOrder asc, p.postId desc
+        order by p.displayOrder asc, p.postId asc
         """)
     List<Post> findByFeedIdWithCursor(
             @Param("feedId") Long feedId,

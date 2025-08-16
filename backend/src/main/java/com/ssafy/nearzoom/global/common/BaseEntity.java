@@ -33,17 +33,17 @@ public class BaseEntity {
 
     @PrePersist
     public void prePersist() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now().plusHours(9);
     }
 
     @PreUpdate
     public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now().plusHours(9);
     }
 
     // soft delete
     public void markDeleted() {
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = LocalDateTime.now().plusHours(9);
     }
 
     public void restore() {

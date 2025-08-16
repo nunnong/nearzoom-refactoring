@@ -34,6 +34,19 @@ public interface UserRepository extends JpaRepository<User, Long> {
     //조회 단일 계정명(accountName)으로 사용자 조회
     Optional<User> findByAccountName(String accountName);
 
+    // UserRepository.java에 추가할 메서드들
+
+    /**
+     * 계정명 중복 확인
+     */
+    boolean existsByAccountName(String accountName);
+
+    /**
+     * 계정명으로 사용자 조회 (삭제되지 않은 사용자만)
+     */
+    @Query("SELECT u FROM User u WHERE u.accountName = :accountName AND u.deletedAt IS NULL")
+    Optional<User> findActiveByAccountName(@Param("accountName") String accountName);
+
     // =========================================
     // 📱 마이룸 방식: JPQL + Pageable (Service에서 PageRequest 생성)
     // =========================================

@@ -1,7 +1,9 @@
 package com.ssafy.nearzoom.domain.user.controller;
 
+import com.ssafy.nearzoom.domain.user.dto.CheckAccountNameResponse;
+import com.ssafy.nearzoom.domain.user.dto.UpdateProfileRequest;
 import com.ssafy.nearzoom.domain.user.dto.UserInfoResponse;
-import com.ssafy.nearzoom.domain.user.repository.UserRepository;
+import com.ssafy.nearzoom.domain.user.dto.UserProfileResponse;
 import com.ssafy.nearzoom.domain.user.service.UserService;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import com.ssafy.nearzoom.global.response.ApiResponse;
@@ -9,17 +11,12 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -30,7 +27,7 @@ public class UserController {
 
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest request,
-                                                    HttpServletResponse response, Authentication authentication) {
+        HttpServletResponse response, Authentication authentication) {
 
         userService.logout(authentication);
 
@@ -57,23 +54,21 @@ public class UserController {
 
     @GetMapping("/userInfo")
     public ResponseEntity<ApiResponse<UserInfoResponse>> getUserInfo(
-            Authentication authentication) {
+        Authentication authentication) {
         UserInfoResponse info = userService.getUserInfo(authentication);
         return ApiResponse.ok(info);
     }
 
     @GetMapping("/prettyFace")
     public ResponseEntity<ApiResponse<String>> getPrettyFace(
-            Authentication authentication) {
+        Authentication authentication) {
         String prettyFace = userService.getPrettyFace(authentication);
         return ApiResponse.ok(prettyFace);
     }
 
-
-
     @DeleteMapping("/signout")
     public ResponseEntity<ApiResponse<Void>> withdraw(HttpServletRequest request,
-                                                      HttpServletResponse response, Authentication authentication) {
+        HttpServletResponse response, Authentication authentication) {
 
         userService.signout(authentication);
 
@@ -98,10 +93,47 @@ public class UserController {
         return ApiResponse.ok("회원탈퇴 완료!", null);
     }
 
+    // =========================================
+    // 📝 프로필 관리 API들 (신규 추가)
+    // =========================================
+
+    /**
+     * 👤 현재 사용자 프로필 조회 (계정명 포함)
+     */
+    @GetMapping("/profile")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> getCurrentUserProfile(
+        Authentication authentication) {
+        UserProfileResponse profile = userService.getCurrentUserProfile(authentication);
+        return ApiResponse.ok(profile);
+    }
+
+    /**
+     * ✏️ 사용자 프로필 업데이트 (계정명만 수정 가능)
+     */
+    @PutMapping("/profile")
+    public ResponseEntity<ApiResponse<Void>> updateProfile(
+        Authentication authentication,
+        @Valid @RequestBody UpdateProfileRequest request) {
+        userService.updateProfile(authentication, request);
+        // ✅ 수정: Void 타입에 맞게 메시지와 null을 전달
+        return ApiResponse.ok("프로필이 성공적으로 업데이트되었습니다.", null);
+    }
+
+    /**
+     * ✅ 계정명 중복 확인
+     */
+    @GetMapping("/check-account-name")
+    public ResponseEntity<ApiResponse<CheckAccountNameResponse>> checkAccountNameAvailable(
+        @RequestParam String accountName,
+        Authentication authentication) {
+        CheckAccountNameResponse response = userService.checkAccountNameAvailable(accountName, authentication);
+        return ApiResponse.ok(response);
+    }
+
     @PutMapping("/save-face-image")
     public ResponseEntity<ApiResponse<String>> updatePrettyFace(
-            Authentication authentication,
-            @RequestParam("prettyFaceUrl") String prettyFaceUrl) {
+        Authentication authentication,
+        @RequestParam("prettyFaceUrl") String prettyFaceUrl) {
 
         // 디버깅을 위한 로그 추가
         System.out.println("=== UserController.updatePrettyFace 호출 ===");
@@ -112,21 +144,21 @@ public class UserController {
             if (prettyFaceUrl == null || prettyFaceUrl.trim().isEmpty()) {
                 System.out.println("ERROR: URL이 비어있음");
                 return ApiResponse.failedOf(HttpStatus.BAD_REQUEST,
-                        "이미지 URL이 비어있습니다.");
+                    "이미지 URL이 비어있습니다.");
             }
 
             // URL 형식 검사
             if (!prettyFaceUrl.startsWith("http://") && !prettyFaceUrl.startsWith("https://")) {
                 System.out.println("ERROR: 잘못된 URL 형식: " + prettyFaceUrl);
                 return ApiResponse.failedOf(HttpStatus.BAD_REQUEST,
-                        "유효하지 않은 URL 형식입니다.");
+                    "유효하지 않은 URL 형식입니다.");
             }
 
             // 사용자 인증 확인
             if (authentication == null || !authentication.isAuthenticated()) {
                 System.out.println("ERROR: 인증되지 않은 사용자");
                 return ApiResponse.failedOf(HttpStatus.UNAUTHORIZED,
-                        "인증되지 않은 사용자입니다.");
+                    "인증되지 않은 사용자입니다.");
             }
 
             System.out.println("UserService.updatePrettyFace 호출 시작");
@@ -141,7 +173,7 @@ public class UserController {
             System.err.println("일반 Exception 발생: " + e.getMessage());
             e.printStackTrace();
             return ApiResponse.failedOf(HttpStatus.INTERNAL_SERVER_ERROR,
-                    "이미지 URL 저장 중 오류가 발생했습니다: " + e.getMessage());
+                "이미지 URL 저장 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
 }

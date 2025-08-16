@@ -47,25 +47,89 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         User user = userRepository.findByUserEmailAndSocialTypeAndDeletedAtIsNull(email, social)
             .map(existing -> {
+                // 기존 사용자 업데이트
                 existing.update(oAuth2Response);
+
+                // ✨ 계정명이 없는 기존 사용자인 경우 초기화
+                if (existing.getAccountName() == null || existing.getAccountName().isEmpty()) {
+                    existing.initializeAccountName();
+                    System.out.println("🔄 기존 사용자 계정명 초기화: " + existing.getAccountName());
+                }
+
                 return existing;
             })
             .orElseGet(() ->
                 userRepository.findByUserEmailAndSocialType(email, social)
                     .map(deletedUser -> {
+                        // 소셜 타입 불일치 체크
                         if (deletedUser.getSocialType() != social) {
                             throw new SocialMismatchException(email, deletedUser.getSocialType());
                         }
+
+                        // 삭제된 사용자 복원
                         deletedUser.restore();
                         deletedUser.update(oAuth2Response);
+
+                        // ✨ 복원된 사용자의 계정명이 없는 경우 초기화
+                        if (deletedUser.getAccountName() == null || deletedUser.getAccountName().isEmpty()) {
+                            deletedUser.initializeAccountName();
+                            System.out.println("🔄 복원된 사용자 계정명 초기화: " + deletedUser.getAccountName());
+                        }
+
                         return deletedUser;
                     })
-                    .orElseGet(oAuth2Response::toEntity)
+                    .orElseGet(() -> {
+                        // ✨ 새로운 사용자 생성
+                        User newUser = oAuth2Response.toEntity();
+
+                        // 계정명 초기화 (이메일 기반)
+                        newUser.initializeAccountName();
+
+                        // 계정명 중복 체크 및 고유 번호 추가
+                        String baseAccountName = newUser.getAccountName();
+                        String uniqueAccountName = generateUniqueAccountName(baseAccountName);
+
+                        if (!baseAccountName.equals(uniqueAccountName)) {
+                            // 중복된 경우 고유 번호가 추가된 계정명으로 설정
+                            newUser.updateAccountName(uniqueAccountName);
+                        }
+
+                        System.out.println("✨ 새로운 사용자 생성 - 이메일: " + email + ", 계정명: " + newUser.getAccountName());
+
+                        return newUser;
+                    })
             );
 
         userRepository.save(user);
 
         OAuth2UserDto oAuth2UserDto = new OAuth2UserDto(name, email, profileImage, social, "USER");
         return new CustomOAuth2User(oAuth2UserDto);
+    }
+
+    /**
+     * 중복되지 않는 고유한 계정명 생성
+     */
+    private String generateUniqueAccountName(String baseAccountName) {
+        String accountName = baseAccountName;
+        int counter = 1;
+
+        // 계정명이 중복되는 경우 숫자를 붙여서 고유하게 만듦
+        while (userRepository.existsByAccountName(accountName)) {
+            accountName = baseAccountName + counter;
+            counter++;
+
+            // 무한 루프 방지 (최대 1000번 시도)
+            if (counter > 1000) {
+                // 타임스탬프를 붙여서 완전히 고유하게 만듦
+                accountName = baseAccountName + System.currentTimeMillis() % 10000;
+                break;
+            }
+        }
+
+        if (!baseAccountName.equals(accountName)) {
+            System.out.println("🔄 계정명 중복으로 인한 변경: " + baseAccountName + " → " + accountName);
+        }
+
+        return accountName;
     }
 }

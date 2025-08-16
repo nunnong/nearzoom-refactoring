@@ -71,4 +71,28 @@ public class User extends BaseEntity {
         this.prettyFace = prettyFaceUrl;
     }
 
+    // =========================================
+    // 📝 프로필 업데이트 관련 메서드들 (신규 추가)
+    // =========================================
+
+    /**
+     * 계정명 업데이트
+     */
+    public void updateAccountName(String newAccountName) {
+        this.accountName = newAccountName;
+    }
+
+    /**
+     * 소셜 로그인 시 계정명 초기 설정 (이메일 기반)
+     * 회원 가입 시에 사용
+     */
+    public void initializeAccountName() {
+        if (this.accountName == null || this.accountName.isEmpty()) {
+            // 이메일에서 @ 앞부분을 기본 계정명으로 설정
+            String emailPrefix = this.userEmail.split("@")[0];
+            // 특수문자 제거하고 영문, 숫자, '_', '.'만 남기기
+            String cleanAccountName = emailPrefix.replaceAll("[^a-zA-Z0-9._]", "");
+            this.accountName = cleanAccountName;
+        }
+    }
 }
