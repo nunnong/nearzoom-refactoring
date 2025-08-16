@@ -1,6 +1,7 @@
 'use client'
 
 import { PencilIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { useRouter } from 'next/navigation'
 import React from 'react'
 
 interface ImageItem {
@@ -27,7 +28,21 @@ const EditConfirmModal: React.FC<EditConfirmModalProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  const router = useRouter()
+
   if (!isOpen || !image) return null
+
+  // 1. /feed/edit?photoId=... 형태로 이동하게 변경
+  const handleEditClick = () => {
+    console.log('EditConfirmModal 편집하기 버튼 클릭됨')
+    console.log(`photoId: ${image.photoId}로 피드 편집 페이지 이동`)
+    
+    // 피드 편집 페이지로 이동
+    router.push(`/feed/edit?photoId=${image.photoId}`)
+    
+    // 모달 닫기
+    onConfirm()
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -119,11 +134,7 @@ const EditConfirmModal: React.FC<EditConfirmModalProps> = ({
             취소
           </button>
           <button
-            onClick={() => {
-              console.log('EditConfirmModal 편집하기 버튼 클릭됨')
-              console.log('onConfirm 함수 호출 시도')
-              onConfirm()
-            }}
+            onClick={handleEditClick}
             className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
             <PencilIcon className="h-4 w-4" />

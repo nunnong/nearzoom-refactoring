@@ -925,15 +925,6 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
                type === 'single' ? '📌 단일' : '📱 피드'}
             </span>
           </div>
-
-          {/* 게시물 ID (개발 환경에서만) */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="absolute top-2 right-2">
-              <span className="bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm font-mono">
-                #{post.postId}
-              </span>
-            </div>
-          )}
         </div>
 
         {/* 피드 정보 */}

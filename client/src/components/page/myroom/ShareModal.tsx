@@ -35,12 +35,9 @@ const ShareModal: React.FC<ShareModalProps> = ({
   }
 
   const handleFeedCreate = () => {
-    const params = new URLSearchParams({
-      imageId: image.photoId,
-      imageSrc: encodeURIComponent(image.imgUrl),
-      imageAlt: '' // alt is removed from ImageItem, so pass empty string or remove if not needed
-    })
-    router.push(`/feeds?${params.toString()}`)
+    const params = new URLSearchParams({ photoId: String(image.photoId) })
+    
+    router.push(`/feed/edit?${params.toString()}`)
     onClose()
   }
 

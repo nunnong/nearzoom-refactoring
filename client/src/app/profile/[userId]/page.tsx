@@ -695,24 +695,6 @@ const UserProfilePage: React.FC = () => {
                     프로필 공유
                   </button>
                   <button 
-                    onClick={() => {
-                      alert('신고 기능은 추후 구현 예정입니다.');
-                      setShowMoreOptions(false);
-                    }}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm"
-                  >
-                    신고하기
-                  </button>
-                  <button 
-                    onClick={() => {
-                      alert('차단 기능은 추후 구현 예정입니다.');
-                      setShowMoreOptions(false);
-                    }}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm"
-                  >
-                    차단하기
-                  </button>
-                  <button 
                     onClick={() => setShowMoreOptions(false)}
                     className="w-full px-4 py-2 text-left hover:bg-gray-100 text-sm text-gray-500"
                   >
@@ -827,13 +809,6 @@ const UserProfilePage: React.FC = () => {
                   팔로우
                 </>
               )}
-            </button>
-            
-            <button 
-              onClick={() => alert('메시지 기능은 추후 구현 예정입니다.')}
-              className="py-3 px-4 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              메시지
             </button>
           </div>
 
