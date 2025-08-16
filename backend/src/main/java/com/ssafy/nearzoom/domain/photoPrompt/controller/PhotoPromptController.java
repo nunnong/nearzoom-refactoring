@@ -48,11 +48,13 @@ public class PhotoPromptController {
     try {
       Long roomId = Long.valueOf(body.get("roomId").toString());
       String frameColor = body.get("frameColor").toString();
+      int cutCount = Integer.parseInt(body.get("cutCount").toString());
 
-      photoPromptService.saveBasicSettings(request, roomId, frameColor);
+      photoPromptService.saveBasicSettings(request, roomId, cutCount, frameColor);
 
       Map<String, Object> responseData = new HashMap<>();
       responseData.put("roomId", roomId);
+      responseData.put("cutCount", cutCount);
       responseData.put("frameColor", frameColor);
       responseData.put("savedAt", LocalDateTime.now().toString());
       responseData.put("nextStep", "각 이미지별로 배경을 설정해주세요");

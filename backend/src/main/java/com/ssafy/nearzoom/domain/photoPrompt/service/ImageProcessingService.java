@@ -37,7 +37,7 @@ public class ImageProcessingService {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   // 개별 이미지 즉시 처리
-  public void processIndividualStart(Long roomId, int imageOrder,
+  public void processIndividualStart(Long roomId, String uniqueKey,
                                      String imageUrl, List<String> personIds, ProcessingOptions options,
                                      String promptId) {
     try {
@@ -50,11 +50,11 @@ public class ImageProcessingService {
       String jobId = response.data().jobId();
       log.info("이미지 서버로부터 받은 JobId: {}", jobId);
 
-      saveIndividualJobInfoToRedis(jobId, roomId, imageOrder, imageUrl, options, promptId);
+      saveIndividualJobInfoToRedis(jobId, roomId, uniqueKey, imageUrl, options, promptId);
 
     } catch (Exception e) {
-      log.error("개별 이미지 즉시 처리 실패 - RoomId: {}, Order: {}, Error: {}",
-              roomId, imageOrder, e.getMessage());
+      log.error("개별 이미지 즉시 처리 실패 - RoomId: {}, uniqueKey: {}, Error: {}",
+              roomId, uniqueKey, e.getMessage());
 
       // 프롬프트 상태 업데이트
       if (promptId != null) {
@@ -71,11 +71,11 @@ public class ImageProcessingService {
     Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries("individual_job:" + jobId);
 
     Long roomId = Long.valueOf((String) jobInfo.get("room_id"));
-    int imageOrder = Integer.parseInt((String) jobInfo.get("image_order"));
+    String uniqueKey = (String) jobInfo.get("uniqueKey");
     String promptId = (String) jobInfo.get("prompt_id");
 
-    log.info("개별 이미지 처리 완료 - JobId: {}, RoomId: {}, Order: {}, ProcessedUrl: {}",
-            jobId, roomId, imageOrder, processedImageUrl);
+    log.info("개별 이미지 처리 완료 - JobId: {}, RoomId: {}, ProcessedUrl: {}",
+            jobId, roomId, processedImageUrl);
 
     if (promptId != null) {
       updatePromptStatus(Long.valueOf(promptId), PromptStatus.SUCCESS);
@@ -83,7 +83,7 @@ public class ImageProcessingService {
 
     // 처리된 이미지 URL 저장
     String roomKey = "room:" + roomId;
-    redisTemplate.opsForHash().put(roomKey, "processed_image_" + imageOrder, processedImageUrl);
+    redisTemplate.opsForHash().put(roomKey, "processed_image_" + uniqueKey, processedImageUrl);
 
     redisTemplate.opsForHash().increment(roomKey, "completed_individual_count", 1);
 
@@ -95,7 +95,7 @@ public class ImageProcessingService {
     String roomKey = "room:" + roomId;
     Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
 
-    //  null 체크 추가 (500 오류 방지)
+    // null 체크 추가 (500 오류 방지)
     String totalImagesStr = (String) roomData.get("total_images");
     String completedImagesStr = (String) roomData.get("completed_individual_count");
 
@@ -104,34 +104,46 @@ public class ImageProcessingService {
 
     log.info("개별 처리 진행률 확인 - RoomId: {}, Completed: {}/{}", roomId, completedImages, totalImages);
 
-    // 개별 사진이 완료되고 나면 frame 단계로 넘어감
+    // 모든 개별 처리가 완료되면 프레임 합성 시작
     if (completedImages == totalImages && totalImages > 0) {
-      log.info("모든 개별 처리 완료되어 프레임 합성 시작합니다.");
+      log.info("모든 개별 처리 완료 - 프레임 합성 시작 - RoomId: {}", roomId);
       startFrameComposition(roomId, roomData, totalImages);
     }
   }
 
   // 프레임 합성 시작
+  // 프레임 합성 시작 (uniqueKey 기반으로 이미지 수집)
   private void startFrameComposition(Long roomId, Map<Object, Object> roomData, int totalImages) {
     try {
-      // 처리된 이미지 URL들을 순서대로 수집
+      String roomKey = "room:" + roomId;
       List<String> processedImageUrls = new ArrayList<>();
 
-      for (int i = 0; i < totalImages; i++) {
-        String processedUrl = (String) roomData.get("processed_image_" + i);
-        processedImageUrls.add(processedUrl);
+      // Redis에서 처리된 이미지들 수집 (processed_image_로 시작하는 키들)
+      for (Map.Entry<Object, Object> entry : roomData.entrySet()) {
+        String key = (String) entry.getKey();
+        if (key.startsWith("processed_image_")) {
+          String processedUrl = (String) entry.getValue();
+          processedImageUrls.add(processedUrl);
+        }
+      }
+
+      if (processedImageUrls.size() != totalImages) {
+        log.error("처리된 이미지 수 불일치 - RoomId: {}, Expected: {}, Found: {}",
+            roomId, totalImages, processedImageUrls.size());
+        return;
       }
 
       String frameColor = (String) roomData.get("frame_color");
 
       // 프레임 합성 요청
       FrameComposeRequest composeRequest = new FrameComposeRequest(
-              processedImageUrls,
-              frameColor
+          processedImageUrls,
+          frameColor
       );
 
       log.info("프레임 합성 요청 시작 - ImageCount: {}, FrameColor: {}", totalImages, frameColor);
 
+      // 프레임 합성 전용 엔드포인트로 전송
       ImageServerResponse response = sendToImageServer("/frame", composeRequest);
 
       String composeJobId = response.data().jobId();
@@ -139,7 +151,6 @@ public class ImageProcessingService {
       // 프레임 합성 Job 정보 저장
       saveFrameComposeJobInfoToRedis(composeJobId, roomId, processedImageUrls, frameColor);
 
-      // photo_status 키 사용
       redisTemplate.opsForHash().put("room:" + roomId, "compose_job_id", composeJobId);
       redisTemplate.opsForHash().put("room:" + roomId, "photo_status", "frame_composing");
 
@@ -147,10 +158,9 @@ public class ImageProcessingService {
 
     } catch (Exception e) {
       log.error("프레임 합성 시작 실패 - RoomId: {}, Error: {}", roomId, e.getMessage());
-      //  photo_status 키 사용
       redisTemplate.opsForHash().put("room:" + roomId, "photo_status", "frame_compose_failed");
       redisTemplate.opsForHash().put("room:" + roomId, "error_message",
-              "프레임 합성 시작 실패: " + e.getMessage());
+          "프레임 합성 시작 실패: " + e.getMessage());
     }
   }
 
@@ -269,7 +279,7 @@ public class ImageProcessingService {
     }
   }
 
-  private void saveIndividualJobInfoToRedis(String jobId, Long roomId, int imageOrder,
+  private void saveIndividualJobInfoToRedis(String jobId, Long roomId, String uniqueKey,
                                             String imageUrl, ProcessingOptions options, String promptId) {
 
     String redisKey = "individual_job:" + jobId;
@@ -277,7 +287,7 @@ public class ImageProcessingService {
 
     Map<String, String> jobInfo = new HashMap<>();
     jobInfo.put("room_id", String.valueOf(roomId));
-    jobInfo.put("image_order", String.valueOf(imageOrder));
+    jobInfo.put("unique_key", uniqueKey);
     jobInfo.put("image_url", imageUrl);
     jobInfo.put("background_type", options.backgroundType());
     jobInfo.put("job_type", "individual");
