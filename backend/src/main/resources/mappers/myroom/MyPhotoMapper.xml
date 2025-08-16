@@ -99,6 +99,17 @@
     )
   </insert>
 
+    <insert id="savePromptToArchive">
+    INSERT INTO archive (user_id, photo_id, heart, editable, created_at)
+    VALUES (
+             #{userId},
+             #{photoId},
+             0,  -- 기본값: 좋아요 안함
+             1,  -- 최초 사진은 편집 가능
+             NOW()
+           )
+  </insert>
+
   <!-- 편집 권한 확인 -->
   <select id="checkEditPermission" resultType="boolean">
     SELECT COUNT(*) > 0

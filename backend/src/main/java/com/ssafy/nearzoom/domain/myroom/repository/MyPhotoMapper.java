@@ -40,4 +40,6 @@ public interface MyPhotoMapper {
     // 편집 권한 확인
     boolean checkEditPermission(@Param("userId") Long userId, @Param("photoId") Long photoId);
 
+    void savePromptToArchive(@Param("userId") Long userId, @Param("photoId") Long photoId);
+
 }

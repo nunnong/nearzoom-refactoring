@@ -10,6 +10,8 @@ public interface PhotoRepository extends JpaRepository<Photo, Long> {
 
     Optional<Photo> findByRoomIdAndDeletedAtIsNull(Long roomId);
 
+    Optional<Photo> findByImgUrlAndRoomId(String imgUrl, Long roomId);
+
     default Photo getById(Long photoId) {
         return findByPhotoIdAndDeletedAtIsNull(photoId)
             .orElseThrow(() -> new RuntimeException("존재하지 않는 사진입니다."));
