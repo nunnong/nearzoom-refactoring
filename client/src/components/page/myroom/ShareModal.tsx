@@ -1,6 +1,10 @@
 'use client'
 
-import { XMarkIcon, ShareIcon, PencilSquareIcon } from '@heroicons/react/24/outline'
+import {
+  XMarkIcon,
+  ShareIcon,
+  PencilSquareIcon,
+} from '@heroicons/react/24/outline'
 import React from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -26,7 +30,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
   onShareKakao,
 }) => {
   const router = useRouter()
-  
+
   if (!isOpen || !image) return null
 
   const handleKakaoShare = () => {
@@ -35,7 +39,12 @@ const ShareModal: React.FC<ShareModalProps> = ({
   }
 
   const handleFeedCreate = () => {
-    router.push(`/feed/edit?photoId=${image.photoId}`)
+    const params = new URLSearchParams({
+      imageId: image.photoId,
+      imageSrc: encodeURIComponent(image.imgUrl),
+      imageAlt: '', // alt is removed from ImageItem, so pass empty string or remove if not needed
+    })
+    router.push(`/feeds?${params.toString()}`)
     onClose()
   }
 
@@ -46,9 +55,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
         <div className="flex items-center justify-between border-b border-gray-200 p-4">
           <div className="flex items-center space-x-2">
             <ShareIcon className="h-5 w-5 text-blue-500" />
-            <h3 className="text-lg font-semibold text-gray-900">
-              공유하기
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-900">공유하기</h3>
           </div>
           <button
             onClick={onClose}
@@ -77,9 +84,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
             <p className="text-sm font-medium text-gray-900">
               "{image.imgUrl}"
             </p>
-            <p className="mt-1 text-xs text-gray-500">
-              이 사진을 공유해보세요
-            </p>
+            <p className="mt-1 text-xs text-gray-500">이 사진을 공유해보세요</p>
           </div>
 
           {/* Share Options */}
@@ -87,14 +92,18 @@ const ShareModal: React.FC<ShareModalProps> = ({
             {/* Feed Create */}
             <button
               onClick={handleFeedCreate}
-              className="flex w-full items-center space-x-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
+              className="flex w-full items-center space-x-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:outline-none"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500">
                 <PencilSquareIcon className="h-6 w-6 text-white" />
               </div>
               <div>
-                <p className="font-medium text-gray-900">피드 게시물 작성하기</p>
-                <p className="text-sm text-gray-500">사진과 함께 게시물을 작성해보세요</p>
+                <p className="font-medium text-gray-900">
+                  피드 게시물 작성하기
+                </p>
+                <p className="text-sm text-gray-500">
+                  사진과 함께 게시물을 작성해보세요
+                </p>
               </div>
             </button>
           </div>

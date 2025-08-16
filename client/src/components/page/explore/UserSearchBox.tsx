@@ -728,13 +728,6 @@ const UserSearchBox: React.FC<UserSearchBoxProps> = ({
                               <span>팔로워 {formatFollowerCount(userProfile.followersCount)}명</span>
                               <span>•</span>
                               <span>피드 {userProfile.feedsCount}개</span>
-                              {/* 개발 환경에서만 ID 표시 */}
-                              {process.env.NODE_ENV === 'development' && (
-                                <>
-                                  <span>•</span>
-                                  <span>ID: {userProfile.userId}</span>
-                                </>
-                              )}
                             </div>
                           </div>
                           

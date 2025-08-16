@@ -518,25 +518,12 @@ const Timeline: React.FC = () => {
                 </button>
                 
                 <button
-                  onClick={() => handlePostClick(post)}
-                  className="flex items-center space-x-1 text-gray-600 hover:text-blue-500 transition-colors"
-                >
-                  <ChatBubbleOvalLeftIcon className="h-6 w-6" />
-                  <span className="text-sm">댓글</span>
-                </button>
-                
-                <button
                   onClick={(e) => handleShare(post, e)}
                   className="flex items-center space-x-1 text-gray-600 hover:text-green-500 transition-colors"
                 >
                   <ShareIcon className="h-6 w-6" />
                   <span className="text-sm">공유</span>
                 </button>
-              </div>
-              
-              {/* 게시물 메타 정보 */}
-              <div className="text-xs text-gray-400">
-                Post ID: {post.postId}
               </div>
             </div>
 
@@ -559,7 +546,6 @@ const Timeline: React.FC = () => {
             {/* 🔥 게시 시간 */}
             <div className="flex items-center justify-between text-xs text-gray-500">
               <span>{new Date(post.createdAt).toLocaleString('ko-KR')}</span>
-              <span>Photo ID: {post.photoId}</span>
             </div>
           </div>
         </div>

@@ -1,8 +1,8 @@
-// src/app/feed/edit/page.tsx - 올바른 아키텍처 적용
+// src/app/feed/edit/page.tsx - 백엔드 DTO와 정확히 일치하도록 수정
 
 'use client'
 
-import React, { Suspense } from 'react'
+import React, { Suspense, useMemo } from 'react'
 import { useState, useEffect, useCallback } from 'react'
 import { XMarkIcon, CheckIcon, PhotoIcon, ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -16,7 +16,7 @@ import api from '@/lib/axios'
 import { useAuthStore } from '@/stores/authStore'
 
 // ============================================================================
-// 🔥 백엔드 연동 타입 정의 (Feed API 기반)
+// 🔥 백엔드 연동 타입 정의 (백엔드 Java DTO와 정확히 일치)
 // ============================================================================
 
 // 백엔드 ApiResponse 표준 형식
@@ -26,16 +26,12 @@ interface ApiResponse<T> {
   data: T | null;
 }
 
-// 🔥 백엔드 PhotoForFeedUploadResponse (MyRoom에서 가져온 사진 정보)
+// 🔥 백엔드 PhotoForFeedUploadResponse - Java record와 정확히 일치
 interface PhotoForFeedUploadResponse {
-  photoId: number;
-  imgUrl: string;
-  takenAt: string;
-  alreadyInFeed: boolean;
-  fileName?: string;
-  fileSize?: number;
-  width?: number;
-  height?: number;
+  photoId: number;       // Long -> number
+  imgUrl: string;        // String
+  takenAt: string;       // LocalDateTime -> ISO string
+  alreadyInFeed: boolean; // boolean
 }
 
 // 🔥 백엔드 CreatePostFromMyRoomRequest (Feed API)
@@ -44,130 +40,186 @@ interface CreatePostFromMyRoomRequest {
   caption: string;
 }
 
-// 🔥 백엔드 사용자 정보
+// 🔥 백엔드 사용자 정보 (추정)
 interface BackendUserInfo {
   userId: number;
-  accountName: string;
-  userName: string;
+  accountName?: string;
+  userName?: string;
   userEmail: string;
   profileImage?: string;
-  prettyFace?: string;
 }
 
 // ============================================================================
-// 🔥 백엔드 API 함수들 (올바른 아키텍처 적용)
+// 🔥 백엔드 API 함수들 (디버깅 강화)
 // ============================================================================
 
 const feedEditAPI = {
-  // 🔥 GET /photos/{photoId} - 마이룸 사진 정보 조회 (상세)
+  // 🔥 GET /myroom/photos/{photoId}/feed-upload-info - 백엔드와 정확히 일치
   getPhotoForFeedUpload: async (photoId: number): Promise<PhotoForFeedUploadResponse> => {
     try {
-      console.log(`🔍 사진 정보 조회: photoId=${photoId}`);
+      console.log(`🔍 [API] 사진 정보 조회 시작: photoId=${photoId}`);
       
-      // 🏗️ 올바른 아키텍처: @/lib/axios 사용 (자동 토큰 처리)
+      // 인증 상태 확인
+      const authState = useAuthStore.getState();
+      console.log('🔍 [AUTH] 현재 상태:', {
+        isAuthenticated: authState.isAuthenticated,
+        hasUser: !!authState.user,
+        userEmail: authState.user?.email
+      });
+
       const response = await api.get<ApiResponse<PhotoForFeedUploadResponse>>(
-        `/photos/${photoId}`
+        `/myroom/photos/${photoId}/feed-upload-info`
       );
       
+      console.log(`🔍 [API] 응답 상태:`, response.status);
+      console.log(`🔍 [API] 응답 헤더:`, response.headers);
+      console.log(`🔍 [API] 응답 데이터:`, response.data);
+      
       if (response.data.error) {
+        console.error(`❌ [API] 백엔드 에러:`, response.data.message);
         throw new Error(response.data.message || '사진 정보를 가져올 수 없습니다.');
       }
       
       if (!response.data.data) {
+        console.error(`❌ [API] 데이터 없음`);
         throw new Error('사진 데이터가 없습니다.');
       }
       
-      console.log(`✅ 사진 정보 조회 성공:`, response.data.data);
+      console.log(`✅ [API] 사진 정보 조회 성공:`, response.data.data);
       return response.data.data;
-    } catch (error) {
-      console.error('❌ 사진 정보 조회 실패:', error);
+      
+    } catch (error: any) {
+      console.error('❌ [API] 사진 정보 조회 실패:', error);
+      
+      // 상세 에러 로깅
+      if (error.response) {
+        console.error('❌ [API] HTTP 에러:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers
+        });
+      } else if (error.request) {
+        console.error('❌ [API] 네트워크 에러:', error.request);
+      } else {
+        console.error('❌ [API] 설정 에러:', error.message);
+      }
+      
       throw error;
     }
   },
 
-  // 🔥 POST /feeds/posts/from-myroom - 마이룸 사진으로 피드 게시물 생성
+  // 🔥 POST /feeds/posts/from-myroom - 백엔드에 구현된 올바른 엔드포인트
   createPostFromMyRoom: async (photoId: number, caption: string): Promise<number> => {
     try {
-      console.log('🔍 게시물 생성 요청:', { photoId, caption: caption.substring(0, 50) + '...' });
+      console.log('🔍 [API] 게시물 생성 요청:', { 
+        photoId, 
+        captionLength: caption.length,
+        captionPreview: caption.substring(0, 50) + '...' 
+      });
       
       const requestBody: CreatePostFromMyRoomRequest = {
         photoId,
         caption: caption.trim()
       };
       
-      // 🏗️ 올바른 아키텍처: @/lib/axios 사용 (자동 토큰 처리)
+      console.log('🔍 [API] 요청 바디:', requestBody);
+
+      // ✅ 백엔드에 구현된 올바른 엔드포인트 사용
       const response = await api.post<ApiResponse<number>>(
         '/feeds/posts/from-myroom',
         requestBody
       );
       
+      console.log(`🔍 [API] 게시물 생성 응답:`, response.data);
+      
       if (response.data.error) {
+        console.error(`❌ [API] 게시물 생성 에러:`, response.data.message);
         throw new Error(response.data.message || '게시물 생성에 실패했습니다.');
       }
       
       if (!response.data.data) {
+        console.error(`❌ [API] 게시물 ID 없음`);
         throw new Error('게시물 ID가 반환되지 않았습니다.');
       }
       
-      console.log(`✅ 게시물 생성 성공: postId=${response.data.data}`);
+      console.log(`✅ [API] 게시물 생성 성공: postId=${response.data.data}`);
       return response.data.data;
-    } catch (error) {
-      console.error('❌ 게시물 생성 실패:', error);
+      
+    } catch (error: any) {
+      console.error('❌ [API] 게시물 생성 실패:', error);
+      
+      if (error.response) {
+        console.error('❌ [API] 게시물 생성 HTTP 에러:', {
+          status: error.response.status,
+          data: error.response.data,
+          url: error.config?.url
+        });
+      }
+      
       throw error;
     }
   },
 
-  // 🔥 GET /users/me - 현재 사용자 정보 조회
+  // 🔥 사용자 정보 조회 - my/page.tsx와 동일한 패턴
   getCurrentUser: async (): Promise<BackendUserInfo> => {
-    const endpoints = ['/users/me', '/users/profile', '/auth/me'];
+    const endpoints = ['/users/me', '/auth/me', '/users/profile', '/user/info'];
 
     for (const endpoint of endpoints) {
       try {
-        console.log(`🔍 사용자 정보 조회: ${endpoint}`);
+        console.log(`🔍 [API] 사용자 정보 조회 시도: ${endpoint}`);
         
-        // 🏗️ 올바른 아키텍처: @/lib/axios 사용 (자동 토큰 처리)
         const response = await api.get<ApiResponse<BackendUserInfo>>(endpoint);
         
+        console.log(`🔍 [API] ${endpoint} 응답:`, response.data);
+        
         if (response.data.error) {
+          console.warn(`⚠️ [API] ${endpoint} 백엔드 에러: ${response.data.message}`);
           continue;
         }
         
         if (!response.data.data) {
+          console.warn(`⚠️ [API] ${endpoint} 데이터 없음`);
           continue;
         }
         
-        console.log(`✅ 사용자 정보 조회 성공: ${endpoint}`, response.data.data);
+        console.log(`✅ [API] 사용자 정보 조회 성공: ${endpoint}`, response.data.data);
         return response.data.data;
         
-      } catch (error) {
-        console.warn(`❌ ${endpoint} 실패:`, error);
+      } catch (error: any) {
+        console.warn(`❌ [API] ${endpoint} 실패:`, {
+          status: error.response?.status,
+          message: error.message
+        });
         continue;
       }
     }
 
-    throw new Error('사용자 정보를 가져올 수 없습니다.');
+    throw new Error('모든 사용자 정보 API 엔드포인트 실패');
   },
 
-  // 🔥 사진이 이미 피드에 올라갔는지 확인 (추가 검증)
-  checkPhotoInFeed: async (photoId: number): Promise<boolean> => {
+  // 🔥 백엔드 헬스체크
+  healthCheck: async (): Promise<{ healthy: boolean; message: string }> => {
     try {
-      // 사용자의 피드에서 해당 photoId를 가진 게시물이 있는지 확인
-      // 🏗️ 올바른 아키텍처: @/lib/axios 사용 (자동 토큰 처리)
-      const response = await api.get<ApiResponse<any>>(
-        `/feeds/posts?photoId=${photoId}&limit=1`
-      );
+      console.log('🔍 [HEALTH] 백엔드 헬스체크 시작');
       
-      if (response.data.error) {
-        return false;
-      }
+      // 간단한 GET 요청으로 백엔드 상태 확인
+      const response = await api.get('/health', { timeout: 5000 });
+      console.log('✅ [HEALTH] 백엔드 정상:', response.data);
+      return { healthy: true, message: '백엔드 서버 정상' };
       
-      const posts = response.data.data || [];
-      return posts.length > 0;
-    } catch (error) {
-      console.warn('사진 피드 중복 확인 실패:', error);
-      return false;
+    } catch (error: any) {
+      console.warn('⚠️ [HEALTH] 헬스체크 실패:', error.response?.status || error.message);
+      
+      // 헬스체크 실패해도 일단 시도해볼 수 있도록
+      return { 
+        healthy: false, 
+        message: `백엔드 연결 불안정 (${error.response?.status || 'timeout'})` 
+      };
     }
-  },
+  }
 };
 
 // ============================================================================
@@ -192,50 +244,20 @@ const FeedEditContent: React.FC = () => {
   const [caption, setCaption] = useState<string>('')
   const [photoInfo, setPhotoInfo] = useState<PhotoForFeedUploadResponse | null>(null)
   const [currentUser, setCurrentUser] = useState<BackendUserInfo | null>(null)
-  const [isLoadingUser, setIsLoadingUser] = useState(false)
+  const [healthStatus, setHealthStatus] = useState<{ healthy: boolean; message: string } | null>(null)
   
-  // URL 파라미터에서 사진 ID 가져오기
-  const photoId = searchParams.get('photoId')
+  // URL 파라미터에서 사진 ID 가져오기 (메모이제이션으로 무한 루프 방지)
+  const photoId = useMemo(() => searchParams.get('photoId'), [searchParams])
 
   // ============================================================================
-  // 🔥 백엔드 연동 - 사용자 정보 로드
-  // ============================================================================
-
-  const loadCurrentUser = useCallback(async () => {
-    if (!isAuthenticated) {
-      setCurrentUser(null);
-      return;
-    }
-
-    setIsLoadingUser(true);
-
-    try {
-      const userInfo = await feedEditAPI.getCurrentUser();
-      setCurrentUser(userInfo);
-    } catch (error) {
-      console.warn('사용자 정보 로드 실패, Zustand user 사용:', error);
-      
-      // Fallback: Zustand user 정보 사용
-      if (user) {
-        setCurrentUser({
-          userId: typeof user.id === 'string' ? parseInt(user.id) : user.id,
-          accountName: (user as any)?.accountName || user.email.split('@')[0],
-          userName: user.name || user.email,
-          userEmail: user.email,
-          profileImage: (user as any)?.profileImage,
-        });
-      }
-    } finally {
-      setIsLoadingUser(false);
-    }
-  }, [isAuthenticated, user]);
-
-  // ============================================================================
-  // 🔥 백엔드 API 호출 - 사진 정보 로드 및 초기화
+  // 🔥 백엔드 API 호출 - 사진 정보 로드 및 초기화 (강화된 에러 처리)
   // ============================================================================
 
   const initializeEditor = useCallback(async () => {
+    console.log('🔍 [INIT] 편집기 초기화 시작');
+    
     if (!isAuthenticated || !user) {
+      console.log('🔍 [INIT] 인증되지 않은 사용자, 로그인 페이지로 이동');
       router.push('/login');
       return;
     }
@@ -246,81 +268,68 @@ const FeedEditContent: React.FC = () => {
     try {
       // photoId 유효성 검사
       if (!photoId || isNaN(Number(photoId))) {
-        setError('사진을 먼저 선택해주세요.');
-        setTimeout(() => {
-          router.push('/myroom');
-        }, 2000);
+        console.error('❌ [INIT] 잘못된 photoId:', photoId);
+        setError('잘못된 사진 ID입니다.');
+        setTimeout(() => router.push('/myroom'), 2000);
         return;
       }
 
-      console.log('=== 피드 게시물 편집기 초기화 시작 ===', { photoId });
+      console.log('🔍 [INIT] 유효한 photoId:', photoId);
 
-      // 🔥 병렬로 사용자 정보와 사진 정보 로드
-      const [userInfo, photoData] = await Promise.allSettled([
-        feedEditAPI.getCurrentUser(),
-        feedEditAPI.getPhotoForFeedUpload(Number(photoId))
-      ]);
+      // 1단계: 사용자 정보 설정 (Zustand에서 바로 사용)
+      const userInfo: BackendUserInfo = {
+        userId: typeof user.id === 'string' ? parseInt(user.id) : user.id,
+        accountName: (user as any)?.accountName || user.email?.split('@')[0] || 'user',
+        userName: user.name || user.email || 'User',
+        userEmail: user.email || 'user@example.com',
+        profileImage: (user as any)?.profileImage,
+      };
+      
+      setCurrentUser(userInfo);
+      console.log('✅ [INIT] 사용자 정보 설정:', userInfo);
 
-      // 사용자 정보 처리
-      if (userInfo.status === 'fulfilled') {
-        setCurrentUser(userInfo.value);
-      } else {
-        console.warn('사용자 정보 로드 실패, Zustand user 사용');
-        if (user) {
-          setCurrentUser({
-            userId: typeof user.id === 'string' ? parseInt(user.id) : user.id,
-            accountName: (user as any)?.accountName || user.email.split('@')[0],
-            userName: user.name || user.email,
-            userEmail: user.email,
-            profileImage: (user as any)?.profileImage,
-          });
-        }
+      // 2단계: 사진 정보 로드 (가장 중요한 부분)
+      console.log('🔍 [INIT] 사진 정보 로드 시작');
+      const photo = await feedEditAPI.getPhotoForFeedUpload(Number(photoId));
+      
+      console.log('✅ [INIT] 사진 정보 로드 성공:', photo);
+      
+      // 이미 피드에 올린 사진인지 확인
+      if (photo.alreadyInFeed) {
+        console.warn('⚠️ [INIT] 이미 피드에 올린 사진');
+        setError('이미 피드에 올린 사진입니다.');
+        // toast 대신 alert 사용 (의존성 제거)
+        alert('이미 피드에 올린 사진입니다.');
+        setTimeout(() => router.push('/myroom'), 3000);
+        return;
       }
 
-      // 사진 정보 처리
-      if (photoData.status === 'fulfilled') {
-        const photo = photoData.value;
-        
-        // 🔥 추가 검증: 이미 피드에 올린 사진인지 확인
-        if (photo.alreadyInFeed) {
-          setError('이미 피드에 올린 사진입니다.');
-          toast.warning('중복 게시물', '이미 피드에 올린 사진입니다.');
-          setTimeout(() => {
-            router.push('/myroom');
-          }, 3000);
-          return;
-        }
-
-        // 🔥 이중 검증: 백엔드에서 한 번 더 확인
-        const isAlreadyInFeed = await feedEditAPI.checkPhotoInFeed(Number(photoId));
-        if (isAlreadyInFeed) {
-          setError('이미 피드에 올린 사진입니다.');
-          toast.warning('중복 게시물', '이미 피드에 올린 사진입니다.');
-          setTimeout(() => {
-            router.push('/myroom');
-          }, 3000);
-          return;
-        }
-
-        setPhotoInfo(photo);
-        console.log('✅ 편집기 초기화 완료:', photo);
-        toast.success('편집기 준비 완료', '게시물을 작성해주세요.');
-      } else {
-        throw photoData.reason;
-      }
+      setPhotoInfo(photo);
+      // toast 대신 로그만 사용
+      console.log('✅ [INIT] 편집기 초기화 완료');
 
     } catch (error: any) {
-      console.error('❌ 편집기 초기화 실패:', error);
+      console.error('❌ [INIT] 편집기 초기화 실패:', error);
       
-      // 백엔드 에러 메시지 상세 처리
       let errorMessage = '사진 정보를 불러올 수 없습니다.';
       
-      if (error.response?.status === 404) {
+      if (error.response?.status === 401) {
+        errorMessage = '로그인이 필요합니다.';
+        try {
+          await useAuthStore.getState().logout();
+        } catch (logoutError) {
+          useAuthStore.getState().clearTokens();
+        }
+        router.push('/login');
+        return;
+      } else if (error.response?.status === 404) {
         errorMessage = '존재하지 않는 사진입니다.';
       } else if (error.response?.status === 403) {
         errorMessage = '해당 사진에 접근할 권한이 없습니다.';
-      } else if (error.response?.status === 401) {
-        errorMessage = '로그인이 필요합니다.';
+      } else if (error.response?.status === 500) {
+        errorMessage = '서버 오류가 발생했습니다. 백엔드 서버를 확인해주세요.';
+      } else if (error.code === 'NETWORK_ERROR' || error.message.includes('Network Error')) {
+        errorMessage = '네트워크 연결을 확인해주세요. 백엔드 서버가 실행 중인지 확인하세요.';
       } else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error.message) {
@@ -328,15 +337,15 @@ const FeedEditContent: React.FC = () => {
       }
       
       setError(errorMessage);
-      toast.error('초기화 실패', errorMessage);
       
-      setTimeout(() => {
-        router.push('/myroom');
-      }, 3000);
+      // 500 에러나 네트워크 에러인 경우 더 오래 기다린 후 리다이렉트
+      const redirectDelay = (error.response?.status >= 500 || error.code === 'NETWORK_ERROR') ? 8000 : 3000;
+      setTimeout(() => router.push('/myroom'), redirectDelay);
+      
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, user, photoId, router, toast]);
+  }, [isAuthenticated, user, photoId, router]);
 
   // ============================================================================
   // 초기 로드
@@ -352,12 +361,12 @@ const FeedEditContent: React.FC = () => {
 
   const handleSave = useCallback(async () => {
     if (!currentUser || !photoId || !photoInfo) {
-      toast.error('저장 불가', '필요한 정보가 없습니다.');
+      alert('필요한 정보가 없습니다.');
       return;
     }
 
     if (caption.trim().length === 0) {
-      toast.warning('캡션 필요', '캡션을 입력해주세요.');
+      alert('캡션을 입력해주세요.');
       return;
     }
 
@@ -365,51 +374,38 @@ const FeedEditContent: React.FC = () => {
     setError(null);
 
     try {
-      console.log('=== 게시물 생성 시작 ===', {
+      console.log('🔍 [SAVE] 게시물 생성 시작', {
         photoId: Number(photoId),
-        caption: caption.trim().substring(0, 50) + '...'
+        captionLength: caption.trim().length
       });
-
-      // 🔥 백엔드 API 호출 - Toast와 함께
-      const loadingToastId = toast.loading('게시물 생성 중...', '피드에 업로드하고 있습니다.');
 
       const newPostId = await feedEditAPI.createPostFromMyRoom(
         Number(photoId), 
         caption.trim()
       );
 
-      // 로딩 토스트 제거 후 성공 토스트 표시
-      toast.removeToast(loadingToastId);
-      toast.success('게시물 생성 완료!', '피드에 성공적으로 업로드되었습니다.');
+      alert('게시물이 성공적으로 생성되었습니다!');
 
-      console.log('✅ 게시물 생성 완료:', { newPostId });
+      console.log('✅ [SAVE] 게시물 생성 완료:', { newPostId });
 
-      // 성공 시 사용자 피드 페이지로 이동 (백엔드 URL 기반)
-      if (currentUser.accountName) {
-        router.push(`/feeds/users/account/${currentUser.accountName}`);
-      } else {
-        router.push('/my');
-      }
+      // 성공 시 마이페이지로 이동
+      router.push('/my');
       
     } catch (error: any) {
-      console.error('❌ 게시물 생성 실패:', error);
+      console.error('❌ [SAVE] 게시물 생성 실패:', error);
       
-      // 백엔드 에러 메시지 상세 처리
       let errorMessage = '게시물 생성에 실패했습니다.';
-      let errorTitle = '생성 실패';
       
       if (error.response?.status === 400) {
         errorMessage = '잘못된 요청입니다. 사진 ID나 캡션을 확인해주세요.';
-        errorTitle = '잘못된 요청';
       } else if (error.response?.status === 403) {
         errorMessage = '내 사진만 게시물로 만들 수 있습니다.';
-        errorTitle = '권한 없음';
       } else if (error.response?.status === 404) {
         errorMessage = '존재하지 않는 사진입니다.';
-        errorTitle = '사진 없음';
       } else if (error.response?.status === 409) {
         errorMessage = '이미 피드에 올린 사진입니다.';
-        errorTitle = '중복 게시물';
+      } else if (error.response?.status >= 500) {
+        errorMessage = '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
       } else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error.message) {
@@ -417,11 +413,11 @@ const FeedEditContent: React.FC = () => {
       }
       
       setError(errorMessage);
-      toast.error(errorTitle, errorMessage);
+      alert(errorMessage);
     } finally {
       setIsSaving(false);
     }
-  }, [currentUser, photoId, photoInfo, caption, router, toast]);
+  }, [currentUser, photoId, photoInfo, caption, router]);
 
   // ============================================================================
   // 이벤트 핸들러들
@@ -439,7 +435,6 @@ const FeedEditContent: React.FC = () => {
 
   const handleCaptionChange = useCallback((value: string) => {
     setCaption(value);
-    // 에러가 있으면 입력 시 클리어
     if (error) {
       setError(null);
     }
@@ -447,8 +442,10 @@ const FeedEditContent: React.FC = () => {
 
   const handleRetry = useCallback(() => {
     setError(null);
-    initializeEditor();
-  }, [initializeEditor]);
+    if (photoId) {
+      initializeEditor();
+    }
+  }, [photoId, initializeEditor]);
 
   // ============================================================================
   // 렌더링 조건
@@ -462,7 +459,7 @@ const FeedEditContent: React.FC = () => {
     profileImage: (user as any)?.profileImage,
   } : null);
 
-  // 🏗️ 아키텍처 원칙: 인증 로딩 중
+  // 인증 로딩 중
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -473,7 +470,7 @@ const FeedEditContent: React.FC = () => {
     );
   }
 
-  // 🏗️ 아키텍처 원칙: 로그인하지 않은 경우
+  // 로그인하지 않은 경우
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -499,8 +496,13 @@ const FeedEditContent: React.FC = () => {
           <FeedLoadingSpinner
             text="게시물 편집기 준비 중..."
             size="lg"
-            apiEndpoint={`/photos/${photoId}`}
+            apiEndpoint={`/myroom/photos/${photoId}/feed-upload-info`}
           />
+          {healthStatus && (
+            <p className={`mt-4 text-sm ${healthStatus.healthy ? 'text-green-600' : 'text-yellow-600'}`}>
+              {healthStatus.message}
+            </p>
+          )}
         </div>
       </div>
     );
@@ -518,6 +520,16 @@ const FeedEditContent: React.FC = () => {
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">오류가 발생했습니다</h2>
           <p className="text-gray-600 mb-6">{error}</p>
+          
+          {/* 백엔드 상태 표시 */}
+          {healthStatus && (
+            <div className={`mb-4 p-3 rounded-lg text-sm ${
+              healthStatus.healthy ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+            }`}>
+              백엔드 상태: {healthStatus.message}
+            </div>
+          )}
+          
           <div className="space-y-3">
             <button
               onClick={handleRetry}
@@ -531,12 +543,6 @@ const FeedEditContent: React.FC = () => {
             >
               내 앨범으로 돌아가기
             </button>
-            <button
-              onClick={() => router.push('/explore')}
-              className="w-full px-6 py-3 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors"
-            >
-              탐색 페이지로 이동
-            </button>
           </div>
         </div>
       </div>
@@ -544,12 +550,12 @@ const FeedEditContent: React.FC = () => {
   }
 
   // ============================================================================
-  // 🔥 메인 렌더링 (백엔드 연동 최적화)
+  // 🔥 메인 렌더링
   // ============================================================================
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* 🔥 상단 편집 헤더 (백엔드 연동) */}
+      {/* 상단 헤더 */}
       <header className="bg-white border-b shadow-sm sticky top-0 z-40">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center space-x-3">
@@ -566,15 +572,11 @@ const FeedEditContent: React.FC = () => {
               </h1>
               <p className="text-sm text-gray-500">
                 {displayUser?.userName || '사용자'}의 피드에 추가
-                {displayUser?.accountName && (
-                  <span className="ml-1">(@{displayUser.accountName})</span>
-                )}
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-3">
-            {/* 에러 메시지 표시 */}
             {error && (
               <p className="text-sm text-red-600 mr-4 max-w-xs truncate" title={error}>
                 {error}
@@ -606,9 +608,9 @@ const FeedEditContent: React.FC = () => {
       </header>
 
       {/* 메인 편집 영역 */}
-      <main className="max-w-4xl mx-auto p-4">
+      <main className="max-w-2xl mx-auto p-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          {/* 🔥 사진 미리보기 섹션 - 백엔드 데이터로 표시 */}
+          {/* 사진 미리보기 섹션 */}
           {photoInfo && (
             <div className="border-b border-gray-200">
               <div className="p-4">
@@ -622,8 +624,7 @@ const FeedEditContent: React.FC = () => {
                       src={photoInfo.imgUrl} 
                       alt="Selected photo" 
                       className="w-32 h-32 object-cover rounded-lg border border-gray-200 shadow-sm"
-                      onError={(e) => {
-                        console.error('Image failed to load:', photoInfo.imgUrl);
+                      onError={() => {
                         setError('사진을 불러올 수 없습니다.');
                         toast.error('이미지 로드 실패', '사진을 불러올 수 없습니다.');
                       }}
@@ -639,18 +640,6 @@ const FeedEditContent: React.FC = () => {
                       <div className="text-xs text-gray-500">
                         <span className="font-medium">촬영일:</span> {new Date(photoInfo.takenAt).toLocaleString('ko-KR')}
                       </div>
-                      
-                      {photoInfo.fileName && (
-                        <div className="text-xs text-gray-500">
-                          <span className="font-medium">파일명:</span> {photoInfo.fileName}
-                        </div>
-                      )}
-                      
-                      {photoInfo.width && photoInfo.height && (
-                        <div className="text-xs text-gray-500">
-                          <span className="font-medium">크기:</span> {photoInfo.width} × {photoInfo.height}
-                        </div>
-                      )}
                       
                       <div className="mt-2">
                         {photoInfo.alreadyInFeed ? (
@@ -693,12 +682,12 @@ const FeedEditContent: React.FC = () => {
                 )}
               </p>
               <p className="text-xs text-gray-500">
-                {displayUser?.accountName ? `@${displayUser.accountName}` : '내'} 피드에 새 게시물로 추가됩니다
+                내 피드에 새 게시물로 추가됩니다
               </p>
             </div>
           </div>
 
-          {/* 🔥 게시물 미리보기 섹션 (백엔드 사용자 정보 반영) */}
+          {/* 게시물 미리보기 섹션 */}
           <div className="border-t border-gray-200 bg-gray-50 p-4">
             <h3 className="text-sm font-medium text-gray-700 mb-4 flex items-center">
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -742,12 +731,9 @@ const FeedEditContent: React.FC = () => {
                     <p className="text-sm text-gray-500">
                       @{displayUser?.accountName || 'user'}
                     </p>
-                    {isLoadingUser && (
-                      <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                    )}
                   </div>
                   
-                  {/* 🔥 실제 백엔드 사진이 있으면 표시 */}
+                  {/* 실제 백엔드 사진이 있으면 표시 */}
                   {photoInfo && (
                     <div className="mb-3">
                       <img 
@@ -784,166 +770,100 @@ const FeedEditContent: React.FC = () => {
               </div>
             </div>
           </div>
-
-          {/* 🔥 게시물 정보 카드 */}
-          {photoInfo && (
-            <div className="border-t border-gray-200 bg-blue-50 p-4">
-              <h4 className="text-sm font-medium text-blue-800 mb-3 flex items-center">
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                게시물 정보
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-blue-700 font-medium">사진 ID:</span>
-                    <span className="text-blue-600 font-mono">{photoInfo.photoId}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-blue-700 font-medium">촬영일:</span>
-                    <span className="text-blue-600">{new Date(photoInfo.takenAt).toLocaleDateString('ko-KR')}</span>
-                  </div>
-                  {photoInfo.width && photoInfo.height && (
-                    <div className="flex justify-between">
-                      <span className="text-blue-700 font-medium">해상도:</span>
-                      <span className="text-blue-600">{photoInfo.width} × {photoInfo.height}</span>
-                    </div>
-                  )}
-                  {photoInfo.fileSize && (
-                    <div className="flex justify-between">
-                      <span className="text-blue-700 font-medium">파일 크기:</span>
-                      <span className="text-blue-600">{(photoInfo.fileSize / 1024 / 1024).toFixed(2)} MB</span>
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-blue-700 font-medium">캡션 길이:</span>
-                    <span className="text-blue-600">{caption.length}/200자</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-blue-700 font-medium">게시 대상:</span>
-                    <span className="text-blue-600">공개 피드</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-blue-700 font-medium">상태:</span>
-                    <span className={`font-medium ${
-                      caption.trim().length > 0 ? 'text-green-600' : 'text-orange-600'
-                    }`}>
-                      {caption.trim().length > 0 ? '게시 준비 완료' : '캡션 입력 필요'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-blue-700 font-medium">작성자:</span>
-                    <span className="text-blue-600">@{displayUser?.accountName || 'user'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 🔥 추가 도움말 및 팁 */}
-        <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-            피드 게시 팁
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
-            <div className="space-y-2">
-              <div className="flex items-start space-x-2">
-                <span className="text-green-500 mt-0.5">✓</span>
-                <span>감정이나 순간을 담은 캡션이 더 많은 공감을 받아요</span>
-              </div>
-              <div className="flex items-start space-x-2">
-                <span className="text-green-500 mt-0.5">✓</span>
-                <span>해시태그나 멘션을 사용해 더 많은 사람들과 소통하세요</span>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-start space-x-2">
-                <span className="text-blue-500 mt-0.5">💡</span>
-                <span>게시 후에도 캡션을 수정할 수 있어요</span>
-              </div>
-              <div className="flex items-start space-x-2">
-                <span className="text-blue-500 mt-0.5">💡</span>
-                <span>피드에 게시하면 팔로워들이 바로 볼 수 있어요</span>
-              </div>
-            </div>
-          </div>
         </div>
       </main>
 
-      {/* 🔥 개발 모드에서 백엔드 연동 상태 표시 */}
+      {/* 개발 모드에서 상세한 디버깅 정보 표시 */}
       {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-4 left-4 bg-black bg-opacity-80 text-white text-xs rounded-lg p-3 z-30 max-w-xs">
-          <details>
-            <summary className="cursor-pointer font-semibold mb-2 text-yellow-300">
-              🔧 Feed Edit 올바른 아키텍처 상태
+        <div className="fixed bottom-4 right-4 bg-black bg-opacity-90 text-white text-xs rounded-lg p-4 z-50 max-w-sm max-h-96 overflow-y-auto">
+          <details open>
+            <summary className="cursor-pointer font-semibold mb-3 text-yellow-300">
+              🔧 DEBUG: 백엔드 연동 상태
             </summary>
-            <div className="space-y-1">
-              <div><strong>🏗️ API:</strong> @/lib/axios</div>
-              <div><strong>🏗️ Auth Store:</strong> {isAuthenticated ? '✅ OK' : '❌ No'}</div>
-              <div><strong>🏗️ 토큰 관리:</strong> Zustand + 인터셉터</div>
-              <div><strong>Photo ID:</strong> {photoId}</div>
-              <div><strong>로딩:</strong> {isLoading ? '⏳ Loading' : '✅ Done'}</div>
-              <div><strong>저장 중:</strong> {isSaving ? '⏳ Saving' : '✅ Ready'}</div>
+            <div className="space-y-2">
+              <div className="border-b border-gray-600 pb-2">
+                <div><strong>🔗 API 정보:</strong></div>
+                <div className="ml-2 text-xs space-y-1">
+                  <div>Photo ID: {photoId}</div>
+                  <div>Base URL: {process.env.NEXT_PUBLIC_API_BASE_URL || 'localhost:8080'}</div>
+                  <div>Auth: {isAuthenticated ? '✅' : '❌'}</div>
+                  <div>User: {useAuthStore.getState().user?.email || 'No user'}</div>
+                </div>
+              </div>
               
+              {healthStatus && (
+                <div className="border-b border-gray-600 pb-2">
+                  <div><strong>🏥 백엔드 상태:</strong></div>
+                  <div className={`ml-2 text-xs ${healthStatus.healthy ? 'text-green-400' : 'text-yellow-400'}`}>
+                    {healthStatus.message}
+                  </div>
+                </div>
+              )}
+              
+              <div className="border-b border-gray-600 pb-2">
+                <div><strong>📡 API 엔드포인트:</strong></div>
+                <div className="ml-2 text-xs space-y-1">
+                  <div>GET /myroom/photos/{photoId}/feed-upload-info</div>
+                  <div>POST /feeds/posts/from-myroom</div>
+                  <div>GET /users/me (fallbacks 포함)</div>
+                </div>
+              </div>
+              
+              <div className="border-b border-gray-600 pb-2">
+                <div><strong>📊 현재 상태:</strong></div>
+                <div className="ml-2 text-xs space-y-1">
+                  <div>Loading: {isLoading ? '⏳' : '✅'}</div>
+                  <div>Saving: {isSaving ? '⏳' : '✅'}</div>
+                  <div>Error: {error ? `❌ ${error.substring(0, 30)}...` : '✅'}</div>
+                  <div>Photo Info: {photoInfo ? '✅' : '❌'}</div>
+                  <div>User Info: {currentUser ? '✅' : '❌'}</div>
+                </div>
+              </div>
+
               {photoInfo && (
-                <>
-                  <div className="mt-2 pt-2 border-t border-gray-600">
-                    <div><strong>사진 정보:</strong></div>
-                    <div className="ml-2 text-xs">
-                      <div>ID: {photoInfo.photoId}</div>
-                      <div>URL: {photoInfo.imgUrl.substring(0, 30)}...</div>
-                      <div>피드 게시: {photoInfo.alreadyInFeed ? '❌ Yes' : '✅ No'}</div>
-                      {photoInfo.width && <div>크기: {photoInfo.width}×{photoInfo.height}</div>}
-                      {photoInfo.fileSize && <div>용량: {(photoInfo.fileSize / 1024 / 1024).toFixed(1)}MB</div>}
-                    </div>
-                  </div>
-                </>
-              )}
-              
-              {displayUser && (
-                <div className="mt-2 pt-2 border-t border-gray-600">
-                  <div><strong>사용자:</strong></div>
-                  <div className="ml-2 text-xs">
-                    <div>ID: {displayUser.userId}</div>
-                    <div>계정: {displayUser.accountName}</div>
-                    <div>이름: {displayUser.userName}</div>
-                    <div>소스: {currentUser ? 'Backend' : 'Zustand'}</div>
+                <div className="border-b border-gray-600 pb-2">
+                  <div><strong>📷 Photo Data:</strong></div>
+                  <div className="ml-2 text-xs space-y-1">
+                    <div>ID: {photoInfo.photoId}</div>
+                    <div>Already in Feed: {photoInfo.alreadyInFeed ? '❌ Yes' : '✅ No'}</div>
+                    <div>URL: {photoInfo.imgUrl.substring(0, 40)}...</div>
+                    <div>Taken: {new Date(photoInfo.takenAt).toLocaleDateString()}</div>
                   </div>
                 </div>
               )}
-              
-              <div className="mt-2 pt-2 border-t border-gray-600">
-                <div><strong>캡션:</strong> {caption.length}/200자</div>
-                <div><strong>에러:</strong> {error ? `❌ ${error.substring(0, 20)}...` : '✅ None'}</div>
-                <div><strong>저장 가능:</strong> {
-                  (!isSaving && photoId && photoInfo && caption.trim().length > 0) ? '✅ Yes' : '❌ No'
-                }</div>
-              </div>
-              
-              <div className="mt-2 pt-2 border-t border-gray-600 text-xs">
-                <div><strong>🔗 API 엔드포인트 (@/lib/axios):</strong></div>
-                <div className="ml-2 space-y-1">
-                  <div>• GET /photos/{photoId}</div>
-                  <div>• POST /feeds/posts/from-myroom</div>
-                  <div>• GET /users/me</div>
+
+              {currentUser && (
+                <div className="border-b border-gray-600 pb-2">
+                  <div><strong>👤 User Data:</strong></div>
+                  <div className="ml-2 text-xs space-y-1">
+                    <div>ID: {currentUser.userId}</div>
+                    <div>Account: {currentUser.accountName || 'N/A'}</div>
+                    <div>Email: {currentUser.userEmail}</div>
+                    <div>Source: {currentUser.accountName ? 'Backend' : 'Zustand'}</div>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="mt-2 pt-2 border-t border-gray-600 text-xs">
-                <div><strong>🏗️ 아키텍처 준수:</strong></div>
-                <div className="ml-2 space-y-1">
-                  <div>✅ 통합 axios 인스턴스</div>
-                  <div>✅ Zustand 상태 관리</div>
-                  <div>✅ 자동 토큰 처리</div>
-                  <div>✅ 커서 기반 무한스크롤 준비</div>
+              )}
+
+              <div>
+                <div><strong>🛠️ Actions:</strong></div>
+                <div className="ml-2 mt-2 space-y-1">
+                  <button 
+                    onClick={handleRetry}
+                    className="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs"
+                  >
+                    재시도
+                  </button>
+                  <button 
+                    onClick={() => {
+                      console.log('🔍 [DEBUG] Auth Store State:', useAuthStore.getState());
+                      console.log('🔍 [DEBUG] Photo Info:', photoInfo);
+                      console.log('🔍 [DEBUG] Current User:', currentUser);
+                      console.log('🔍 [DEBUG] Health Status:', healthStatus);
+                    }}
+                    className="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs ml-2"
+                  >
+                    콘솔 로그
+                  </button>
                 </div>
               </div>
             </div>
@@ -969,7 +889,7 @@ const FeedEditPage: React.FC = () => {
               size="lg"
             />
             <p className="mt-4 text-sm text-gray-500">
-              올바른 아키텍처 적용: 사용자 정보와 사진 데이터를 확인하고 있습니다...
+              백엔드 API와 연동하여 사진 정보를 확인하고 있습니다...
             </p>
           </div>
         </div>

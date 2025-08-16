@@ -470,17 +470,6 @@ const RandomPhotoGrid: React.FC<RandomPhotoGridProps> = ({
                 </div>
               </div>
 
-              {/* 게시물 ID 표시 (개발 환경에서만) */}
-              {process.env.NODE_ENV === 'development' && (
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <div className="bg-black/60 rounded px-2 py-1 backdrop-blur-sm">
-                    <span className="text-white text-xs font-mono">
-                      #{feed.postId}
-                    </span>
-                  </div>
-                </div>
-              )}
-
               {/* 좋아요 상태 표시 */}
               {feed.isLiked && (
                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">

@@ -739,30 +739,6 @@ const ExploreRandom: React.FC<ExploreRandomProps> = ({ className = '' }) => {
           </button>
         </div>
       )}
-
-      {/* 디버그 정보 (개발 환경에서만) */}
-      {process.env.NODE_ENV === 'development' && !isLoading && (
-        <div className="mt-8 p-4 bg-gray-100 rounded-lg">
-          <h4 className="font-medium text-gray-700 mb-2">디버그 정보 (올바른 아키텍처 완전 준수)</h4>
-          <div className="text-sm text-gray-600 space-y-1">
-            <div>🔐 로그인 상태: {isAuthenticated ? '✅ 로그인됨' : '❌ 로그인 안됨'}</div>
-            <div>🎫 액세스 토큰: {accessToken ? '✅ 있음' : '❌ 없음'}</div>
-            <div>👤 사용자: {user?.accountName || '없음'}</div>
-            <div>📊 로드된 게시물 수: {feeds.length}</div>
-            <div>📄 hasNext: {hasNext.toString()}</div>
-            <div>🔗 nextCursor: {nextCursor || '없음'}</div>
-            <div>⏳ isLoadingMore: {isLoadingMore.toString()}</div>
-            <div>🚨 에러 상태: {error || '없음'}</div>
-            <div>🔄 새로고침 횟수: {refreshKey}</div>
-            <div>📱 현재 limit: {getOptimalLimit()}</div>
-            <div>🌐 API: GET /feeds/explore (로그인 필수 + 커서 기반 무한스크롤)</div>
-            <div>🔧 올바른 아키텍처: ✅ api from '@/lib/axios'</div>
-            <div>🔧 Axios 인터셉터: ✅ 토큰 자동 처리 + 갱신</div>
-            <div>🏪 Zustand Store: ✅ 토큰 관리 + 자동 로그아웃</div>
-            <div>🔗 게시물 라우팅: /feeds/posts/[id]</div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
