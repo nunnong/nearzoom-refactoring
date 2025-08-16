@@ -1,23 +1,17 @@
 package com.ssafy.nearzoom.domain.photoPrompt.service;
 
-import com.ssafy.nearzoom.domain.photoPrompt.dto.IndividualBackgroundRequest;
+import com.ssafy.nearzoom.domain.photoPrompt.dto.*;
 import com.ssafy.nearzoom.domain.photoPrompt.dto.imageServer.ProcessingOptions;
 import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingResult;
-import com.ssafy.nearzoom.domain.photoPrompt.entity.PhotoPrompt;
-import com.ssafy.nearzoom.domain.photoPrompt.entity.PromptStatus;
+import com.ssafy.nearzoom.domain.photoPrompt.entity.*;
 import com.ssafy.nearzoom.domain.photoPrompt.repository.PhotoPromptRepository;
-import com.ssafy.nearzoom.domain.room.constants.RedisKeyConstants;
-import com.ssafy.nearzoom.domain.user.entity.Social;
-import com.ssafy.nearzoom.domain.user.entity.User;
+import com.ssafy.nearzoom.domain.photoPrompt.repository.RedisPhotoPromptRepository;
+import com.ssafy.nearzoom.domain.user.entity.*;
 import com.ssafy.nearzoom.domain.user.repository.UserRepository;
 import com.ssafy.nearzoom.global.auth.jwt.JWTUtil;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
-import java.time.Duration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -32,23 +26,15 @@ public class PhotoPromptService {
   private final JWTUtil jwtUtil;
   private final UserRepository userRepository;
   private final PhotoPromptRepository photoPromptRepository;
+  private final RedisPhotoPromptRepository redisPromptRepository;
   private final RedisTemplate<String, String> redisTemplate;
   private final ImageProcessingService imageProcessingService;
 
   // 1단계: 기본 설정 저장 (프레임 색상만)
-  public void saveBasicSettings(HttpServletRequest request, Long roomId, int cutCount, String frameColor) {
+  public void saveBasicSettings(HttpServletRequest request, BasicSettingsRequest basicSettingsRequest) {
     validateUser(request);
 
-    String roomKey = "room:" + roomId;
-
-    // 수정: putAll() 대신 개별 put() 사용
-    redisTemplate.opsForHash().put(roomKey, "total_images", String.valueOf(cutCount));
-    redisTemplate.opsForHash().put(roomKey, "frame_color", frameColor);
-    redisTemplate.opsForHash().put(roomKey, "photo_status", "basic_settings_saved");
-
-    redisTemplate.expire(roomKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
-
-    log.info("기본 설정 저장 완료 - RoomId: {}, FrameColor: {}", roomId, frameColor);
+    redisPromptRepository.saveSettings(basicSettingsRequest);
   }
 
   // 2단계: 개별 이미지별 배경 설정 저장 및 즉시 처리
@@ -56,82 +42,41 @@ public class PhotoPromptService {
     validateUser(request);
 
     Long roomId = backgroundRequest.roomId();
-    String roomKey = "room:" + roomId;
-    Map<Object, Object> roomData = redisTemplate.opsForHash().entries(roomKey);
+    String promptText = backgroundRequest.promptText();
 
-    if (roomData.isEmpty()) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "방 정보를 찾을 수 없습니다.");
-    }
-
-    String totalImagesStr = (String) roomData.get("total_images");
-
-    String backgroundType = backgroundRequest.backgroundType();
-
-    // ProcessingOptions 생성
     ProcessingOptions processingOptions;
-    String promptId = null;
-    System.out.println("backgroundType = " + backgroundType);
-    if ("prompt".equals(backgroundType)) {
-      String promptText = backgroundRequest.promptText();
 
-      // 프롬프트 테이블에 저장
+    String promptId = null;
+
+    if ("prompt".equals(promptText)) { // save to prompt table
       PhotoPrompt photoPrompt = new PhotoPrompt(promptText);
       photoPromptRepository.save(photoPrompt);
       promptId = String.valueOf(photoPrompt.getPromptId());
-
       processingOptions = new ProcessingOptions("prompt", promptText, null);
+
     } else { // solid
       String color = backgroundRequest.colorValue();
       processingOptions = new ProcessingOptions("color", null, color);
     }
 
-    String uniqueKey = System.currentTimeMillis() + "_" + (int)(Math.random() * 1000);
-
-    // 수정: Map 생성하지 말고 개별 put() 사용
-    redisTemplate.opsForHash().put(roomKey, "image_url_" + uniqueKey, backgroundRequest.imageUrl());
-    redisTemplate.opsForHash().put(roomKey, "background_type_" + uniqueKey, backgroundType);
-
-    if (promptId != null) {
-      redisTemplate.opsForHash().put(roomKey, "prompt_id_" + uniqueKey, promptId);
-    }
-
-//    // 총 이미지 수 업데이트 (동적으로 증가)
-//    String currentMaxOrder = (String) roomData.get("max_image_order");
-//    int maxOrder = currentMaxOrder != null ? Integer.parseInt(currentMaxOrder) : -1;
-//    if (imageOrder > maxOrder) {
-//      redisTemplate.opsForHash().put(roomKey, "max_image_order", String.valueOf(imageOrder));
-//      redisTemplate.opsForHash().put(roomKey, "total_images", String.valueOf(imageOrder + 1));
-//    }
+    redisPromptRepository.saveBackground(backgroundRequest, promptId);
 
     // 즉시 이미지 서버로 전송
     try {
       imageProcessingService.processIndividualStart(
-              roomId,
-          uniqueKey,
+              backgroundRequest.roomId(),
               backgroundRequest.imageUrl(),
               backgroundRequest.personIds(),
               processingOptions,
               promptId
       );
-
-      log.info("이미지 서버 전송 완료 - RoomId: {}, Order: {}", roomId, uniqueKey);
+      log.info("이미지 서버 전송 완료 - Room:{}", roomId);
 
     } catch (Exception e) {
-      log.error("이미지 서버 전송 실패 - RoomId: {}, Order: {}, Error: {}", roomId, uniqueKey, e.getMessage());
-
-      // 프롬프트 상태를 실패로 업데이트
-      if (promptId != null) {
-        try {
-          PhotoPrompt photoPrompt = photoPromptRepository.findById(Long.valueOf(promptId)).orElse(null);
-          if (photoPrompt != null) {
-            photoPrompt.updateStatus(PromptStatus.FAIL);
-            photoPromptRepository.save(photoPrompt);
-          }
-        } catch (Exception ex) {
-          log.warn("프롬프트 상태 업데이트 실패: {}", ex.getMessage());
-        }
-      }
-
+      log.error("이미지 서버 전송 실패 - RoomId: {}, Error: {}", roomId, e.getMessage());
+      PhotoPrompt photoPrompt = photoPromptRepository.findById(Long.valueOf(promptId)).orElse(null);
+      photoPrompt.updateStatus(PromptStatus.FAIL);
+      photoPromptRepository.save(photoPrompt);
       throw e;
     }
   }

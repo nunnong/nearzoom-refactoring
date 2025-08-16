@@ -4,7 +4,6 @@ import java.util.List;
 
 public record IndividualBackgroundRequest(
     Long roomId,
-    int imageOrder,          // 0, 1, 2, 3 순서
     String imageUrl,
     List<String> personIds,
     String backgroundType,   // "solid" 또는 "prompt"
