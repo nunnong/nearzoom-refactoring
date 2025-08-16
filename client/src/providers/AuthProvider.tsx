@@ -18,31 +18,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   })
 
   useEffect(() => {
-    // 앱 시작 시 저장된 토큰으로 인증 상태 복원
-    const initializeAuth = async () => {
-      setLoading(true)
-      try {
-        const savedToken = tokenStorage.get()
-        if (savedToken) {
-          setTokens({ accessToken: savedToken })
-
-          // 저장된 토큰으로 사용자 정보 가져오기
-          try {
-            const userInfo = await userService.getUserInfo()
-            setUser(userInfo.data)
-          } catch (error) {
-            // 토큰이 유효하지 않은 경우
-            tokenStorage.remove()
-            setTokens({ accessToken: null })
-          }
-        }
-      } catch (error) {
-        console.error('Auth initialization failed:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
+    // 앱 시작 시 인증 상태 초기화
     initializeAuth()
   }, [initializeAuth])
 

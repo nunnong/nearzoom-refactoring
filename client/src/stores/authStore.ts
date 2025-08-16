@@ -142,3 +142,17 @@ export const useAuthStore = create<AuthState & AuthActions>()(
     }
   )
 )
+
+// axios interceptor에서 발생하는 이벤트 리스너 등록
+if (typeof window !== 'undefined') {
+  // 토큰 갱신 이벤트 처리
+  window.addEventListener('token-refreshed', (event: any) => {
+    const { accessToken } = event.detail
+    useAuthStore.getState().setTokens({ accessToken })
+  })
+
+  // 로그아웃 이벤트 처리  
+  window.addEventListener('auth-logout', () => {
+    useAuthStore.getState().clearTokens()
+  })
+}

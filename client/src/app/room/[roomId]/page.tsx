@@ -28,6 +28,7 @@ export default function RoomTestSocialPage() {
 
   // 인증 상태 확인
   useEffect(() => {
+    // 인증 로딩 중이면 대기
     if (authLoading) return
 
     // 1. 로그인되지 않은 경우
@@ -42,11 +43,17 @@ export default function RoomTestSocialPage() {
       return
     }
 
-    // 2. 로그인된 상태라면 무조건 참조사진 모달 표시
+    // 2. 로그인은 되었지만 user 정보가 아직 없으면 대기
+    if (!user) {
+      console.log('⏳ 사용자 정보 로딩 중...')
+      return
+    }
+
+    // 3. 로그인된 상태이고 user 정보도 있으면 참조사진 모달 표시
     console.log('✅ 로그인됨 - 참조사진 모달 표시')
     setPageState('photo_upload')
     setShowPhotoModal(true)
-  }, [authLoading, isAuthenticated, roomId, router])
+  }, [authLoading, isAuthenticated, user, roomId, router])
 
   // 방 참가 로직
   const handleRoomJoin = async () => {
