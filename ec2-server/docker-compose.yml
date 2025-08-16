@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  ws-server:
+    build: ./ws-server
+    container_name: ws_server
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0
+    restart: unless-stopped
+    networks:
+      - web
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: nginx_proxy
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - ws-server
+    restart: unless-stopped
+    networks:
+      - web
+      - nearzoom
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  web:
+    driver: bridge
+    external: false
+  nearzoom:
+    external: true
+    name: nearzoom_default
