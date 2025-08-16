@@ -110,16 +110,16 @@ const timelineAPI = {
   // 🔥 GET /feeds/timeline?limit=20&cursor=123 - 팔로잉하는 사용자들의 최신 게시물들 조회
   getTimelinePosts: async (limit: number = 20, cursor?: number): Promise<PostListResponse> => {
     console.log('🔥 API 요청 - GET /feeds/timeline', { limit, cursor });
-    
+
     const params: Record<string, any> = { limit };
     if (cursor) params.cursor = cursor;
 
     const response = await api.get<ApiResponse<PostListResponse>>('/feeds/timeline', { params });
-    
+
     if (response.data.error) {
       throw new Error(response.data.message || '타임라인을 불러올 수 없습니다.');
     }
-    
+
     console.log('🔥 API 응답 - 타임라인:', response.data.data);
     return response.data.data;
   },
@@ -127,16 +127,16 @@ const timelineAPI = {
   // 🔥 GET /feeds/explore?limit=20&cursor=123 - 모든 사용자의 게시물 랜덤 조회
   getExplorePosts: async (limit: number = 20, cursor?: number): Promise<PostListResponse> => {
     console.log('🔥 API 요청 - GET /feeds/explore', { limit, cursor });
-    
+
     const params: Record<string, any> = { limit };
     if (cursor) params.cursor = cursor;
 
     const response = await api.get<ApiResponse<PostListResponse>>('/feeds/explore', { params });
-    
+
     if (response.data.error) {
       throw new Error(response.data.message || '탐색 피드를 불러올 수 없습니다.');
     }
-    
+
     console.log('🔥 API 응답 - 탐색 피드:', response.data.data);
     return response.data.data;
   },
@@ -144,40 +144,40 @@ const timelineAPI = {
   // 🔥 POST /likes/posts/{postId} - 게시물에 좋아요
   likePost: async (postId: number): Promise<void> => {
     console.log('🔥 API 요청 - POST /likes/posts/' + postId);
-    
+
     const response = await api.post<ApiResponse<void>>(`/likes/posts/${postId}`);
-    
+
     if (response.data.error) {
       throw new Error(response.data.message || '좋아요에 실패했습니다.');
     }
-    
+
     console.log('🔥 API 응답 - 좋아요 성공');
   },
 
   // 🔥 DELETE /likes/posts/{postId} - 게시물 좋아요 취소
   unlikePost: async (postId: number): Promise<void> => {
     console.log('🔥 API 요청 - DELETE /likes/posts/' + postId);
-    
+
     const response = await api.delete<ApiResponse<void>>(`/likes/posts/${postId}`);
-    
+
     if (response.data.error) {
       throw new Error(response.data.message || '좋아요 취소에 실패했습니다.');
     }
-    
+
     console.log('🔥 API 응답 - 좋아요 취소 성공');
   },
 
   // 🔥 GET /likes/posts/{postId}/count - 게시물 좋아요 수 조회
   getLikeCount: async (postId: number): Promise<number> => {
     console.log('🔥 API 요청 - GET /likes/posts/' + postId + '/count');
-    
+
     const response = await api.get<ApiResponse<number>>(`/likes/posts/${postId}/count`);
-    
+
     if (response.data.error) {
       console.warn('좋아요 수 조회 실패:', response.data.message);
       return 0;
     }
-    
+
     console.log('🔥 API 응답 - 좋아요 수:', response.data.data);
     return response.data.data;
   },
@@ -206,7 +206,7 @@ const formatTimeAgo = (dateString: string): string => {
   if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}분 전`;
   if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}시간 전`;
   if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}일 전`;
-  
+
   return date.toLocaleDateString('ko-KR');
 };
 
@@ -247,11 +247,11 @@ function InfiniteScrollTimeline({
   type = 'explore'
 }: InfiniteScrollTimelineProps): React.ReactElement {
   const router = useRouter();
-  
+
   // ============================================================================
   // 상태 관리
   // ============================================================================
-  
+
   const [posts, setPosts] = useState<TimelinePost[]>([]);
   const [loading, setLoading] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -265,9 +265,9 @@ function InfiniteScrollTimeline({
 
   const handleError = useCallback((err: unknown, context: string) => {
     console.error(`Error in ${context}:`, err);
-    
+
     let errorMessage = '알 수 없는 오류가 발생했습니다.';
-    
+
     if (err instanceof Error) {
       if (err.message.includes('401') || err.message.includes('Unauthorized')) {
         errorMessage = '로그인이 필요합니다.';
@@ -279,7 +279,7 @@ function InfiniteScrollTimeline({
         errorMessage = err.message;
       }
     }
-    
+
     setError(errorMessage);
   }, []);
 
@@ -295,14 +295,14 @@ function InfiniteScrollTimeline({
 
     try {
       console.log(`🔥 ${type} 초기 로드 시작`);
-      
-      const apiCall = type === 'timeline' 
+
+      const apiCall = type === 'timeline'
         ? timelineAPI.getTimelinePosts(20)
         : timelineAPI.getExplorePosts(20);
-      
+
       const postsData = await apiCall;
       const convertedPosts = postsData.posts.map(post => convertPostForTimeline(post, type));
-      
+
       console.log(`🔥 ${type} 초기 로드 완료:`, {
         count: convertedPosts.length,
         hasNext: postsData.hasNext,
@@ -312,7 +312,7 @@ function InfiniteScrollTimeline({
       setPosts(convertedPosts);
       setHasMore(postsData.hasNext);
       setNextCursor(postsData.nextCursor);
-      
+
     } catch (err) {
       console.error(`❌ ${type} 초기 로드 실패:`, err);
       handleError(err, `${type} 초기 로드`);
@@ -331,14 +331,14 @@ function InfiniteScrollTimeline({
 
     try {
       console.log(`🔥 ${type} 추가 로드 시작 (커서: ${nextCursor})`);
-      
-      const apiCall = type === 'timeline' 
+
+      const apiCall = type === 'timeline'
         ? timelineAPI.getTimelinePosts(20, nextCursor)
         : timelineAPI.getExplorePosts(20, nextCursor);
-      
+
       const newPostsData = await apiCall;
       const newConvertedPosts = newPostsData.posts.map(post => convertPostForTimeline(post, type));
-      
+
       console.log(`🔥 ${type} 추가 로드 완료:`, {
         newCount: newConvertedPosts.length,
         totalCount: posts.length + newConvertedPosts.length,
@@ -349,10 +349,10 @@ function InfiniteScrollTimeline({
       if (newConvertedPosts.length > 0) {
         setPosts(prev => [...prev, ...newConvertedPosts]);
       }
-      
+
       setHasMore(newPostsData.hasNext);
       setNextCursor(newPostsData.nextCursor);
-      
+
     } catch (err) {
       console.error(`❌ ${type} 추가 로드 실패:`, err);
       handleError(err, `${type} 추가 로드`);
@@ -382,24 +382,24 @@ function InfiniteScrollTimeline({
 
     const wasLiked = post.isLikedByMe;
     const originalLikeCount = post.likeCount;
-    
+
     // 낙관적 업데이트
     const newLikeCount = wasLiked ? originalLikeCount - 1 : originalLikeCount + 1;
-    
-    setPosts(prevPosts => prevPosts.map(p => 
-      p.postId === postId 
-        ? { 
-            ...p, 
-            isLikedByMe: !wasLiked, 
-            likeCount: newLikeCount,
-            formattedLikeCount: formatLikeCount(newLikeCount)
-          }
+
+    setPosts(prevPosts => prevPosts.map(p =>
+      p.postId === postId
+        ? {
+          ...p,
+          isLikedByMe: !wasLiked,
+          likeCount: newLikeCount,
+          formattedLikeCount: formatLikeCount(newLikeCount)
+        }
         : p
     ));
 
     try {
       console.log(`🔥 좋아요 토글 시작:`, { postId, wasLiked });
-      
+
       // 🔥 실제 백엔드 API 호출
       await timelineAPI.toggleLike(postId, wasLiked);
 
@@ -408,13 +408,13 @@ function InfiniteScrollTimeline({
       // 🔥 실제 좋아요 수 동기화 (선택적)
       try {
         const actualLikeCount = await timelineAPI.getLikeCount(postId);
-        setPosts(prevPosts => prevPosts.map(p => 
-          p.postId === postId 
-            ? { 
-                ...p, 
-                likeCount: actualLikeCount,
-                formattedLikeCount: formatLikeCount(actualLikeCount)
-              }
+        setPosts(prevPosts => prevPosts.map(p =>
+          p.postId === postId
+            ? {
+              ...p,
+              likeCount: actualLikeCount,
+              formattedLikeCount: formatLikeCount(actualLikeCount)
+            }
             : p
         ));
         console.log(`🔥 좋아요 수 동기화 완료:`, { postId, actualLikeCount });
@@ -424,21 +424,21 @@ function InfiniteScrollTimeline({
 
     } catch (error) {
       console.error('❌ 좋아요 토글 실패:', error);
-      
+
       // 실패 시 롤백
-      setPosts(prevPosts => prevPosts.map(p => 
-        p.postId === postId 
-          ? { 
-              ...p, 
-              isLikedByMe: wasLiked, 
-              likeCount: originalLikeCount,
-              formattedLikeCount: formatLikeCount(originalLikeCount)
-            }
+      setPosts(prevPosts => prevPosts.map(p =>
+        p.postId === postId
+          ? {
+            ...p,
+            isLikedByMe: wasLiked,
+            likeCount: originalLikeCount,
+            formattedLikeCount: formatLikeCount(originalLikeCount)
+          }
           : p
       ));
-      
+
       handleError(error, '좋아요 토글');
-      
+
       // 3초 후 에러 메시지 제거
       setTimeout(() => setError(null), 3000);
     }
@@ -471,7 +471,7 @@ function InfiniteScrollTimeline({
   }, [toggleLike]);
 
   const handleUserClick = useCallback((accountName: string) => {
-    router.push(`/@${accountName}`); // accountName 기반 라우팅
+    router.push(`/profile/${accountName}`); // ✅ Timeline과 동일한 패턴
   }, [router]);
 
   const handlePhotoClick = useCallback((postId: string) => {
@@ -550,7 +550,7 @@ function InfiniteScrollTimeline({
             {type === 'timeline' ? '타임라인이 비어있어요' : '탐색할 피드가 없어요'}
           </h3>
           <p className="mt-2 text-gray-500 max-w-md mx-auto">
-            {type === 'timeline' 
+            {type === 'timeline'
               ? '다른 사용자들을 팔로우해서 그들의 최신 업데이트를 확인해보세요!'
               : '새로운 피드가 곧 업데이트될 예정입니다.'
             }
@@ -601,8 +601,8 @@ function InfiniteScrollTimeline({
           </button>
         </div>
         <p className="text-gray-600 mt-2">
-          {type === 'timeline' 
-            ? '팔로우한 친구들의 최신 업데이트' 
+          {type === 'timeline'
+            ? '팔로우한 친구들의 최신 업데이트'
             : '새로운 사람들과 콘텐츠 탐색'
           }
         </p>
@@ -650,8 +650,8 @@ function InfiniteScrollTimeline({
       {!hasMore && posts.length > 0 && (
         <div className="text-center py-8 border-t border-gray-200 mt-8">
           <p className="text-gray-500">
-            {type === 'timeline' 
-              ? '모든 포스트를 확인했습니다! 🎉' 
+            {type === 'timeline'
+              ? '모든 포스트를 확인했습니다! 🎉'
               : '모든 피드를 탐색했습니다! 🎉'
             }
           </p>
@@ -699,7 +699,7 @@ function InfiniteScrollTimeline({
 // ============================================================================
 
 export const convertPostResponseToTimelinePost = (
-  post: PostResponse, 
+  post: PostResponse,
   type: 'timeline' | 'explore'
 ): TimelinePost => {
   return convertPostForTimeline(post, type);
@@ -721,13 +721,13 @@ export const useTimelinePosts = (type: 'timeline' | 'explore' = 'explore') => {
     setError(null);
 
     try {
-      const apiCall = type === 'timeline' 
+      const apiCall = type === 'timeline'
         ? timelineAPI.getTimelinePosts(20, cursor)
         : timelineAPI.getExplorePosts(20, cursor);
-      
+
       const postsData = await apiCall;
       const convertedPosts = postsData.posts.map(post => convertPostForTimeline(post, type));
-      
+
       if (cursor) {
         // 추가 로드
         setPosts(prev => [...prev, ...convertedPosts]);
@@ -735,10 +735,10 @@ export const useTimelinePosts = (type: 'timeline' | 'explore' = 'explore') => {
         // 초기 로드
         setPosts(convertedPosts);
       }
-      
+
       setHasMore(postsData.hasNext);
       setNextCursor(postsData.nextCursor);
-      
+
       return convertedPosts;
 
     } catch (err) {
@@ -764,8 +764,8 @@ export const useTimelinePosts = (type: 'timeline' | 'explore' = 'explore') => {
   }, [loadPosts]);
 
   const updatePost = useCallback((postId: number, updates: Partial<TimelinePost>) => {
-    setPosts(prev => prev.map(post => 
-      post.postId === postId 
+    setPosts(prev => prev.map(post =>
+      post.postId === postId
         ? { ...post, ...updates }
         : post
     ));
@@ -788,7 +788,7 @@ export const useTimelinePosts = (type: 'timeline' | 'explore' = 'explore') => {
 
     try {
       await timelineAPI.toggleLike(postId, wasLiked);
-      
+
       // 실제 좋아요 수 동기화
       const actualLikeCount = await timelineAPI.getLikeCount(postId);
       updatePost(postId, {

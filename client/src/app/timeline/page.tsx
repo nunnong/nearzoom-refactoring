@@ -1,4 +1,4 @@
-// src/app/timeline/page.tsx - 올바른 아키텍처 적용
+// src/app/timeline/page.tsx - 통일된 네비게이션 바 적용
 
 'use client'
 
@@ -16,7 +16,6 @@ import {
   ShareIcon,
   EllipsisHorizontalIcon,
   ExclamationTriangleIcon,
-  PlusIcon,
   UserPlusIcon,
   ArrowUpIcon,
   CogIcon
@@ -31,6 +30,12 @@ import {
 
 // 🏗️ 올바른 아키텍처: 통합된 api 인스턴스 사용
 import api from '@/lib/axios'
+
+// 🏗️ 올바른 아키텍처: 타임라인 API 사용
+import { getFollowingTimeline, toggleTimelinePostLike } from '@/lib/api/timeline'
+
+// 🏗️ 올바른 아키텍처: 타입들 import
+import type { PostCardForUI, CursorPostsResult, PostResponse } from '@/lib/types/feed'
 
 // 🏗️ 올바른 아키텍처: Zustand 스토어 사용
 import { useAuthStore } from '@/stores/authStore'
@@ -69,35 +74,6 @@ const LoadingSpinner = ({ size = 'md', className = '', text }: {
 // 🔥 백엔드 타입 정의 (정확한 API 응답 구조)
 // ============================================================================
 
-// 백엔드 ApiResponse 표준 형식
-interface ApiResponse<T> {
-  error: boolean;
-  message: string | null;
-  data: T | null;
-}
-
-// 🔥 백엔드 PostResponse 타입 (FeedController에서 반환)
-interface PostResponse {
-  postId: number;
-  photoId: number;
-  imgUrl: string;
-  caption: string;
-  displayOrder: number | null;
-  createdAt: string;
-  likeCount: number;
-  isLikedByMe: boolean;
-  authorId: number;
-  authorAccountName: string;
-  authorProfileImage: string | null;
-}
-
-// 🔥 백엔드 PostListResponse 타입 (커서 기반 무한스크롤)
-interface PostListResponse {
-  posts: PostResponse[];
-  hasNext: boolean;
-  nextCursor: number | null;
-}
-
 // 🔥 백엔드 사용자 정보 타입
 interface BackendUserInfo {
   userId: number;
@@ -107,94 +83,6 @@ interface BackendUserInfo {
   profileImage?: string;
   prettyFace?: string;
 }
-
-// ============================================================================
-// 🔥 백엔드 API 함수들 (올바른 아키텍처 적용)
-// ============================================================================
-
-const timelineAPI = {
-  // 🔥 GET /users/me - 현재 사용자 정보 조회
-  getCurrentUser: async (): Promise<BackendUserInfo> => {
-    const endpoints = ['/users/me', '/users/profile', '/auth/me'];
-
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`🔍 현재 사용자 정보 조회: ${endpoint}`);
-        
-        // 🏗️ 올바른 아키텍처: @/lib/axios 사용 (자동 토큰 처리)
-        const response = await api.get<ApiResponse<BackendUserInfo>>(endpoint);
-        
-        if (response.data.error) {
-          continue;
-        }
-        
-        if (!response.data.data) {
-          continue;
-        }
-        
-        console.log(`✅ 현재 사용자 정보 조회 성공: ${endpoint}`, response.data.data);
-        return response.data.data;
-        
-      } catch (error) {
-        console.warn(`❌ ${endpoint} 실패:`, error);
-        continue;
-      }
-    }
-
-    throw new Error('현재 사용자 정보를 가져올 수 없습니다.');
-  },
-
-  // 🔥 GET /feeds/timeline - 팔로잉 타임라인 조회 (커서 기반 무한스크롤)
-  getTimelinePosts: async (limit: number, cursor?: number): Promise<PostListResponse> => {
-    try {
-      console.log(`🔍 타임라인 조회: limit=${limit}, cursor=${cursor}`);
-      
-      const params: any = { limit };
-      if (cursor) {
-        params.cursor = cursor;
-      }
-      
-      // 🏗️ 올바른 아키텍처: @/lib/axios 사용 (자동 토큰 처리)
-      const response = await api.get<ApiResponse<PostListResponse>>(
-        '/feeds/timeline',
-        { params }
-      );
-      
-      if (response.data.error) {
-        throw new Error(response.data.message || '타임라인을 가져올 수 없습니다.');
-      }
-      
-      if (!response.data.data) {
-        throw new Error('타임라인 데이터가 없습니다.');
-      }
-      
-      console.log(`✅ 타임라인 조회 성공: posts=${response.data.data.posts.length}개, hasNext=${response.data.data.hasNext}, nextCursor=${response.data.data.nextCursor}`);
-      return response.data.data;
-    } catch (error) {
-      console.error('❌ 타임라인 조회 실패:', error);
-      throw error;
-    }
-  },
-
-  // 🔥 POST/DELETE /likes/posts/{postId} - 게시물 좋아요 토글
-  togglePostLike: async (postId: number, isCurrentlyLiked: boolean): Promise<void> => {
-    try {
-      console.log(`🔍 좋아요 ${isCurrentlyLiked ? '취소' : '추가'}: postId=${postId}`);
-      
-      // 🏗️ 올바른 아키텍처: @/lib/axios 사용 (자동 토큰 처리)
-      if (isCurrentlyLiked) {
-        await api.delete<ApiResponse<void>>(`/likes/posts/${postId}`);
-      } else {
-        await api.post<ApiResponse<void>>(`/likes/posts/${postId}`);
-      }
-      
-      console.log(`✅ 좋아요 ${isCurrentlyLiked ? '취소' : '추가'} 성공`);
-    } catch (error) {
-      console.error('❌ 좋아요 처리 실패:', error);
-      throw error;
-    }
-  }
-};
 
 // Timeline 컴포넌트
 const Timeline: React.FC = () => {
@@ -244,7 +132,7 @@ const Timeline: React.FC = () => {
   };
 
   // ============================================================================
-  // 🔥 백엔드 데이터 로딩
+  // 🔥 백엔드 데이터 로딩 (팔로잉한 사용자들의 게시물만)
   // ============================================================================
 
   const loadTimelinePosts = useCallback(async () => {
@@ -252,16 +140,39 @@ const Timeline: React.FC = () => {
       setLoading(prev => ({ ...prev, initial: true }));
       setError(null);
 
-      console.log('=== 타임라인 로딩 시작 ===');
+      console.log('=== 팔로잉 타임라인 로딩 시작 ===');
+      
+      // 🔥 인증 상태 디버깅
+      const { isAuthenticated, accessToken, user } = useAuthStore.getState();
+      console.log('🔐 인증 상태:', {
+        isAuthenticated,
+        hasToken: !!accessToken,
+        tokenLength: accessToken?.length || 0,
+        hasUser: !!user,
+        userId: user?.id
+      });
 
       const limit = getOptimalLimit();
-      const timelineData = await timelineAPI.getTimelinePosts(limit);
+      
+      // 🔥 올바른 API 함수 사용
+      const result = await getFollowingTimeline({ limit });
+      
+      if (!result.success) {
+        throw new Error(result.error || '타임라인을 불러오는데 실패했습니다.');
+      }
+      
+      if (!result.data) {
+        throw new Error('타임라인 데이터가 없습니다.');
+      }
+      
+      // 타입 안전성을 위한 null 체크
+      const timelineData = result.data;
       
       setPosts(timelineData.posts);
       setHasMore(timelineData.hasNext);
       setNextCursor(timelineData.nextCursor);
 
-      console.log('✅ 타임라인 로딩 완료:', {
+      console.log('✅ 팔로잉 타임라인 로딩 완료:', {
         postsCount: timelineData.posts.length,
         hasMore: timelineData.hasNext,
         nextCursor: timelineData.nextCursor,
@@ -269,25 +180,43 @@ const Timeline: React.FC = () => {
       });
 
     } catch (error: any) {
-      console.error('❌ 타임라인 로딩 실패:', error);
+      console.error('❌ 팔로잉 타임라인 로딩 실패:', error);
+      
+      // 🔥 더 자세한 에러 분석
+      console.error('🔍 Error details:', {
+        errorType: typeof error,
+        errorConstructor: error?.constructor?.name,
+        errorMessage: error?.message,
+        errorCode: error?.code,
+        errorStatus: error?.status,
+        isAxiosError: error?.isAxiosError,
+        hasResponse: !!error?.response,
+        hasRequest: !!error?.request,
+        errorKeys: Object.keys(error || {}),
+        errorValues: Object.values(error || {})
+      });
       
       // 백엔드 에러 메시지 처리
-      let errorMessage = '타임라인을 불러오는데 실패했습니다.';
+      let errorMessage = '팔로잉 타임라인을 불러오는데 실패했습니다.';
       
-      if (error.response?.status === 401) {
+      if (error?.response?.status === 401) {
         errorMessage = '로그인이 필요합니다.';
+        console.log('🔒 인증 에러 - 로그인 페이지로 이동');
         router.push('/login');
         return;
-      } else if (error.response?.status === 403) {
+      } else if (error?.response?.status === 403) {
         errorMessage = '타임라인에 접근할 권한이 없습니다.';
-      } else if (error.response?.status === 404) {
-        errorMessage = '타임라인 데이터를 찾을 수 없습니다.';
-      } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
+      } else if (error?.response?.status === 404) {
+        errorMessage = '팔로잉한 사용자가 없거나 게시물이 없습니다.';
       } else if (error?.message) {
         errorMessage = error.message;
+      } else if (error?.code === 'ERR_NETWORK') {
+        errorMessage = '네트워크 연결을 확인해주세요.';
+      } else if (error?.code === 'ECONNREFUSED') {
+        errorMessage = '서버에 연결할 수 없습니다.';
       }
       
+      console.error('🚨 최종 에러 메시지:', errorMessage);
       setError(errorMessage);
     } finally {
       setLoading(prev => ({ ...prev, initial: false }));
@@ -312,7 +241,20 @@ const Timeline: React.FC = () => {
       console.log('🔍 커서 기반 추가 게시물 로드:', { cursor: nextCursor });
 
       const limit = getOptimalLimit();
-      const moreData = await timelineAPI.getTimelinePosts(limit, nextCursor);
+      
+      // 🔥 올바른 API 함수 사용
+      const result = await getFollowingTimeline({ limit, cursor: nextCursor });
+      
+      if (!result.success) {
+        throw new Error(result.error || '추가 게시물을 불러오는데 실패했습니다.');
+      }
+      
+      if (!result.data) {
+        throw new Error('추가 게시물 데이터가 없습니다.');
+      }
+      
+      // 타입 안전성을 위한 null 체크
+      const moreData = result.data;
       
       setPosts(prev => [...prev, ...moreData.posts]);
       setHasMore(moreData.hasNext);
@@ -323,7 +265,7 @@ const Timeline: React.FC = () => {
     } catch (error: any) {
       console.error('❌ 추가 게시물 로드 실패:', error);
       
-      const errorMessage = error?.response?.data?.message || '추가 게시물을 불러오는데 실패했습니다.';
+      const errorMessage = error?.message || '추가 게시물을 불러오는데 실패했습니다.';
       
       // 토스트나 간단한 알림 표시 (alert 대신)
       if (window.confirm(`${errorMessage}\n다시 시도하시겠습니까?`)) {
@@ -339,7 +281,7 @@ const Timeline: React.FC = () => {
   // ============================================================================
 
   // 좋아요 토글
-  const handleLike = async (post: PostResponse) => {
+  const handleLike = async (post: PostCardForUI) => {
     try {
       // 낙관적 업데이트
       setPosts(prev => prev.map(p => 
@@ -352,37 +294,40 @@ const Timeline: React.FC = () => {
           : p
       ));
 
-      // 백엔드 API 호출
-      await timelineAPI.togglePostLike(post.postId, post.isLikedByMe);
+      // 🔥 올바른 API 함수 사용
+      const result = await toggleTimelinePostLike(post.postId, post.isLikedByMe);
+      
+      if (!result.success) {
+        // 실패 시 롤백
+        setPosts(prev => prev.map(p => 
+          p.postId === post.postId ? post : p
+        ));
+        throw new Error(result.error || '좋아요 처리에 실패했습니다.');
+      }
       
       console.log(`✅ 좋아요 ${post.isLikedByMe ? '취소' : '추가'} 완료: postId=${post.postId}`);
       
     } catch (error: any) {
       console.error('❌ 좋아요 처리 실패:', error);
       
-      // 실패 시 롤백
-      setPosts(prev => prev.map(p => 
-        p.postId === post.postId ? post : p
-      ));
-      
-      const errorMessage = error?.response?.data?.message || '좋아요 처리에 실패했습니다.';
+      const errorMessage = error?.message || '좋아요 처리에 실패했습니다.';
       alert(errorMessage);
     }
   };
 
   // 게시물 상세로 이동
-  const handlePostClick = (post: PostResponse) => {
+  const handlePostClick = (post: PostCardForUI) => {
     router.push(`/feeds/posts/${post.postId}`);
   };
 
   // 작성자 프로필로 이동
-  const handleAuthorClick = (post: PostResponse, event: React.MouseEvent) => {
+  const handleAuthorClick = (post: PostCardForUI, event: React.MouseEvent) => {
     event.stopPropagation();
     router.push(`/profile/${post.authorAccountName}`);
   };
 
   // 공유 기능
-  const handleShare = (post: PostResponse, event: React.MouseEvent) => {
+  const handleShare = (post: PostCardForUI, event: React.MouseEvent) => {
     event.stopPropagation();
     
     const shareUrl = `${window.location.origin}/feeds/posts/${post.postId}`;
@@ -423,7 +368,7 @@ const Timeline: React.FC = () => {
         <div className="text-center py-12">
           <LoadingSpinner 
             size="lg" 
-            text="타임라인을 불러오는 중..."
+            text="팔로잉 타임라인을 불러오는 중..."
           />
         </div>
       </div>
@@ -445,7 +390,7 @@ const Timeline: React.FC = () => {
               다시 시도
             </button>
             <button
-              onClick={() => router.push('/feeds/explore')}
+              onClick={() => router.push('/explore')}
               className="w-full px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
             >
               탐색 페이지로 이동
@@ -463,24 +408,18 @@ const Timeline: React.FC = () => {
           <div className="w-24 h-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-6">
             <HomeIcon className="h-12 w-12 text-gray-400" />
           </div>
-          <h3 className="text-xl font-medium text-gray-900 mb-2">타임라인이 비어있습니다</h3>
+          <h3 className="text-xl font-medium text-gray-900 mb-2">팔로잉 타임라인이 비어있습니다</h3>
           <p className="text-gray-500 mb-6">
-            팔로우하는 사용자가 없거나 아직 게시물이 없습니다.
+            팔로우하는 사용자가 없거나 아직 게시물이 없습니다.<br />
+            다른 사용자를 팔로우하여 타임라인을 채워보세요!
           </p>
           <div className="space-y-3">
             <button
-              onClick={() => router.push('/feeds/explore')}
+              onClick={() => router.push('/explore')}
               className="block w-full sm:w-auto sm:inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               <UserPlusIcon className="h-5 w-5 mr-2 inline" />
               다른 사용자 탐색하기
-            </button>
-            <button
-              onClick={() => router.push('/myroom')}
-              className="block w-full sm:w-auto sm:inline-block px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              <PlusIcon className="h-5 w-5 mr-2 inline" />
-              첫 게시물 만들기
             </button>
           </div>
         </div>
@@ -492,7 +431,7 @@ const Timeline: React.FC = () => {
     <div className="max-w-2xl mx-auto space-y-6">
       {/* 🔥 새로고침 버튼 */}
       <div className="flex justify-between items-center">
-        <h1 className="text-xl font-semibold text-gray-900">타임라인</h1>
+        <h1 className="text-xl font-semibold text-gray-900">팔로잉 타임라인</h1>
         <button
           onClick={handleRefresh}
           className="px-3 py-1.5 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
@@ -501,7 +440,7 @@ const Timeline: React.FC = () => {
         </button>
       </div>
 
-      {posts.map((post) => (
+      {(posts as PostCardForUI[]).map((post: PostCardForUI) => (
         <div key={post.postId} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
           {/* 🔥 게시물 헤더 (백엔드 작성자 정보) */}
           <div className="p-4 border-b border-gray-100">
@@ -639,7 +578,7 @@ const Timeline: React.FC = () => {
       {/* 🔥 더 이상 게시물이 없을 때 */}
       {!hasMore && posts.length > 0 && (
         <div className="text-center py-8 border-t border-gray-200">
-          <p className="text-gray-500 mb-4">모든 게시물을 확인했습니다!</p>
+          <p className="text-gray-500 mb-4">팔로잉한 모든 게시물을 확인했습니다!</p>
           <button
             onClick={handleRefresh}
             className="px-4 py-2 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
@@ -652,7 +591,7 @@ const Timeline: React.FC = () => {
       {/* 🔥 게시물 총계 정보 */}
       <div className="text-center py-4 border-t border-gray-200">
         <p className="text-sm text-gray-500">
-          총 <strong>{posts.length}</strong>개의 게시물
+          팔로잉 피드에서 <strong>{posts.length}</strong>개의 게시물
           {hasMore && <span className="ml-1">• 더 많은 게시물이 있습니다</span>}
           {nextCursor && <span className="ml-1">• 다음 커서: {nextCursor}</span>}
         </p>
@@ -679,7 +618,7 @@ const TimelinePage: React.FC = () => {
   const [currentUserInfo, setCurrentUserInfo] = useState<BackendUserInfo | null>(null);
 
   // ============================================================================
-  // 🔥 현재 사용자 정보 로드
+  // 🔥 현재 사용자 정보 로드 (백엔드에 API 없으므로 auth store만 사용)
   // ============================================================================
 
   useEffect(() => {
@@ -687,20 +626,17 @@ const TimelinePage: React.FC = () => {
       if (!isAuthenticated || !user) return;
 
       try {
-        const userInfo = await timelineAPI.getCurrentUser();
-        setCurrentUserInfo(userInfo);
+        // 백엔드에 사용자 정보 API가 없으므로 auth store 정보만 사용
+        console.log('백엔드에 사용자 정보 API가 없으므로 auth store 정보 사용');
+        setCurrentUserInfo({
+          userId: typeof user.id === 'string' ? parseInt(user.id) : user.id,
+          accountName: (user as any)?.accountName || user.email?.split('@')[0] || 'user',
+          userName: user.name || user.email || 'User',
+          userEmail: user.email || 'user@example.com',
+          profileImage: (user as any)?.profileImage,
+        });
       } catch (error) {
-        console.warn('현재 사용자 정보 로드 실패:', error);
-        // Fallback: authUser 정보 사용
-        if (user) {
-          setCurrentUserInfo({
-            userId: typeof user.id === 'string' ? parseInt(user.id) : user.id,
-            accountName: (user as any)?.accountName || user.email?.split('@')[0] || 'user',
-            userName: user.name || user.email || 'User',
-            userEmail: user.email || 'user@example.com',
-            profileImage: (user as any)?.profileImage,
-          });
-        }
+        console.warn('현재 사용자 정보 설정 실패:', error);
       }
     };
 
@@ -708,7 +644,7 @@ const TimelinePage: React.FC = () => {
   }, [isAuthenticated, user]);
 
   // ============================================================================
-  // 🔥 네비게이션 설정
+  // 🔥 통일된 네비게이션 설정
   // ============================================================================
 
   const navigationItems = [
@@ -717,12 +653,12 @@ const TimelinePage: React.FC = () => {
       href: '/timeline',
       icon: HomeIcon,
       activeIcon: HomeSolidIcon,
-      current: true,
+      current: true, // 현재 페이지
       showLabel: false
     },
     {
       name: 'Explore',
-      href: '/feeds/explore',
+      href: '/explore',
       icon: MagnifyingGlassIcon,
       activeIcon: MagnifyingGlassSolidIcon,
       current: false,
@@ -742,13 +678,19 @@ const TimelinePage: React.FC = () => {
       icon: CalendarIcon,
       activeIcon: CalendarSolidIcon,
       current: false,
-      showLabel: true
+      showLabel: false
     }
   ];
 
   // 네비게이션 핸들러
   const handleNavigation = (href: string) => {
     router.push(href);
+    setIsMobileMenuOpen(false);
+  };
+
+  // 로고 클릭 핸들러 (홈으로 이동)
+  const handleLogoClick = () => {
+    router.push('/');
     setIsMobileMenuOpen(false);
   };
 
@@ -789,7 +731,7 @@ const TimelinePage: React.FC = () => {
         <div className="text-center max-w-md mx-auto p-8">
           <UserIcon className="mx-auto h-16 w-16 text-gray-400 mb-4" />
           <h2 className="text-xl font-semibold text-gray-700 mb-2">로그인이 필요합니다</h2>
-          <p className="text-gray-500 mb-6">타임라인을 보려면 로그인해 주세요.</p>
+          <p className="text-gray-500 mb-6">팔로잉 타임라인을 보려면 로그인해 주세요.</p>
           <button
             onClick={() => router.push('/login')}
             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
@@ -803,14 +745,14 @@ const TimelinePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 🔥 네비게이션 헤더 */}
+      {/* 🔥 통일된 네비게이션 헤더 */}
       <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* 브랜드 */}
+            {/* 브랜드 - 로고 클릭 시 / 로 이동 */}
             <div className="flex items-center">
               <button
-                onClick={() => handleNavigation('/')}
+                onClick={handleLogoClick}
                 className="text-2xl font-bold text-blue-600 hover:text-blue-700 transition-colors"
               >
                 📖 NearZoom
@@ -934,6 +876,15 @@ const TimelinePage: React.FC = () => {
                   </button>
                 )
               })}
+
+              {/* 홈으로 가기 버튼 추가 */}
+              <button
+                onClick={handleLogoClick}
+                className="w-full text-left px-3 py-2 rounded-md text-base font-medium transition-colors flex items-center space-x-3 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+              >
+                <HomeIcon className="h-5 w-5" />
+                <span>Home</span>
+              </button>
             </div>
           </div>
         )}

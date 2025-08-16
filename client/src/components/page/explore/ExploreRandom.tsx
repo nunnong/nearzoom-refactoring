@@ -1,6 +1,4 @@
-// =============================================================================
-// 📁 ExploreRandom.tsx - 올바른 아키텍처 원칙 완전 준수
-// =============================================================================
+// src/components/page/explore/ExploreRandom.tsx - 올바른 라우팅 적용
 
 'use client'
 
@@ -453,14 +451,15 @@ const ExploreRandom: React.FC<ExploreRandomProps> = ({ className = '' }) => {
     setRefreshKey(prev => prev + 1);
   }, [isAuthenticated, accessToken]);
 
-  // 피드 클릭 - 게시물 상세 페이지로 이동
+  // 🔥 피드 클릭 - 게시물 상세 페이지로 이동 (올바른 경로로 수정)
   const handleFeedClick = useCallback((feed: ExploreFeed) => {
     console.log('=== 게시물 클릭 ===', { 
       postId: feed.postId, 
       authorName: feed.authorName,
       user: user?.accountName 
     });
-    router.push(`/post/${feed.postId}`);
+    // 🔥 올바른 경로로 수정: /feeds/posts/[id]
+    router.push(`/feeds/posts/${feed.postId}`);
   }, [router, user]);
 
   // 사용자 검색 결과 - 해당 사용자 프로필로 이동
@@ -469,7 +468,7 @@ const ExploreRandom: React.FC<ExploreRandomProps> = ({ className = '' }) => {
       accountName, 
       currentUser: user?.accountName 
     });
-    router.push(`/@${accountName}`);
+    router.push(`/profile/${accountName}`);
   }, [router, user]);
 
   // 작성자 클릭 - 사용자 프로필로 이동
@@ -478,7 +477,7 @@ const ExploreRandom: React.FC<ExploreRandomProps> = ({ className = '' }) => {
       authorId, 
       currentUser: user?.accountName 
     });
-    router.push(`/@${authorId}`);
+    router.push(`/profile/${authorId}`);
   }, [router, user]);
 
   // 🔥 좋아요 토글 핸들러 (로그인 필수)
@@ -585,9 +584,9 @@ const ExploreRandom: React.FC<ExploreRandomProps> = ({ className = '' }) => {
       <div className="mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">랜덤 탐색</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">탐색</h2>
             <p className="text-gray-600">
-              예상치 못한 놀라운 피드들을 발견해보세요
+              모든 사용자의 다양한 게시물을 발견해보세요
               {user && (
                 <span className="ml-2 text-sm text-blue-600">
                   • {user.accountName}님 환영합니다!
@@ -643,20 +642,20 @@ const ExploreRandom: React.FC<ExploreRandomProps> = ({ className = '' }) => {
         <div className="flex flex-col items-center justify-center py-20">
           <LoadingSpinner size="lg" />
           <p className="mt-4 text-gray-600">
-            새로운 피드들을 찾는 중...
-            {user && <span className="block text-sm text-gray-500 mt-1">{user.accountName}님을 위한 맞춤 피드</span>}
+            새로운 게시물들을 찾는 중...
+            {user && <span className="block text-sm text-gray-500 mt-1">{user.accountName}님을 위한 탐색 피드</span>}
           </p>
         </div>
       )}
 
-      {/* 랜덤 피드 그리드 */}
+      {/* 🔥 Masonry 그리드 - Instagram 스타일 */}
       {!isLoading && !error && feeds.length > 0 && (
         <div>
           {/* 통계 정보 */}
           <div className="mb-6 text-sm text-gray-500 flex items-center gap-4">
-            <span>총 {feeds.length}개의 피드</span>
+            <span>총 {feeds.length}개의 게시물</span>
             {hasNext && (
-              <span className="text-blue-600">• 더 많은 피드 로딩 가능</span>
+              <span className="text-blue-600">• 더 많은 게시물 로딩 가능</span>
             )}
             {user && (
               <span className="text-green-600">• {user.accountName}님 전용</span>
@@ -668,6 +667,9 @@ const ExploreRandom: React.FC<ExploreRandomProps> = ({ className = '' }) => {
             onPhotoClick={handleFeedClick}
             onAuthorClick={handleAuthorClick}
             onLikeToggle={handleLikeToggle}
+            hasNextPage={hasNext}
+            isLoadingMore={isLoadingMore}
+            totalCount={feeds.length}
           />
           
           {/* 무한스크롤 트리거 요소 */}
@@ -679,26 +681,26 @@ const ExploreRandom: React.FC<ExploreRandomProps> = ({ className = '' }) => {
               {isLoadingMore ? (
                 <div className="flex flex-col items-center">
                   <LoadingSpinner size="md" />
-                  <p className="mt-2 text-gray-600">더 많은 피드를 불러오는 중...</p>
+                  <p className="mt-2 text-gray-600">더 많은 게시물을 불러오는 중...</p>
                 </div>
               ) : (
                 <div className="text-gray-400 text-sm">
-                  스크롤하여 더 많은 피드 보기
+                  스크롤하여 더 많은 게시물 보기
                 </div>
               )}
             </div>
           )}
           
-          {/* 더 이상 로드할 피드가 없을 때 */}
+          {/* 더 이상 로드할 게시물이 없을 때 */}
           {!hasNext && feeds.length > 0 && (
             <div className="flex items-center justify-center py-8">
               <div className="text-center">
-                <p className="text-gray-500 text-sm">모든 피드를 확인했습니다!</p>
+                <p className="text-gray-500 text-sm">모든 게시물을 확인했습니다!</p>
                 <button
                   onClick={handleRefresh}
                   className="mt-2 px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors"
                 >
-                  새로운 피드 찾기
+                  새로운 게시물 찾기
                 </button>
               </div>
             </div>
@@ -711,7 +713,7 @@ const ExploreRandom: React.FC<ExploreRandomProps> = ({ className = '' }) => {
         <div className="flex flex-col items-center justify-center py-20">
           <div className="text-center">
             <MagnifyingGlassIcon className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900">피드를 찾을 수 없어요</h3>
+            <h3 className="mt-4 text-lg font-medium text-gray-900">게시물을 찾을 수 없어요</h3>
             <p className="mt-2 text-gray-500">새로고침 버튼을 눌러서 다시 시도해보세요!</p>
             <button
               onClick={handleRefresh}
@@ -746,7 +748,7 @@ const ExploreRandom: React.FC<ExploreRandomProps> = ({ className = '' }) => {
             <div>🔐 로그인 상태: {isAuthenticated ? '✅ 로그인됨' : '❌ 로그인 안됨'}</div>
             <div>🎫 액세스 토큰: {accessToken ? '✅ 있음' : '❌ 없음'}</div>
             <div>👤 사용자: {user?.accountName || '없음'}</div>
-            <div>📊 로드된 피드 수: {feeds.length}</div>
+            <div>📊 로드된 게시물 수: {feeds.length}</div>
             <div>📄 hasNext: {hasNext.toString()}</div>
             <div>🔗 nextCursor: {nextCursor || '없음'}</div>
             <div>⏳ isLoadingMore: {isLoadingMore.toString()}</div>
@@ -757,6 +759,7 @@ const ExploreRandom: React.FC<ExploreRandomProps> = ({ className = '' }) => {
             <div>🔧 올바른 아키텍처: ✅ api from '@/lib/axios'</div>
             <div>🔧 Axios 인터셉터: ✅ 토큰 자동 처리 + 갱신</div>
             <div>🏪 Zustand Store: ✅ 토큰 관리 + 자동 로그아웃</div>
+            <div>🔗 게시물 라우팅: /feeds/posts/[id]</div>
           </div>
         </div>
       )}

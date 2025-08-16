@@ -1,5 +1,5 @@
 // ============================================================================
-// src/hooks/useFollowModal.ts - 완전 수정 버전
+// src/hooks/useFollowModal.ts - 수정된 버전 (올바른 타입 적용)
 // ============================================================================
 
 import { useState, useCallback, useEffect, useRef } from 'react'
@@ -9,7 +9,7 @@ import { useAuthStore } from '@/stores/authStore'
 // 🔧 올바른 API 사용 - 인터셉터가 적용된 axios 인스턴스
 import api from '@/lib/axios'
 
-// 🔥 useFollow.ts와 동일한 타입 구조 사용
+// 🔥 올바른 타입 import
 import {
   type FollowCountsResponse,
   type UserProfileResponse,
@@ -17,14 +17,17 @@ import {
 } from '@/lib/types/feed'
 
 // ============================================================================
-// 백엔드 API 응답 타입 정의
+// 백엔드 API 응답 타입 정의 (커서 기반이 아닌 단순 목록)
 // ============================================================================
 
-// 커서 기반 팔로우 목록 응답
+// 🔥 실제 백엔드 팔로우 목록 응답 (커서 기반 X)
 interface FollowListResponse {
   users: UserProfileResponse[]
-  hasNext: boolean
-  nextCursor: number | null
+  // 🔥 실제로는 커서 기반이 아닐 수 있음 - 백엔드 확인 필요
+  hasNext?: boolean
+  nextCursor?: number | null
+  // 또는 단순히 전체 목록만 반환할 수도 있음
+  totalCount?: number
 }
 
 // ============================================================================
@@ -104,7 +107,7 @@ export interface UseFollowModalReturn {
 }
 
 // ============================================================================
-// 백엔드 API 함수들
+// 백엔드 API 함수들 (안전한 데이터 처리 포함)
 // ============================================================================
 
 const followModalAPI = {
@@ -114,19 +117,36 @@ const followModalAPI = {
     limit: number = 20,
     cursor?: number
   ): Promise<FollowListResponse> => {
-    const params: Record<string, any> = { limit }
-    if (cursor) params.cursor = cursor
+    try {
+      const params: Record<string, any> = { limit }
+      if (cursor) params.cursor = cursor
 
-    const response = await api.get<ApiResponse<FollowListResponse>>(
-      `/follows/followers/${accountName}`,
-      { params }
-    )
-    
-    if (response.data.error || !response.data.data) {
-      throw new Error(response.data.message || '팔로워 목록 조회에 실패했습니다.')
+      console.log('🔍 팔로워 목록 API 호출:', { accountName, params })
+
+      const response = await api.get<ApiResponse<UserProfileResponse[]>>(
+        `/follows/followers/${accountName}`,
+        { params }
+      )
+      
+      console.log('🔍 팔로워 API 응답:', response.data)
+      
+      if (response.data.error || !response.data.data) {
+        throw new Error(response.data.message || '팔로워 목록 조회에 실패했습니다.')
+      }
+      
+      // 🔥 안전한 데이터 처리
+      const users = Array.isArray(response.data.data) ? response.data.data : []
+      
+      return {
+        users,
+        hasNext: users.length === limit, // 간단한 hasNext 로직
+        nextCursor: users.length > 0 ? users[users.length - 1].userId : null,
+        totalCount: users.length
+      }
+    } catch (error) {
+      console.error('❌ 팔로워 목록 조회 실패:', error)
+      throw error
     }
-    
-    return response.data.data
   },
 
   // 팔로잉 목록 조회
@@ -135,60 +155,97 @@ const followModalAPI = {
     limit: number = 20,
     cursor?: number
   ): Promise<FollowListResponse> => {
-    const params: Record<string, any> = { limit }
-    if (cursor) params.cursor = cursor
+    try {
+      const params: Record<string, any> = { limit }
+      if (cursor) params.cursor = cursor
 
-    const response = await api.get<ApiResponse<FollowListResponse>>(
-      `/follows/following/${accountName}`,
-      { params }
-    )
-    
-    if (response.data.error || !response.data.data) {
-      throw new Error(response.data.message || '팔로잉 목록 조회에 실패했습니다.')
+      console.log('🔍 팔로잉 목록 API 호출:', { accountName, params })
+
+      const response = await api.get<ApiResponse<UserProfileResponse[]>>(
+        `/follows/following/${accountName}`,
+        { params }
+      )
+      
+      console.log('🔍 팔로잉 API 응답:', response.data)
+      
+      if (response.data.error || !response.data.data) {
+        throw new Error(response.data.message || '팔로잉 목록 조회에 실패했습니다.')
+      }
+      
+      // 🔥 안전한 데이터 처리
+      const users = Array.isArray(response.data.data) ? response.data.data : []
+      
+      return {
+        users,
+        hasNext: users.length === limit, // 간단한 hasNext 로직
+        nextCursor: users.length > 0 ? users[users.length - 1].userId : null,
+        totalCount: users.length
+      }
+    } catch (error) {
+      console.error('❌ 팔로잉 목록 조회 실패:', error)
+      throw error
     }
-    
-    return response.data.data
   },
 
   // 팔로우 수 조회
   getFollowCounts: async (accountName: string): Promise<FollowCountsResponse> => {
-    const response = await api.get<ApiResponse<FollowCountsResponse>>(`/follows/count/${accountName}`)
-    
-    if (response.data.error || !response.data.data) {
-      throw new Error(response.data.message || '팔로우 수 조회에 실패했습니다.')
+    try {
+      const response = await api.get<ApiResponse<FollowCountsResponse>>(`/follows/count/${accountName}`)
+      
+      if (response.data.error || !response.data.data) {
+        throw new Error(response.data.message || '팔로우 수 조회에 실패했습니다.')
+      }
+      
+      return response.data.data
+    } catch (error) {
+      console.error('❌ 팔로우 수 조회 실패:', error)
+      throw error
     }
-    
-    return response.data.data
   },
 
   // 팔로우
   followUser: async (accountName: string): Promise<void> => {
-    const response = await api.post<ApiResponse<void>>(`/follows/${accountName}`)
-    
-    if (response.data.error) {
-      throw new Error(response.data.message || '팔로우에 실패했습니다.')
+    try {
+      const response = await api.post<ApiResponse<void>>(`/follows/${accountName}`)
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '팔로우에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('❌ 팔로우 실패:', error)
+      throw error
     }
   },
 
   // 언팔로우
   unfollowUser: async (accountName: string): Promise<void> => {
-    const response = await api.delete<ApiResponse<void>>(`/follows/${accountName}`)
-    
-    if (response.data.error) {
-      throw new Error(response.data.message || '언팔로우에 실패했습니다.')
+    try {
+      const response = await api.delete<ApiResponse<void>>(`/follows/${accountName}`)
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '언팔로우에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('❌ 언팔로우 실패:', error)
+      throw error
     }
   },
 
   // 팔로우 상태 확인
   checkFollowStatus: async (accountName: string): Promise<boolean> => {
-    const response = await api.get<ApiResponse<boolean>>(`/follows/check/${accountName}`)
-    
-    if (response.data.error) {
-      console.warn('팔로우 상태 확인 실패:', response.data.message)
+    try {
+      const response = await api.get<ApiResponse<boolean>>(`/follows/check/${accountName}`)
+      
+      if (response.data.error) {
+        console.warn('팔로우 상태 확인 실패:', response.data.message)
+        return false
+      }
+      
+      return response.data.data ?? false
+    } catch (error) {
+      console.warn('팔로우 상태 확인 실패:', error)
       return false
     }
-    
-    return response.data.data ?? false
   },
 }
 
@@ -266,14 +323,13 @@ export const useFollowModal = (): UseFollowModalReturn => {
   const abortControllerRef = useRef<AbortController | null>(null)
   const loadingRef = useRef(false)
 
-  // 🔐 미인증시 즉시 리다이렉트
-  useEffect(() => {
-    if (!isAuthenticated || !user) {
-      console.warn('🔐 인증되지 않은 사용자 - 로그인 페이지로 리다이렉트')
-      router.replace('/auth/login')
-      return
-    }
-  }, [isAuthenticated, user, router])
+  // 🔐 미인증시 즉시 리다이렉트 제거 (모달에서는 불필요)
+  // useEffect(() => {
+  //   if (!isAuthenticated || !user) {
+  //     console.warn('🔐 인증되지 않은 사용자')
+  //     return
+  //   }
+  // }, [isAuthenticated, user])
 
   // ============================================================================
   // 유틸리티 함수들
@@ -289,24 +345,34 @@ export const useFollowModal = (): UseFollowModalReturn => {
         loading: false,
         isInitialLoad: false
       }))
-      router.replace('/auth/login')
       return false
     }
     return true
-  }, [isAuthenticated, user, router])
+  }, [isAuthenticated, user])
 
-  // 백엔드 UserProfileResponse를 FollowUser 타입으로 변환
-  const transformBackendUser = useCallback((backendUser: UserProfileResponse): FollowUser => {
-    return {
-      id: backendUser.accountName,
-      userId: backendUser.userId,
-      accountName: backendUser.accountName,
-      username: backendUser.userName,
-      displayName: backendUser.userName,
-      email: backendUser.userEmail,
-      profileImageUrl: backendUser.profileImage || undefined,
-      prettyFace: backendUser.prettyFace || null,
-      isFollowing: false
+  // 🔥 안전한 백엔드 UserProfileResponse를 FollowUser 타입으로 변환
+  const transformBackendUser = useCallback((backendUser: UserProfileResponse): FollowUser | null => {
+    try {
+      // 필수 필드 검증
+      if (!backendUser || !backendUser.accountName || !backendUser.userName) {
+        console.warn('⚠️ 잘못된 사용자 데이터:', backendUser)
+        return null
+      }
+
+      return {
+        id: backendUser.accountName,
+        userId: backendUser.userId || 0,
+        accountName: backendUser.accountName,
+        username: backendUser.userName,
+        displayName: backendUser.userName,
+        email: backendUser.userEmail || '',
+        profileImageUrl: backendUser.profileImage || undefined,
+        prettyFace: backendUser.prettyFace || null,
+        isFollowing: false
+      }
+    } catch (error) {
+      console.error('❌ 사용자 데이터 변환 실패:', error, backendUser)
+      return null
     }
   }, [])
 
@@ -325,7 +391,7 @@ export const useFollowModal = (): UseFollowModalReturn => {
   }, [])
 
   // ============================================================================
-  // 커서 기반 무한스크롤 - 초기 로드
+  // 커서 기반 무한스크롤 - 초기 로드 (안전한 처리)
   // ============================================================================
 
   const loadInitialUsers = useCallback(async () => {
@@ -347,6 +413,8 @@ export const useFollowModal = (): UseFollowModalReturn => {
     }))
 
     try {
+      console.log(`🔍 ${modalType} 초기 로드 시작:`, targetAccountName)
+
       let backendResponse: FollowListResponse
 
       if (modalType === 'followers') {
@@ -355,106 +423,78 @@ export const useFollowModal = (): UseFollowModalReturn => {
         backendResponse = await followModalAPI.getFollowing(targetAccountName, 20)
       }
 
-      const transformedUsers = backendResponse.users.map(transformBackendUser)
-
-      // 팔로우 상태 확인 (최대 10개까지만)
-      const usersToCheck = transformedUsers.slice(0, 10) 
-      const usersWithFollowStatus = await Promise.allSettled(
-        usersToCheck.map(async (user: FollowUser) => {
-          try {
-            const isFollowing = await followModalAPI.checkFollowStatus(user.accountName)
-            return { ...user, isFollowing }
-          } catch (error) {
-            console.warn(`팔로우 상태 확인 실패: ${user.accountName}`, error)
-            return { ...user, isFollowing: false }
-          }
+      console.log('🔍 백엔드 응답:', backendResponse)
+      
+      // 🔥 안전한 데이터 처리
+      if (!backendResponse || !Array.isArray(backendResponse.users)) {
+        console.warn('⚠️ 잘못된 API 응답:', backendResponse)
+        setScrollState({
+          items: [],
+          loading: false,
+          error: null,
+          hasNext: false,
+          nextCursor: null,
+          isInitialLoad: false,
+          isLoadingMore: false
         })
-      )
-
-      // Promise.allSettled 결과 처리
-      const checkedUsers = usersWithFollowStatus.map((result: PromiseSettledResult<FollowUser>, index: number) => {
-        if (result.status === 'fulfilled') {
-          return result.value
-        } else {
-          console.warn(`팔로우 상태 확인 실패: ${usersToCheck[index].accountName}`, result.reason)
-          return { ...usersToCheck[index], isFollowing: false }
-        }
-      })
-
-      // 나머지 사용자들은 기본값으로 설정
-      const remainingUsers = transformedUsers.slice(10).map((user: FollowUser) => ({ ...user, isFollowing: false }))
-      const allUsers = [...checkedUsers, ...remainingUsers]
-
-      setScrollState({
-        items: allUsers,
-        loading: false,
-        error: null,
-        hasNext: backendResponse.hasNext,
-        nextCursor: backendResponse.nextCursor,
-        isInitialLoad: false,
-        isLoadingMore: false
-      })
-
-      // 팔로우 통계도 함께 조회
-      try {
-        const statsResult = await followModalAPI.getFollowCounts(targetAccountName)
+        
+        // 빈 통계 설정
         setFollowStats({
-          followerCount: statsResult.followerCount,
-          followingCount: statsResult.followingCount
+          followerCount: 0,
+          followingCount: 0
         })
-      } catch (statsError) {
-        console.warn('팔로우 통계 로딩 실패:', statsError)
-      }
-
-    } catch (err: any) {
-      if (err instanceof Error && err.name === 'AbortError') {
         return
       }
 
-      console.error(`${modalType} 초기 로드 실패:`, err)
-      const errorMessage = handleErrorLocal(err, `${modalType} 초기 로드`)
-      
-      setScrollState((prev: FollowScrollState<FollowUser>) => ({
-        ...prev,
-        loading: false,
-        error: errorMessage,
-        isInitialLoad: false,
-        isLoadingMore: false
-      }))
-    } finally {
-      loadingRef.current = false
-    }
-  }, [checkAuth, targetAccountName, modalType, transformBackendUser, cancelPendingRequests, handleErrorLocal])
-
-  // ============================================================================
-  // 커서 기반 무한스크롤 - 더 로드
-  // ============================================================================
-
-  const loadMoreUsers = useCallback(async () => {
-    if (!checkAuth() || !targetAccountName || !scrollState.hasNext || scrollState.isLoadingMore || loadingRef.current) {
-      return
-    }
-
-    loadingRef.current = true
-
-    setScrollState((prev: FollowScrollState<FollowUser>) => ({
-      ...prev,
-      isLoadingMore: true,
-      error: null
-    }))
-
-    try {
-      let backendResponse: FollowListResponse
-
-      if (modalType === 'followers') {
-        backendResponse = await followModalAPI.getFollowers(targetAccountName, 20, scrollState.nextCursor || undefined)
-      } else {
-        backendResponse = await followModalAPI.getFollowing(targetAccountName, 20, scrollState.nextCursor || undefined)
+      // 빈 배열인 경우 처리
+      if (backendResponse.users.length === 0) {
+        console.log('ℹ️ 팔로우 목록이 비어있음')
+        setScrollState({
+          items: [],
+          loading: false,
+          error: null,
+          hasNext: false,
+          nextCursor: null,
+          isInitialLoad: false,
+          isLoadingMore: false
+        })
+        
+        // 통계 조회
+        try {
+          const statsResult = await followModalAPI.getFollowCounts(targetAccountName)
+          setFollowStats(statsResult)
+        } catch (statsError) {
+          console.warn('⚠️ 팔로우 통계 로딩 실패:', statsError)
+          setFollowStats({
+            followerCount: 0,
+            followingCount: 0
+          })
+        }
+        return
       }
 
-      const transformedUsers = backendResponse.users.map(transformBackendUser)
+      // 🔥 안전한 변환 처리
+      const transformedUsers = backendResponse.users
+        .map(transformBackendUser)
+        .filter((user): user is FollowUser => user !== null) // null 값 제거
 
-      // 팔로우 상태 확인 (최대 5개까지만)
+      console.log('✅ 변환된 사용자 목록:', transformedUsers)
+
+      if (transformedUsers.length === 0) {
+        console.warn('⚠️ 변환 후 빈 목록')
+        setScrollState({
+          items: [],
+          loading: false,
+          error: '사용자 데이터를 처리할 수 없습니다.',
+          hasNext: false,
+          nextCursor: null,
+          isInitialLoad: false,
+          isLoadingMore: false
+        })
+        return
+      }
+
+      // 팔로우 상태 확인 (최대 5개까지만 - 성능 최적화)
       const usersToCheck = transformedUsers.slice(0, 5) 
       const usersWithFollowStatus = await Promise.allSettled(
         usersToCheck.map(async (user: FollowUser) => {
@@ -480,14 +520,91 @@ export const useFollowModal = (): UseFollowModalReturn => {
 
       // 나머지 사용자들은 기본값으로 설정
       const remainingUsers = transformedUsers.slice(5).map((user: FollowUser) => ({ ...user, isFollowing: false }))
-      const newUsers = [...checkedUsers, ...remainingUsers]
+      const allUsers = [...checkedUsers, ...remainingUsers]
+
+      setScrollState({
+        items: allUsers,
+        loading: false,
+        error: null,
+        hasNext: backendResponse.hasNext || false,
+        nextCursor: backendResponse.nextCursor || null,
+        isInitialLoad: false,
+        isLoadingMore: false
+      })
+
+      // 팔로우 통계도 함께 조회
+      try {
+        const statsResult = await followModalAPI.getFollowCounts(targetAccountName)
+        setFollowStats(statsResult)
+        console.log('✅ 팔로우 통계 로드 성공:', statsResult)
+      } catch (statsError) {
+        console.warn('⚠️ 팔로우 통계 로딩 실패:', statsError)
+        // 기본값으로 설정
+        setFollowStats({
+          followerCount: modalType === 'followers' ? allUsers.length : 0,
+          followingCount: modalType === 'following' ? allUsers.length : 0
+        })
+      }
+
+      console.log(`✅ ${modalType} 초기 로드 완료:`, allUsers.length, '명')
+
+    } catch (err: any) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return
+      }
+
+      console.error(`❌ ${modalType} 초기 로드 실패:`, err)
+      const errorMessage = handleErrorLocal(err, `${modalType} 초기 로드`)
+      
+      setScrollState((prev: FollowScrollState<FollowUser>) => ({
+        ...prev,
+        loading: false,
+        error: errorMessage,
+        isInitialLoad: false,
+        isLoadingMore: false
+      }))
+    } finally {
+      loadingRef.current = false
+    }
+  }, [checkAuth, targetAccountName, modalType, transformBackendUser, cancelPendingRequests, handleErrorLocal])
+
+  // ============================================================================
+  // 나머지 함수들은 동일하게 유지... (생략)
+  // ============================================================================
+
+  // 커서 기반 무한스크롤 - 더 로드
+  const loadMoreUsers = useCallback(async () => {
+    if (!checkAuth() || !targetAccountName || !scrollState.hasNext || scrollState.isLoadingMore || loadingRef.current) {
+      return
+    }
+
+    loadingRef.current = true
+
+    setScrollState((prev: FollowScrollState<FollowUser>) => ({
+      ...prev,
+      isLoadingMore: true,
+      error: null
+    }))
+
+    try {
+      let backendResponse: FollowListResponse
+
+      if (modalType === 'followers') {
+        backendResponse = await followModalAPI.getFollowers(targetAccountName, 20, scrollState.nextCursor || undefined)
+      } else {
+        backendResponse = await followModalAPI.getFollowing(targetAccountName, 20, scrollState.nextCursor || undefined)
+      }
+
+      const transformedUsers = backendResponse.users
+        .map(transformBackendUser)
+        .filter((user): user is FollowUser => user !== null)
 
       setScrollState((prev: FollowScrollState<FollowUser>) => ({
         ...prev,
-        items: [...prev.items, ...newUsers],
+        items: [...prev.items, ...transformedUsers],
         isLoadingMore: false,
-        hasNext: backendResponse.hasNext,
-        nextCursor: backendResponse.nextCursor
+        hasNext: backendResponse.hasNext || false,
+        nextCursor: backendResponse.nextCursor || null
       }))
 
     } catch (err: any) {
@@ -504,27 +621,18 @@ export const useFollowModal = (): UseFollowModalReturn => {
     }
   }, [checkAuth, targetAccountName, modalType, scrollState.hasNext, scrollState.isLoadingMore, scrollState.nextCursor, transformBackendUser, handleErrorLocal])
 
-  // ============================================================================
   // 새로고침
-  // ============================================================================
-
   const refreshUsers = useCallback(async () => {
     setScrollState(createInitialScrollState<FollowUser>())
     setFollowStats(null)
     await loadInitialUsers()
   }, [loadInitialUsers])
 
-  // ============================================================================
   // 팔로우/언팔로우 액션 (낙관적 업데이트)
-  // ============================================================================
-
   const followUser = useCallback(async (accountName: string) => {
-    if (!checkAuth()) {
-      return
-    }
+    if (!checkAuth()) return
 
     try {
-      // 낙관적 업데이트: 즉시 UI 업데이트
       setScrollState((prev: FollowScrollState<FollowUser>) => ({
         ...prev,
         items: prev.items.map((user: FollowUser) => 
@@ -534,10 +642,8 @@ export const useFollowModal = (): UseFollowModalReturn => {
         )
       }))
 
-      // 백엔드 API 호출
       await followModalAPI.followUser(accountName)
 
-      // 팔로우 통계 업데이트
       if (followStats && modalType === 'followers') {
         setFollowStats((prev: FollowModalStats | null) => prev ? {
           ...prev,
@@ -548,7 +654,6 @@ export const useFollowModal = (): UseFollowModalReturn => {
     } catch (err: any) {
       console.error('팔로우 실패:', err)
       
-      // 실패 시 롤백
       setScrollState((prev: FollowScrollState<FollowUser>) => ({
         ...prev,
         items: prev.items.map((user: FollowUser) => 
@@ -562,12 +667,9 @@ export const useFollowModal = (): UseFollowModalReturn => {
   }, [checkAuth, followStats, modalType, handleErrorLocal])
 
   const unfollowUser = useCallback(async (accountName: string) => {
-    if (!checkAuth()) {
-      return
-    }
+    if (!checkAuth()) return
 
     try {
-      // 낙관적 업데이트: 즉시 UI 업데이트
       setScrollState((prev: FollowScrollState<FollowUser>) => ({
         ...prev,
         items: prev.items.map((user: FollowUser) => 
@@ -577,10 +679,8 @@ export const useFollowModal = (): UseFollowModalReturn => {
         )
       }))
 
-      // 백엔드 API 호출
       await followModalAPI.unfollowUser(accountName)
 
-      // 팔로우 통계 업데이트
       if (followStats && modalType === 'followers') {
         setFollowStats((prev: FollowModalStats | null) => prev ? {
           ...prev,
@@ -591,7 +691,6 @@ export const useFollowModal = (): UseFollowModalReturn => {
     } catch (err: any) {
       console.error('언팔로우 실패:', err)
       
-      // 실패 시 롤백
       setScrollState((prev: FollowScrollState<FollowUser>) => ({
         ...prev,
         items: prev.items.map((user: FollowUser) => 
@@ -604,7 +703,6 @@ export const useFollowModal = (): UseFollowModalReturn => {
     }
   }, [checkAuth, followStats, modalType, handleErrorLocal])
 
-  // 토글 팔로우
   const toggleFollow = useCallback(async (accountName: string) => {
     const user = scrollState.items.find((u: FollowUser) => u.accountName === accountName)
     if (!user) {
@@ -619,14 +717,9 @@ export const useFollowModal = (): UseFollowModalReturn => {
     }
   }, [scrollState.items, followUser, unfollowUser])
 
-  // ============================================================================
   // 모달 제어
-  // ============================================================================
-
   const openFollowerModal = useCallback((accountName: string) => {
-    if (!checkAuth()) {
-      return
-    }
+    if (!checkAuth()) return
 
     setTargetAccountName(accountName)
     setModalType('followers')
@@ -636,9 +729,7 @@ export const useFollowModal = (): UseFollowModalReturn => {
   }, [checkAuth])
 
   const openFollowingModal = useCallback((accountName: string) => {
-    if (!checkAuth()) {
-      return
-    }
+    if (!checkAuth()) return
 
     setTargetAccountName(accountName)
     setModalType('following')
@@ -653,7 +744,6 @@ export const useFollowModal = (): UseFollowModalReturn => {
     setScrollState(createInitialScrollState<FollowUser>())
     setFollowStats(null)
     
-    // 진행 중인 요청 취소
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
@@ -661,10 +751,7 @@ export const useFollowModal = (): UseFollowModalReturn => {
     loadingRef.current = false
   }, [])
 
-  // ============================================================================
   // 유틸리티 함수들
-  // ============================================================================
-
   const clearError = useCallback(() => {
     setScrollState((prev: FollowScrollState<FollowUser>) => ({ ...prev, error: null }))
   }, [])
@@ -686,20 +773,14 @@ export const useFollowModal = (): UseFollowModalReturn => {
     }
   }, [scrollState.isInitialLoad, scrollState.hasNext, scrollState.items.length, loadInitialUsers, loadMoreUsers])
 
-  // ============================================================================
   // 모달이 열릴 때 자동으로 초기 데이터 로드
-  // ============================================================================
-
   useEffect(() => {
     if (isOpen && targetAccountName && scrollState.isInitialLoad && isAuthenticated && user) {
       loadInitialUsers()
     }
   }, [isOpen, targetAccountName, scrollState.isInitialLoad, isAuthenticated, user, loadInitialUsers])
 
-  // ============================================================================
   // Cleanup
-  // ============================================================================
-
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {

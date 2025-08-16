@@ -1,4 +1,4 @@
-// src/app/profile/[userId]/page.tsx - 올바른 아키텍처 적용
+// src/app/profile/[userId]/page.tsx - 아키텍처 원칙 완전 준수
 
 'use client'
 
@@ -18,10 +18,10 @@ import {
 } from '@heroicons/react/24/outline'
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid'
 
-// 🏗️ 올바른 아키텍처: 통합된 api 인스턴스 사용
+// 🏗️ 아키텍처 원칙: 통합된 api 인스턴스 사용
 import api from '@/lib/axios'
 
-// 🏗️ 올바른 아키텍처: Zustand 스토어 사용
+// 🏗️ 아키텍처 원칙: Zustand 스토어 사용
 import { useAuthStore } from '@/stores/authStore'
 
 // LoadingSpinner 컴포넌트
@@ -109,42 +109,11 @@ interface UserProfileData extends BackendUserInfo {
 }
 
 // ============================================================================
-// 🔥 백엔드 API 함수들 (올바른 아키텍처 적용)
+// 🔥 백엔드 API 함수들 (아키텍처 원칙 완전 준수)
 // ============================================================================
 
 const userProfileAPI = {
-  // 🔥 GET /users/me - 현재 사용자 정보 조회
-  getCurrentUser: async (): Promise<BackendUserInfo> => {
-    const endpoints = ['/users/me', '/users/profile', '/auth/me'];
-
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`🔍 현재 사용자 정보 조회: ${endpoint}`);
-        
-        // 🏗️ 올바른 아키텍처: @/lib/axios 사용 (자동 토큰 처리)
-        const response = await api.get<ApiResponse<BackendUserInfo>>(endpoint);
-        
-        if (response.data.error) {
-          continue;
-        }
-        
-        if (!response.data.data) {
-          continue;
-        }
-        
-        console.log(`✅ 현재 사용자 정보 조회 성공: ${endpoint}`, response.data.data);
-        return response.data.data;
-        
-      } catch (error) {
-        console.warn(`❌ ${endpoint} 실패:`, error);
-        continue;
-      }
-    }
-
-    throw new Error('현재 사용자 정보를 가져올 수 없습니다.');
-  },
-
-  // 🔥 GET /feeds/users/account/{accountName} - 사용자 피드 조회 (커서 기반 무한스크롤)
+  // 🔥 GET /feeds/users/account/{accountName} - 사용자 피드 조회 (아키텍처 원칙: @/lib/axios 사용)
   getUserFeedWithPosts: async (accountName: string, limit: number = 20, cursor?: number): Promise<FeedWithPostsResponse> => {
     try {
       console.log(`🔍 사용자 피드 조회: ${accountName}, limit=${limit}, cursor=${cursor}`);
@@ -154,7 +123,7 @@ const userProfileAPI = {
         params.cursor = cursor;
       }
       
-      // 🏗️ 올바른 아키텍처: @/lib/axios 사용 (자동 토큰 처리)
+      // 🏗️ 아키텍처 원칙: @/lib/axios 사용 → 인터셉터 → Zustand 토큰 → 자동 갱신 → 백엔드
       const response = await api.get<ApiResponse<FeedWithPostsResponse>>(
         `/feeds/users/account/${accountName}`,
         { params }
@@ -176,12 +145,12 @@ const userProfileAPI = {
     }
   },
 
-  // 🔥 GET /follows/count/{accountName} - 팔로우 통계 조회
+  // 🔥 GET /follows/count/{accountName} - 팔로우 통계 조회 (아키텍처 원칙: @/lib/axios 사용)
   getFollowStats: async (accountName: string): Promise<FollowCountsResponse> => {
     try {
       console.log(`🔍 팔로우 통계 조회: ${accountName}`);
       
-      // 🏗️ 올바른 아키텍처: @/lib/axios 사용 (자동 토큰 처리)
+      // 🏗️ 아키텍처 원칙: @/lib/axios 사용 → 인터셉터 → Zustand 토큰 → 자동 갱신 → 백엔드
       const response = await api.get<ApiResponse<FollowCountsResponse>>(
         `/follows/count/${accountName}`
       );
@@ -202,12 +171,12 @@ const userProfileAPI = {
     }
   },
 
-  // 🔥 GET /follows/check/{accountName} - 팔로우 상태 확인
+  // 🔥 GET /follows/check/{accountName} - 팔로우 상태 확인 (아키텍처 원칙: @/lib/axios 사용)
   checkFollowStatus: async (accountName: string): Promise<boolean> => {
     try {
       console.log(`🔍 팔로우 상태 확인: ${accountName}`);
       
-      // 🏗️ 올바른 아키텍처: @/lib/axios 사용 (자동 토큰 처리)
+      // 🏗️ 아키텍처 원칙: @/lib/axios 사용 → 인터셉터 → Zustand 토큰 → 자동 갱신 → 백엔드
       const response = await api.get<ApiResponse<boolean>>(
         `/follows/check/${accountName}`
       );
@@ -225,12 +194,12 @@ const userProfileAPI = {
     }
   },
 
-  // 🔥 POST/DELETE /follows/{accountName} - 팔로우/언팔로우
+  // 🔥 POST/DELETE /follows/{accountName} - 팔로우/언팔로우 (아키텍처 원칙: @/lib/axios 사용)
   toggleFollow: async (accountName: string, isCurrentlyFollowing: boolean): Promise<void> => {
     try {
       console.log(`🔍 ${isCurrentlyFollowing ? '언팔로우' : '팔로우'}: ${accountName}`);
       
-      // 🏗️ 올바른 아키텍처: @/lib/axios 사용 (자동 토큰 처리)
+      // 🏗️ 아키텍처 원칙: @/lib/axios 사용 → 인터셉터 → Zustand 토큰 → 자동 갱신 → 백엔드
       if (isCurrentlyFollowing) {
         const response = await api.delete<ApiResponse<void>>(`/follows/${accountName}`);
         if (response.data.error) {
@@ -250,12 +219,12 @@ const userProfileAPI = {
     }
   },
 
-  // 🔥 POST/DELETE /likes/posts/{postId} - 게시물 좋아요 토글
+  // 🔥 POST/DELETE /likes/posts/{postId} - 게시물 좋아요 토글 (아키텍처 원칙: @/lib/axios 사용)
   togglePostLike: async (postId: number, isCurrentlyLiked: boolean): Promise<void> => {
     try {
       console.log(`🔍 좋아요 ${isCurrentlyLiked ? '취소' : '추가'}: postId=${postId}`);
       
-      // 🏗️ 올바른 아키텍처: @/lib/axios 사용 (자동 토큰 처리)
+      // 🏗️ 아키텍처 원칙: @/lib/axios 사용 → 인터셉터 → Zustand 토큰 → 자동 갱신 → 백엔드
       if (isCurrentlyLiked) {
         await api.delete<ApiResponse<void>>(`/likes/posts/${postId}`);
       } else {
@@ -269,7 +238,7 @@ const userProfileAPI = {
     }
   },
 
-  // 🔥 추가 게시물 로드 (커서 기반 무한스크롤)
+  // 🔥 추가 게시물 로드 (커서 기반 무한스크롤) - 아키텍처 원칙 준수
   loadMorePosts: async (accountName: string, cursor: number, limit: number = 20): Promise<PostResponse[]> => {
     try {
       const feedData = await userProfileAPI.getUserFeedWithPosts(accountName, limit, cursor);
@@ -285,7 +254,7 @@ const UserProfilePage: React.FC = () => {
   const router = useRouter()
   const params = useParams()
   
-  // 🏗️ 올바른 아키텍처: Zustand 스토어에서 인증 상태 관리
+  // 🏗️ 아키텍처 원칙: Zustand 스토어에서 인증 상태 관리
   const { user: currentUser, isLoading: authLoading, isAuthenticated } = useAuthStore()
   
   // ============================================================================
@@ -308,25 +277,21 @@ const UserProfilePage: React.FC = () => {
   const targetAccountName = params.userId as string
 
   // ============================================================================
-  // 🔥 본인 프로필 접근 시 /my로 리다이렉트
+  // 🔥 본인 프로필 접근 시 /my로 리다이렉트 (아키텍처 원칙 준수)
   // ============================================================================
   
   useEffect(() => {
     const checkSelfProfile = async () => {
-      if (isAuthenticated && currentUser) {
-        try {
-          const currentUserInfo = await userProfileAPI.getCurrentUser();
-          if (currentUserInfo.accountName === targetAccountName) {
-            router.push('/my');
-            return;
-          }
-        } catch (error) {
-          // 현재 사용자 정보 조회 실패 시 fallback
-          const currentAccountName = (currentUser as any)?.accountName || currentUser.email?.split('@')[0];
-          if (currentAccountName === targetAccountName) {
-            router.push('/my');
-            return;
-          }
+      if (isAuthenticated && currentUser && targetAccountName) {
+        // 🏗️ 아키텍처 원칙: Zustand 스토어의 사용자 정보 직접 활용 (API 호출 생략)
+        const currentAccountName = (currentUser as any)?.accountName || currentUser.email?.split('@')[0] || 'user';
+        
+        console.log('🔍 본인 프로필 체크:', { currentAccountName, targetAccountName });
+        
+        if (currentAccountName === targetAccountName) {
+          console.log('🔄 본인 프로필 접근 감지 - /my로 리다이렉트');
+          router.push('/my');
+          return;
         }
       }
     };
@@ -335,7 +300,7 @@ const UserProfilePage: React.FC = () => {
   }, [isAuthenticated, currentUser, targetAccountName, router]);
 
   // ============================================================================
-  // 🔥 데이터 로딩 함수들
+  // 🔥 데이터 로딩 함수들 (아키텍처 원칙 준수)
   // ============================================================================
 
   const loadUserProfile = useCallback(async () => {
@@ -386,11 +351,18 @@ const UserProfilePage: React.FC = () => {
     } catch (error: any) {
       console.error('❌ 사용자 프로필 로딩 실패:', error);
       
-      // 백엔드 에러 메시지 처리
+      // 🏗️ 아키텍처 원칙: 인터셉터에서 처리된 인증 오류 감지
       let errorMessage = '사용자 프로필을 불러오는데 실패했습니다.';
       
       if (error.response?.status === 401) {
         errorMessage = '로그인이 필요합니다.';
+        // 🏗️ 아키텍처 원칙: Zustand 스토어 통해 로그아웃 처리
+        try {
+          await useAuthStore.getState().logout();
+        } catch (logoutError) {
+          console.warn('로그아웃 처리 실패:', logoutError);
+          useAuthStore.getState().clearTokens();
+        }
         router.push('/login');
         return;
       } else if (error.response?.status === 403) {
@@ -411,19 +383,20 @@ const UserProfilePage: React.FC = () => {
 
   // 초기 데이터 로드
   useEffect(() => {
-    // 본인 프로필인 경우 로딩하지 않음 (리다이렉트됨)
-    if (isAuthenticated && currentUser) {
-      const currentAccountName = (currentUser as any)?.accountName || currentUser.email?.split('@')[0];
+    // 🏗️ 아키텍처 원칙: 본인 프로필인 경우 로딩하지 않음 (Zustand 스토어 활용)
+    if (isAuthenticated && currentUser && targetAccountName) {
+      const currentAccountName = (currentUser as any)?.accountName || currentUser.email?.split('@')[0] || 'user';
       if (currentAccountName === targetAccountName) {
+        console.log('🔄 본인 프로필 - 로딩 생략 (리다이렉트됨)');
         return;
       }
     }
 
     loadUserProfile();
-  }, [loadUserProfile]);
+  }, [loadUserProfile, isAuthenticated, currentUser, targetAccountName]);
 
   // ============================================================================
-  // 🔥 커서 기반 무한스크롤 - 추가 게시물 로드
+  // 🔥 커서 기반 무한스크롤 - 추가 게시물 로드 (아키텍처 원칙 준수)
   // ============================================================================
 
   const loadMorePosts = useCallback(async () => {
@@ -459,7 +432,7 @@ const UserProfilePage: React.FC = () => {
   }, [userProfile, hasMore, loading.loadMore, nextCursor]);
 
   // ============================================================================
-  // 🔥 이벤트 핸들러들
+  // 🔥 이벤트 핸들러들 (아키텍처 원칙 준수)
   // ============================================================================
 
   const handleBack = () => {
@@ -483,7 +456,7 @@ const UserProfilePage: React.FC = () => {
           : Math.max(0, prev.followersCount - 1)
       } : null);
 
-      // 백엔드 API 호출
+      // 백엔드 API 호출 (아키텍처 원칙: @/lib/axios 사용)
       await userProfileAPI.toggleFollow(userProfile.accountName, userProfile.isFollowing);
       
       console.log(`✅ ${userProfile.isFollowing ? '언팔로우' : '팔로우'} 완료: ${userProfile.accountName}`);
@@ -540,6 +513,7 @@ const UserProfilePage: React.FC = () => {
           : p
       ));
 
+      // 백엔드 API 호출 (아키텍처 원칙: @/lib/axios 사용)
       await userProfileAPI.togglePostLike(post.postId, post.isLikedByMe);
       
       console.log(`✅ 좋아요 ${post.isLikedByMe ? '취소' : '추가'} 완료: postId=${post.postId}`);
