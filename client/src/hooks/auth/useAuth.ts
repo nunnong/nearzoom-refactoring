@@ -6,6 +6,7 @@ import { userService } from '@/services/userService'
 import { userTransformer } from '@/lib/auth'
 import { useRoomStore } from '@/stores/roomStore'
 import { roomAPI } from '@/lib/api/room' // 🔥 방 API import
+import { EMAIL_LIST } from '@/constants'
 import type { SocialType } from '@/types/auth'
 
 interface Filter {
@@ -107,6 +108,15 @@ export const useAuth = () => {
     }
 
     if (isCreatingRoom) return // 중복 클릭 방지
+
+    // Lock 모드 체크
+    if (process.env.NEXT_PUBLIC_MODE === 'LOCK') {
+      const userEmail = user?.email
+      if (!userEmail || !EMAIL_LIST.includes(userEmail)) {
+        alert('현재 발표시간입니다. 시연이후 시도 해주세요')
+        return
+      }
+    }
 
     setIsCreatingRoom(true)
 
