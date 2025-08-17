@@ -26,9 +26,16 @@ export default function ColorPalette({
   onColorSelect,
   className = '',
 }: ColorPaletteProps) {
+  const handleHexChange = (value: string) => {
+    // HEX 유효성 검사 (3자리 또는 6자리)
+    if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(value)) {
+      onColorSelect(value)
+    }
+  }
+
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* 색상 선택 팔레트 */}
+      {/* 프리셋 색상 선택 팔레트 */}
       <div className="flex justify-center">
         <div className="grid grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
           {backgroundColors.map(color => (
@@ -46,6 +53,34 @@ export default function ColorPalette({
             />
           ))}
         </div>
+      </div>
+
+      {/* 구분선 */}
+      <div className="flex items-center">
+        <div className="flex-1 border-t border-gray-200" />
+        <span className="px-3 text-xs text-gray-500">또는</span>
+        <div className="flex-1 border-t border-gray-200" />
+      </div>
+      
+      {/* 커스텀 색상 선택 */}
+      <div className="flex items-center justify-center gap-3">
+        <label className="text-sm text-gray-600">커스텀:</label>
+        <input 
+          type="color" 
+          value={selectedColor}
+          onChange={(e) => onColorSelect(e.target.value)}
+          className="h-10 w-20 cursor-pointer rounded border border-gray-300"
+          title="색상 선택기"
+        />
+        <input
+          type="text"
+          value={selectedColor}
+          onChange={(e) => handleHexChange(e.target.value)}
+          placeholder="#000000"
+          className="w-24 px-2 py-1 border border-gray-300 rounded text-sm text-center"
+          pattern="^#[0-9A-Fa-f]{6}$"
+          title="HEX 색상 코드 입력"
+        />
       </div>
 
       {/* 선택된 색상 표시 */}

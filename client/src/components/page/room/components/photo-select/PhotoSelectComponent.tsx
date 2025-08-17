@@ -71,19 +71,20 @@ export default function PhotoSelectComponent({
     const photoCount = capturedPhotos.length
     console.log('📸 Available photo count:', photoCount)
     
-    if (photoCount >= 4) return 4
-    if (photoCount >= 2) return 2
-    if (photoCount >= 1) return 1
-    return 1 // 최소 1컷은 선택 가능하도록
-  }, [capturedPhotos.length])
+    // UI에서는 모든 옵션을 보여주되, 실제 제한은 PhotoPicker에서 처리
+    return 4 // 항상 4 반환하여 1컷, 2컷, 4컷 모두 선택 가능하게 함
+  }, [])
 
   // cutCount가 사용 가능한 사진 수를 초과하면 자동으로 조정
   useMemo(() => {
-    if (cutCount > maxAvailableCuts) {
-      console.log(`📸 Adjusting cutCount from ${cutCount} to ${maxAvailableCuts}`)
-      setCutCount(maxAvailableCuts)
+    const photoCount = capturedPhotos.length
+    // 실제 제한: 사진 수보다 많은 컷을 선택할 수 없음
+    if (cutCount > photoCount && photoCount > 0) {
+      const adjustedCut = photoCount >= 4 ? 4 : photoCount >= 2 ? 2 : 1
+      console.log(`📸 Adjusting cutCount from ${cutCount} to ${adjustedCut} (${photoCount} photos available)`)
+      setCutCount(adjustedCut)
     }
-  }, [cutCount, maxAvailableCuts, setCutCount])
+  }, [cutCount, capturedPhotos.length, setCutCount])
 
   // PhotoPicker를 위한 선택된 이미지 URL 배열 (로컬 상태)
   const [selectedImageUrls, setSelectedImageUrls] = useState<string[]>([])
@@ -116,7 +117,7 @@ export default function PhotoSelectComponent({
   // 컷수 변경 핸들러
   const handleCutCountChange = useCallback((count: number) => {
     setCutCount(count)
-    setSelectedImageUrls([]) // 로컬 선택 초기화
+    // 기존 선택 유지 - PhotoPicker가 자동으로 제한 처리
   }, [setCutCount])
 
   // PhotoPicker 선택 변경 핸들러
@@ -208,7 +209,8 @@ export default function PhotoSelectComponent({
                   <PhotoCutSelector 
                     cutCount={cutCount} 
                     onChange={handleCutCountChange}
-                    maxAvailable={maxAvailableCuts}
+                    maxAvailable={4}
+                    availablePhotos={capturedPhotos.length}
                   />
                 </div>
                 
