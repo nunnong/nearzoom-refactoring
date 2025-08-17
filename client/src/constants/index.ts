@@ -101,4 +101,6 @@ export const EMAIL_LIST = [
   'juyy99@gmail.com',
   'dnlwlgns1117@gmail.com',
   't25kwon@gmail.com',
+  'sojung0734@naver.com',
+  'jieun8764@gmail.com ',
 ]

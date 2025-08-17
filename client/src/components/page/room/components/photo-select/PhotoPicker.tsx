@@ -4,32 +4,22 @@ import Image from 'next/image'
 
 interface PhotoPickerProps {
   photos: string[]
-  cutCount: number
   selected: string[]
   onSelect: (selected: string[]) => void
 }
 
 export default function PhotoPicker({
   photos,
-  cutCount,
   selected,
   onSelect,
 }: PhotoPickerProps) {
-  // 실제 선택 가능한 최대 개수 (사진 수와 cutCount 중 작은 값)
-  const actualMaxSelection = Math.min(cutCount, photos.length)
-  
   const toggleSelect = (photo: string) => {
     let newSelected = [...selected]
     if (newSelected.includes(photo)) {
       newSelected = newSelected.filter(p => p !== photo)
     } else {
-      if (newSelected.length < actualMaxSelection) {
-        newSelected.push(photo)
-      } else {
-        // 최대 선택 개수에 도달하면 첫 번째 선택을 제거하고 새로운 것 추가
-        newSelected.shift()
-        newSelected.push(photo)
-      }
+      // 자유 선택 - 제한 없음
+      newSelected.push(photo)
     }
     onSelect(newSelected)
   }
@@ -42,20 +32,20 @@ export default function PhotoPicker({
   return (
     <div>
       <h3 className="mb-3 text-center text-lg font-semibold text-gray-800">
-        사진 선택 ({selected.length}/{actualMaxSelection})
+        사진 선택 ({selected.length}장 선택됨)
       </h3>
       
-      {/* 사진 부족 경고 메시지 */}
-      {cutCount > photos.length && photos.length > 0 && (
-        <div className="mb-4 rounded-lg bg-yellow-50 border border-yellow-200 p-3 text-center">
-          <p className="text-sm text-yellow-700">
-            📸 {cutCount}컷을 선택하려면 {cutCount}장의 사진이 필요하지만, 현재 {photos.length}장만 촬영되었습니다.
+      {/* 선택 안내 메시지 */}
+      <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 p-3 text-center">
+        <p className="text-sm text-blue-700">
+          📸 1장, 2장 또는 4장을 선택하세요.
+        </p>
+        {selected.length > 0 && ![1, 2, 4].includes(selected.length) && (
+          <p className="text-xs text-orange-600 mt-1">
+            현재 {selected.length}장 선택됨 - 유효한 개수가 아닙니다.
           </p>
-          <p className="text-xs text-yellow-600 mt-1">
-            최대 {photos.length}장까지 선택 가능합니다.
-          </p>
-        </div>
-      )}
+        )}
+      </div>
       
       <div className="grid grid-cols-2 gap-4">
         {photos.map((photo, idx) => {

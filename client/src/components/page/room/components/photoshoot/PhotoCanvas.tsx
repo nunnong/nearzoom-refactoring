@@ -105,14 +105,25 @@ export default function PhotoCanvas({
         const participantCount = existingIds.length + index
         console.log(`➕ Adding participant to canvas via Yjs: ${id}`)
 
+        // Grid layout calculation
+        const gridCols = 2
+        const col = participantCount % gridCols
+        const row = Math.floor(participantCount / gridCols)
+        
+        // Position calculation for 512x512 canvas
+        const videoWidth = 220
+        const videoHeight = 165 // 4:3 ratio
+        const spacingX = (canvasSize.width - (videoWidth * gridCols)) / (gridCols + 1)
+        const spacingY = (canvasSize.height - (videoHeight * Math.ceil((participantCount + 1) / gridCols))) / (Math.ceil((participantCount + 1) / gridCols) + 1)
+        
         updatedParticipants[id] = {
           id,
-          x: Math.random() * 200,
-          y: Math.random() * 200,
-          width: 320,
-          height: 240,
+          x: spacingX + col * (videoWidth + spacingX),
+          y: spacingY + row * (videoHeight + spacingY),
+          width: videoWidth,
+          height: videoHeight,
           rotation: 0,
-          scaleX: 1,
+          scaleX: -1, // Default mirror mode
           scaleY: 1,
           lastInteractionTime: Date.now(),
           aspectRatio: 4/3, // Default aspect ratio, will be updated when video loads
@@ -728,6 +739,9 @@ export default function PhotoCanvas({
                   width={currentTransform.width}
                   height={currentTransform.height}
                   rotation={currentTransform.rotation || 0}
+                  scaleX={currentTransform.scaleX || -1}
+                  scaleY={currentTransform.scaleY || 1}
+                  offsetX={currentTransform.scaleX && currentTransform.scaleX < 0 ? currentTransform.width : 0}
                   image={displayImage}
                   stroke={
                     selectedId === `video-${participantId}`
