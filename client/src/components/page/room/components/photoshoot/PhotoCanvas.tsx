@@ -482,12 +482,13 @@ export default function PhotoCanvas({
       const selectedNode = stage.findOne(`#${selectedId}`)
       if (selectedNode) {
         transformerRef.current.nodes([selectedNode])
-        transformerRef.current.getLayer()?.batchDraw()
+        // batchDraw 대신 draw() 한 번만 사용하여 성능 최적화
+        transformerRef.current.getLayer()?.draw()
       }
     } else if (transformerRef.current) {
       // 선택 해제 시 Transformer 제거
       transformerRef.current.nodes([])
-      transformerRef.current.getLayer()?.batchDraw()
+      transformerRef.current.getLayer()?.draw()
     }
   }, [selectedId])
 
@@ -738,6 +739,8 @@ export default function PhotoCanvas({
                     console.log(
                       `📹 Video clicked: ${participantId} - bringing to front`
                     )
+                    // 선택된 노드를 최상위로 이동
+                    e.target.moveToTop()
                     handleSelect(`video-${participantId}`)
                   }}
                   onDragEnd={e => {
@@ -810,9 +813,11 @@ export default function PhotoCanvas({
                         participants: updatedParticipants,
                       })
 
-                      // Transform 완료 후 스케일 리셋
-                      node.scaleX(1)
-                      node.scaleY(1)
+                      // Transform 완료 후 스케일 리셋 (다음 프레임에서 실행)
+                      requestAnimationFrame(() => {
+                        node.scaleX(1)
+                        node.scaleY(1)
+                      })
                     }
                   }}
                 />
