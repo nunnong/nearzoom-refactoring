@@ -123,7 +123,7 @@ export default function PhotoCanvas({
           width: videoWidth,
           height: videoHeight,
           rotation: 0,
-          scaleX: -1, // Default mirror mode (always)
+          scaleX: 1,
           scaleY: 1,
           lastInteractionTime: Date.now(),
           aspectRatio: 4/3, // Default aspect ratio, will be updated when video loads
@@ -322,6 +322,7 @@ export default function PhotoCanvas({
         video.muted = true
         video.playsInline = true
         video.style.display = 'none'
+        video.style.transform = 'scaleX(-1)'  // 거울모드 적용
 
         try {
           track.attach(video)
@@ -352,7 +353,7 @@ export default function PhotoCanvas({
                   width: baseWidth,
                   height: dynamicHeight,
                   aspectRatio: aspectRatio,
-                  scaleX: participants[participantId]?.scaleX || -1, // Always maintain mirror mode
+                  scaleX: participants[participantId]?.scaleX || 1,
                   scaleY: participants[participantId]?.scaleY || 1,
                   lastInteractionTime: Date.now(),
                 }
@@ -424,8 +425,12 @@ export default function PhotoCanvas({
       const ctx = canvas.getContext('2d', { willReadFrequently: true })
       if (!ctx) return
 
-      // 비디오 현재 프레임 그리기
+      // 비디오 현재 프레임 그리기 (거울모드 적용)
+      ctx.save()
+      ctx.scale(-1, 1)  // 수평 반전
+      ctx.translate(-canvas.width, 0)  // 위치 조정
       ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height)
+      ctx.restore()
 
       // 크로마키 처리
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
@@ -741,9 +746,8 @@ export default function PhotoCanvas({
                   width={currentTransform.width}
                   height={currentTransform.height}
                   rotation={currentTransform.rotation || 0}
-                  scaleX={currentTransform.scaleX || -1}
+                  scaleX={currentTransform.scaleX || 1}
                   scaleY={currentTransform.scaleY || 1}
-                  offsetX={currentTransform.scaleX && currentTransform.scaleX < 0 ? currentTransform.width : 0}
                   image={displayImage}
                   stroke={
                     selectedId === `video-${participantId}`
@@ -787,7 +791,7 @@ export default function PhotoCanvas({
                           width: currentTransform.width,
                           height: currentTransform.height,
                           rotation: currentTransform.rotation || 0,
-                          scaleX: participants[participantId]?.scaleX || -1, // Always maintain mirror mode
+                          scaleX: participants[participantId]?.scaleX || 1,
                           scaleY: participants[participantId]?.scaleY || 1,
                           lastInteractionTime: Date.now(),
                         },
@@ -802,18 +806,28 @@ export default function PhotoCanvas({
                     const scaleX = node.scaleX()
                     const scaleY = node.scaleY()
 
+                    // Use absolute value for size calculation (mirror mode fix)
+                    const absScaleX = Math.abs(scaleX)
+                    const absScaleY = Math.abs(scaleY)
+
+                    // Calculate new dimensions with absolute scale
+                    const newWidth = Math.max(
+                      50,
+                      (participants[participantId]?.width || 320) * absScaleX
+                    )
+                    const newHeight = Math.max(
+                      50,
+                      (participants[participantId]?.height || 240) * absScaleY
+                    )
+
                     console.log(`🔄 Video transformed: ${participantId}`, {
                       x: node.x(),
                       y: node.y(),
-                      width: Math.max(
-                        5,
-                        (participants[participantId]?.width || 320) * scaleX
-                      ),
-                      height: Math.max(
-                        5,
-                        (participants[participantId]?.height || 240) * scaleY
-                      ),
+                      width: newWidth,
+                      height: newHeight,
                       rotation: node.rotation(),
+                      scaleX: absScaleX,
+                      scaleY: absScaleY,
                     })
 
                     // Transform 완료 시 Yjs에 최종 상태 저장
@@ -825,17 +839,10 @@ export default function PhotoCanvas({
                           x: node.x(),
                           y: node.y(),
                           rotation: node.rotation(),
-                          width: Math.max(
-                            5,
-                            (participants[participantId]?.width || 320) * scaleX
-                          ),
-                          height: Math.max(
-                            5,
-                            (participants[participantId]?.height || 240) *
-                              scaleY
-                          ),
-                          scaleX: participants[participantId]?.scaleX || -1, // Always maintain mirror mode
-                          scaleY: participants[participantId]?.scaleY || 1,
+                          width: newWidth,
+                          height: newHeight,
+                          scaleX: 1,
+                          scaleY: 1,
                           lastInteractionTime: Date.now(),
                         },
                       }
@@ -845,8 +852,10 @@ export default function PhotoCanvas({
 
                       // Transform 완료 후 스케일 리셋 (거울모드 유지)
                       requestAnimationFrame(() => {
-                        node.scaleX(participants[participantId]?.scaleX || -1)
-                        node.scaleY(participants[participantId]?.scaleY || 1)
+                        node.scaleX(1)
+                        node.scaleY(1)
+                        node.width(newWidth)
+                        node.height(newHeight)
                       })
                     }
                   }}
