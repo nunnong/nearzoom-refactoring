@@ -62,13 +62,11 @@ function ScrollToTopButton() {
 }
 
 // 이미지 데이터
-const images = [
+const images: { src: string; alt: string }[] = [
   { src: '/friends.png', alt: 'Friends with colorful sunglasses' },
   { src: '/family.png', alt: 'Family walking on beach' },
-  { src: '/couple.png', alt: 'Couple silhouette making heart shape' },
-  { src: '/friends.png', alt: 'Friends with colorful sunglasses' },
-  { src: '/family.png', alt: 'Family walking on beach' },
-  { src: '/couple.png', alt: 'Couple silhouette making heart shape' },
+  { src: '/celebrate.png', alt: 'Celebration group' },
+  { src: '/parents.png', alt: 'Parents with kids' },
 ]
 
 // 햄버거 메뉴만 담당하는 컴포넌트
@@ -151,7 +149,7 @@ function NavigationMenu({
   user?: { name?: string; email?: string; profileImage?: string } | null
 }) {
   return (
-    <div className="mb-12 flex items-center justify-center gap-12">
+    <div className=" mb-1 flex items-center justify-center gap-12">
       {isLoggedIn ? (
         <>
           <button
@@ -160,14 +158,12 @@ function NavigationMenu({
           >
             ALBUM
           </button>
-
           <button
             onClick={onStart}
-            className="didot-font bg-black px-8 py-3 text-xl font-medium text-white transition-colors hover:bg-gray-800"
+            className="didot-font bg-black px-8 py-3 text-xl rounded-xl font-medium text-white transition-colors hover:bg-gray-800"
           >
             START
           </button>
-
           <button
             onClick={onMyFeed}
             className=" text-xl font-medium text-black transition-colors hover:text-gray-600"
@@ -183,14 +179,12 @@ function NavigationMenu({
           >
             ALBUM
           </button>
-
           <button
             onClick={onLogin}
             className="didot-font bg-black rounded-xl px-5 py-2 text-xl font-medium text-white transition-colors hover:bg-gray-800"
           >
             LOGIN
           </button>
-
           <button
             className="font-semibold cursor-not-allowed text-xl text-black opacity-50 transition-colors hover:text-gray-600"
             disabled
@@ -203,38 +197,41 @@ function NavigationMenu({
   )
 }
 
-// GSAP 애니메이션 갤러리 컴포넌트
+// GSAP 애니메이션 갤러리 컴포넌트 (디자인/애니메이션 개선)
 function GallerySection() {
   const containerRef = useRef<HTMLDivElement>(null)
   const galleryRef = useRef<HTMLDivElement>(null)
+  const extendedImages = [...images, ...images]
 
   useEffect(() => {
-    // GSAP 라이브러리 동적 로드
     const script = document.createElement('script')
-    script.src =
-      'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js'
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js'
     script.onload = () => {
       const { gsap } = window as any
-
       if (galleryRef.current && containerRef.current) {
         const gallery = galleryRef.current
+        const container = containerRef.current
         const galleryWidth = gallery.scrollWidth
-        const containerWidth = containerRef.current.offsetWidth
+        const containerWidth = container.offsetWidth
 
-        // 무한 반복 애니메이션 (오른쪽에서 왼쪽으로)
-        gsap.set(gallery, { x: containerWidth })
-
+        // 화면의 38%만큼 땡겨서 2.5장 정도 보이게
+        const initialOffset = containerWidth * 0.38
+        // 살짝 위로 올림 (y), 오른쪽에서 왼쪽으로
+        gsap.set(gallery, { x: -initialOffset, y: '-2vh' })
         gsap.to(gallery, {
-          x: -galleryWidth,
-          duration: 25,
+          x: -galleryWidth + initialOffset,
+          duration: 46, // 천천히
           ease: 'none',
           repeat: -1,
-          repeatDelay: 0,
+          modifiers: {
+            x: gsap.utils.unitize((x: number) =>
+              (-x >= galleryWidth / 2) ? -initialOffset : x
+            ),
+          },
         })
       }
     }
     document.head.appendChild(script)
-
     return () => {
       if (document.head.contains(script)) {
         document.head.removeChild(script)
@@ -243,51 +240,53 @@ function GallerySection() {
   }, [])
 
   return (
-    <div className="w-full relative">
-      {/* 갤러리 컨테이너 - 보그처럼 화면을 꽉 채우고 약간 넘치게 */}
-      <div
-        ref={containerRef}
-        className="w-full overflow-hidden"
-        style={{ 
-          height: '85vh', // 화면 높이의 85%로 설정해서 아래가 약간 잘리게
-          minHeight: '600px' // 최소 높이 보장
-        }}
-      >
+    <div className="relative w-full overflow-hidden select-none" style={{ height: '66vh', marginTop: '2.5vh', userSelect: 'none' }}>
+      <div ref={containerRef} className="w-full h-full flex items-center overflow-hidden">
         <div
           ref={galleryRef}
-          className="flex h-full items-center gap-0"
-          style={{ width: 'max-content' }}
+          className="flex items-center"
+          style={{ gap: '0.25vw', width: 'max-content', willChange: 'transform' }}
         >
-          {images.map((image, index) => (
-            <div
-              key={index}
-              className="h-full flex-shrink-0"
-              style={{ width: '33.333vw' }}
-            >
-              <div className="relative h-full w-full">
-                <Image
-                  src={image.src}
-                  alt={image.alt}
-                  fill
-                  className="object-cover"
-                  priority={index < 3}
-                />
-              </div>
+        {extendedImages.map((image, index) => (
+          <div
+            key={index}
+            className="overflow-hidden flex-shrink-0 rounded-none"
+            style={{
+              width: '42vw',
+              minWidth: '320px',
+              maxWidth: '830px',
+              aspectRatio: '3/2',        // <-- 이 부분
+              minHeight: '38vh',
+              maxHeight: '68vh',
+              background: '#eaeaea'
+            }}
+          >
+            <div className="relative w-full h-full">
+              <Image
+                src={image.src}
+                alt={image.alt}
+                fill
+                style={{ objectFit: 'cover' }}
+                priority={index < 3}
+                sizes="(max-width: 900px) 100vw, 42vw"
+                draggable={false}
+              />
             </div>
-          ))}
-        </div>
-      </div>
-      
-      {/* 하단 그라데이션 오버레이 - 스크롤 힌트 */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/30 via-black/10 to-transparent pointer-events-none"></div>
-      
-      {/* 스크롤 힌트 애니메이션 */}
-      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-10">
-        <div className="flex flex-col items-center animate-bounce text-white">
-          <div className="w-6 h-10 border-2 border-white/70 rounded-full flex justify-center mb-2">
-            <div className="w-1 h-3 bg-white/70 rounded-full mt-2 animate-pulse"></div>
           </div>
-          <p className="text-xs font-medium tracking-wider opacity-80">SCROLL</p>
+        ))}
+        </div>
+
+        {/* 하단 그라데이션 오버레이 - 스크롤 힌트 */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/30 via-black/10 to-transparent pointer-events-none"></div>
+
+        {/* 스크롤 힌트 애니메이션 */}
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-10">
+          <div className="flex flex-col items-center animate-bounce text-white">
+            <div className="w-6 h-10 border-2 border-white/70 rounded-full flex justify-center mb-2">
+              <div className="w-1 h-3 bg-white/70 rounded-full mt-2 animate-pulse"></div>
+            </div>
+            <p className="text-xs font-medium tracking-wider opacity-80">SCROLL</p>
+          </div>
         </div>
       </div>
     </div>
@@ -311,45 +310,34 @@ export default function CreativePage() {
     isCreatingRoom,
   } = useAuth()
 
-  // START 버튼 핸들러 (방 생성 등의 기능)
+  // START 버튼 핸들러
   const handleStart = () => {
-    // 여기에 START 버튼 클릭 시 실행할 로직 추가
-    handleAfterLoginClick() // 기존 방 생성 로직 사용
+    handleAfterLoginClick()
   }
 
   // MyRoom으로 이동 (셀피 업로드/AI 보정)
   const handleUploadSelfie = () => {
-    router.push('/myroom');
-  };
+    router.push('/myroom')
+  }
 
   // 프로필 설정 페이지로 이동
   const handleAccount = () => {
-    router.push('/profile');
-  };
-
-  // 프로필 이미지 직접 업로드 (추후 구현)
-  const handleProfileImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    // 추후 구현 예정
-    console.log('프로필 이미지 업로드:', event.target.files?.[0]);
-  };
+    router.push('/profile')
+  }
 
   useEffect(() => {
     initializeAuth()
   }, [])
 
   useEffect(() => {
-    console.log('MainPage - isLoggedIn:', isLoggedIn)
+    // 로그인 상태 체크
   }, [isLoggedIn])
 
-  // URL 파라미터 처리 (로그인 후 방 생성)
   useEffect(() => {
     if (isLoggedIn) {
       const action = searchParams.get('action')
       if (action === 'createRoom') {
-        console.log('✅ 로그인 완료 - URL 파라미터로 방 생성 실행')
-        // URL 파라미터 제거
         router.replace('/', { scroll: false })
-        // 방 생성 실행
         handleAfterLoginClick()
       }
     }
@@ -359,9 +347,8 @@ export default function CreativePage() {
     <div className="min-h-screen bg-white">
       {/* 헤더 영역 */}
       <div className="pt-6 pb-8">
-        {/* NEARZOOM 타이틀과 프로필 영역 */}
+        {/* 로고 + 프로필 */}
         <div className="relative w-full h-32 md:h-40 lg:h-48 flex items-center justify-center">
-          {/* 각 글자별 이미지로 구성된 로고 - 훨씬 크게 */}
           <div className="flex items-center gap-1 md:gap-2 lg:gap-3">
             <div className="relative w-12 h-16 md:w-16 md:h-20 lg:w-24 lg:h-28">
               <Image
@@ -410,7 +397,7 @@ export default function CreativePage() {
                 priority
               />
             </div>
-            {/* O 글자 크기 조정 - 다른 글자보다 약간 크게 */}
+            {/* O 글자 크기 조정 */}
             <div className="relative w-14 h-18 md:w-18 md:h-22 lg:w-26 lg:h-30">
               <Image
                 src="/letter-oo.png"
@@ -429,7 +416,7 @@ export default function CreativePage() {
                 priority
               />
             </div>
-            {/* M 글자 크기 조정 - 다른 글자보다 약간 크게 */}
+            {/* M 글자 크기 조정 */}
             <div className="relative w-16 h-20 md:w-19 md:h-23 lg:w-30 lg:h-34">
               <Image
                 src="/letter-mm.png"
@@ -440,8 +427,6 @@ export default function CreativePage() {
               />
             </div>
           </div>
-          
-          {/* 로그인 상태일 때 로고 옆에 프로필과 햄버거 메뉴 */}
           {isLoggedIn && (
             <div className="absolute right-8 top-1/2 transform -translate-y-1/2 flex items-center gap-4">
               {/* 프로필 원형 아바타 - 소셜 계정 프로필 사진과 연결 */}
@@ -474,7 +459,6 @@ export default function CreativePage() {
                   </span>
                 </div>
               </div>
-              
               {/* 햄버거 메뉴 */}
               <HamburgerMenuComponent
                 isLoggedIn={isLoggedIn}
@@ -484,7 +468,6 @@ export default function CreativePage() {
             </div>
           )}
         </div>
-
         {/* 네비게이션 메뉴 */}
         <NavigationMenu
           isLoggedIn={isLoggedIn}
@@ -498,6 +481,7 @@ export default function CreativePage() {
           user={user}
         />
       </div>
+      
 
       {/* 이미지 갤러리 */}
       <GallerySection />
