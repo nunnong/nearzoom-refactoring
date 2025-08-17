@@ -1,6 +1,10 @@
 'use client'
 
-import { XMarkIcon, ShareIcon, PencilSquareIcon } from '@heroicons/react/24/outline'
+import {
+  XMarkIcon,
+  ShareIcon,
+  PencilSquareIcon,
+} from '@heroicons/react/24/outline'
 import React, { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSuccessToast } from '@/components/ui/Toast'
@@ -42,7 +46,7 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
 
   const handleFeedCreate = useCallback(() => {
     const params = new URLSearchParams({ photoId: String(image.photoId) })
-    
+
     router.push(`/feed/edit?${params.toString()}`)
     onClose()
   }, [image.photoId, image.imgUrl, router, onClose])
@@ -121,23 +125,19 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="mx-4 w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
         {/* Header */}
-        <div className="border-b bg-white shadow-sm">
-          <div className="flex items-center justify-between p-4">
-            <div className="flex items-center space-x-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-100">
-                <ShareIcon className="h-5 w-5 text-blue-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900">공유하기</h3>
-            </div>
-            <button
-              onClick={onClose}
-              className="flex items-center space-x-2 rounded-md px-3 py-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
-              aria-label="Close modal"
-            >
-              <XMarkIcon className="h-5 w-5" />
-              <span>닫기</span>
-            </button>
+        <div className="flex items-center justify-between border-b border-gray-200 p-4">
+          <div className="flex items-center space-x-2">
+            <ShareIcon className="h-5 w-5 text-blue-500" />
+            <h3 className="text-lg font-semibold text-gray-900">공유하기</h3>
           </div>
+          <button
+            onClick={onClose}
+            className="flex items-center space-x-2 rounded-md px-3 py-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            aria-label="Close modal"
+          >
+            <XMarkIcon className="h-5 w-5" />
+            <span>닫기</span>
+          </button>
         </div>
 
         {/* Content */}
@@ -207,14 +207,18 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
             {/* Feed Create */}
             <button
               onClick={handleFeedCreate}
-              className="flex w-full items-center space-x-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
+              className="flex w-full items-center space-x-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:outline-none"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500">
                 <PencilSquareIcon className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="font-medium text-gray-900">피드 게시물 작성하기</p>
-                <p className="text-sm text-gray-500">사진과 함께 게시물을 작성해보세요</p>
+                <p className="font-medium text-gray-900">
+                  피드 게시물 작성하기
+                </p>
+                <p className="text-sm text-gray-500">
+                  사진과 함께 게시물을 작성해보세요
+                </p>
               </div>
             </button>
             

@@ -1,16 +1,17 @@
-"use client"
+'use client'
 
-import { useAuth } from "@/hooks/auth"  
-import { useRouter, useSearchParams } from 'next/navigation'  // 🔥 추가: useSearchParams import
-import CreativeSection from "./CreativeSection"
-import AboutUsSection from "./AboutUsSection"
-import Footer from "./Footer"
-import { useEffect } from "react"
+import { useAuth } from '@/hooks/auth'
+import { useRouter, useSearchParams } from 'next/navigation' // 🔥 추가: useSearchParams import
+import CreativeSection from './CreativeSection'
+import AboutUsSection from './AboutUsSection'
+import Footer from './Footer'
+import { useEffect } from 'react'
+import Link from 'next/link'
 
 export default function CreativePage() {
-  const router = useRouter()  // 🔥 추가
-  const searchParams = useSearchParams()  // 🔥 추가
-  
+  const router = useRouter() // 🔥 추가
+  const searchParams = useSearchParams() // 🔥 추가
+
   const {
     isLoggedIn,
     handleLogin,
@@ -46,7 +47,10 @@ export default function CreativePage() {
   }, [isLoggedIn, searchParams, router, handleAfterLoginClick])
 
   return (
-    <div className="min-h-screen w-full mx-auto transform origin-top" style={{transform: 'scaleX(0.9)'}}>
+    <div
+      className="mx-auto min-h-screen w-full origin-top transform"
+      style={{ transform: 'scaleX(0.9)' }}
+    >
       <CreativeSection
         isLoggedIn={isLoggedIn}
         onLogin={handleLogin}
@@ -57,7 +61,6 @@ export default function CreativePage() {
         user={user}
         isCreatingRoom={isCreatingRoom}
       />
-
       <AboutUsSection />
 
       <Footer />

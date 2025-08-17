@@ -56,8 +56,8 @@ export const useAuth = () => {
     try {
       setLoading(true)
       const response = await userService.getUserInfo()
-
-      const rawData = response
+      
+      const rawData = response.data
       const userData = userTransformer.fromBackend(rawData)
       setUser(userData)
     } catch (error) {
@@ -127,9 +127,9 @@ export const useAuth = () => {
       // ✅ 수정: 이미 최상위에서 가져온 함수들 사용
       setRoomData(roomData)
       setIsHost(true)
-
-      // 생성된 방으로 이동
-      const roomUrl = `/room/${roomData.roomId}?isHost=true&skipJoin=true`
+      
+      // 생성된 방으로 이동 (LiveKit metadata로 방장 확인)
+      const roomUrl = `/room/${roomData.roomId}`
       router.push(roomUrl)
     } catch (error) {
       console.error('방 생성 실패:', error)

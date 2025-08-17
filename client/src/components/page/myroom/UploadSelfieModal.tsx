@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { X, Edit } from 'lucide-react'
 import api from '@/lib/axios'
-import { API_ENDPOINTS } from '@/constants/api'
+import { resizeImage } from '@/utils/imageOptimizer'
 
 // 🚀 이미지 업로드 엔드포인트 상수
 const IMAGE_UPLOAD_URL = 'https://image.nearzoom.store/upload'
@@ -17,11 +17,14 @@ interface UploadSelfieModalProps {
 export default function UploadSelfieModal({
   isOpen,
   onClose,
-  onImageUpdated
+  onImageUpdated,
 }: UploadSelfieModalProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [optimizedBlob, setOptimizedBlob] = useState<Blob | null>(null)
   const [isUploading, setIsUploading] = useState(false)
-  const [currentReferenceImage, setCurrentReferenceImage] = useState<string | null>(null)
+  const [currentReferenceImage, setCurrentReferenceImage] = useState<
+    string | null
+  >(null)
   const [hasExistingImage, setHasExistingImage] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -103,30 +106,43 @@ export default function UploadSelfieModal({
     }
   }
 
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0]
     if (file) {
-      console.log('📁 파일 선택됨:', {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        lastModified: new Date(file.lastModified).toISOString()
-      })
-      
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const result = e.target?.result as string
-        console.log('📸 Base64 변환 완료, 길이:', result.length)
-        setSelectedImage(result)
-        console.log('📸 이미지 미리보기 설정 완료')
+      try {
+        console.log(
+          '원본 이미지 크기:',
+          (file.size / 1024 / 1024).toFixed(2) + 'MB'
+        )
+
+        // 이미지 최적화
+        const optimizedImage = await resizeImage(file)
+        console.log(
+          '최적화된 이미지 크기:',
+          (optimizedImage.size / 1024 / 1024).toFixed(2) + 'MB'
+        )
+
+        // 미리보기용 base64 변환
+        const reader = new FileReader()
+        reader.onload = e => {
+          setSelectedImage(e.target?.result as string)
+        }
+        reader.readAsDataURL(optimizedImage)
+
+        // 업로드용 Blob 저장
+        setOptimizedBlob(optimizedImage)
+      } catch (error) {
+        console.error('이미지 최적화 실패:', error)
+        // 실패시 원본 사용
+        const reader = new FileReader()
+        reader.onload = e => {
+          setSelectedImage(e.target?.result as string)
+        }
+        reader.readAsDataURL(file)
+        setOptimizedBlob(file)
       }
-      reader.onerror = () => {
-        console.error('❌ 파일 읽기 실패')
-        alert('파일을 읽을 수 없습니다. 다른 이미지를 선택해주세요.')
-      }
-      reader.readAsDataURL(file)
-    } else {
-      console.log('📁 파일이 선택되지 않음')
     }
   }
 
@@ -135,35 +151,17 @@ export default function UploadSelfieModal({
   }
 
   const handleSave = async () => {
-    if (!selectedImage) {
-      console.error('❌ 선택된 이미지가 없습니다')
-      return
-    }
+    if (!selectedImage || !optimizedBlob) return
 
     try {
       setIsUploading(true)
       console.log('🚀 이미지 저장 시작')
       console.log('📸 선택된 이미지:', selectedImage.substring(0, 100) + '...')
 
-      // 🚀 Base64를 Blob으로 변환
-      console.log('🔄 Base64 → Blob 변환 시작')
-      const base64Response = await fetch(selectedImage)
-      console.log('📡 fetch 응답:', base64Response)
-      
-      const blob = await base64Response.blob()
-      console.log('📸 Blob 변환 완료:', { 
-        size: blob.size, 
-        type: blob.type,
-        blobKeys: Object.keys(blob)
-      })
-
+      // 최적화된 Blob 직접 사용
       const formData = new FormData()
-      formData.append('file', blob, 'profile.jpg')
-      console.log('📦 FormData 생성 완료')
-      console.log('📋 FormData 내용:', {
-        fileCount: formData.getAll('file').length,
-        fileEntry: formData.get('file')
-      })
+      formData.append('file', optimizedBlob, 'profile.png')
+      formData.append('type', 'profile')
 
       // 🚀 이미지 업로드
       console.log('📤 이미지 업로드 시작:', IMAGE_UPLOAD_URL)
@@ -191,58 +189,35 @@ export default function UploadSelfieModal({
 
       console.log('✅ 이미지 업로드 성공, URL:', imageUrl)
 
-      // 🚀 프로필에 이미지 URL 저장
-      console.log('💾 프로필에 이미지 URL 저장 시작:', API_ENDPOINTS.SAVE_FACE_IMAGE)
-      const saveResponse = await api.put(API_ENDPOINTS.SAVE_FACE_IMAGE, null, {
-        params: { prettyFaceUrl: imageUrl }
+      await api.put('/user/save-face-image', null, {
+        params: { prettyFaceUrl: imageUrl },
       })
 
-      console.log('💾 프로필 저장 응답:', saveResponse.data)
+      console.log('💾 프로필 저장 응답:', uploadResponse.data)
       console.log('🎉 이미지 저장 완료!')
 
       // 🚀 상태 업데이트
       setCurrentReferenceImage(imageUrl)
       setHasExistingImage(true)
       setSelectedImage(null)
-      
+      setOptimizedBlob(null)
+
       // 🚀 콜백 호출
       onImageUpdated?.()
       onClose()
-      
     } catch (error: any) {
-      console.error('❌ 프로필 이미지 저장 실패 - 상세 정보:', {
+      console.error('프로필 이미지 저장 실패:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
         error,
-        errorType: typeof error,
-        errorKeys: error ? Object.keys(error) : 'undefined',
-        errorMessage: error?.message,
-        errorCode: error?.code,
-        errorStatus: error?.response?.status,
-        errorResponse: error?.response?.data,
-        errorConfig: error?.config,
-        errorStack: error?.stack,
-        selectedImage: selectedImage ? '있음' : '없음'
       })
-      
-      // 🚀 구체적인 에러 메시지 생성
-      let errorMessage = '알 수 없는 오류가 발생했습니다.'
-      
-      if (error?.response?.status === 413) {
-        errorMessage = '이미지 파일이 너무 큽니다. 더 작은 이미지를 선택해주세요.'
-      } else if (error?.response?.status === 400) {
-        errorMessage = '잘못된 이미지 형식입니다. JPG, PNG 파일을 선택해주세요.'
-      } else if (error?.response?.status === 500) {
-        errorMessage = '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
-      } else if (error?.response?.status === 401) {
-        errorMessage = '인증이 필요합니다. 다시 로그인해주세요.'
-      } else if (error?.response?.status === 403) {
-        errorMessage = '권한이 없습니다. 관리자에게 문의해주세요.'
-      } else if (error?.message) {
-        errorMessage = error.message
-      } else if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message
-      }
-      
-      alert(`참조 이미지 저장에 실패했습니다:\n${errorMessage}`)
+
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        '알 수 없는 오류가 발생했습니다.'
+      alert(`참조 이미지 저장에 실패했습니다: ${errorMessage}`)
     } finally {
       setIsUploading(false)
     }
@@ -253,17 +228,17 @@ export default function UploadSelfieModal({
   const displayImage = selectedImage || currentReferenceImage
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-      <div className="mx-4 w-96 max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl relative">
-        <button 
-          onClick={onClose} 
-          className="absolute top-4 right-4 z-10 p-2 hover:bg-gray-100 rounded-full transition-colors"
+    <div className="bg-opacity-30 fixed inset-0 z-50 flex items-center justify-center bg-black">
+      <div className="relative mx-4 w-96 max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-10 rounded-full p-2 transition-colors hover:bg-gray-100"
         >
           <X size={20} className="text-gray-600" />
         </button>
 
         {/* 헤더 */}
-        <div className="flex items-center justify-center p-4 border-b border-gray-100">
+        <div className="flex items-center justify-center border-b border-gray-100 p-4">
           <div className="flex items-center space-x-2">
             <span className="text-lg font-medium text-blue-500">이</span>
             <span className="text-lg font-medium text-red-500">어</span>
@@ -278,17 +253,25 @@ export default function UploadSelfieModal({
           </h2>
 
           <p className="mb-6 text-sm leading-relaxed text-gray-600">
-            {hasExistingImage 
+            {hasExistingImage
               ? '새로운 참조 사진으로 교체하거나 현재 사진을 그대로 사용하세요.'
-              : '가장 잘 나온 사진 하나를 업로드해주세요. AI가 이를 참조하여 더 예쁘고 자연스러운 사진을 만들어 드립니다.'
-            }
+              : '가장 잘 나온 사진 하나를 업로드해주세요. AI가 이를 참조하여 더 예쁘고 자연스러운 사진을 만들어 드립니다.'}
           </p>
 
-
           {/* AI 사진 합성용 태그 */}
-          <div className="mb-6 flex items-center space-x-2 rounded-full border border-blue-200 px-4 py-2 text-blue-600 w-fit">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          <div className="mb-6 flex w-fit items-center space-x-2 rounded-full border border-blue-200 px-4 py-2 text-blue-600">
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 10V3L4 14h7v7l9-11h-7z"
+              />
             </svg>
             <span className="text-sm font-medium">AI 사진 합성용</span>
           </div>
@@ -298,13 +281,22 @@ export default function UploadSelfieModal({
             <div className="h-32 w-32 overflow-hidden rounded-full bg-gradient-to-br from-orange-200 via-green-200 to-blue-200 p-1">
               <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-white">
                 {displayImage ? (
-                  <img src={displayImage} alt="참조 사진" className="h-full w-full object-cover" />
+                  <img
+                    src={displayImage}
+                    alt="참조 사진"
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
                   <svg viewBox="0 0 100 100" className="h-full w-full">
                     <circle cx="50" cy="50" r="45" fill="#ff9999" />
                     <circle cx="35" cy="40" r="3" fill="#000" />
                     <circle cx="65" cy="40" r="3" fill="#000" />
-                    <path d="M 30 60 Q 50 75 70 60" stroke="#000" strokeWidth="2" fill="none" />
+                    <path
+                      d="M 30 60 Q 50 75 70 60"
+                      stroke="#000"
+                      strokeWidth="2"
+                      fill="none"
+                    />
                   </svg>
                 )}
               </div>

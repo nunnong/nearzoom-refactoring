@@ -1,6 +1,6 @@
-"use client"
+'use client'
 
-import type { JSX } from "react"
+import type { JSX } from 'react'
 import { useAuth } from '@/hooks/auth'
 
 interface LoginModalProps {
@@ -11,7 +11,13 @@ interface LoginModalProps {
   isLoading?: boolean
 }
 
-const LoginModal = ({ isOpen, onClose, onKakaoLogin, onGoogleLogin, isLoading = false }: LoginModalProps): JSX.Element => {
+const LoginModal = ({
+  isOpen,
+  onClose,
+  onKakaoLogin,
+  onGoogleLogin,
+  isLoading = false,
+}: LoginModalProps): JSX.Element => {
   const { startSocialLogin } = useAuth()
 
   if (!isOpen) return <></>
@@ -37,31 +43,42 @@ const LoginModal = ({ isOpen, onClose, onKakaoLogin, onGoogleLogin, isLoading = 
   return (
     <div className="fixed inset-0 z-50">
       {/* 배경 오버레이 */}
-      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" aria-hidden="true" onClick={onClose} />
+      <div
+        className="fixed inset-0 bg-black/30 backdrop-blur-sm"
+        aria-hidden="true"
+        onClick={onClose}
+      />
 
       {/* 모달 컨테이너 */}
-      <div className="fixed top-1/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
-        <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-md relative">
+      <div className="fixed top-1/3 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2 transform">
+        <div className="relative w-full max-w-sm rounded-xl bg-white p-6 shadow-md">
           {/* X 버튼 */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors group"
+            className="group absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 transition-colors hover:bg-gray-200"
             aria-label="닫기"
             disabled={isLoading}
           >
             <svg
-              className="w-4 h-4 text-gray-600 group-hover:text-gray-800"
+              className="h-4 w-4 text-gray-600 group-hover:text-gray-800"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
 
           {/* 제목 */}
           <h3 className="text-center text-2xl font-bold text-black">로그인</h3>
-          <p className="mt-2 text-center text-sm text-gray-600">소셜 계정으로 간편하게 로그인하세요</p>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            소셜 계정으로 간편하게 로그인하세요
+          </p>
 
           {/* 소셜 로그인 버튼들 */}
           <div className="mt-6 flex flex-col gap-3">
@@ -69,10 +86,10 @@ const LoginModal = ({ isOpen, onClose, onKakaoLogin, onGoogleLogin, isLoading = 
             <button
               onClick={handleKakaoLogin}
               disabled={isLoading}
-              className="w-full px-4 py-3 rounded-lg font-medium transition-colors bg-[#FEE500] text-black hover:bg-[#FDD835] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full rounded-lg bg-[#FEE500] px-4 py-3 font-medium text-black transition-colors hover:bg-[#FDD835] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <div className="flex items-center justify-center space-x-3">
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <svg className="h-5 w-5" viewBox="0 0 24 24">
                   <path
                     fill="currentColor"
                     d="M12 3C7.03 3 3 6.14 3 10.1c0 2.54 1.66 4.77 4.16 6.07l-1.09 4.02c-.07.26.2.47.43.33l4.75-3.15c.25.01.5.02.75.02 4.97 0 9-3.14 9-7.1S16.97 3 12 3z"
@@ -86,10 +103,10 @@ const LoginModal = ({ isOpen, onClose, onKakaoLogin, onGoogleLogin, isLoading = 
             <button
               onClick={handleGoogleLogin}
               disabled={isLoading}
-              className="w-full px-4 py-3 rounded-lg font-medium transition-colors bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <div className="flex items-center justify-center space-x-3">
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <svg className="h-5 w-5" viewBox="0 0 24 24">
                   <path
                     fill="#4285F4"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -125,13 +142,18 @@ const LoginModal = ({ isOpen, onClose, onKakaoLogin, onGoogleLogin, isLoading = 
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-300" />
             </div>
-            <div className="relative flex justify-center bg-white px-2 text-xs text-gray-500">또는</div>
+            <div className="relative flex justify-center bg-white px-2 text-xs text-gray-500">
+              또는
+            </div>
           </div>
 
           {/* 약관 */}
           <p className="text-center text-xs text-gray-500">
-            로그인 시{" "}
-            <a href="#" className="font-medium text-gray-600 underline hover:text-gray-800">
+            로그인 시{' '}
+            <a
+              href="#"
+              className="font-medium text-gray-600 underline hover:text-gray-800"
+            >
               이용약관 및 개인정보처리방침
             </a>
             에 동의합니다

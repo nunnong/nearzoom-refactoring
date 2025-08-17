@@ -28,11 +28,25 @@ export const useAuthenticatedImage = (
         setLoading(true)
         setError(null)
 
-        // 인증이 포함된 이미지 요청
-        const response = await api.get(`${API_ENDPOINTS.PHOTOS}/${photoId}`, {
-          responseType: 'blob', // 이미지 데이터를 blob으로 받기
-          timeout: 15000, // 15초 타임아웃
+        console.log('🔄 이미지 로딩 시작:', photoId)
+        console.log('📤 요청 URL:', `/myroom/image/${photoId}`)
+
+        // 현재 인증 상태 확인
+        const { useAuthStore } = await import('@/stores/authStore')
+        const authState = useAuthStore.getState()
+        console.log('🔑 인증 상태:', {
+          isAuthenticated: authState.isAuthenticated,
+          hasToken: !!authState.accessToken,
+          tokenPreview: authState.accessToken?.substring(0, 20) + '...',
         })
+        // 인증이 포함된 이미지 요청
+        const response = await api.get(
+          `${API_ENDPOINTS.IMAGE_PROXY}/${photoId}`,
+          {
+            responseType: 'blob', // 이미지 데이터를 blob으로 받기
+            timeout: 15000, // 15초 타임아웃
+          }
+        )
 
         // Blob을 Object URL로 변환
         const imageBlob = response.data

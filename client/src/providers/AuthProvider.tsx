@@ -18,7 +18,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   })
 
   useEffect(() => {
-    // authStore의 통합된 초기화 함수 사용
+    // 앱 시작 시 인증 상태 초기화
     initializeAuth()
   }, [initializeAuth])
 

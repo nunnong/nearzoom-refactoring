@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
+import { persist, createJSONStorage, devtools } from 'zustand/middleware'
 import type { CreateRoomData, JoinRoomData } from '@/lib/api/room'
 
 interface RoomStore {
@@ -16,7 +16,8 @@ interface RoomStore {
 }
 
 export const useRoomStore = create<RoomStore>()(
-  persist(
+  devtools(
+    persist(
     (set, get) => ({
       // 초기 상태
       roomData: null,
@@ -46,6 +47,10 @@ export const useRoomStore = create<RoomStore>()(
         roomData: state.roomData,
         isHost: state.isHost,
       }),
+    }
+    ),
+    {
+      name: 'room-store', // DevTools에서 표시될 이름
     }
   )
 )

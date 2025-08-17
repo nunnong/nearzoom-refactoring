@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { subscribeWithSelector, devtools } from 'zustand/middleware'
 
 import type { AuthState, User } from '@/types/auth'
 import { API_ENDPOINTS } from '@/constants/api'
@@ -16,7 +17,9 @@ interface AuthActions {
   logoutDueToInactivity: () => void
 }
 
-export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
+export const useAuthStore = create<AuthState & AuthActions>()(
+  devtools(
+    subscribeWithSelector((set, get) => ({
   // 상태
   accessToken: null,
   user: null,
@@ -195,4 +198,23 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       window.location.href = '/'
     }
   },
-}))
+    })),
+    {
+      name: 'auth-store', // DevTools에서 표시될 이름
+    }
+  )
+)
+
+// axios interceptor에서 발생하는 이벤트 리스너 등록
+if (typeof window !== 'undefined') {
+  // 토큰 갱신 이벤트 처리
+  window.addEventListener('token-refreshed', (event: any) => {
+    const { accessToken } = event.detail
+    useAuthStore.getState().setTokens({ accessToken })
+  })
+
+  // 로그아웃 이벤트 처리  
+  window.addEventListener('auth-logout', () => {
+    useAuthStore.getState().clearTokens()
+  })
+}
