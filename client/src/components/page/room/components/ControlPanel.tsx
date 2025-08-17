@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils'
 import { useLocalParticipant, useRoomContext } from '@livekit/components-react'
 import { Track } from 'livekit-client'
+import { useRouter } from 'next/navigation'
 
 interface ControlPanelProps {
   showLeaveButton?: boolean
@@ -17,6 +18,7 @@ export default function ControlPanel({
 }: ControlPanelProps) {
   const localParticipant = useLocalParticipant()
   const room = useRoomContext()
+  const router = useRouter()
 
   const handleMicToggle = () => {
     localParticipant.localParticipant?.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled)
@@ -27,8 +29,11 @@ export default function ControlPanel({
   }
 
   const handleLeaveRoom = () => {
-    if (room) {
-      room.disconnect()
+    if (confirm('정말 나가시겠습니까?')) {
+      if (room) {
+        room.disconnect()
+      }
+      router.push('/')
     }
   }
   const buttonBaseClasses =
@@ -145,7 +150,7 @@ export default function ControlPanel({
               buttonBaseClasses,
               'bg-gradient-to-br from-gray-600 to-gray-700 text-white shadow-gray-600/30 hover:shadow-gray-600/40 hover:from-gray-500 hover:to-gray-600'
             )}
-            title="통화 종료"
+            title="나가기"
           >
             <svg
               className="h-6 w-6 stroke-current"

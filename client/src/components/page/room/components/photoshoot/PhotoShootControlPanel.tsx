@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { useLocalParticipant, useRoomContext } from '@livekit/components-react'
 import { usePhotoBoothStore } from '../../providers/PhotoBoothProvider'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface PhotoShootControlPanelProps {
   showLeaveButton?: boolean
@@ -14,6 +15,7 @@ export default function PhotoShootControlPanel({
 }: PhotoShootControlPanelProps) {
   const localParticipant = useLocalParticipant()
   const room = useRoomContext()
+  const router = useRouter()
   
   // PhotoBooth 관련 상태
   const frameColor = usePhotoBoothStore(state => state.frameColor)
@@ -33,8 +35,11 @@ export default function PhotoShootControlPanel({
   }
 
   const handleLeaveRoom = () => {
-    if (room) {
-      room.disconnect()
+    if (confirm('정말 나가시겠습니까?')) {
+      if (room) {
+        room.disconnect()
+      }
+      router.push('/')
     }
   }
 
@@ -383,7 +388,7 @@ export default function PhotoShootControlPanel({
                 buttonBaseClasses,
                 'bg-gradient-to-br from-gray-600 to-gray-700 text-white shadow-gray-600/30 hover:shadow-gray-600/40 hover:from-gray-500 hover:to-gray-600'
               )}
-              title="통화 종료"
+              title="나가기"
             >
               <svg
                 className="h-6 w-6 stroke-current"
