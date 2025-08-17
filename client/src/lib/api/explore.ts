@@ -557,7 +557,7 @@ export const searchFeeds = async (
 }
 
 /**
- * ✅ 사용자 피드 조회 (백엔드 GET /feeds/users/account/{accountName})
+ * ✅ 사용자 피드 조회 (백엔드 GET /feeds/user/account/{accountName})
  * 🔐 인증 필수
  */
 export const getUserFeedByAccountName = async (

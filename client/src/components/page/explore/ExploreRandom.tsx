@@ -1,4 +1,4 @@
-// src/components/page/explore/ExploreRandom.tsx - 올바른 라우팅 적용
+// src/components/page/explore/ExploreRandom.tsx - 수정된 프로필 클릭 핸들러 적용
 
 'use client'
 
@@ -14,6 +14,9 @@ import api from '@/lib/axios'
 
 // 🔥 올바른 아키텍처: Zustand 토큰 스토어 (로그인 상태 관리)
 import { useAuthStore } from '@/stores/authStore'
+
+// 🔥 통합 프로필 라우팅 유틸리티 import
+import { handleUserProfileClick } from '@/utils/profileNavigation'
 
 // ============================================================================
 // 백엔드 API 응답 타입 정의 (백엔드와 완전 일치)
@@ -438,7 +441,7 @@ const ExploreRandom: React.FC<ExploreRandomProps> = ({ className = '' }) => {
       }, [isAuthenticated, accessToken]);
 
   // ============================================================================
-  // 이벤트 핸들러들
+  // 이벤트 핸들러들 (🔥 수정된 프로필 클릭 핸들러 적용)
   // ============================================================================
   
   // 새로고침 핸들러
@@ -462,22 +465,24 @@ const ExploreRandom: React.FC<ExploreRandomProps> = ({ className = '' }) => {
     router.push(`/feeds/posts/${feed.postId}`);
   }, [router, user]);
 
-  // 사용자 검색 결과 - 해당 사용자 프로필로 이동
+  // 🔥 사용자 검색 결과 - 통합 프로필 핸들러 사용
   const handleUserFound = useCallback((accountName: string) => {
     console.log('=== 사용자 검색 결과 클릭 ===', { 
       accountName, 
       currentUser: user?.accountName 
     });
-    router.push(`/profile/${accountName}`);
+    // 🔥 통합 프로필 핸들러 사용
+    handleUserProfileClick(accountName, router, user, { debug: true });
   }, [router, user]);
 
-  // 작성자 클릭 - 사용자 프로필로 이동
-  const handleAuthorClick = useCallback((authorId: string) => {
+  // 🔥 작성자 클릭 - 통합 프로필 핸들러 사용
+  const handleAuthorClick = useCallback((authorAccountName: string) => {
     console.log('=== 작성자 클릭 ===', { 
-      authorId, 
+      authorAccountName, 
       currentUser: user?.accountName 
     });
-    router.push(`/profile/${authorId}`);
+    // 🔥 통합 프로필 핸들러 사용
+    handleUserProfileClick(authorAccountName, router, user, { debug: true });
   }, [router, user]);
 
   // 🔥 좋아요 토글 핸들러 (로그인 필수)

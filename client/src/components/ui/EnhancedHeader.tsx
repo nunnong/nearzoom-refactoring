@@ -60,8 +60,8 @@ const headerAPI = {
   // 🔥 현재 사용자 정보 조회 (여러 엔드포인트 시도)
   getCurrentUser: async (): Promise<BackendUserProfile> => {
     const endpoints = [
-      '/users/me',      // 가장 일반적인 엔드포인트
-      '/users/profile', // 대안 엔드포인트
+      '/user/my',      // 가장 일반적인 엔드포인트
+      '/user/profile', // 대안 엔드포인트
       '/auth/me',       // 인증 관련 엔드포인트
     ];
 
@@ -103,9 +103,9 @@ const headerAPI = {
       
       // 여러 가능한 엔드포인트 시도
       const endpoints = [
-        `/users/profile/${accountName}`,
-        `/feeds/users/account/${accountName}`, // FeedController의 엔드포인트
-        `/users/${accountName}`,
+        `/user/profile/${accountName}`,
+        `/feeds/user/account/${accountName}`, // FeedController의 엔드포인트
+        `/user/${accountName}`,
       ];
 
       for (const endpoint of endpoints) {
@@ -166,7 +166,7 @@ const headerAPI = {
 
   // 🔥 로그아웃 (여러 엔드포인트 시도)
   logout: async (): Promise<void> => {
-    const endpoints = ['/auth/logout', '/users/logout', '/logout'];
+    const endpoints = ['/auth/logout', '/user/logout', '/logout'];
     
     for (const endpoint of endpoints) {
       try {
@@ -386,7 +386,7 @@ const EnhancedHeader: React.FC<EnhancedHeaderProps> = ({
       } catch (error) {
         // 사용자가 존재하지 않으면 피드 페이지로 이동
         console.warn('사용자 프로필 조회 실패, 피드 페이지로 이동:', error);
-        router.push(`/feeds/users/account/${user.accountName}`);
+        router.push(`/feeds/user/account/${user.accountName}`);
       }
       
     } catch (error) {
