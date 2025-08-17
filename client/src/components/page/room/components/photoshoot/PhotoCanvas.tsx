@@ -144,10 +144,26 @@ export default function PhotoCanvas({
     }
   }, [cameraTrackRefs, participants, roomName, selectedParticipant])
 
+  // 셔터 사운드 재생 함수
+  const playShutterSound = useCallback(() => {
+    try {
+      const audio = new Audio('/sounds/shutter.mp3')
+      audio.volume = 0.5 // 볼륨 50%로 설정
+      audio.play().catch(err => 
+        console.log('🔇 Shutter sound play failed:', err)
+      )
+    } catch (error) {
+      console.log('🔇 Audio creation failed:', error)
+    }
+  }, [])
+
   // 캡쳐 함수
   const captureImage = useCallback(() => {
     if (stageRef.current && onCapture) {
       console.log('📸 Capturing canvas image...')
+      
+      // 셔터 사운드 재생
+      playShutterSound()
 
       try {
         // Konva Stage를 이미지로 변환
@@ -178,14 +194,13 @@ export default function PhotoCanvas({
                   faceImageUrl: metadata.faceImageUrl ? metadata.faceImageUrl : 'null',
                   hasUrl: !!metadata.faceImageUrl
                 })
-                return metadata.faceImageUrl
+                return metadata.faceImageUrl || ''
               } catch (error) {
                 console.error(`❌ Failed to parse metadata for ${participantId}:`, error)
               }
             }
-            return null
+            return ''
           })
-          .filter(url => url !== null)
 
         console.log(`🎯 Extracted ${sortedPersonIds.length} face image URLs in left-to-right order:`, sortedPersonIds)
 
@@ -195,7 +210,7 @@ export default function PhotoCanvas({
         console.error('❌ Failed to capture canvas:', error)
       }
     }
-  }, [onCapture, currentCutIndex, cutCount, participants, allParticipants])
+  }, [onCapture, currentCutIndex, cutCount, participants, allParticipants, playShutterSound])
 
   // isCapturing 상태 변화 감지하여 자동 캡쳐
   useEffect(() => {
