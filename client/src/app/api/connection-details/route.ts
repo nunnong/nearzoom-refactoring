@@ -54,12 +54,12 @@ export async function GET(request: NextRequest) {
     // Set role metadata with face image URL
     const roleMetadata = {
       role: isFirstParticipant ? "host" : "participant",
-      faceImageUrl: faceImageUrl || null
+      faceImageUrl: faceImageUrl || ''
     }
     
     console.log(`🎭 Setting metadata for ${participantName}:`, {
       role: roleMetadata.role,
-      faceImageUrl: roleMetadata.faceImageUrl ? 'provided' : 'null'
+      faceImageUrl: roleMetadata.faceImageUrl ? 'provided' : 'empty'
     })
 
     const participantToken = await createParticipantToken(
