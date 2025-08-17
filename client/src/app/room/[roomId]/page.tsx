@@ -78,9 +78,13 @@ export default function RoomTestSocialPage() {
       const message = getErrorMessage(error)
       setErrorMessage(message)
 
-      // 방을 찾을 수 없는 경우
-      if (error.response?.status === 404) {
+      // 방을 찾을 수 없는 경우 - 자동 리다이렉트
+      if (error.response?.status === 404 || message.includes('존재하지 않는 방')) {
         setPageState('error')
+        // 3초 후 메인 페이지로 자동 리다이렉트
+        setTimeout(() => {
+          router.push('/')
+        }, 3000)
       } else {
         setPageState('error')
       }
@@ -112,18 +116,25 @@ export default function RoomTestSocialPage() {
 
   // 에러 상태
   if (pageState === 'error') {
+    const isRoomNotFound = errorMessage.includes('존재하지 않는 방')
+    
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="mb-4 text-xl font-semibold text-red-600">
-            방 입장 실패
+            {isRoomNotFound ? '존재하지 않는 방입니다' : '방 입장 실패'}
           </div>
           <div className="mb-6 text-gray-700">{errorMessage}</div>
+          {isRoomNotFound && (
+            <div className="mb-4 text-sm text-gray-500">
+              3초 후 메인 페이지로 이동합니다...
+            </div>
+          )}
           <button
             onClick={() => router.push('/')}
             className="rounded-lg bg-blue-500 px-6 py-3 text-white hover:bg-blue-600"
           >
-            메인으로 돌아가기
+            {isRoomNotFound ? '지금 메인으로 가기' : '메인으로 돌아가기'}
           </button>
         </div>
       </div>
