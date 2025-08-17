@@ -34,7 +34,7 @@ export default function Header({
         {/* <div className="w-1/6"></div> */}
 
         {/* 중앙: NEARZOOM 로고 이미지 */}
-        <Link href="/" className="flex flex-1 justify-center">
+        <Link href="/" className="flex justify-center">
           <Image
             src="/nearzoomlogologo.png"
             alt="NEARZOOM"
