@@ -1,5 +1,6 @@
 package com.ssafy.nearzoom.domain.photoPrompt.controller;
 
+import com.ssafy.nearzoom.domain.photoPrompt.dto.BasicSettingsRequest;
 import com.ssafy.nearzoom.domain.photoPrompt.dto.IndividualBackgroundRequest;
 import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingResult;
 import com.ssafy.nearzoom.domain.photoPrompt.service.PhotoPromptService;
@@ -28,14 +29,13 @@ public class PhotoPromptController {
   private final PhotoPromptService photoPromptService;
 
   @PostMapping("/selection")
-  @Operation(summary = "기본 설정 저장 (선택적)",
+  @Operation(summary = "기본 설정 저장",
       description = """
-      프레임 색상 등 기본 설정을 저장합니다. 선택적으로 호출할 수 있습니다.
-      
       **요청 예시:**
       ```json
       {
         "roomId": 123,
+        "cutCount": 3,
         "frameColor": "#FFFFFF"
       }
       ```
@@ -43,47 +43,27 @@ public class PhotoPromptController {
   @PostApiResponses
   public ResponseEntity<ApiResponse<Map<String, Object>>> saveBasicSettings(
       HttpServletRequest request,
-      @RequestBody Map<String, Object> body) {
+      @RequestBody BasicSettingsRequest settingsRequest) {
 
-    try {
-      Long roomId = Long.valueOf(body.get("roomId").toString());
-      String frameColor = body.get("frameColor").toString();
+    photoPromptService.saveBasicSettings(request, settingsRequest);
 
-      photoPromptService.saveBasicSettings(request, roomId, frameColor);
-
-      Map<String, Object> responseData = new HashMap<>();
-      responseData.put("roomId", roomId);
-      responseData.put("frameColor", frameColor);
-      responseData.put("savedAt", LocalDateTime.now().toString());
-      responseData.put("nextStep", "각 이미지별로 배경을 설정해주세요");
-
-      return ResponseEntity.ok(new ApiResponse<>(false,
-          "기본 설정이 성공적으로 저장되었습니다. 이제 이미지별로 배경을 설정해주세요.", responseData));
-
-    } catch (ApiException e) {
-      return ApiResponse.failedOf(e);
-    } catch (Exception e) {
-      return ApiResponse.failedOf(HttpStatus.INTERNAL_SERVER_ERROR,
-          "기본 설정 저장 중 오류가 발생했습니다: " + e.getMessage());
-    }
+    return ResponseEntity.ok(new ApiResponse<>(false,
+        "기본 설정이 성공적으로 저장되었습니다.",
+        Map.of(
+            "roomId", settingsRequest.roomId(),
+            "cutCount", settingsRequest.cutCount(),
+            "frameColor", settingsRequest.frameColor()
+        )));
   }
 
   @PostMapping("/image/background")
   @Operation(summary = "개별 이미지 배경 설정",
       description = """
-      각 이미지별로 개별적으로 배경을 설정합니다.
-      설정 완료 즉시 이미지 서버로 전송되며, 이미지 순서와 개수가 동적으로 관리됩니다.
-      
-      **backgroundType별 필수 필드:**
-      - `solid`: colorValue 필수, promptText 무시
-      - `prompt`: promptText 필수, colorValue 무시
-      
       **요청 예시:**
       ```json
       // 첫 번째 이미지 - 단색 배경
       {
         "roomId": 123,
-        "imageOrder": 0,
         "imageUrl": "https://example.com/image1.jpg",
         "personIds": [
           "https://storage.example.com/users/user1_profile.jpg",
@@ -97,7 +77,6 @@ public class PhotoPromptController {
       // 두 번째 이미지 - 프롬프트 배경
       {
         "roomId": 123,
-        "imageOrder": 1,
         "imageUrl": "https://example.com/image2.jpg",
         "personIds": [
           "https://storage.example.com/users/user1_profile.jpg",
@@ -108,12 +87,6 @@ public class PhotoPromptController {
         "promptText": "아름다운 벚꽃 풍경"
       }
       ```
-      
-      **주요 특징:**
-      - 이미지 순서는 연속적이지 않아도 됩니다 (0, 2, 1 순서도 가능)
-      - personIds는 프론트에서 전달하며, 개별 이쁜사진 URL들입니다
-      - 각 이미지 설정 시 즉시 개별 처리가 시작됩니다
-      - 모든 개별 처리 완료 시 자동으로 프레임 합성이 시작됩니다
       """)
   @PostApiResponses
   public ResponseEntity<ApiResponse<Map<String, Object>>> saveIndividualImageBackground(
@@ -123,22 +96,14 @@ public class PhotoPromptController {
     try {
       photoPromptService.saveIndividualImageBackground(request, imageRequest);
 
-      Map<String, Object> responseData = new HashMap<>();
-      responseData.put("roomId", imageRequest.roomId());
-      responseData.put("imageOrder", imageRequest.imageOrder());
-      responseData.put("backgroundType", imageRequest.backgroundType());
-      responseData.put("personIds", imageRequest.personIds());
-      responseData.put("savedAt", LocalDateTime.now().toString());
-      responseData.put("status", "이미지 서버로 전송 완료");
-
-      if ("prompt".equals(imageRequest.backgroundType())) {
-        responseData.put("promptText", imageRequest.promptText());
-      } else {
-        responseData.put("colorValue", imageRequest.colorValue());
-      }
-
       return ResponseEntity.ok(new ApiResponse<>(false,
-          "이미지 배경 설정이 저장되고 처리가 시작되었습니다.", responseData));
+          "기본 설정이 성공적으로 저장되었습니다.",
+          Map.of(
+              "roomId", imageRequest.roomId(),
+              "backgroundType", imageRequest.backgroundType(),
+              "personIds", imageRequest.personIds(),
+              "status", "이미지 서버로 전송 완료"
+          )));
 
     } catch (ApiException e) {
       return ApiResponse.failedOf(e);
