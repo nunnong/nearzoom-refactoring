@@ -88,11 +88,8 @@ public class User extends BaseEntity {
      */
     public void initializeAccountName() {
         if (this.accountName == null || this.accountName.isEmpty()) {
-            // 이메일에서 @ 앞부분을 기본 계정명으로 설정
-            String emailPrefix = this.userEmail.split("@")[0];
-            // 특수문자 제거하고 영문, 숫자, '_', '.'만 남기기
-            String cleanAccountName = emailPrefix.replaceAll("[^a-zA-Z0-9._]", "");
-            this.accountName = cleanAccountName;
+            // 전체 이메일을 기본 계정명으로 설정
+            this.accountName = this.userEmail;
         }
     }
 }

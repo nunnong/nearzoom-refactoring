@@ -1,4 +1,4 @@
-// PostRepository.java - PageRequest 방식으로 수정 (완전한 버전)
+// PostRepository.java - N+1 문제 해결을 위한 Like JOIN FETCH 추가
 
 package com.ssafy.nearzoom.domain.feed.repository;
 
@@ -27,11 +27,13 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     List<Post> findByFeedIdOrderByDisplayOrder(Long feedId);
 
     @Query("""
-        select p 
+        select distinct p 
         from Post p 
         join fetch p.feed f
         join fetch f.user u
         join fetch p.photo ph
+        left join fetch p.likes l
+        left join fetch l.user lu
         where p.postId = :postId
         """)
     Optional<Post> findPostWithDetails(Long postId);
@@ -52,15 +54,17 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     // =========================================
 
     /**
-     * 팔로잉하는 사용자들의 최신 게시물들 + 자신의 게시물 - 마이룸 방식
+     * 🔥 팔로잉하는 사용자들의 최신 게시물들 + 자신의 게시물 - N+1 문제 해결
      * Service에서 PageRequest.ofSize(limit + 1) 전달
      */
     @Query("""
-    select p 
+    select distinct p 
     from Post p 
     join fetch p.feed f
     join fetch f.user u
     join fetch p.photo ph
+    left join fetch p.likes l
+    left join fetch l.user lu
     where (f.user.userId in (
         select fo.followee.userId 
         from Follow fo 
@@ -76,71 +80,83 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     );
 
     /**
-     * 전체 게시물들 조회 - 마이룸 방식
+     * 🔥 전체 게시물들 조회 - N+1 문제 해결
      */
     @Query("""
-        select p 
+        select distinct p 
         from Post p 
         join fetch p.feed f
         join fetch f.user u
         join fetch p.photo ph
+        left join fetch p.likes l
+        left join fetch l.user lu
         where (:cursor is null or p.postId < :cursor)
         order by p.postId desc
         """)
     List<Post> findRandomPosts(
-            @Param("cursor") Long cursor,
-            Pageable pageable
+        @Param("cursor") Long cursor,
+        Pageable pageable
     );
 
     /**
-     * 특정 피드의 게시물들 - 마이룸 방식
+     * 🔥 특정 피드의 게시물들 - N+1 문제 해결
      */
     @Query("""
-        select p 
+        select distinct p 
         from Post p 
+        join fetch p.feed f
+        join fetch f.user u
         join fetch p.photo ph
+        left join fetch p.likes l
+        left join fetch l.user lu
         where p.feed.feedId = :feedId 
         and (:cursor is null or p.postId < :cursor)
         order by p.displayOrder asc, p.postId asc
         """)
     List<Post> findByFeedIdWithCursor(
-            @Param("feedId") Long feedId,
-            @Param("cursor") Long cursor,
-            Pageable pageable
+        @Param("feedId") Long feedId,
+        @Param("cursor") Long cursor,
+        Pageable pageable
     );
 
     /**
-     * 특정 사용자의 모든 게시물 - 마이룸 방식
+     * 🔥 특정 사용자의 모든 게시물 - N+1 문제 해결
      */
     @Query("""
-        select p 
+        select distinct p 
         from Post p 
+        join fetch p.feed f
+        join fetch f.user u
         join fetch p.photo ph
+        left join fetch p.likes l
+        left join fetch l.user lu
         where p.feed.user.userId = :userId 
         and (:cursor is null or p.postId < :cursor)
         order by p.postId desc
         """)
     List<Post> findByUserIdWithCursor(
-            @Param("userId") Long userId,
-            @Param("cursor") Long cursor,
-            Pageable pageable
+        @Param("userId") Long userId,
+        @Param("cursor") Long cursor,
+        Pageable pageable
     );
 
     /**
-     * 최신 게시물들 조회 (전체) - 마이룸 방식
+     * 🔥 최신 게시물들 조회 (전체) - N+1 문제 해결
      */
     @Query("""
-        select p 
+        select distinct p 
         from Post p 
         join fetch p.feed f
         join fetch f.user u
         join fetch p.photo ph
+        left join fetch p.likes l
+        left join fetch l.user lu
         where (:cursor is null or p.postId < :cursor)
         order by p.postId desc
         """)
     List<Post> findLatestPostsWithCursor(
-            @Param("cursor") Long cursor,
-            Pageable pageable
+        @Param("cursor") Long cursor,
+        Pageable pageable
     );
 
     // =========================================

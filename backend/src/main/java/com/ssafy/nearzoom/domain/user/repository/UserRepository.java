@@ -1,4 +1,4 @@
-// UserRepository.java - 중복 메서드 제거 및 PageRequest 방식으로 통일
+// UserRepository.java - JOIN FETCH 제거 (User 엔티티에 feed 관계 없음)
 
 package com.ssafy.nearzoom.domain.user.repository;
 
@@ -42,10 +42,38 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByAccountName(String accountName);
 
     /**
-     * 계정명으로 사용자 조회 (삭제되지 않은 사용자만)
+     * ✅ 계정명으로 사용자 조회 (삭제되지 않은 사용자만)
      */
-    @Query("SELECT u FROM User u WHERE u.accountName = :accountName AND u.deletedAt IS NULL")
+    @Query("""
+        SELECT u FROM User u 
+        WHERE u.accountName = :accountName 
+        AND u.deletedAt IS NULL
+        """)
     Optional<User> findActiveByAccountName(@Param("accountName") String accountName);
+
+    /**
+     * ✅ 이메일로 사용자 조회
+     */
+    @Query("""
+        SELECT u FROM User u 
+        WHERE u.userEmail = :userEmail 
+        AND u.deletedAt IS NULL
+        """)
+    Optional<User> findByUserEmailWithFeed(@Param("userEmail") String userEmail);
+
+    /**
+     * ✅ 이메일과 소셜타입으로 사용자 조회
+     */
+    @Query("""
+        SELECT u FROM User u 
+        WHERE u.userEmail = :userEmail 
+        AND u.socialType = :socialType 
+        AND u.deletedAt IS NULL
+        """)
+    Optional<User> findByUserEmailAndSocialTypeWithFeed(
+        @Param("userEmail") String userEmail,
+        @Param("socialType") Social socialType
+    );
 
     // =========================================
     // 📱 마이룸 방식: JPQL + Pageable (Service에서 PageRequest 생성)

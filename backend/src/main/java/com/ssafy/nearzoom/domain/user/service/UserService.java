@@ -7,8 +7,8 @@ import com.ssafy.nearzoom.domain.user.dto.UserInfoResponse;
 import com.ssafy.nearzoom.domain.user.dto.UserProfileResponse;
 import com.ssafy.nearzoom.domain.user.entity.Social;
 import com.ssafy.nearzoom.domain.user.entity.User;
+import com.ssafy.nearzoom.domain.user.exception.UserNotFoundException;
 import com.ssafy.nearzoom.domain.user.repository.UserRepository;
-import com.ssafy.nearzoom.global.auth.jwt.JWTUtil;
 import com.ssafy.nearzoom.global.auth.jwt.service.RefreshTokenService;
 import com.ssafy.nearzoom.global.auth.util.AuthUtil;
 import com.ssafy.nearzoom.global.exception.ApiException;
@@ -22,21 +22,17 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UserService {
 
-    private final JWTUtil jwtUtil;
+    // 🔥 사용하지 않는 JWTUtil 제거
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
 
     public void logout(Authentication authentication) {
-
         UserAuthInfoResponse userAuthInfo = AuthUtil.getUserAuthInfo(authentication);
-
         String email = userAuthInfo.email();
-
         refreshTokenService.delete(email);
     }
 
     public UserInfoResponse getUserInfo(Authentication authentication) {
-
         UserAuthInfoResponse userAuthInfo = AuthUtil.getUserAuthInfo(authentication);
 
         String email = userAuthInfo.email();
@@ -90,7 +86,7 @@ public class UserService {
     }
 
     // =========================================
-    // 📝 프로필 관리 기능들 (신규 추가)
+    // 🔍 프로필 관리 기능들 (신규 추가)
     // =========================================
 
     /**
@@ -110,6 +106,25 @@ public class UserService {
             user.getAccountName(),
             user.getUserName(),
             user.getUserEmail(),  // userEmail 필드를 사용
+            user.getProfileImage(),
+            user.getPrettyFace()
+        );
+    }
+
+    /**
+     * 🔥 계정명으로 다른 사용자 프로필 조회 - 수정된 버전
+     */
+    @Transactional(readOnly = true)
+    public UserProfileResponse getUserProfileByAccountName(String accountName) {
+        User user = userRepository.findActiveByAccountName(accountName)
+            .orElseThrow(() -> new UserNotFoundException());  // ✅ 매개변수 제거
+
+        // 🔥 UserProfileResponse 생성자 직접 호출 (from 메서드 대신)
+        return new UserProfileResponse(
+            user.getUserId(),
+            user.getAccountName(),
+            user.getUserName(),
+            user.getUserEmail(),
             user.getProfileImage(),
             user.getPrettyFace()
         );

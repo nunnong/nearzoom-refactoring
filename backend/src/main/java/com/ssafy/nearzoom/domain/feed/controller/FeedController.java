@@ -51,34 +51,6 @@ public class FeedController {
     }
 
     // =========================================
-    // 👤 USER FEED: 특정 사용자 피드 조회 (마이룸 방식)
-    // =========================================
-
-    /**
-     * 👤 특정 사용자의 피드 조회 (게시물 포함) - 마이룸 방식
-     */
-    @GetMapping("/users/{userId}")
-    public ResponseEntity<ApiResponse<FeedWithPostsResponse>> getUserFeed(
-            Authentication authentication,
-            @PathVariable Long userId,
-            @RequestParam(defaultValue = "20") int limit,
-            @RequestParam(required = false) Long cursor) {
-        return ApiResponse.ok(feedService.getUserFeedWithPosts(authentication, userId, limit, cursor));
-    }
-
-    /**
-     * 👤 계정명으로 사용자 피드 조회 (게시물 포함) - 마이룸 방식
-     */
-    @GetMapping("/users/account/{accountName}")
-    public ResponseEntity<ApiResponse<FeedWithPostsResponse>> getUserFeedByAccountName(
-            Authentication authentication,
-            @PathVariable String accountName,
-            @RequestParam(defaultValue = "20") int limit,
-            @RequestParam(required = false) Long cursor) {
-        return ApiResponse.ok(feedService.getUserFeedByAccountName(authentication, accountName, limit, cursor));
-    }
-
-    // =========================================
     // 📝 POST MANAGEMENT: 게시물 관리 (기존 유지)
     // =========================================
 

@@ -10,10 +10,14 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Comment;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -41,6 +45,10 @@ public class Post extends BaseEntity {
     @Comment("피드 내 표시 순서")
     private Integer displayOrder;
 
+    // 🔥 Likes 엔티티와의 관계 (Like → Likes로 수정)
+    @OneToMany(mappedBy = "post", fetch = FetchType.LAZY)
+    private List<Likes> likes = new ArrayList<>();
+
     private Post(Feed feed, Photo photo, String caption, Integer displayOrder) {
         this.feed = feed;
         this.photo = photo;
@@ -58,5 +66,15 @@ public class Post extends BaseEntity {
 
     public void updateDisplayOrder(Integer displayOrder) {
         this.displayOrder = displayOrder;
+    }
+
+    // 🔥 편의 메서드들 (Likes 사용)
+    public int getLikeCount() {
+        return likes != null ? likes.size() : 0;
+    }
+
+    public boolean isLikedByUser(Long userId) {
+        return likes != null && likes.stream()
+            .anyMatch(like -> like.getUser().getUserId().equals(userId));
     }
 }

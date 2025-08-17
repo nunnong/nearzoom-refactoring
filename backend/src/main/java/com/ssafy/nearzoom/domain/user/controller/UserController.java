@@ -25,6 +25,47 @@ public class UserController {
 
     private final UserService userService;
 
+    // =========================================
+    // 🔥 누락된 엔드포인트들 추가
+    // =========================================
+
+    /**
+     * 🔥 프론트엔드에서 호출하는 /user/profile1 엔드포인트 (호환성)
+     * 실제로는 현재 사용자 프로필을 반환
+     */
+    @GetMapping("/profile1")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> getProfile1(
+        Authentication authentication) {
+        UserProfileResponse profile = userService.getCurrentUserProfile(authentication);
+        return ApiResponse.ok(profile);
+    }
+
+    /**
+     * 🔥 /my 엔드포인트 추가 (리다이렉트용)
+     * 현재 사용자의 프로필 정보 반환
+     */
+    @GetMapping("/my")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> getMyProfile(
+        Authentication authentication) {
+        UserProfileResponse profile = userService.getCurrentUserProfile(authentication);
+        return ApiResponse.ok(profile);
+    }
+
+    /**
+     * 🔥 계정명으로 다른 사용자 프로필 조회
+     */
+    @GetMapping("/profile/{accountName}")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> getUserProfileByAccountName(
+        @PathVariable String accountName,
+        Authentication authentication) {
+        UserProfileResponse profile = userService.getUserProfileByAccountName(accountName);
+        return ApiResponse.ok(profile);
+    }
+
+    // =========================================
+    // 🔄 기존 메서드들 (그대로 유지)
+    // =========================================
+
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest request,
         HttpServletResponse response, Authentication authentication) {
@@ -94,7 +135,7 @@ public class UserController {
     }
 
     // =========================================
-    // 📝 프로필 관리 API들 (신규 추가)
+    // 🔍 프로필 관리 APIs (신규 추가)
     // =========================================
 
     /**
@@ -115,7 +156,6 @@ public class UserController {
         Authentication authentication,
         @Valid @RequestBody UpdateProfileRequest request) {
         userService.updateProfile(authentication, request);
-        // ✅ 수정: Void 타입에 맞게 메시지와 null을 전달
         return ApiResponse.ok("프로필이 성공적으로 업데이트되었습니다.", null);
     }
 
