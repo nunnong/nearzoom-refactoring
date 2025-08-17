@@ -123,7 +123,7 @@ export default function PhotoCanvas({
           width: videoWidth,
           height: videoHeight,
           rotation: 0,
-          scaleX: -1, // Default mirror mode
+          scaleX: -1, // Default mirror mode (always)
           scaleY: 1,
           lastInteractionTime: Date.now(),
           aspectRatio: 4/3, // Default aspect ratio, will be updated when video loads
@@ -352,6 +352,8 @@ export default function PhotoCanvas({
                   width: baseWidth,
                   height: dynamicHeight,
                   aspectRatio: aspectRatio,
+                  scaleX: participants[participantId]?.scaleX || -1, // Always maintain mirror mode
+                  scaleY: participants[participantId]?.scaleY || 1,
                   lastInteractionTime: Date.now(),
                 }
               }
@@ -596,8 +598,8 @@ export default function PhotoCanvas({
             width: participants[participantId]?.width || 320,
             height: participants[participantId]?.height || 240,
             rotation: participants[participantId]?.rotation || 0,
-            scaleX: 1,
-            scaleY: 1,
+            scaleX: participants[participantId]?.scaleX || -1, // Always maintain mirror mode
+            scaleY: participants[participantId]?.scaleY || 1,
             lastInteractionTime: Date.now(),
           },
         }
@@ -785,6 +787,8 @@ export default function PhotoCanvas({
                           width: currentTransform.width,
                           height: currentTransform.height,
                           rotation: currentTransform.rotation || 0,
+                          scaleX: participants[participantId]?.scaleX || -1, // Always maintain mirror mode
+                          scaleY: participants[participantId]?.scaleY || 1,
                           lastInteractionTime: Date.now(),
                         },
                       }
@@ -830,6 +834,8 @@ export default function PhotoCanvas({
                             (participants[participantId]?.height || 240) *
                               scaleY
                           ),
+                          scaleX: participants[participantId]?.scaleX || -1, // Always maintain mirror mode
+                          scaleY: participants[participantId]?.scaleY || 1,
                           lastInteractionTime: Date.now(),
                         },
                       }
@@ -837,10 +843,10 @@ export default function PhotoCanvas({
                         participants: updatedParticipants,
                       })
 
-                      // Transform 완료 후 스케일 리셋 (다음 프레임에서 실행)
+                      // Transform 완료 후 스케일 리셋 (거울모드 유지)
                       requestAnimationFrame(() => {
-                        node.scaleX(1)
-                        node.scaleY(1)
+                        node.scaleX(participants[participantId]?.scaleX || -1)
+                        node.scaleY(participants[participantId]?.scaleY || 1)
                       })
                     }
                   }}
