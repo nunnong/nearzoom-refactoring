@@ -65,7 +65,7 @@ const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetError
 
 // 🚀 메인 마이룸 컴포넌트
 function MyRoomContent() {
-  const { user, isAuthenticated, isLoading: authLoading, initializeAuth } = useAuthStore()
+  const { user, isAuthenticated, isLoading: authLoading, initializeAuth, logout } = useAuthStore()
   const [userImages, setUserImages] = useState<ImageItem[]>([])
   const [loading, setLoading] = useState(false)  // 🚀 false로 변경
   const [userInfoLoading, setUserInfoLoading] = useState(false)
@@ -113,207 +113,187 @@ function MyRoomContent() {
     } : null
   })
 
-  // 🚀 사용자 이미지 가져오기
-  const fetchUserImages = async () => {
-    console.log('🚀 fetchUserImages 함수 시작 - 현재 상태:', {
-      loading,
-      isAuthenticated,
-      user: user ? '있음' : '없음',
-      userImagesLength: userImages.length
+  // 🚀 이미지 목록 업데이트 시 필터링된 이미지도 업데이트
+  useEffect(() => {
+    setUserImages(userImages)
+  }, [userImages])
+
+  // 🚀 필터 변경 핸들러 (클라이언트 사이드 필터링)
+  const handleFiltersChange = useCallback((filters: any[]) => {
+    if (filters.length === 0) {
+      // 필터가 없으면 모든 이미지 표시
+      return
+    }
+
+    // 클라이언트 사이드에서 필터링 수행
+    let filtered = [...userImages]
+
+    filters.forEach(filter => {
+      switch (filter.type) {
+        case 'heart':
+          filtered = filtered.filter(img => img.isLiked)
+          break
+        case 'edited':
+          if (filter.value === 'edited') {
+            filtered = filtered.filter(img => img.isEdited)
+          } else if (filter.value === 'not_edited') {
+            filtered = filtered.filter(img => !img.isEdited)
+          }
+          break
+        case 'date':
+          // 날짜 필터링 로직 (필요시 구현)
+          break
+        case 'name':
+          // 이름 필터링 로직 (필요시 구현)
+          break
+      }
     })
 
+    setUserImages(filtered)
+  }, [userImages])
+
+  // 🚀 사용자 이미지 가져오기
+  const fetchUserImages = useCallback(async (condition?: MyPhotoListCondition) => {
+    if (!isAuthenticated || !user) return
+
     try {
-      setLoading(true);
-      setError(null);
-
-      console.log('🚀 fetchUserImages 시작');
-      console.log('📊 현재 상태:', { 
-        loading, 
-        userImagesLength: userImages.length, 
-        isAuthenticated, 
-        user: user ? '있음' : '없음' 
-      });
-
-      const condition: MyPhotoListCondition = {
-        limit: 20
-      };
-
-      console.log('🔍 API 호출 조건:', condition);
-      console.log('🌐 API 엔드포인트:', API_ENDPOINTS.PHOTOS);
-      console.log('👤 현재 사용자 정보:', user);
-
-      const response = await myroomService.getPhotos(condition);
+      setLoading(true)
       
-      console.log('📡 API 응답 전체:', response);
+      const defaultCondition: MyPhotoListCondition = {
+        limit: 20,
+        ...condition
+      }
+
+      const response = await myroomService.getPhotos(defaultCondition)
       
       if (response && response.photos) {
         const convertedImages: ImageItem[] = response.photos.map(photo => ({
           photoId: String(photo.photoId),
-          imgUrl: photo.imageUrl || '',
-          isLiked: false, // 기본값으로 설정
-          isEdited: false, // 기본값으로 설정
-          editable: typeof photo.editable === 'number' ? photo.editable : 0,
-          hashtags: [], // 기본값으로 설정
-          createdAt: photo.createdAt || '',
-          partnerEmails: photo.partnerEmails || ''
-        }));
+          imgUrl: photo.imageUrl,
+          alt: '이미지',
+          isLiked: photo.heart === 1,
+          isEdited: !photo.editable,
+          editable: photo.editable ? 1 : 0,
+          hashtags: []
+        }))
 
-        console.log('🔄 변환된 이미지들:', convertedImages);
-
-        setUserImages(convertedImages);
-        setNextCursor(response.nextCursor || null);
-        setHasMore(!!response.nextCursor);
-        
-        console.log('✅ 사용자 이미지 로딩 완료:', {
-          count: convertedImages.length,
-          hasMore: !!response.nextCursor,
-          nextCursor: response.nextCursor
-        });
-      } else {
-        console.warn('⚠️ 응답 데이터가 예상과 다릅니다:', response);
-        setUserImages([]);
-        setHasMore(false);
+        setUserImages(convertedImages)
+        setHasMore(response.hasNext)
       }
-
-    } catch (error: any) {
-      console.error('❌ 사용자 이미지 가져오기 실패:', error);
-      
-      // 에러 상세 정보 로깅
-      if (error.response) {
-        console.error('📊 에러 응답:', {
-          status: error.response.status,
-          data: error.response.data,
-          headers: error.response.headers
-        });
-      } else if (error.request) {
-        console.error('📊 에러 요청:', error.request);
-      } else {
-        console.error('📊 에러 메시지:', error.message);
-      }
-      
-      setError('이미지를 불러오는데 실패했습니다.');
+    } catch (error) {
+      console.error('사용자 이미지 로딩 실패:', error)
     } finally {
-      setLoading(false);
-      console.log('🏁 fetchUserImages 함수 종료');
+      setLoading(false)
     }
-  };
+  }, [isAuthenticated, user])
 
-  // 🚀 추가 이미지 로딩
-  const loadMoreImages = async () => {
-    if (!hasMore || !nextCursor || loading) return;
+  // 🚀 추가 이미지 로드
+  const loadMoreImages = useCallback(async () => {
+    if (!isAuthenticated || !user || !hasMore) return
 
     try {
-      setLoading(true);
-      
       const condition: MyPhotoListCondition = {
         limit: 20,
-        cursor: nextCursor
-      };
+        cursor: Number(userImages[userImages.length - 1]?.photoId)
+      }
 
-      const response = await myroomService.getPhotos(condition);
+      const response = await myroomService.getPhotos(condition)
       
       if (response && response.photos) {
         const newImages: ImageItem[] = response.photos.map(photo => ({
           photoId: String(photo.photoId),
-          imgUrl: photo.imageUrl || '',
-          isLiked: false, // 기본값으로 설정
-          isEdited: false, // 기본값으로 설정
-          editable: typeof photo.editable === 'number' ? photo.editable : 0,
-          hashtags: [], // 기본값으로 설정
-          createdAt: photo.createdAt || '',
-          partnerEmails: photo.partnerEmails || ''
-        }));
+          imgUrl: photo.imageUrl,
+          alt: '이미지',
+          isLiked: photo.heart === 1,
+          isEdited: !photo.editable,
+          editable: photo.editable ? 1 : 0,
+          hashtags: []
+        }))
 
-        setUserImages(prev => [...prev, ...newImages]);
-        setNextCursor(response.nextCursor || null);
-        setHasMore(!!response.nextCursor);
+        setUserImages(prev => [...prev, ...newImages])
+        setHasMore(response.hasNext)
       }
     } catch (error) {
-      console.error('❌ 추가 이미지 로딩 실패:', error);
-    } finally {
-      setLoading(false);
+      console.error('추가 이미지 로딩 실패:', error)
     }
-  };
+  }, [isAuthenticated, user, hasMore, userImages])
 
   // 🚀 좋아요 토글
-  const handleLike = async (photoId: string) => {
+  const handleLike = useCallback(async (photoId: string) => {
     try {
-      // API 호출 로직 추가 예정
-      console.log('👍 좋아요 토글:', photoId);
-      
-      // 임시로 로컬 상태만 업데이트
-      setUserImages(prev => prev.map(img => 
-        img.photoId === photoId 
-          ? { ...img, isLiked: !img.isLiked }
-          : img
-      ));
+      await myroomService.updateHeart({
+        photoId: Number(photoId),
+        heart: !userImages.find(img => img.photoId === photoId)?.isLiked
+      })
+      await fetchUserImages()
     } catch (error) {
-      console.error('❌ 좋아요 토글 실패:', error);
+      console.error('좋아요 토글 실패:', error)
     }
-  };
+  }, [fetchUserImages, userImages])
 
   // 🚀 이미지 삭제
-  const handleDelete = async (photoId: string) => {
-    if (!confirm('정말로 이 이미지를 삭제하시겠습니까?')) return;
-
+  const handleDelete = useCallback(async (photoId: string) => {
     try {
-      // API 호출 로직 추가 예정
-      console.log('🗑️ 이미지 삭제:', photoId);
-      
-      // 임시로 로컬 상태만 업데이트
-      setUserImages(prev => prev.filter(img => img.photoId !== photoId));
+      await myroomService.deletePhoto({
+        photoId: Number(photoId)
+      })
+      await fetchUserImages()
     } catch (error) {
-      console.error('❌ 이미지 삭제 실패:', error);
+      console.error('이미지 삭제 실패:', error)
     }
-  };
+  }, [fetchUserImages])
 
   // 🚀 이미지 편집
-  const handleEdit = async (photoId: string, editedImageUrl?: string): Promise<void> => {
-    console.log('✏️ 이미지 편집:', photoId, editedImageUrl);
-    router.push(`/drawing?photoId=${photoId}`);
-  };
-
-  // 🚀 이미지 새로고침
-  const handleImageRefresh = () => {
-    console.log('🔄 이미지 새로고침');
-    fetchUserImages();
-  };
+  const handleEdit = useCallback(async (photoId: string, editedImageUrl: string) => {
+    try {
+      await myroomService.saveEditedPhoto({
+        imageUrl: editedImageUrl,
+        originalPhotoId: Number(photoId)
+      })
+      await fetchUserImages()
+    } catch (error) {
+      console.error('이미지 편집 저장 실패:', error)
+    }
+  }, [fetchUserImages])
 
   // 🚀 페이지 새로고침
-  const handlePageReload = () => {
-    console.log('🔄 페이지 새로고침');
-    window.location.reload();
-  };
+  const handlePageReload = useCallback(() => {
+    window.location.reload()
+  }, [])
 
-  // 🚀 MyRoom으로 이동 (셀피 업로드/AI 보정)
-  const handleUploadSelfie = () => {
-    // 이미 MyRoom에 있으므로 UploadSelfieModal을 열거나 해당 섹션으로 이동
-    console.log('📸 UPLOAD SELFIE 클릭');
-    // TODO: UploadSelfieModal 열기 로직 추가
-    // 현재는 /upload-photo 페이지로 이동
-    router.push('/upload-photo');
-  };
+  // 🚀 셀피 업로드
+  const handleUploadSelfie = useCallback(() => {
+    router.push('/upload-selfie')
+  }, [router])
 
-  // 🚀 프로필 설정 페이지로 이동
-  const handleAccount = () => {
-    router.push('/profile');
-  };
+  // 🚀 계정 설정
+  const handleAccount = useCallback(() => {
+    router.push('/profile')
+  }, [router])
 
   // 🚀 로그아웃
-  const handleLogout = () => {
-    if (confirm('로그아웃하시겠습니까?')) {
+  const handleLogout = useCallback(async () => {
+    try {
+      logout()
+      router.push('/')
+    } catch (error) {
+      console.error('로그아웃 실패:', error)
+      alert('로그아웃에 실패했습니다.')
+    }
+  }, [logout, router])
+
+  // 🚀 계정 삭제
+  const handleDeleteAccount = useCallback(async () => {
+    if (confirm('정말로 계정을 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없으며, 모든 데이터가 영구적으로 삭제됩니다.')) {
       try {
-        // useAuthStore의 logout 함수 사용
-        const { logout } = useAuthStore.getState();
-        logout();
-        console.log('🚪 로그아웃');
-        router.push('/');
+        // 프로필 페이지로 이동하여 계정 삭제 진행
+        router.push('/profile')
       } catch (error) {
-        console.error('❌ 로그아웃 실패:', error);
-        alert('로그아웃에 실패했습니다.');
+        console.error('계정 삭제 페이지 이동 실패:', error)
+        alert('계정 삭제 페이지로 이동할 수 없습니다.')
       }
     }
-  };
+  }, [router])
 
   // 🚀 에러 상태
   const [error, setError] = useState<string | null>(null);
@@ -410,6 +390,7 @@ function MyRoomContent() {
           onUploadSelfie={() => {}}
           onAccount={() => {}}
           onLogout={() => {}}
+          onDeleteAccount={() => {}}
         />
         <div className="flex min-h-[calc(100vh-80px)] items-center justify-center">
           <div className="text-center">
@@ -442,6 +423,7 @@ function MyRoomContent() {
         onUploadSelfie={handleUploadSelfie}
         onAccount={handleAccount}
         onLogout={handleLogout}
+        onDeleteAccount={handleDeleteAccount}
       />
 
       {/* Dashboard - 전체 너비 사용 */}

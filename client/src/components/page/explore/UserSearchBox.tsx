@@ -1,5 +1,5 @@
 // =============================================================================
-// 📁 UserSearchBox.tsx - 올바른 아키텍처 원칙 완전 준수
+// 📁 f.tsx - 올바른 아키텍처 원칙 완전 준수
 // =============================================================================
 
 'use client'
@@ -193,7 +193,6 @@ const UserSearchBox: React.FC<UserSearchBoxProps> = ({
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isAuthChecked, setIsAuthChecked] = useState(false);
   
   // 🔥 무한스크롤 상태
   const [hasNextPage, setHasNextPage] = useState(false);
@@ -214,29 +213,7 @@ const UserSearchBox: React.FC<UserSearchBoxProps> = ({
       hasAccessToken: !!accessToken,
       user: user?.accountName
     });
-
-    setIsAuthChecked(true);
-
-    if (!isAuthenticated || !accessToken) {
-      console.log('🚨 검색을 위해서는 로그인이 필요합니다.');
-      // 검색 관련 상태 초기화
-      setQuery('');
-      setSearchResults([]);
-      setShowResults(false);
-      setError('로그인이 필요합니다.');
-      setHasNextPage(false);
-      setNextCursor(null);
-      setTotalSearched(0);
-      return;
-    }
-
-    // 로그인 상태이면 에러 상태 초기화
-    if (error === '로그인이 필요합니다.') {
-      setError(null);
-    }
-
-    console.log('✅ 검색 가능 상태 (로그인됨).');
-  }, [isAuthenticated, accessToken, user, error]);
+  }, [isAuthenticated, accessToken, user]);
 
   // ============================================================================
   // 에러 처리 헬퍼
@@ -273,7 +250,7 @@ const UserSearchBox: React.FC<UserSearchBoxProps> = ({
   
   const performInitialSearch = useCallback(async (searchQuery: string) => {
     // 로그인 상태 확인
-    if (!isAuthChecked || !isAuthenticated || !accessToken) {
+    if (!isAuthenticated || !accessToken) {
       console.log('🚨 검색을 위해 로그인이 필요합니다.');
       setError('로그인이 필요합니다.');
       return;
@@ -330,7 +307,7 @@ const UserSearchBox: React.FC<UserSearchBoxProps> = ({
     } finally {
       setIsSearching(false);
     }
-  }, [isAuthChecked, isAuthenticated, accessToken, user, maxResults, handleError]);
+  }, [isAuthenticated, accessToken, user, maxResults, handleError]);
 
   // ============================================================================
   // 백엔드 API 연동 - 다음 페이지 로드 (무한스크롤)

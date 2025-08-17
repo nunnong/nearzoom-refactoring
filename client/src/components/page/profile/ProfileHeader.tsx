@@ -724,11 +724,6 @@ function ProfileHeader({
             </div>
           </div>
 
-          {/* 계정명 표시 */}
-          <p className="text-gray-600 mb-1 truncate">
-            @{user.accountName}
-          </p>
-
           {/* 피드 설명 */}
           <div className="mt-4">
             <h3 className="font-semibold text-gray-900 mb-1 truncate">{user.feed.name}</h3>

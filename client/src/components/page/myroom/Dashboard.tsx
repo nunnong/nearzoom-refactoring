@@ -55,7 +55,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   onEdit
 }) => {
   const router = useRouter()
-  const { logout, isLoading } = useAuthStore()
   const actualUser = userProfile
   
   const [activeModal, setActiveModal] = useState<string | null>(null)
@@ -67,15 +66,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
     setImageList(images)
     setFilteredImages(images)
-    console.log('📸 Dashboard received images:', images)
-    console.log('📸 Dashboard imageList:', imageList)
-    console.log('📸 Dashboard filteredImages:', filteredImages)
   }, [images])
 
   // 🚀 필터 변경 핸들러 (클라이언트 사이드 필터링)
   const handleFiltersChange = useCallback((filters: Filter[]) => {
-    console.log('🔍 필터 변경:', filters)
-    
     if (filters.length === 0) {
       // 필터가 없으면 모든 이미지 표시
       setFilteredImages(imageList)
@@ -91,23 +85,22 @@ const Dashboard: React.FC<DashboardProps> = ({
           filtered = filtered.filter(img => img.isLiked)
           break
         case 'edited':
-          filtered = filtered.filter(img => img.isEdited)
+          if (filter.value === 'edited') {
+            filtered = filtered.filter(img => img.isEdited)
+          } else if (filter.value === 'not_edited') {
+            filtered = filtered.filter(img => !img.isEdited)
+          }
           break
         case 'date':
-          // 날짜 필터링 로직 (추후 구현)
+          // 날짜 필터링 로직 (필요시 구현)
           break
         case 'name':
-          // 이름 검색 필터링 (추후 구현)
+          // 이름 필터링 로직 (필요시 구현)
           break
       }
     })
 
     setFilteredImages(filtered)
-    console.log('✅ 필터링 완료:', { 
-      originalCount: imageList.length, 
-      filteredCount: filtered.length,
-      filters: filters.map(f => f.type)
-    })
   }, [imageList])
 
   // 🚀 이미지 새로고침
@@ -167,28 +160,18 @@ const Dashboard: React.FC<DashboardProps> = ({
     router.push('/profile')
   }, [router])
 
-  // 🚀 로그아웃
-  const handleLogoutClick = useCallback(async () => {
-    if (confirm('로그아웃하시겠습니까?')) {
-      try {
-        logout()
-        router.push('/')
-      } catch (error) {
-        console.error('로그아웃 실패:', error)
-        alert('로그아웃에 실패했습니다.')
-      }
-    }
-  }, [logout, router])
 
-  // 🚀 계정 삭제 (현재는 구현되지 않음)
-  const handleDeleteAccountClick = useCallback(async () => {
-    alert('계정 삭제 기능은 현재 구현되지 않았습니다.')
-  }, [])
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-white">
       {/* 🚀 검색 및 필터 영역 */}
-      <div className="bg-gray-100 border-b border-gray-200 p-4">
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 p-6 shadow-sm">
+        <div className="flex justify-center">
+          <div className="text-center mb-4">
+            <h2 className="text-2xl font-bold text-blue-900 mb-2">ALBUM</h2>
+            <p className="text-blue-700 text-sm">나만의 특별한 순간들을 정리해보세요</p>
+          </div>
+        </div>
         <div className="flex justify-center">
           <div className="w-[30rem] ml-16">
             <SearchBox
@@ -198,15 +181,15 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* 🚀 이미지 아카이브 - 전체 한 톤 */}
+      {/* 🚀 이미지 아카이브 - 깔끔한 흰색 그리드 */}
       <div className="flex-1">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-12 gap-0">
             {/* 왼쪽 공간 */}
-            <div className="col-span-1 bg-gray-100 min-h-screen"></div>
+            <div className="col-span-0.5 bg-gray-50 min-h-screen"></div>
             
             {/* 중앙 콘텐츠 영역 */}
-            <div className="col-span-10 p-4 bg-gray-100">
+            <div className="col-span-11 p-4 bg-white">
               <ImageArchive
                 images={filteredImages}
                 onLoadMore={handleLoadMore}
@@ -219,7 +202,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
             
             {/* 오른쪽 공간 */}
-            <div className="col-span-1 bg-gray-100 min-h-screen"></div>
+            <div className="col-span-0.5 bg-gray-50 min-h-screen"></div>
           </div>
         </div>
       </div>

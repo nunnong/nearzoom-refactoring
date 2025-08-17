@@ -7,12 +7,56 @@ import {
   HeartIcon as HeartSolidIcon,
   ShareIcon,
   TrashIcon,
-  PencilIcon
+  PencilIcon,
+  MagnifyingGlassIcon
 } from '@heroicons/react/24/outline'
 
 import DeleteConfirmModal from './DeleteConfirmModal'
 import ShareModal from './ShareModal'
 import EditConfirmModal from './EditConfirmModal'
+
+// 이미지 확대 모달 컴포넌트
+const ImageZoomModal = ({ 
+  isOpen, 
+  image, 
+  onClose 
+}: { 
+  isOpen: boolean; 
+  image: ImageItem | null; 
+  onClose: () => void; 
+}) => {
+  if (!isOpen || !image) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <div className="relative max-w-4xl max-h-[90vh] mx-4">
+        {/* 닫기 버튼 */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-10 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        
+        {/* 이미지 */}
+        <img
+          src={image.imgUrl}
+          alt={image.alt || '확대된 이미지'}
+          className="w-full h-auto max-h-[80vh] object-contain rounded-lg shadow-2xl"
+        />
+        
+        {/* 이미지 정보 */}
+        <div className="mt-4 text-center text-white">
+          <p className="text-sm opacity-80">
+            {image.alt || '이미지'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export interface ImageItem {
   photoId: string
@@ -50,6 +94,8 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(({
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [imageToEdit, setImageToEdit] = useState<ImageItem | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [zoomModalOpen, setZoomModalOpen] = useState(false)
+  const [imageToZoom, setImageToZoom] = useState<ImageItem | null>(null)
 
   // 반응형 컬럼 설정
   const breakpointColumns = {
@@ -59,17 +105,17 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(({
     500: 1
   }
 
-  const handleDeleteClick = (image: ImageItem) => {
+  const handleDeleteClick = useCallback((image: ImageItem) => {
     setImageToDelete(image)
     setDeleteModalOpen(true)
-  }
+  }, [])
 
-  const handleDeleteCancel = () => {
+  const handleDeleteCancel = useCallback(() => {
     setDeleteModalOpen(false)
     setImageToDelete(null)
-  }
+  }, [])
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = useCallback(async () => {
     if (imageToDelete && onDelete) {
       try {
         await onDelete(imageToDelete.photoId)
@@ -79,48 +125,57 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(({
         console.error('이미지 삭제 실패:', error)
       }
     }
-  }
+  }, [imageToDelete, onDelete])
 
-  const handleShareClick = (image: ImageItem) => {
+  const handleShareClick = useCallback((image: ImageItem) => {
+    console.log('🔗 공유 버튼 클릭됨:', image.photoId)
     setImageToShare(image)
     setShareModalOpen(true)
-  }
+    console.log('✅ 공유 모달 상태 업데이트됨')
+  }, [])
 
-  const handleShareClose = () => {
+  const handleShareClose = useCallback(() => {
     setShareModalOpen(false)
     setImageToShare(null)
-  }
+  }, [])
 
-  const handleEditClick = (image: ImageItem) => {
+  const handleEditClick = useCallback((image: ImageItem) => {
     setImageToEdit(image)
     setEditModalOpen(true)
-  }
+  }, [])
 
-  const handleEditConfirm = async () => {
+  const handleEditConfirm = useCallback(async () => {
     if (imageToEdit) {
       try {
-        // 편집 페이지로 이동 (photoId와 imgUrl 파라미터 전달)
-        const editUrl = `/drawing?id=${imageToEdit.photoId}&src=${encodeURIComponent(imageToEdit.imgUrl)}&returnUrl=${encodeURIComponent('/myroom')}`
-        window.location.href = editUrl
-        
+        await onEdit?.(imageToEdit.photoId, 'new_edited_image_url')
         setEditModalOpen(false)
         setImageToEdit(null)
       } catch (error) {
-        console.error('편집 시작 실패:', error)
+        console.error('이미지 편집 실패:', error)
       }
     }
-  }
+  }, [imageToEdit, onEdit])
 
-  const handleEditCancel = (): void => {
+  const handleEditCancel = useCallback(() => {
     setEditModalOpen(false)
     setImageToEdit(null)
-  }
+  }, [])
 
-  const handleLikeClick = (photoId: string): void => {
+  const handleLikeClick = useCallback((photoId: string) => {
     onLike?.(photoId)
-  }
+  }, [onLike])
 
-  const fetchMoreImages = async () => {
+  const handleImageZoom = useCallback((image: ImageItem) => {
+    setImageToZoom(image)
+    setZoomModalOpen(true)
+  }, [])
+
+  const handleZoomClose = useCallback(() => {
+    setZoomModalOpen(false)
+    setImageToZoom(null)
+  }, [])
+
+  const fetchMoreImages = useCallback(async () => {
     if (onLoadMore && !loadingMore) {
       setLoadingMore(true)
       try {
@@ -131,7 +186,7 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(({
         setLoadingMore(false)
       }
     }
-  }
+  }, [onLoadMore, loadingMore])
 
   // 이미지가 없을 때 표시할 메시지
   if (images.length === 0) {
@@ -162,20 +217,21 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(({
       <div className="bg-white rounded-2xl p-6 shadow-lg">
         <Masonry
           breakpointCols={breakpointColumns}
-          className="-ml-2 flex w-auto"
-          columnClassName="pl-2 bg-clip-padding"
+          className="-ml-6 flex w-auto"
+          columnClassName="pl-6 bg-clip-padding"
         >
-          {images.map(image => (
+          {images.map((image, index) => (
             <div
               key={image.photoId}
               data-image-id={image.photoId}
-              className="group relative mb-2 overflow-hidden rounded-lg"
+              className="group relative mb-8 overflow-hidden rounded-lg transform hover:scale-105 transition-all duration-300"
             >
               <img
                 src={image.imgUrl}
                 alt={image.alt || '이미지'}
-                className="w-full h-auto cursor-pointer rounded-lg shadow-sm transition-all duration-300 ease-in-out group-hover:scale-105"
+                className="w-full h-auto cursor-pointer rounded-lg shadow-lg transition-all duration-300 ease-in-out group-hover:scale-110"
                 loading="lazy"
+                onClick={() => handleImageZoom(image)}
                 onError={() => {
                   // 에러 처리
                   const parent = document.querySelector(`[data-image-id="${image.photoId}"]`) as HTMLElement
@@ -185,6 +241,13 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(({
                   }
                 }}
               />
+
+              {/* 돋보기 아이콘 (호버 시 표시) */}
+              <div className="absolute top-2 left-2 opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100">
+                <div className="p-2 bg-white/20 backdrop-blur-sm rounded-full">
+                  <MagnifyingGlassIcon className="h-4 w-4 text-white" />
+                </div>
+              </div>
 
               <div className="absolute inset-0 bg-black/0 transition-all duration-300 ease-in-out group-hover:bg-black/40" />
 
@@ -274,7 +337,7 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(({
       </div>
 
       {hasMore && (
-        <div 
+        <div
           ref={loadMoreRef}
           className="flex items-center justify-center py-8"
         >
@@ -321,8 +384,8 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(({
         onCancel={handleDeleteCancel}
       />
 
-      {/* Share Modal */}
-      <ShareModal
+                        {/* Share Modal */}
+                  <ShareModal
         isOpen={shareModalOpen}
         image={imageToShare}
         onClose={handleShareClose}
@@ -335,6 +398,13 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(({
         image={imageToEdit}
         onConfirm={handleEditConfirm}
         onCancel={handleEditCancel}
+      />
+
+      {/* Image Zoom Modal */}
+      <ImageZoomModal
+        isOpen={zoomModalOpen}
+        image={imageToZoom}
+        onClose={handleZoomClose}
       />
     </>
   )

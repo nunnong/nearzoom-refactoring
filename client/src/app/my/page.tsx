@@ -24,13 +24,8 @@ const MyProfilePage: React.FC = (): JSX.Element => {
   // 🔥 리다이렉트 로직: 내 이메일과 accountName이 같으면 /my로 유지
   useEffect(() => {
     if (!authLoading && isAuthenticated && user) {
-      console.log('🔍 내 프로필 페이지 접근:', { 
-        userEmail: user.email,
-        userAccountName: (user as any)?.accountName 
-      });
       // 여기서는 이미 /my이므로 추가 리다이렉트 불필요
     } else if (!authLoading && !isAuthenticated) {
-      console.log('🔒 인증되지 않은 사용자, 로그인 페이지로 리다이렉트');
       router.replace('/login');
     }
   }, [authLoading, isAuthenticated, user, router]);
@@ -79,15 +74,9 @@ const MyProfilePage: React.FC = (): JSX.Element => {
           email: user.email,
           profileImage: user.profileImage
         }}
-        onUploadSelfie={() => {
-          // 셀피 업로드 기능 (필요시 구현)
-          console.log('Upload selfie clicked')
-        }}
+        onUploadSelfie={() => router.push('/upload-selfie')}
         onAccount={() => router.push('/profile')}
-        onLogout={() => {
-          // 로그아웃 기능 (필요시 구현)
-          console.log('Logout clicked')
-        }}
+        onLogout={() => router.push('/')}
       />
 
       {/* 메인 컨텐츠 */}

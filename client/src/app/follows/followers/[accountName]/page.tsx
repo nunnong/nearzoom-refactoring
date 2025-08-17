@@ -12,6 +12,9 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { useFollow } from '@/hooks/useFollow';
 
+// MyRoomHeader 컴포넌트 추가
+import MyRoomHeader from '@/components/page/myroom/MyRoomHeader';
+
 // LoadingSpinner 컴포넌트
 const LoadingSpinner = ({ size = 'md', text }: { 
   size?: 'sm' | 'md' | 'lg'; 
@@ -236,8 +239,20 @@ export default function FollowersPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
-      <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+      {/* MyRoomHeader 추가 */}
+      <MyRoomHeader
+        user={{
+          name: user?.name,
+          email: user?.email,
+          profileImage: user?.profileImage
+        }}
+        onUploadSelfie={() => router.push('/upload-selfie')}
+        onAccount={() => router.push('/profile')}
+        onLogout={() => router.push('/')}
+      />
+
+      {/* 팔로워 헤더 */}
+      <div className="bg-white shadow-sm border-b border-gray-200 sticky top-20 z-30">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">

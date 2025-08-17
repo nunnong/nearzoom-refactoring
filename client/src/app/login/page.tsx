@@ -239,15 +239,6 @@ const LoginContent = (): JSX.Element => {
           <div className="relative flex justify-center bg-white px-2 text-xs text-gray-500">또는</div>
         </div>
 
-        {/* 여러 이동 옵션들 */}
-        <div className="space-y-2">
-          <button
-            onClick={handleGoToMain}
-            className="w-full text-sm text-gray-600 hover:text-gray-800 py-3 px-4 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            🏠 메인으로 돌아가기
-          </button>
-        </div>
 
         {/* 약관 */}
         <p className="mt-2 text-center text-xs text-gray-500">

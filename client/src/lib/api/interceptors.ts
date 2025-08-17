@@ -67,16 +67,19 @@ api.interceptors.response.use(
 
     // 🚀 상세한 에러 정보 로깅
     console.error('🚨 API 인터셉터 에러 상세 정보:', {
-      error,
       errorType: typeof error,
-      errorKeys: error ? Object.keys(error) : 'undefined',
-      errorMessage: error?.message,
-      errorCode: error?.code,
-      errorStatus: error?.response?.status,
-      errorResponse: error?.response?.data,
-      errorConfig: error?.config,
-      url: error?.config?.url,
-      method: error?.config?.method,
+      errorMessage: error?.message || 'Unknown error',
+      errorCode: error?.code || 'No code',
+      errorStatus: error?.response?.status || 'No status',
+      errorResponse: error?.response?.data || 'No response data',
+      url: error?.config?.url || 'No URL',
+      method: error?.config?.method || 'No method',
+      isAxiosError: error?.isAxiosError || false,
+      isNetworkError: !error?.response || false,
+      isTimeoutError:
+        error?.code === 'ECONNABORTED' ||
+        error?.message?.includes('timeout') ||
+        false,
     })
 
     // 🚀 타임아웃 에러 처리
@@ -163,7 +166,9 @@ api.interceptors.response.use(
     }
 
     // 🚀 기타 HTTP 에러 처리
-    const apiError = new Error(error.response?.data?.message || '오류가 발생했습니다.')
+    const apiError = new Error(
+      error.response?.data?.message || '오류가 발생했습니다.'
+    )
     ;(apiError as any).code = error.response?.data?.code
     ;(apiError as any).status = error.response?.status
     ;(apiError as any).originalError = error // 원본 에러 보존

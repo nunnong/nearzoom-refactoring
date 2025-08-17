@@ -55,21 +55,22 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
       return '날짜 형식 오류'
     }
   }, [])
-  
-  if (!isOpen || !image) return null
 
   // 메모이제이션된 콜백 함수들
   const handleKakaoShare = useCallback(() => {
-    onShareKakao(image.photoId)
-    onClose()
-  }, [image.photoId, onShareKakao, onClose])
+    if (image) {
+      onShareKakao(image.photoId)
+      onClose()
+    }
+  }, [image, onShareKakao, onClose])
 
   const handleFeedCreate = useCallback(() => {
-    const params = new URLSearchParams({ photoId: String(image.photoId) })
-
-    router.push(`/feed/edit?${params.toString()}`)
-    onClose()
-  }, [image.photoId, image.imgUrl, router, onClose])
+    if (image) {
+      const params = new URLSearchParams({ photoId: String(image.photoId) })
+      router.push(`/feed/edit?${params.toString()}`)
+      onClose()
+    }
+  }, [image, router, onClose])
 
   const handleEmailCopy = useCallback(async (email: string) => {
     try {
@@ -95,6 +96,8 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
   }, [showToast])
 
   const handleDownload = useCallback(async () => {
+    if (!image) return
+    
     try {
       // 이미지 URL에서 실제 이미지 데이터 가져오기
       const response = await fetch(image.imgUrl)
@@ -122,7 +125,7 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
       setCopySuccess('이미지 다운로드에 실패했습니다.')
       setTimeout(() => setCopySuccess(null), 3000)
     }
-  }, [image.photoId, image.imgUrl])
+  }, [image])
 
   const handleEmailClick = useCallback((email: string) => {
     // 이메일을 클릭하면 해당 사람의 피드로 이동
@@ -133,13 +136,16 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
 
   // 메모이제이션된 값들
   const partnerEmails = useMemo(() => {
-    if (!image.partnerEmails) return null
+    if (!image?.partnerEmails) return null
     return image.partnerEmails.split(',').map(email => email.trim())
-  }, [image.partnerEmails])
+  }, [image?.partnerEmails])
 
   const hasPartnerEmails = useMemo(() => {
     return partnerEmails && partnerEmails.length > 0
   }, [partnerEmails])
+
+  // 조건부 return은 모든 Hooks 이후에
+  if (!isOpen || !image) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">

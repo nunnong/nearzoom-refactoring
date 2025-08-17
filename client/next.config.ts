@@ -15,7 +15,27 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'lh3.googleusercontent.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'k.kakaocdn.net',
+      },
+      {
+        protocol: 'http',
+        hostname: 'k.kakaocdn.net',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.kakaocdn.net',
+      },
+      {
+        protocol: 'http',
+        hostname: '*.kakaocdn.net',
+      },
     ],
+    // 추가 안전 설정
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   eslint: {
     // Warning: This allows production builds to successfully complete even if

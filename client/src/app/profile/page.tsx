@@ -24,6 +24,9 @@ import api from '@/lib/axios'
 // 🏗️ 아키텍처 원칙: Zustand 스토어 사용
 import { useAuthStore } from '@/stores/authStore'
 
+// MyRoomHeader 컴포넌트 추가
+import MyRoomHeader from '@/components/page/myroom/MyRoomHeader'
+
 // LoadingSpinner 컴포넌트
 const LoadingSpinner = ({ size = 'md', className = '', text }: { 
   size?: 'sm' | 'md' | 'lg'; 
@@ -66,7 +69,6 @@ interface UserInfoResponse {
 // 🔥 백엔드 UserProfileResponse와 정확히 일치하는 타입
 interface UserProfileResponse {
   userId: number;
-  accountName: string;      // 🔥 변경 가능한 계정명
   userName: string;         // 🔥 소셜 로그인 기반 이름 (변경 불가)
   userEmail: string;
   userProfileImage?: string | null;
@@ -75,14 +77,14 @@ interface UserProfileResponse {
 
 // 🔥 백엔드 UpdateProfileRequest와 정확히 일치
 interface UpdateProfileRequest {
-  accountName: string;  // 🔥 계정명만 변경 가능
+  // accountName 제거 - 더 이상 사용하지 않음
 }
 
-// 🔥 계정명 중복 확인 응답
-interface CheckAccountNameResponse {
-  available: boolean;
-  message: string;
-}
+// 🔥 계정명 중복 확인 응답 제거
+// interface CheckAccountNameResponse {
+//   available: boolean;
+//   message: string;
+// }
 
 // 🔥 프로필 이미지 업로드 응답 타입
 interface UploadProfileImageResponse {
@@ -135,7 +137,6 @@ const profileSettingsAPI = {
       
       const userProfile: UserProfileResponse = {
         userId: 0, // userInfo에는 userId가 없으므로 기본값 사용
-        accountName: accountName,
         userName: userInfo.userName,
         userEmail: userInfo.userEmail,
         userProfileImage: userInfo.userProfileImage,
@@ -197,11 +198,11 @@ const profileSettingsAPI = {
   },
 
   // 🔥 GET /user/check-account-name - 계정명 중복 확인
-  checkAccountName: async (accountName: string): Promise<CheckAccountNameResponse> => {
+  checkAccountName: async (accountName: string): Promise<void> => {
     try {
       console.log('🔍 계정명 중복 확인:', accountName);
       
-      const response = await api.get<ApiResponse<CheckAccountNameResponse>>(
+      const response = await api.get<ApiResponse<void>>(
         `/user/check-account-name?accountName=${encodeURIComponent(accountName)}`
       );
       
@@ -214,7 +215,7 @@ const profileSettingsAPI = {
       }
       
       console.log('✅ 계정명 확인 성공:', response.data.data);
-      return response.data.data;
+      return;
     } catch (error) {
       console.error('❌ 계정명 확인 실패:', error);
       throw error;
@@ -276,7 +277,7 @@ const ProfileSettingsPage: React.FC = () => {
   })
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [accountNameCheckResult, setAccountNameCheckResult] = useState<CheckAccountNameResponse | null>(null)
+  // const [accountNameCheckResult, setAccountNameCheckResult] = useState<CheckAccountNameResponse | null>(null)
   
   // 🔥 편집 폼 상태 (계정명만 수정 가능)
   const [editForm, setEditForm] = useState({
@@ -306,10 +307,10 @@ const ProfileSettingsPage: React.FC = () => {
       
       // 편집 폼 초기화 (계정명만)
       setEditForm({
-        accountName: profile.accountName
+        accountName: profile.userName
       });
       
-      console.log('✅ 편집 폼 초기화 완료:', profile.accountName);
+      console.log('✅ 편집 폼 초기화 완료:', profile.userName);
 
       console.log('✅ 사용자 프로필 로딩 완료:', profile);
 
@@ -377,24 +378,24 @@ const ProfileSettingsPage: React.FC = () => {
     // 입력 시 메시지 클리어
     if (error) setError(null);
     if (successMessage) setSuccessMessage(null);
-    setAccountNameCheckResult(null);
+    // setAccountNameCheckResult(null); // 제거
 
     // 현재 계정명과 같거나 빈 값이면 중복 확인 안함
-    if (!value.trim() || (userProfile && value.trim() === userProfile.accountName)) {
+    if (!value.trim() || (userProfile && value.trim() === userProfile.userName)) {
       return;
     }
 
     // 실시간 계정명 중복 확인
     try {
       setLoading(prev => ({ ...prev, checkAccountName: true }));
-      const result = await profileSettingsAPI.checkAccountName(value.trim());
-      setAccountNameCheckResult(result);
+      await profileSettingsAPI.checkAccountName(value.trim());
+      // setAccountNameCheckResult(result); // 제거
     } catch (error: any) {
       console.error('계정명 확인 실패:', error);
-      setAccountNameCheckResult({
-        available: false,
-        message: '계정명 확인 중 오류가 발생했습니다.'
-      });
+      // setAccountNameCheckResult({ // 제거
+      //   available: false,
+      //   message: '계정명 확인 중 오류가 발생했습니다.'
+      // });
     } finally {
       setLoading(prev => ({ ...prev, checkAccountName: false }));
     }
@@ -410,27 +411,27 @@ const ProfileSettingsPage: React.FC = () => {
       setSuccessMessage(null);
 
       const updateData: UpdateProfileRequest = {
-        accountName: editForm.accountName.trim()
+        // accountName: editForm.accountName.trim() // 제거
       };
 
       // 유효성 검사
-      if (!updateData.accountName) {
-        throw new Error('계정명을 입력해주세요.');
-      }
+      // if (!updateData.accountName) { // 제거
+      //   throw new Error('계정명을 입력해주세요.');
+      // }
 
-      if (updateData.accountName.length < 3) {
-        throw new Error('계정명은 3자 이상이어야 합니다.');
-      }
+      // if (updateData.accountName.length < 3) { // 제거
+      //   throw new Error('계정명은 3자 이상이어야 합니다.');
+      // }
 
-      if (updateData.accountName.length > 30) {
-        throw new Error('계정명은 30자 이하여야 합니다.');
-      }
+      // if (updateData.accountName.length > 30) { // 제거
+      //   throw new Error('계정명은 30자 이하여야 합니다.');
+      // }
 
-      // 영문, 숫자, '.', '_'만 허용
-      const accountNameRegex = /^[a-zA-Z0-9._]+$/;
-      if (!accountNameRegex.test(updateData.accountName)) {
-        throw new Error('계정명은 영문, 숫자, \'.\', \'_\'만 사용 가능합니다.');
-      }
+      // 영문, 숫자, '.', '_'만 허용 // 제거
+      // const accountNameRegex = /^[a-zA-Z0-9._]+$/; // 제거
+      // if (!accountNameRegex.test(updateData.accountName)) { // 제거
+      //   throw new Error('계정명은 영문, 숫자, \'.\', \'_\'만 사용 가능합니다.');
+      // }
 
       // 백엔드 API 호출
       await profileSettingsAPI.updateProfile(updateData);
@@ -470,12 +471,12 @@ const ProfileSettingsPage: React.FC = () => {
   const handleCancelEdit = () => {
     if (userProfile) {
       setEditForm({
-        accountName: userProfile.accountName
+        accountName: userProfile.userName
       });
     }
     setError(null);
     setSuccessMessage(null);
-    setAccountNameCheckResult(null);
+    // setAccountNameCheckResult(null); // 제거
   };
 
   // 🔥 로그아웃 핸들러
@@ -549,7 +550,7 @@ const ProfileSettingsPage: React.FC = () => {
   // 내 프로필 페이지로 이동
   const handleViewMyProfile = () => {
     if (userProfile) {
-      router.push(`/profile/${userProfile.accountName}`);
+      router.push(`/profile/${userProfile.userName}`);
     }
   };
 
@@ -561,7 +562,7 @@ const ProfileSettingsPage: React.FC = () => {
 
   // 변경사항이 있는지 확인
   const hasChanges = userProfile && (
-    editForm.accountName.trim() !== userProfile.accountName
+    editForm.accountName.trim() !== userProfile.userName
   );
 
   // 저장 가능한지 확인
@@ -569,7 +570,8 @@ const ProfileSettingsPage: React.FC = () => {
     editForm.accountName.trim().length >= 3 && 
     editForm.accountName.trim().length <= 30 &&
     /^[a-zA-Z0-9._]+$/.test(editForm.accountName.trim()) &&
-    (accountNameCheckResult?.available !== false);
+    // (accountNameCheckResult?.available !== false); // 제거
+    true; // 변경사항이 있으면 저장 가능
 
   // ============================================================================
   // 🔥 렌더링
@@ -635,8 +637,20 @@ const ProfileSettingsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 상단 헤더 */}
-      <header className="sticky top-0 z-40 bg-white border-b border-gray-200">
+      {/* MyRoomHeader 추가 */}
+      <MyRoomHeader
+        user={{
+          name: currentUser?.name,
+          email: currentUser?.email,
+          profileImage: currentUser?.profileImage
+        }}
+        onUploadSelfie={() => router.push('/upload-selfie')}
+        onAccount={() => router.push('/profile')}
+        onLogout={() => router.push('/')}
+      />
+
+      {/* 프로필 편집 헤더 */}
+      <header className="sticky top-20 z-30 bg-white border-b border-gray-200">
         <div className="flex items-center justify-between p-4">
           <button
             onClick={handleBack}
@@ -645,8 +659,6 @@ const ProfileSettingsPage: React.FC = () => {
           >
             <ArrowLeftIcon className="w-5 h-5" />
           </button>
-          
-
           
           <div className="flex items-center space-x-2">
             {hasChanges && (
@@ -725,7 +737,7 @@ const ProfileSettingsPage: React.FC = () => {
                 
                 <div className="flex-1">
                   <h3 className="font-medium text-gray-900">{userProfile.userName}</h3>
-                  <p className="text-sm text-gray-500 mb-1">@{userProfile.accountName}</p>
+                  <p className="text-sm text-gray-500 mb-1">@{userProfile.userName}</p>
                   <p className="text-xs text-gray-400 mb-3">{userProfile.userEmail}</p>
                   <div className="space-y-2">
                     <button

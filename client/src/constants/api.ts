@@ -1,8 +1,8 @@
 // constants/api.ts
-// 백엔드 API 서버 주소
+// nearzoom.store로 강제 설정
 export const API_BASE_URL = 'https://api.nearzoom.store'
 
-// 프론트엔드 콜백 URL
+// nearzoom.store로 강제 설정
 export const FRONTEND_BASE_URL = 'https://nearzoom.store'
 
 export const API_ENDPOINTS = {

@@ -63,11 +63,13 @@ export default function MyRoomHeader({
   onUploadSelfie,
   onAccount,
   onLogout,
+  onDeleteAccount,
 }: {
   user?: { name?: string; email?: string; profileImage?: string } | null
   onUploadSelfie?: () => void
   onAccount?: () => void
   onLogout?: () => void
+  onDeleteAccount?: () => void
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const router = useRouter()
@@ -98,19 +100,21 @@ export default function MyRoomHeader({
   const handleUploadSelfie = () => {
     setIsMenuOpen(false)
     onUploadSelfie?.()
-    console.log('Upload selfie clicked')
   }
 
   const handleAccount = () => {
     setIsMenuOpen(false)
     onAccount?.()
-    console.log('Account clicked')
   }
 
   const handleLogout = () => {
     setIsMenuOpen(false)
     onLogout?.()
-    console.log('Logout clicked')
+  }
+
+  const handleDeleteAccount = () => {
+    setIsMenuOpen(false)
+    onDeleteAccount?.()
   }
 
   return (

@@ -267,7 +267,11 @@ const DrawingContent: React.FC = () => {
       family: 'Noto Sans KR, sans-serif',
       displayName: 'Noto Sans KR',
     },
-    { name: '귀여움', family: 'Jua, cursive', displayName: 'Jua' },
+    { 
+      name: '귀여움', 
+      family: 'Jua, cursive', 
+      displayName: 'Jua' 
+    },
     {
       name: '힙함',
       family: 'Black Han Sans, sans-serif',
@@ -278,8 +282,16 @@ const DrawingContent: React.FC = () => {
       family: 'Gamja Flower, cursive',
       displayName: 'Gamja Flower',
     },
-    { name: '삐뚤빼뚤', family: 'Gaegu, cursive', displayName: 'Gaegu' },
-    { name: '기본', family: 'Arial, sans-serif', displayName: 'Arial' },
+    { 
+      name: '삐뚤빼뚤', 
+      family: 'Gaegu, cursive', 
+      displayName: 'Gaegu' 
+    },
+    { 
+      name: '기본', 
+      family: 'Arial, sans-serif', 
+      displayName: 'Arial' 
+    },
   ]
 
   // 이미지 해상도 기반 폰트 크기 계산

@@ -241,14 +241,6 @@ const ExploreRandom: React.FC<ExploreRandomProps> = ({ className = '' }) => {
     // 로그인 상태가 확인되었음을 표시
     setIsAuthChecked(true);
 
-    if (!isAuthenticated || !accessToken) {
-      console.log('🚨 로그인이 필요합니다. 로그인 페이지로 리다이렉트...');
-      // 현재 페이지를 redirect 파라미터로 전달
-      const currentPath = encodeURIComponent(window.location.pathname + window.location.search);
-      router.replace(`/login?redirect=${currentPath}`);
-      return;
-    }
-
     console.log('✅ 로그인 상태 확인 완료. 서비스 이용 가능.');
   }, [isAuthenticated, accessToken, user, router]);
 

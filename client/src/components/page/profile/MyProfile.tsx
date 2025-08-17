@@ -23,6 +23,9 @@ import api from '@/lib/axios'
 // 🔥 올바른 아키텍처: Zustand 토큰 스토어
 import { useAuthStore } from '@/stores/authStore'
 
+// 🔥 UploadSelfieModal 추가
+import UploadSelfieModal from '@/components/page/myroom/UploadSelfieModal'
+
 // ============================================================================
 // 백엔드 API 응답 타입 정의 (실제 백엔드와 일치)
 // ============================================================================
