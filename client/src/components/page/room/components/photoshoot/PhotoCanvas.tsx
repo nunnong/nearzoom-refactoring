@@ -640,6 +640,7 @@ export default function PhotoCanvas({
         height={canvasSize.height}
         className="overflow-hidden rounded-xl border-2 border-gray-300 shadow-lg"
         onClick={handleStageClick}
+        onTap={handleStageClick}
       >
         {/* 배경 레이어 */}
         <Layer>
@@ -680,7 +681,7 @@ export default function PhotoCanvas({
         {/* 참가자 비디오 레이어 */}
         <Layer>
           {/* LiveKit 참가자 비디오들 (VirtualBackground 지원) - Z-Index 정렬됨 */}
-          {sortedCameraTracksByZIndex.map((trackRef, index) => {
+          {sortedCameraTracksByZIndex.map((trackRef) => {
             const participantId = trackRef.participant.identity
             const videoElement = videoElements[participantId]
             const processedCanvas = processedCanvases[participantId]
@@ -738,6 +739,15 @@ export default function PhotoCanvas({
                     e.cancelBubble = true
                     console.log(
                       `📹 Video clicked: ${participantId} - bringing to front`
+                    )
+                    // 선택된 노드를 최상위로 이동
+                    e.target.moveToTop()
+                    handleSelect(`video-${participantId}`)
+                  }}
+                  onTap={e => {
+                    e.cancelBubble = true
+                    console.log(
+                      `📹 Video tapped: ${participantId} - bringing to front`
                     )
                     // 선택된 노드를 최상위로 이동
                     e.target.moveToTop()
@@ -834,7 +844,7 @@ export default function PhotoCanvas({
               borderStrokeWidth={2}
               anchorStroke="#4ECDC4"
               anchorFill="white"
-              anchorSize={8}
+              anchorSize={window.matchMedia && window.matchMedia('(pointer: coarse)').matches ? 16 : 8}
               anchorCornerRadius={2}
               boundBoxFunc={(oldBox, newBox) => {
                 // 최소 크기 제한
