@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useEffect, useState, useCallback, useMemo, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { myroomService, MyPhotoListCondition } from '@/services/myroomService'
+import { API_ENDPOINTS } from '@/constants/api'
 import ErrorBoundary from '@/components/common/ErrorBoundary'
 
 interface ImageItem {
@@ -66,7 +67,7 @@ const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetError
 function MyRoomContent() {
   const { user, isAuthenticated, isLoading: authLoading, initializeAuth } = useAuthStore()
   const [userImages, setUserImages] = useState<ImageItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)  // 🚀 false로 변경
   const [userInfoLoading, setUserInfoLoading] = useState(false)
   const [nextCursor, setNextCursor] = useState<number | null>(null)
   const [hasMore, setHasMore] = useState(false)
@@ -102,6 +103,8 @@ function MyRoomContent() {
     loading, 
     userInfoLoading,
     forceTimeout,
+    userImagesLength: userImages.length, // 🚀 이미지 개수 추가
+    userImages: userImages, // 🚀 전체 이미지 배열 추가
     userDetails: user ? {
       id: user.id,
       name: user.name,
@@ -112,7 +115,12 @@ function MyRoomContent() {
 
   // 🚀 사용자 이미지 가져오기
   const fetchUserImages = async () => {
-    if (loading) return; // 이미 로딩 중이면 중복 호출 방지
+    console.log('🚀 fetchUserImages 함수 시작 - 현재 상태:', {
+      loading,
+      isAuthenticated,
+      user: user ? '있음' : '없음',
+      userImagesLength: userImages.length
+    })
 
     try {
       setLoading(true);
@@ -131,8 +139,12 @@ function MyRoomContent() {
       };
 
       console.log('🔍 API 호출 조건:', condition);
+      console.log('🌐 API 엔드포인트:', API_ENDPOINTS.PHOTOS);
+      console.log('👤 현재 사용자 정보:', user);
 
       const response = await myroomService.getPhotos(condition);
+      
+      console.log('📡 API 응답 전체:', response);
       
       if (response && response.photos) {
         const convertedImages: ImageItem[] = response.photos.map(photo => ({
@@ -145,6 +157,8 @@ function MyRoomContent() {
           createdAt: photo.createdAt || '',
           partnerEmails: photo.partnerEmails || ''
         }));
+
+        console.log('🔄 변환된 이미지들:', convertedImages);
 
         setUserImages(convertedImages);
         setNextCursor(response.nextCursor || null);
@@ -162,7 +176,7 @@ function MyRoomContent() {
       }
 
     } catch (error: any) {
-      console.error('사용자 이미지 가져오기 실패:', error);
+      console.error('❌ 사용자 이미지 가져오기 실패:', error);
       
       // 에러 상세 정보 로깅
       if (error.response) {
@@ -180,6 +194,7 @@ function MyRoomContent() {
       setError('이미지를 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
+      console.log('🏁 fetchUserImages 함수 종료');
     }
   };
 

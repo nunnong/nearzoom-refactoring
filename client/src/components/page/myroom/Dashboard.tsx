@@ -68,6 +68,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     setImageList(images)
     setFilteredImages(images)
     console.log('📸 Dashboard received images:', images)
+    console.log('📸 Dashboard imageList:', imageList)
+    console.log('📸 Dashboard filteredImages:', filteredImages)
   }, [images])
 
   // 🚀 필터 변경 핸들러 (클라이언트 사이드 필터링)
