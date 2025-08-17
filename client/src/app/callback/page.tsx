@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/auth'
 import { API_BASE_URL } from '@/constants/api'
 
 type PageState = 'loading' | 'success' | 'error'
 
-export default function CallbackPage() {
+function CallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { handleLoginSuccess, fetchUserInfo } = useAuth()
@@ -41,7 +41,7 @@ export default function CallbackPage() {
       try {
         setState('loading')
 
-        // 에러 파라미터 확인
+        // OAuth2 인증 실패 체크
         const error = searchParams.get('error')
         if (error) {
           throw new Error(`OAuth2 인증 실패: ${error}`)
@@ -56,11 +56,39 @@ export default function CallbackPage() {
           throw new Error('Access token 요청 실패')
         }
 
-        const tokenData = await tokenResponse.json()
-        const accessToken = tokenData.data?.accessToken
-        if (!accessToken) {
-          console.error('토큰 응답 구조:', tokenData)
-          throw new Error('Access token이 응답에 없습니다')
+        // 다양한 토큰 파라미터 이름 확인
+        const token = searchParams.get('token') || 
+                     searchParams.get('access_token') || 
+                     searchParams.get('accessToken')
+        
+        console.log('URL에서 찾은 토큰:', token ? '토큰 있음' : '토큰 없음')
+
+        let accessToken: string
+
+        if (token) {
+          // 1단계: URL에 토큰이 있으면 사용
+          console.log('✅ URL 파라미터에서 토큰 사용')
+          accessToken = token
+        } else {
+          // 2단계: 토큰이 없으면 refresh 엔드포인트 호출
+          console.log('🔄 URL에 토큰이 없어서 refresh 엔드포인트 호출')
+          
+          const tokenResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
+            method: 'POST',
+            credentials: 'include',
+          })
+          
+          if (!tokenResponse.ok) {
+            console.error('Refresh 응답 실패:', tokenResponse.status, tokenResponse.statusText)
+            throw new Error('Access token 요청 실패')
+          }
+
+          const tokenData = await tokenResponse.json()
+          accessToken = tokenData.data?.accessToken
+          if (!accessToken) {
+            console.error('토큰 응답 구조:', tokenData)
+            throw new Error('Access token이 응답에 없습니다')
+          }
         }
 
         // 토큰 저장
@@ -230,5 +258,23 @@ export default function CallbackPage() {
         <p className="text-sm text-gray-500">잠시 후 자동으로 이동합니다.</p>
       </div>
     </div>
+  )
+}
+
+export default function CallbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+          <h2 className="mb-2 text-xl font-semibold text-gray-900">
+            로그인 처리 중...
+          </h2>
+          <p className="text-gray-600">잠시만 기다려 주세요.</p>
+        </div>
+      </div>
+    }>
+      <CallbackContent />
+    </Suspense>
   )
 }

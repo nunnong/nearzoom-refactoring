@@ -1,6 +1,7 @@
-import GallerySection from "./GallerySection"
-import Header from "./Header"
-import HeroSection from "./HeroSection"
+import Link from 'next/link'
+import GallerySection from './GallerySection'
+import Header from './Header'
+import HeroSection from './HeroSection'
 
 interface CreativeSectionProps {
   isLoggedIn: boolean
@@ -25,11 +26,11 @@ export default function CreativeSection({
   onMyFeed,
   onAfterLoginClick,
   user,
-  isCreatingRoom = false  // 🔥 추가: 기본값 설정
+  isCreatingRoom = false, // 🔥 추가: 기본값 설정
 }: CreativeSectionProps) {
   return (
     <div className="bg-stone-100 p-4 md:p-8">
-      <Header 
+      <Header
         isLoggedIn={isLoggedIn}
         onLogin={onLogin}
         onLogout={onLogout}
@@ -37,13 +38,13 @@ export default function CreativeSection({
         onMyFeed={onMyFeed}
         user={user}
       />
-      
-      <HeroSection 
+
+      <HeroSection
         isLoggedIn={isLoggedIn}
         onAfterLoginClick={onAfterLoginClick}
-        isCreatingRoom={isCreatingRoom}  // 🔥 추가: prop 전달
+        isCreatingRoom={isCreatingRoom} // 🔥 추가: prop 전달
       />
-      
+
       <GallerySection />
     </div>
   )

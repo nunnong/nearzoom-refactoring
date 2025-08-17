@@ -13,10 +13,9 @@ import {
 } from '@heroicons/react/24/outline'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
-import React, { useState, useRef, useEffect } from 'react'
+import React, { Suspense, useState, useRef, useEffect } from 'react'
 import { myroomService } from '@/services/myroomService'
 import api from '@/lib/axios'
-
 
 // Konva 컴포넌트들을 동적으로 import
 const KonvaCanvas = dynamic(() => import('../../components/KonvaCanvas'), {
@@ -37,7 +36,6 @@ const ExitConfirmModal = dynamic(
   () => import('../../components/page/drawing/ExitConfirmModal'),
   { ssr: false }
 )
-
 
 interface LineData {
   points: number[]
@@ -66,7 +64,7 @@ interface TextData {
   rotation?: number
 }
 
-const DrawingPage = () => {
+const DrawingContent: React.FC = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const stageRef = useRef<any>(null)
@@ -79,11 +77,16 @@ const DrawingPage = () => {
   )
   const [lines, setLines] = useState<LineData[]>([])
   const [stageSize, setStageSize] = useState({ width: 800, height: 600 })
-  const [originalImageSize, setOriginalImageSize] = useState({ width: 800, height: 600 })
+  const [originalImageSize, setOriginalImageSize] = useState({
+    width: 800,
+    height: 600,
+  })
   const [isClient, setIsClient] = useState(false)
   const [stickers, setStickers] = useState<StickerData[]>([])
   const [texts, setTexts] = useState<TextData[]>([])
-  const [activeTool, setActiveTool] = useState<'brush' | 'eraser' | 'sticker' | 'text'>('brush')
+  const [activeTool, setActiveTool] = useState<
+    'brush' | 'eraser' | 'sticker' | 'text'
+  >('brush')
   const [history, setHistory] = useState<
     { lines: LineData[]; stickers: StickerData[] }[]
   >([])
@@ -94,10 +97,15 @@ const DrawingPage = () => {
   } | null>(null)
   const [hasChanges, setHasChanges] = useState<boolean>(false)
   const [stickerModalOpen, setStickerModalOpen] = useState<boolean>(false)
-  const [selectedStickerId, setSelectedStickerId] = useState<string | null>(null)
+  const [selectedStickerId, setSelectedStickerId] = useState<string | null>(
+    null
+  )
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null)
   const [textModalOpen, setTextModalOpen] = useState<boolean>(false)
-  const [textClickPosition, setTextClickPosition] = useState<{x: number, y: number} | null>(null)
+  const [textClickPosition, setTextClickPosition] = useState<{
+    x: number
+    y: number
+  } | null>(null)
   const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false)
 
   // 클라이언트 사이드에서만 렌더링하도록 설정
@@ -145,31 +153,32 @@ const DrawingPage = () => {
     if (id) setImageId(id)
     if (src) {
       const imgSrc = decodeURIComponent(src)
-      
+
       const img = new Image()
-      
+
       // 이미지 URL이 같은 도메인인지 확인
-      const isCurrentDomain = imgSrc.startsWith(window.location.origin) || imgSrc.startsWith('/')
-      
+      const isCurrentDomain =
+        imgSrc.startsWith(window.location.origin) || imgSrc.startsWith('/')
+
       // CORS 문제 해결을 위한 crossOrigin 설정
       if (!isCurrentDomain) {
         img.crossOrigin = 'anonymous'
       }
-      
+
       img.onload = () => {
         console.log('✅ 이미지 로드 성공:', {
           width: img.width,
           height: img.height,
-          src: img.src
+          src: img.src,
         })
-        
+
         setOriginalImage(img)
         // 원본 이미지 크기 저장
         setOriginalImageSize({
           width: img.width,
           height: img.height,
         })
-        
+
         // 이미지 크기에 맞게 스테이지 크기 조정
         const maxWidth = Math.min(img.width, 1200)
         const maxHeight = Math.min(img.height, 800)
@@ -185,8 +194,8 @@ const DrawingPage = () => {
         setHistory([initialState])
         setHistoryStep(0)
       }
-      
-      img.onerror = (error) => {
+
+      img.onerror = error => {
         console.error('❌ 이미지 로드 실패:', {
           error: error,
           errorType: error instanceof Event ? error.type : 'unknown',
@@ -195,9 +204,9 @@ const DrawingPage = () => {
           imgCurrentSrc: img.currentSrc,
           imgComplete: img.complete,
           imgNaturalWidth: img.naturalWidth,
-          imgNaturalHeight: img.naturalHeight
+          imgNaturalHeight: img.naturalHeight,
         })
-        
+
         // 이미지 URL 직접 테스트
         console.log('🔗 이미지 URL 직접 테스트:', imgSrc)
         fetch(imgSrc)
@@ -206,14 +215,14 @@ const DrawingPage = () => {
               status: response.status,
               statusText: response.statusText,
               headers: Object.fromEntries(response.headers.entries()),
-              url: response.url
+              url: response.url,
             })
           })
           .catch(fetchError => {
             console.error('📡 Fetch 실패:', fetchError)
           })
       }
-      
+
       img.src = imgSrc
     }
   }, [searchParams])
@@ -236,10 +245,22 @@ const DrawingPage = () => {
   const brushSizes = [2, 5, 10, 15, 20]
 
   const fontOptions = [
-    { name: '깔끔', family: 'Noto Sans KR, sans-serif', displayName: 'Noto Sans KR' },
+    {
+      name: '깔끔',
+      family: 'Noto Sans KR, sans-serif',
+      displayName: 'Noto Sans KR',
+    },
     { name: '귀여움', family: 'Jua, cursive', displayName: 'Jua' },
-    { name: '힙함', family: 'Black Han Sans, sans-serif', displayName: 'Black Han Sans' },
-    { name: '손글씨', family: 'Gamja Flower, cursive', displayName: 'Gamja Flower' },
+    {
+      name: '힙함',
+      family: 'Black Han Sans, sans-serif',
+      displayName: 'Black Han Sans',
+    },
+    {
+      name: '손글씨',
+      family: 'Gamja Flower, cursive',
+      displayName: 'Gamja Flower',
+    },
     { name: '삐뚤빼뚤', family: 'Gaegu, cursive', displayName: 'Gaegu' },
     { name: '기본', family: 'Arial, sans-serif', displayName: 'Arial' },
   ]
@@ -247,7 +268,9 @@ const DrawingPage = () => {
   // 이미지 해상도 기반 폰트 크기 계산
   const calculateFontSize = (fontSize: number) => {
     // 이미지의 대각선 길이를 기준으로 계산
-    const diagonal = Math.sqrt(originalImageSize.width ** 2 + originalImageSize.height ** 2)
+    const diagonal = Math.sqrt(
+      originalImageSize.width ** 2 + originalImageSize.height ** 2
+    )
     const ratio = fontSize / 1000 // fontSize를 비율로 변환
     return Math.round(diagonal * ratio)
   }
@@ -327,18 +350,18 @@ const DrawingPage = () => {
 
   const handleMouseDown = (e: any) => {
     const pos = e.target.getStage()?.getPointerPosition()
-    
+
     // 스티커 모드나 텍스트 모드일 때는 그리기 비활성화
     if (activeTool === 'sticker' || activeTool === 'text') {
       return
     }
-    
+
     if (activeTool === 'eraser') {
       // 지우개 모드일 때는 선 지우기 처리
       handleEraserClick(e)
       return
     }
-    
+
     setIsDrawing(true)
     if (pos) {
       saveToHistory() // 그리기 시작 전 히스토리 저장
@@ -369,8 +392,10 @@ const DrawingPage = () => {
       for (let i = 0; i < line.points.length; i += 2) {
         const x = line.points[i]
         const y = line.points[i + 1]
-        const distance = Math.sqrt(Math.pow(pos.x - x, 2) + Math.pow(pos.y - y, 2))
-        
+        const distance = Math.sqrt(
+          Math.pow(pos.x - x, 2) + Math.pow(pos.y - y, 2)
+        )
+
         if (distance < eraserRadius && distance < minDistance) {
           minDistance = distance
           closestLineIndex = index
@@ -483,10 +508,14 @@ const DrawingPage = () => {
     setTextClickPosition(null)
   }
 
-  const addText = (text: string, fontFamily: string, fontSize: number, color: string) => {
+  const addText = (
+    text: string,
+    fontFamily: string,
+    fontSize: number,
+    color: string
+  ) => {
     if (!textClickPosition || !text.trim()) return
-    
-    
+
     const newText: TextData = {
       id: Date.now().toString(),
       x: textClickPosition.x,
@@ -500,10 +529,10 @@ const DrawingPage = () => {
     saveToHistory()
     setHasChanges(true)
     setTexts([...texts, newText])
-    
+
     // 새로 생성된 텍스트 자동 선택하지 않기
     setSelectedTextId(null)
-    
+
     closeTextModal()
   }
 
@@ -520,9 +549,7 @@ const DrawingPage = () => {
   const updateText = (textId: string, updates: Partial<TextData>) => {
     setHasChanges(true)
     setTexts(
-      texts.map(text =>
-        text.id === textId ? { ...text, ...updates } : text
-      )
+      texts.map(text => (text.id === textId ? { ...text, ...updates } : text))
     )
   }
 
@@ -548,32 +575,38 @@ const DrawingPage = () => {
       // 1. 스케일 비율 계산
       const scaleX = originalImageSize.width / stageSize.width
       const scaleY = originalImageSize.height / stageSize.height
-      
+
       // 2. 원본 크기로 캔버스 생성
       const canvas = stageRef.current.toCanvas({
         width: originalImageSize.width,
         height: originalImageSize.height,
-        pixelRatio: 1
+        pixelRatio: 1,
       })
-      
+
       // 3. 2D 컨텍스트 가져오기
       const ctx = canvas.getContext('2d')
       if (!ctx) {
         throw new Error('캔버스 컨텍스트를 가져올 수 없습니다.')
       }
-      
+
       // 4. 원본 이미지를 캔버스에 그리기
       if (originalImage) {
-        ctx.drawImage(originalImage, 0, 0, originalImageSize.width, originalImageSize.height)
+        ctx.drawImage(
+          originalImage,
+          0,
+          0,
+          originalImageSize.width,
+          originalImageSize.height
+        )
       }
-      
+
       // 5. 그리기 선들을 원본 크기에 맞게 조정하여 그리기
       lines.forEach(line => {
         ctx.strokeStyle = line.stroke
         ctx.lineWidth = line.strokeWidth * Math.min(scaleX, scaleY) // 선 굵기 조정
         ctx.lineCap = 'round'
         ctx.lineJoin = 'round'
-        
+
         ctx.beginPath()
         // points 배열은 [x1, y1, x2, y2, ...] 형태로 저장됨
         for (let i = 0; i < line.points.length; i += 2) {
@@ -581,7 +614,7 @@ const DrawingPage = () => {
           const y = line.points[i + 1]
           const scaledX = x * scaleX
           const scaledY = y * scaleY
-          
+
           if (i === 0) {
             ctx.moveTo(scaledX, scaledY)
           } else {
@@ -590,21 +623,27 @@ const DrawingPage = () => {
         }
         ctx.stroke()
       })
-      
+
       // 6. 스티커들을 원본 크기에 맞게 조정하여 그리기
       const stickerPromises = stickers.map(sticker => {
-        return new Promise<void>((resolve) => {
+        return new Promise<void>(resolve => {
           const stickerImg = new Image()
           stickerImg.onload = () => {
             const scaledX = sticker.x * scaleX
             const scaledY = sticker.y * scaleY
             const scaledWidth = sticker.width * scaleX
             const scaledHeight = sticker.height * scaleY
-            
+
             ctx.save()
             ctx.translate(scaledX + scaledWidth / 2, scaledY + scaledHeight / 2)
-            ctx.rotate((sticker.rotation || 0) * Math.PI / 180)
-            ctx.drawImage(stickerImg, -scaledWidth / 2, -scaledHeight / 2, scaledWidth, scaledHeight)
+            ctx.rotate(((sticker.rotation || 0) * Math.PI) / 180)
+            ctx.drawImage(
+              stickerImg,
+              -scaledWidth / 2,
+              -scaledHeight / 2,
+              scaledWidth,
+              scaledHeight
+            )
             ctx.restore()
             resolve()
           }
@@ -615,41 +654,45 @@ const DrawingPage = () => {
           stickerImg.src = sticker.src
         })
       })
-      
+
       // 7. 텍스트들을 원본 크기에 맞게 조정하여 그리기
       texts.forEach(text => {
         const scaledX = text.x * scaleX
         const scaledY = text.y * scaleY
         const scaledFontSize = text.fontSize * Math.min(scaleX, scaleY)
-        
+
         ctx.font = `${scaledFontSize}px ${text.fontFamily}`
         ctx.fillStyle = text.fill
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-        
+
         ctx.save()
         ctx.translate(scaledX, scaledY)
         if (text.rotation) {
-          ctx.rotate(text.rotation * Math.PI / 180)
+          ctx.rotate((text.rotation * Math.PI) / 180)
         }
         ctx.fillText(text.text, 0, 0)
         ctx.restore()
       })
-      
+
       // 8. 모든 스티커 이미지가 로드될 때까지 대기
       await Promise.all(stickerPromises)
-      
+
       // 9. 캔버스를 Blob으로 변환
-      const blob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((blob: Blob | null) => {
-          if (blob) resolve(blob)
-        }, 'image/png', 1.0)
+      const blob = await new Promise<Blob>(resolve => {
+        canvas.toBlob(
+          (blob: Blob | null) => {
+            if (blob) resolve(blob)
+          },
+          'image/png',
+          1.0
+        )
       })
 
       // 10. FormData로 이미지 서버에 업로드
       const formData = new FormData()
       formData.append('file', blob, 'edited-image.png')
-      
+
       // 이미지 서버에 업로드 (기존 프로필 이미지 업로드와 동일한 방식)
       const uploadResponse = await api.post(
         'https://image.nearzoom.store/upload',
@@ -659,23 +702,23 @@ const DrawingPage = () => {
           withCredentials: false,
         }
       )
-      
+
       const uploadedImageUrl = uploadResponse.data?.data?.file_url
       if (!uploadedImageUrl) {
         throw new Error('이미지 URL을 받아올 수 없습니다.')
       }
-      
+
       // 11. 백엔드에 편집본 저장 요청
       console.log('백엔드 저장 요청 데이터:', {
         imgUrl: uploadedImageUrl,
-        originalPhotoId: parseInt(imageId!)
+        originalPhotoId: parseInt(imageId!),
       })
-      
+
       await myroomService.saveEditedPhoto({
         imageUrl: uploadedImageUrl,
-        originalPhotoId: parseInt(imageId!)
+        originalPhotoId: parseInt(imageId!),
       })
-      
+
       // 12. 저장 성공 알림
       alert('이미지가 성공적으로 저장되었습니다!')
 
@@ -683,18 +726,17 @@ const DrawingPage = () => {
       const currentUrl = new URL(window.location.href)
       const returnUrl = currentUrl.searchParams.get('returnUrl') || '/'
       router.push(returnUrl)
-
     } catch (error) {
       // 자세한 에러 로깅
       console.error('❌ Failed to save image:', error)
       console.error('❌ Error type:', typeof error)
       console.error('❌ Error constructor:', error?.constructor?.name)
-      
+
       // 에러 객체의 모든 속성 로깅
       if (error && typeof error === 'object') {
         console.error('❌ Error properties:', Object.keys(error))
         console.error('❌ Error values:', Object.values(error))
-        
+
         // Error 객체의 속성들 안전하게 접근
         const errorObj = error as any
         if (errorObj.message) {
@@ -704,10 +746,10 @@ const DrawingPage = () => {
           console.error('❌ Error stack:', errorObj.stack)
         }
       }
-      
+
       // 사용자에게 명확한 에러 메시지 표시
       let errorMessage = '이미지 저장에 실패했습니다.'
-      
+
       if (error instanceof Error) {
         errorMessage += `\n\n오류 내용: ${error.message}`
       } else if (typeof error === 'string') {
@@ -726,7 +768,7 @@ const DrawingPage = () => {
           errorMessage += `\n\n알 수 없는 오류: ${JSON.stringify(error)}`
         }
       }
-      
+
       alert(errorMessage)
     }
   }
@@ -753,7 +795,10 @@ const DrawingPage = () => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-100" style={{ zoom: '0.9' }}>
+    <div
+      className="flex min-h-screen flex-col bg-gray-100"
+      style={{ zoom: '0.9' }}
+    >
       {/* Header */}
       <header className="border-b bg-white shadow-sm">
         <div className="flex items-center justify-between p-4">
@@ -766,9 +811,12 @@ const DrawingPage = () => {
               <span>돌아가기</span>
             </button>
             <div className="flex flex-col">
-              <h1 className="text-xl font-semibold text-gray-900">이미지 편집</h1>
-              <p className="text-xs text-orange-600 font-medium">
-                ⚠️ 편집은 한 번만 가능합니다. 저장 후에는 더 이상 편집할 수 없습니다.
+              <h1 className="text-xl font-semibold text-gray-900">
+                이미지 편집
+              </h1>
+              <p className="text-xs font-medium text-orange-600">
+                ⚠️ 편집은 한 번만 가능합니다. 저장 후에는 더 이상 편집할 수
+                없습니다.
               </p>
             </div>
           </div>
@@ -782,7 +830,9 @@ const DrawingPage = () => {
                 : 'cursor-not-allowed bg-gray-400'
             }`}
             title={
-              hasChanges ? '편집 내용을 저장합니다 (저장 후 편집 불가)' : '변경사항이 없습니다'
+              hasChanges
+                ? '편집 내용을 저장합니다 (저장 후 편집 불가)'
+                : '변경사항이 없습니다'
             }
           >
             <CheckIcon className="h-5 w-5" />
@@ -801,11 +851,13 @@ const DrawingPage = () => {
               onClick={() => setActiveTool('brush')}
               className="flex items-center space-x-2"
             >
-              <div className={`flex h-12 w-12 items-center justify-center rounded-lg transition-colors ${
-                activeTool === 'brush' 
-                  ? 'bg-blue-500 text-white' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}>
+              <div
+                className={`flex h-12 w-12 items-center justify-center rounded-lg transition-colors ${
+                  activeTool === 'brush'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
                 <PaintBrushIcon className="h-6 w-6" />
               </div>
               <span className="text-sm font-medium text-gray-700">브러시</span>
@@ -816,11 +868,13 @@ const DrawingPage = () => {
               onClick={() => setActiveTool('eraser')}
               className="flex items-center space-x-2"
             >
-              <div className={`flex h-12 w-12 items-center justify-center rounded-lg transition-colors ${
-                activeTool === 'eraser' 
-                  ? 'bg-red-500 text-white' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}>
+              <div
+                className={`flex h-12 w-12 items-center justify-center rounded-lg transition-colors ${
+                  activeTool === 'eraser'
+                    ? 'bg-red-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
                 <Square3Stack3DIcon className="h-6 w-6" />
               </div>
               <span className="text-sm font-medium text-gray-700">지우개</span>
@@ -831,11 +885,13 @@ const DrawingPage = () => {
               onClick={toggleStickerMode}
               className="flex items-center space-x-2"
             >
-              <div className={`flex h-12 w-12 items-center justify-center rounded-lg transition-colors ${
-                activeTool === 'sticker' 
-                  ? 'bg-green-500 text-white' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}>
+              <div
+                className={`flex h-12 w-12 items-center justify-center rounded-lg transition-colors ${
+                  activeTool === 'sticker'
+                    ? 'bg-green-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
                 <FaceSmileIcon className="h-6 w-6" />
               </div>
               <span className="text-sm font-medium text-gray-700">스티커</span>
@@ -849,11 +905,13 @@ const DrawingPage = () => {
               }}
               className="flex items-center space-x-2"
             >
-              <div className={`flex h-12 w-12 items-center justify-center rounded-lg transition-colors ${
-                activeTool === 'text' 
-                  ? 'bg-purple-500 text-white' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}>
+              <div
+                className={`flex h-12 w-12 items-center justify-center rounded-lg transition-colors ${
+                  activeTool === 'text'
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
                 <PencilSquareIcon className="h-6 w-6" />
               </div>
               <span className="text-sm font-medium text-gray-700">텍스트</span>
@@ -945,19 +1003,23 @@ const DrawingPage = () => {
         <div className="rounded-lg bg-white p-4 shadow-lg">
           <div className="relative">
             {isClient ? (
-              <div 
+              <div
                 className={`${
-                  activeTool === 'brush' 
-                    ? 'cursor-crosshair' 
-                    : activeTool === 'eraser' 
-                      ? 'cursor-pointer' 
+                  activeTool === 'brush'
+                    ? 'cursor-crosshair'
+                    : activeTool === 'eraser'
+                      ? 'cursor-pointer'
                       : activeTool === 'text'
                         ? 'cursor-text'
                         : 'cursor-default'
                 }`}
-                style={activeTool === 'brush' ? {
-                  cursor: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${Math.min(brushSize * 2, 32)}' height='${Math.min(brushSize * 2, 32)}' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='${Math.min(brushSize, 16)}' fill='${currentColor}' fill-opacity='0.5' stroke='${currentColor}' stroke-width='1'/%3E%3C/svg%3E") ${Math.min(brushSize, 16)} ${Math.min(brushSize, 16)}, crosshair`
-                } : {}}
+                style={
+                  activeTool === 'brush'
+                    ? {
+                        cursor: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${Math.min(brushSize * 2, 32)}' height='${Math.min(brushSize * 2, 32)}' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='${Math.min(brushSize, 16)}' fill='${currentColor}' fill-opacity='0.5' stroke='${currentColor}' stroke-width='1'/%3E%3C/svg%3E") ${Math.min(brushSize, 16)} ${Math.min(brushSize, 16)}, crosshair`,
+                      }
+                    : {}
+                }
               >
                 <KonvaCanvas
                   stageRef={stageRef}
@@ -977,8 +1039,8 @@ const DrawingPage = () => {
                   onTextSelect={handleTextSelect}
                   onTextDelete={deleteText}
                   onTextUpdate={updateText}
-                  onIncreaseFontSize={(textId) => {}}
-                  onDecreaseFontSize={(textId) => {}}
+                  onIncreaseFontSize={textId => {}}
+                  onDecreaseFontSize={textId => {}}
                 />
               </div>
             ) : (
@@ -989,82 +1051,127 @@ const DrawingPage = () => {
                 <div className="text-gray-500">편집기 로딩 중...</div>
               </div>
             )}
-            
+
             {/* Sticker Delete Button Overlay */}
-            {selectedStickerId && isClient && (() => {
-              const selectedSticker = stickers.find(s => s.id === selectedStickerId)
-              if (!selectedSticker) return null
-              
-              return (
-                <button
-                  onClick={() => deleteSticker(selectedStickerId)}
-                  className="absolute flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white shadow-lg hover:bg-red-600 transition-colors"
-                  style={{
-                    left: selectedSticker.x + selectedSticker.width - 12,
-                    top: selectedSticker.y - 12,
-                  }}
-                  title="스티커 삭제"
-                >
-                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )
-            })()}
+            {selectedStickerId &&
+              isClient &&
+              (() => {
+                const selectedSticker = stickers.find(
+                  s => s.id === selectedStickerId
+                )
+                if (!selectedSticker) return null
+
+                return (
+                  <button
+                    onClick={() => deleteSticker(selectedStickerId)}
+                    className="absolute flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white shadow-lg transition-colors hover:bg-red-600"
+                    style={{
+                      left: selectedSticker.x + selectedSticker.width - 12,
+                      top: selectedSticker.y - 12,
+                    }}
+                    title="스티커 삭제"
+                  >
+                    <svg
+                      className="h-3 w-3"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                )
+              })()}
 
             {/* Text Control Buttons Overlay */}
-            {selectedTextId && isClient && (() => {
-              const selectedText = texts.find(t => t.id === selectedTextId)
-              if (!selectedText) return null
-              
-              // 고정 위치 (캔버스 우상단)
-              const fixedX = stageSize.width - 120
-              const fixedY = 20
-              
-              return (
-                <div 
-                  className="absolute flex items-center space-x-2 z-20"
-                  style={{
-                    left: fixedX,
-                    top: fixedY,
-                  }}
-                >
-                  {/* 텍스트 크기 증가 버튼 */}
-                  <button
-                    onClick={() => increaseFontSize(selectedTextId)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl hover:bg-blue-700 transition-colors border-2 border-white"
-                    title="글자 크기 증가"
+            {selectedTextId &&
+              isClient &&
+              (() => {
+                const selectedText = texts.find(t => t.id === selectedTextId)
+                if (!selectedText) return null
+
+                // 고정 위치 (캔버스 우상단)
+                const fixedX = stageSize.width - 120
+                const fixedY = 20
+
+                return (
+                  <div
+                    className="absolute z-20 flex items-center space-x-2"
+                    style={{
+                      left: fixedX,
+                      top: fixedY,
+                    }}
                   >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                  </button>
-                  
-                  {/* 텍스트 크기 감소 버튼 */}
-                  <button
-                    onClick={() => decreaseFontSize(selectedTextId)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-600 text-white shadow-xl hover:bg-gray-700 transition-colors border-2 border-white"
-                    title="글자 크기 감소"
-                  >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 12H6" />
-                    </svg>
-                  </button>
-                  
-                  {/* 텍스트 삭제 버튼 */}
-                  <button
-                    onClick={() => deleteText(selectedTextId)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white shadow-xl hover:bg-red-700 transition-colors border-2 border-white"
-                    title="텍스트 삭제"
-                  >
-                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              )
-            })()}
-            
+                    {/* 텍스트 크기 증가 버튼 */}
+                    <button
+                      onClick={() => increaseFontSize(selectedTextId)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-white shadow-xl transition-colors hover:bg-blue-700"
+                      title="글자 크기 증가"
+                    >
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                        />
+                      </svg>
+                    </button>
+
+                    {/* 텍스트 크기 감소 버튼 */}
+                    <button
+                      onClick={() => decreaseFontSize(selectedTextId)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-gray-600 text-white shadow-xl transition-colors hover:bg-gray-700"
+                      title="글자 크기 감소"
+                    >
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M18 12H6"
+                        />
+                      </svg>
+                    </button>
+
+                    {/* 텍스트 삭제 버튼 */}
+                    <button
+                      onClick={() => deleteText(selectedTextId)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-red-600 text-white shadow-xl transition-colors hover:bg-red-700"
+                      title="텍스트 삭제"
+                    >
+                      <svg
+                        className="h-3 w-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                )
+              })()}
           </div>
         </div>
       </div>
@@ -1101,6 +1208,14 @@ const DrawingPage = () => {
         />
       )}
     </div>
+  )
+}
+
+const DrawingPage: React.FC = () => {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <DrawingContent />
+    </Suspense>
   )
 }
 
