@@ -12,9 +12,15 @@ import PhotoSelectComponent from './photo-select/PhotoSelectComponent'
 import PhotoEditComponent from './photo-edit/PhotoEditComponent'
 import CompletePage from './complete/CompletePage'
 
-interface PhotoBoothProps {}
+interface PhotoBoothProps {
+  globalVolume?: number
+  setGlobalVolume?: (volume: number) => void
+}
 
-export default function PhotoBooth({}: PhotoBoothProps = {}) {
+export default function PhotoBooth({ 
+  globalVolume,
+  setGlobalVolume
+}: PhotoBoothProps = {}) {
   const photoBoothState = usePhotoBoothStore(state => state.photoBoothState)
 
   const { name, metadata } = useRoomInfo()
@@ -37,7 +43,10 @@ export default function PhotoBooth({}: PhotoBoothProps = {}) {
       case PhotoBoothState.END:
         return <CompletePage />
       default:
-        return <WaitingComponent />
+        return <WaitingComponent 
+          globalVolume={globalVolume}
+          setGlobalVolume={setGlobalVolume}
+        />
     }
   }
 

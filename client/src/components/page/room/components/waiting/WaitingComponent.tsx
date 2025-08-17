@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { useEffect, useRef } from 'react'
 import { Track } from 'livekit-client'
 
+
 // 최대 4명을 위한 커스텀 그리드 레이아웃 정의
 const FOUR_PERSON_LAYOUTS: GridLayoutDefinition[] = [
   {
@@ -33,11 +34,15 @@ const FOUR_PERSON_LAYOUTS: GridLayoutDefinition[] = [
 interface WaitingComponentProps {
   onStartCall?: () => void
   className?: string
+  globalVolume?: number
+  setGlobalVolume?: (volume: number) => void
 }
 
 export default function WaitingComponent({
   onStartCall = () => {},
   className,
+  globalVolume,
+  setGlobalVolume,
 }: WaitingComponentProps) {
   const participants = useParticipants()
   const localParticipant = useLocalParticipant()
@@ -133,6 +138,8 @@ export default function WaitingComponent({
             showStartButton={true}
             showLeaveButton={true}
             onStartCall={onStartCall}
+            globalVolume={globalVolume}
+            setGlobalVolume={setGlobalVolume}
           />
         </aside>
       </main>

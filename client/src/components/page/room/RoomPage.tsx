@@ -7,7 +7,7 @@ import { PhotoBoothProvider } from './providers/PhotoBoothProvider'
 import { CursorProvider } from './providers/CursorProvider'
 import PhotoBooth from './components/PhotoBooth'
 import DebugPanel from './components/DebugPanel'
-import { RoomContext } from '@livekit/components-react'
+import { RoomContext, RoomAudioRenderer } from '@livekit/components-react'
 import { Room, RoomConnectOptions } from 'livekit-client'
 import { ConnectionDetails } from './types/livekit'
 
@@ -24,6 +24,7 @@ export default function RoomPage({ roomName }: RoomPageProps) {
   >(undefined)
   const [isConnecting, setIsConnecting] = useState(false)
   const [connectionError, setConnectionError] = useState<string | null>(null)
+  const [globalVolume, setGlobalVolume] = useState(1.0)
 
   const user = useAuthStore(state => state.user)
   const username = user?.name
@@ -177,8 +178,13 @@ export default function RoomPage({ roomName }: RoomPageProps) {
     <div ref={containerRef} className="h-full">
       <RoomContext.Provider value={room}>
         <PhotoBoothProvider roomName={roomName}>
+          {/* 모든 참가자의 오디오 자동 렌더링 */}
+          <RoomAudioRenderer volume={globalVolume} />
           <CursorProvider containerRef={containerRef}>
-            <PhotoBooth />
+            <PhotoBooth 
+              globalVolume={globalVolume}
+              setGlobalVolume={setGlobalVolume}
+            />
             <DebugPanel />
           </CursorProvider>
         </PhotoBoothProvider>

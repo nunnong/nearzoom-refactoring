@@ -10,6 +10,8 @@ interface SidebarProps {
   showLeaveButton?: boolean
   onStartCall?: () => void
   className?: string
+  globalVolume?: number
+  setGlobalVolume?: (volume: number) => void
 }
 
 export default function Sidebar({
@@ -17,6 +19,8 @@ export default function Sidebar({
   showLeaveButton = true,
   onStartCall = () => {},
   className,
+  globalVolume,
+  setGlobalVolume,
 }: SidebarProps) {
   const participants = useParticipants()
   const localParticipant = useLocalParticipant()
@@ -31,6 +35,8 @@ export default function Sidebar({
       {/* 컨트롤 버튼들 */}
       <ControlPanel
         showLeaveButton={showLeaveButton}
+        globalVolume={globalVolume}
+        setGlobalVolume={setGlobalVolume}
       />
     </div>
   )
