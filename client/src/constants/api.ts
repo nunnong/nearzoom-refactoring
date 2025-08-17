@@ -1,11 +1,9 @@
 // constants/api.ts
-// 백엔드 API 서버 주소 (테스트용 로컬로 임시 전환)
-// export const API_BASE_URL = 'https://api.nearzoom.store'
-export const API_BASE_URL = 'http://localhost:8080'
+// 백엔드 API 서버 주소
+export const API_BASE_URL = 'https://api.nearzoom.store'
 
-// 프론트엔드 콜백 URL (테스트용 로컬로 임시 전환)
-// export const FRONTEND_BASE_URL = 'https://nearzoom.store'
-export const FRONTEND_BASE_URL = 'http://localhost:3000'
+// 프론트엔드 콜백 URL
+export const FRONTEND_BASE_URL = 'https://nearzoom.store'
 
 export const API_ENDPOINTS = {
   // Auth
@@ -19,7 +17,7 @@ export const API_ENDPOINTS = {
   SAVE_EDITED_URL: '/myroom/photos/save-edited-url', // 추가
   FEED_UPLOAD_INFO: '/myroom/photos',
   SAVE_FACE_IMAGE: '/user/save-face-image',
-  IMAGE_PROXY: '/myroom/image', // 🚀 인증된 이미지 프록시
+  IMAGE_PROXY: '/myroom/image', //
 
   // PhotoPrompt
   PHOTO_SELECTION: '/photoprompt/selection',
