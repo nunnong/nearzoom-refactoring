@@ -1,9 +1,11 @@
 // constants/api.ts
-// 백엔드 API 서버 주소
-export const API_BASE_URL = 'https://api.nearzoom.store'
+// 백엔드 API 서버 주소 (테스트용 로컬로 임시 전환)
+// export const API_BASE_URL = 'https://api.nearzoom.store'
+export const API_BASE_URL = 'http://localhost:8080'
 
-// 프론트엔드 콜백 URL
-export const FRONTEND_BASE_URL = 'https://nearzoom.store'
+// 프론트엔드 콜백 URL (테스트용 로컬로 임시 전환)
+// export const FRONTEND_BASE_URL = 'https://nearzoom.store'
+export const FRONTEND_BASE_URL = 'http://localhost:3000'
 
 export const API_ENDPOINTS = {
   // Auth

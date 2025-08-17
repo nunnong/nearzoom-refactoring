@@ -134,7 +134,6 @@ export const roomAPI = {
   },
 }
 
-// 🔥 유틸리티 함수들 (기존과 동일)
 export const generateRoomUrl = (roomId: number | string): string => {
   if (typeof window !== 'undefined') {
     return `${window.location.origin}/room/${roomId}`

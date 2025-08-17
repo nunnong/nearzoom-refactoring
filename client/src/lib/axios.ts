@@ -56,11 +56,14 @@ api.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
         return api.request(originalRequest)
       } catch (refreshError) {
-        // Refresh Token도 만료된 경우 로그아웃
+        // Refresh Token도 만료된 경우
         if (typeof window !== 'undefined') {
           const { clearTokens } = useAuthStore.getState()
           clearTokens()
-          window.location.href = '/'
+          // 개발 환경에서는 강제 리다이렉트 대신 오류만 전달
+          if (process.env.NODE_ENV !== 'development') {
+            window.location.href = '/'
+          }
         }
         return Promise.reject(refreshError)
       }

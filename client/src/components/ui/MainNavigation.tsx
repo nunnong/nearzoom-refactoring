@@ -35,46 +35,8 @@ import { useAuthStore } from '@/stores/authStore'
 // import { api } from '@/lib/axios';
 
 // 🔧 옵션 3: 임시 직접 설정 (프로젝트 axios 구조 확인까지)
-import axios from 'axios';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080'
-
-// Axios 인스턴스 생성 (임시 - 추후 @/lib/axios로 교체 필요)
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
-
-// 🚀 자동 토큰 갱신: 인터셉터 설정
-api.interceptors.request.use(
-  (config) => {
-    // 🏪 Zustand에서 토큰 가져오기 (localStorage 대신 useAuthStore 사용 권장)
-    const token = localStorage.getItem('accessToken')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  }
-)
-
-// 🚀 자동 토큰 갱신: 응답 인터셉터
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      console.warn('🔓 401 Unauthorized - 토큰 만료, 자동 갱신 시도');
-      // 여기서 useAuthStore의 refreshToken 또는 logout 호출
-      const { logout } = useAuthStore.getState();
-      logout();
-    }
-    return Promise.reject(error)
-  }
-)
+import api from '@/lib/axios'
+import { API_BASE_URL } from '@/constants/api'
 
 // ============================================================================
 // 🔥 백엔드 연동 타입 정의

@@ -590,14 +590,7 @@ const ProfileSettingsPage: React.FC = () => {
             <ArrowLeftIcon className="w-5 h-5" />
           </button>
           
-          <div className="text-center">
-            <h1 className="text-lg font-semibold text-gray-900">프로필 설정</h1>
-            {userProfile && (
-              <p className="text-xs text-gray-500">
-                사용자 ID: {userProfile.userId} • @{userProfile.accountName}
-              </p>
-            )}
-          </div>
+
           
           <div className="flex items-center space-x-2">
             {hasChanges && (
@@ -747,151 +740,6 @@ const ProfileSettingsPage: React.FC = () => {
               )}
             </div>
 
-            {/* 🔥 기본 정보 섹션 (Zustand 스토어 데이터) */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <UserCircleIcon className="h-5 w-5 mr-2" />
-                기본 정보
-              </h2>
-              <div className="space-y-4">
-                {/* 이름 (수정 가능) */}
-                <div>
-                  <label htmlFor="userName" className="block text-sm font-medium text-gray-700 mb-1">
-                    이름 *
-                  </label>
-                  <input
-                    type="text"
-                    id="userName"
-                    value={editForm.userName}
-                    onChange={(e) => handleInputChange('userName', e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                    placeholder="이름을 입력하세요"
-                    maxLength={50}
-                    disabled={loading.save}
-                  />
-                  <div className="flex justify-between items-center mt-1">
-                    <p className="text-xs text-gray-500">
-                      2-50자 사이로 입력해주세요
-                    </p>
-                    <p className={`text-xs ${editForm.userName.length > 45 ? 'text-red-500' : 'text-gray-400'}`}>
-                      {editForm.userName.length}/50
-                    </p>
-                  </div>
-                </div>
-
-                {/* 계정명 (읽기 전용) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    계정명
-                  </label>
-                  <div className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-600">
-                    @{userProfile.accountName}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    계정명은 변경할 수 없습니다.
-                  </p>
-                </div>
-
-                {/* 이메일 (읽기 전용) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    이메일
-                  </label>
-                  <div className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-600">
-                    {userProfile.userEmail}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {userProfile.socialType} 로그인 계정의 이메일은 변경할 수 없습니다.
-                  </p>
-                </div>
-              </div>
-
-              {/* 🔥 저장 버튼 (변경사항이 있을 때만 표시) */}
-              {hasChanges && (
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                    <div className="flex items-center">
-                      <CheckIcon className="h-5 w-5 text-blue-400 mr-3 flex-shrink-0" />
-                      <div>
-                        <p className="text-blue-800 font-medium">변경사항이 있습니다</p>
-                        <p className="text-blue-600 text-sm">
-                          변경사항을 저장하거나 취소할 수 있습니다.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={handleCancelEdit}
-                      disabled={loading.save}
-                      className="flex-1 py-3 px-4 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                    >
-                      취소
-                    </button>
-                    <button
-                      onClick={handleSaveProfile}
-                      disabled={loading.save || !editForm.userName.trim()}
-                      className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors disabled:cursor-not-allowed"
-                    >
-                      {loading.save ? (
-                        <>
-                          <LoadingSpinner size="sm" className="mr-2 inline" />
-                          저장 중...
-                        </>
-                      ) : (
-                        '변경사항 저장'
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* 🔥 계정 정보 섹션 (Zustand 스토어 메타데이터) */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <CogIcon className="h-5 w-5 mr-2" />
-                계정 정보
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">사용자 ID</span>
-                    <span className="font-mono text-gray-800">{userProfile.userId}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">소셜 로그인</span>
-                    <span className="font-medium capitalize bg-gray-100 px-2 py-1 rounded text-gray-700">
-                      {userProfile.socialType}
-                    </span>
-                  </div>
-                </div>
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">가입일</span>
-                    <span className="font-medium text-gray-800">
-                      {new Date(userProfile.createdAt).toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">마지막 수정</span>
-                    <span className="font-medium text-gray-800">
-                      {new Date(userProfile.updatedAt).toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <ShieldExclamationIcon className="h-5 w-5 mr-2" />
@@ -932,22 +780,7 @@ const ProfileSettingsPage: React.FC = () => {
                   {loading.delete && <LoadingSpinner size="sm" />}
                 </button>
               </div>
-              
-              {/* 🔥 계정 삭제 경고 */}
-              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <div className="flex items-start">
-                  <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mt-0.5 mr-3 flex-shrink-0" />
-                  <div>
-                    <p className="text-red-800 font-medium text-sm mb-1">계정 삭제 시 주의사항</p>
-                    <ul className="text-red-700 text-xs space-y-1">
-                      <li>• 모든 게시물과 사진이 영구적으로 삭제됩니다</li>
-                      <li>• 팔로우/팔로워 관계가 모두 해제됩니다</li>
-                      <li>• 계정 정보와 개인 데이터가 복구 불가능하게 삭제됩니다</li>
-                      <li>• 이 작업은 되돌릴 수 없습니다</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
+
             </div>
           </>
         )}

@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'image.nearzoom.store',
       },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
     ],
   },
   eslint: {
@@ -29,7 +33,7 @@ const nextConfig: NextConfig = {
       config.externals = config.externals || []
       config.externals.push({
         konva: 'konva',
-        'react-konva': 'react-konva'
+        'react-konva': 'react-konva',
       })
     }
     return config

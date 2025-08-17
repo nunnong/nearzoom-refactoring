@@ -194,9 +194,11 @@ const Dashboard: React.FC<DashboardProps> = ({
     <div className="min-h-screen bg-gray-50">
       {/* 🚀 검색 및 필터 영역 - 전체 너비 사용 */}
       <div className="bg-white border-b border-gray-200 p-4">
-        <SearchBox 
-          onFiltersChange={handleFiltersChange}
-        />
+        <div className="mx-auto max-w-3xl">
+          <SearchBox 
+            onFiltersChange={handleFiltersChange}
+          />
+        </div>
       </div>
 
       {/* 🚀 이미지 아카이브 - 전체 너비 사용 */}

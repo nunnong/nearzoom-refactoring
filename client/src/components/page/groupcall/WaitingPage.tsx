@@ -91,8 +91,8 @@ export default function WaitingPage({
       const roomInfo = await roomAPI.getRoomInfo(numericRoomId)
       console.log('✅ 방 정보 로드 성공:', roomInfo)
       
-      // 서버에서 온 참가자 이름 배열을 그대로 저장
-      const participantNames = roomInfo.participants || []
+      // 서버에서 온 참가자 배열 → 문자열 이름 배열로 변환
+      const participantNames = (roomInfo.participants || []).map((p: any) => p.name || p.email || 'Guest')
       setServerParticipants(participantNames)
       console.log('👥 참가자 이름 목록:', participantNames)
       

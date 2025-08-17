@@ -1,6 +1,7 @@
 'use client'
 
 import Dashboard from '@/components/page/myroom/Dashboard'
+import MyRoomHeader from '@/components/page/myroom/MyRoomHeader'
 import { useAuth } from '@/hooks/auth'
 import { useEffect, useState, useCallback, useMemo, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
@@ -63,7 +64,7 @@ const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetError
 
 // 🚀 메인 마이룸 컴포넌트
 function MyRoomContent() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth()
+  const { user, isAuthenticated, isLoading: authLoading, initializeAuth } = useAuth()
   const [userImages, setUserImages] = useState<ImageItem[]>([])
   const [loading, setLoading] = useState(true)
   const [userInfoLoading, setUserInfoLoading] = useState(false)
@@ -87,6 +88,11 @@ function MyRoomContent() {
 
     return () => clearTimeout(timeoutId)
   }, [])
+
+  // 🚀 보장: 페이지 진입 시 인증 상태 초기화 (Main과 동일하게 동작)
+  useEffect(() => {
+    initializeAuth()
+  }, [initializeAuth])
 
   // 디버깅을 위한 상태 로깅
   console.log('🔍 MyRoom 상태:', { 
@@ -413,119 +419,12 @@ function MyRoomContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 새로운 헤더 스타일 적용 - MainPage와 동일 */}
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
-        <div className="flex items-center justify-between p-4">
-          <div className="text-center">
-            <h1 className="text-lg font-semibold text-gray-900">My Room</h1>
-            <p className="text-xs text-gray-500">
-              사용자 ID: {user?.id} • {user?.name || user?.email}
-            </p>
-          </div>
-          
-          {/* 우측 상단 프로필 및 햄버거 메뉴 */}
-          <div className="flex items-center space-x-2">
-            {/* 프로필 원형 아바타 - 소셜 계정 프로필 사진과 연결 */}
-            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 shadow-md">
-              {user?.profileImage ? (
-                <img
-                  src={user.profileImage}
-                  alt="프로필 사진"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement
-                    target.style.display = 'none'
-                    const fallback = target.nextElementSibling as HTMLElement
-                    if (fallback) fallback.style.display = 'flex'
-                  }}
-                />
-              ) : null}
-              {/* Fallback: 프로필 이미지가 없을 때 이니셜 표시 */}
-              <div 
-                className={`w-full h-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center ${
-                  user?.profileImage ? 'hidden' : 'flex'
-                }`}
-              >
-                <span className="text-white text-sm font-bold">
-                  {user?.name ? user?.name.charAt(0).toUpperCase() : 
-                   user?.email ? user?.email.charAt(0).toUpperCase() : 'U'}
-                </span>
-              </div>
-            </div>
-            
-            {/* 햄버거 메뉴 */}
-            <div className="relative">
-              <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="p-2 rounded-md hover:bg-gray-100 transition-colors focus:outline-none"
-              >
-                <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-              
-              {/* Dropdown Menu - MainPage와 동일한 구조 */}
-              {isMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                  <div className="py-2">
-                    {/* UPLOAD SELFIE */}
-                    <button
-                      onClick={() => {
-                        handleUploadSelfie()
-                        setIsMenuOpen(false)
-                      }}
-                      className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors flex items-center gap-3 text-gray-800 border-b border-gray-100"
-                    >
-                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <div>
-                        <p className="font-medium">UPLOAD SELFIE</p>
-                        <p className="text-xs text-gray-500">AI 프로필 이미지 생성</p>
-                      </div>
-                    </button>
-                    
-                    {/* ACCOUNT */}
-                    <button
-                      onClick={() => {
-                        handleAccount()
-                        setIsMenuOpen(false)
-                      }}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 text-gray-800 border-b border-gray-100"
-                    >
-                      <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                      <div>
-                        <p className="font-medium">ACCOUNT</p>
-                        <p className="text-xs text-gray-500">프로필 설정 및 관리</p>
-                      </div>
-                    </button>
-                    
-                    {/* LOGOUT - 빨간색 */}
-                    <button
-                      onClick={() => {
-                        handleLogout()
-                        setIsMenuOpen(false)
-                      }}
-                      className="w-full px-4 py-3 text-left hover:bg-red-50 transition-colors flex items-center gap-3 text-red-600"
-                    >
-                      <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                      </svg>
-                      <div>
-                        <p className="font-medium">LOGOUT</p>
-                        <p className="text-xs text-red-500">현재 기기에서 로그아웃</p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      <MyRoomHeader
+        user={user}
+        onUploadSelfie={() => router.push('/upload-photo')}
+        onAccount={() => router.push('/profile')}
+        onLogout={() => router.push('/login')}
+      />
 
       {/* Dashboard - 전체 너비 사용 */}
       <Dashboard
