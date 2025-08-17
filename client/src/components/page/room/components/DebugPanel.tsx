@@ -10,6 +10,7 @@ interface DebugPanelProps {
 }
 
 export default function DebugPanel({ className = '' }: DebugPanelProps) {
+  const [isVisible, setIsVisible] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
   const [showJsonView, setShowJsonView] = useState<Record<string, boolean>>({})
@@ -214,18 +215,34 @@ export default function DebugPanel({ className = '' }: DebugPanelProps) {
   )
 
   return (
-    <div className={`fixed top-4 right-4 z-50 ${className}`}>
-      <div className="max-h-screen min-w-[280px] overflow-hidden rounded-lg bg-black/90 text-white shadow-lg">
-        {/* Header */}
-        <div
-          className="flex cursor-pointer items-center justify-between border-b border-gray-700 p-3"
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
-          <span className="text-sm font-semibold">🐛 Debug Panel</span>
-          <span className="text-xs text-gray-400">
-            {isExpanded ? '▼' : '▶'}
-          </span>
-        </div>
+    <>
+      {/* 숨겨진 토글 버튼 - 오른쪽 위 모서리 작은 영역 */}
+      <button
+        onClick={() => setIsVisible(!isVisible)}
+        className="fixed top-0 right-0 z-[100] h-8 w-8 bg-transparent hover:bg-red-500/10 transition-colors"
+        title="Debug Panel Toggle"
+        style={{ 
+          // 개발 환경에서만 약간의 시각적 힌트
+          backgroundColor: process.env.NODE_ENV === 'development' ? 'rgba(255,0,0,0.05)' : 'transparent'
+        }}
+      >
+        {/* 아무 내용 없음 - 완전히 투명 */}
+      </button>
+
+      {/* Debug Panel */}
+      {isVisible && (
+        <div className={`fixed top-4 right-4 z-50 ${className}`}>
+          <div className="max-h-screen min-w-[280px] overflow-hidden rounded-lg bg-black/90 text-white shadow-lg">
+            {/* Header */}
+            <div
+              className="flex cursor-pointer items-center justify-between border-b border-gray-700 p-3"
+              onClick={() => setIsExpanded(!isExpanded)}
+            >
+              <span className="text-sm font-semibold">🐛 Debug Panel</span>
+              <span className="text-xs text-gray-400">
+                {isExpanded ? '▼' : '▶'}
+              </span>
+            </div>
 
         {/* Content */}
         {isExpanded && (
@@ -1149,7 +1166,9 @@ export default function DebugPanel({ className = '' }: DebugPanelProps) {
             </div>
           </div>
         )}
-      </div>
-    </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

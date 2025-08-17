@@ -176,15 +176,41 @@ export default function PhotoCanvas({
         console.log('✅ Canvas captured successfully')
 
         // 참가자들을 왼쪽에서 오른쪽 순서로 정렬하여 faceImageUrl 추출
+        console.log('🔍 === PARTICIPANTS MATCHING DEBUG ===')
+        console.log('Canvas participants:', Object.keys(participants))
+        console.log('LiveKit participants:', allParticipants.map(p => ({
+          identity: p.identity,
+          hasMetadata: !!p.metadata,
+          metadata: p.metadata ? JSON.parse(p.metadata || '{}') : null
+        })))
+        
         const sortedPersonIds = Object.entries(participants)
           .sort(([, a], [, b]) => a.x - b.x)  // x 좌표 기준 정렬 (왼쪽 → 오른쪽)
           .map(([participantId]) => {
             console.log(`🔍 Processing participant: ${participantId}, position: (${participants[participantId]?.x}, ${participants[participantId]?.y})`)
             
-            // LiveKit 참가자 찾기 (identity가 participantId를 포함하는 것 찾기)
-            const livekitParticipant = allParticipants.find(p => 
-              p.identity.includes(participantId)
+            // 1차: 정확한 매칭 시도
+            let livekitParticipant = allParticipants.find(p => 
+              p.identity === participantId
             )
+            
+            if (!livekitParticipant) {
+              console.log(`⚠️ Exact match failed for ${participantId}`)
+              console.log('Trying partial match...')
+              
+              // 2차: 부분 매칭 시도 (기존 로직)
+              livekitParticipant = allParticipants.find(p => 
+                p.identity.includes(participantId) || participantId.includes(p.identity)
+              )
+              
+              if (livekitParticipant) {
+                console.log(`✅ Partial match found: ${livekitParticipant.identity} for ${participantId}`)
+              } else {
+                console.log(`❌ No match found for ${participantId}`)
+              }
+            } else {
+              console.log(`✅ Exact match found: ${livekitParticipant.identity}`)
+            }
             
             if (livekitParticipant?.metadata) {
               try {
@@ -192,17 +218,36 @@ export default function PhotoCanvas({
                 console.log(`👤 Found metadata for ${participantId}:`, {
                   fullMetadata: metadata,
                   faceImageUrl: metadata.faceImageUrl ? metadata.faceImageUrl : 'null',
-                  hasUrl: !!metadata.faceImageUrl
+                  hasUrl: !!metadata.faceImageUrl,
+                  willReturn: metadata.faceImageUrl || ''
                 })
                 return metadata.faceImageUrl || ''
               } catch (error) {
                 console.error(`❌ Failed to parse metadata for ${participantId}:`, error)
+                console.log('Raw metadata:', livekitParticipant.metadata)
+              }
+            } else {
+              console.log(`❌ No metadata found for ${participantId}`)
+              if (livekitParticipant) {
+                console.log('Participant exists but no metadata:', {
+                  identity: livekitParticipant.identity,
+                  hasMetadata: !!livekitParticipant.metadata,
+                  metadata: livekitParticipant.metadata
+                })
               }
             }
+            console.log(`🔄 Returning empty string for ${participantId}`)
             return ''
           })
 
         console.log(`🎯 Extracted ${sortedPersonIds.length} face image URLs in left-to-right order:`, sortedPersonIds)
+        console.log('🔍 === END PARTICIPANTS MATCHING DEBUG ===')
+        
+        // 빈 문자열 개수 체크
+        const emptyCount = sortedPersonIds.filter(id => id === '').length
+        if (emptyCount > 0) {
+          console.log(`⚠️ WARNING: ${emptyCount} empty strings found in personIds!`)
+        }
 
         // onCapture에 정렬된 personIds도 함께 전달
         onCapture(dataURL, sortedPersonIds)
