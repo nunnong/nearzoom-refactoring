@@ -2,7 +2,7 @@
 
 import Dashboard from '@/components/page/myroom/Dashboard'
 import MyRoomHeader from '@/components/page/myroom/MyRoomHeader'
-import { useAuth } from '@/hooks/auth'
+import { useAuthStore } from '@/stores/authStore'
 import { useEffect, useState, useCallback, useMemo, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { myroomService, MyPhotoListCondition } from '@/services/myroomService'
@@ -64,7 +64,7 @@ const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetError
 
 // 🚀 메인 마이룸 컴포넌트
 function MyRoomContent() {
-  const { user, isAuthenticated, isLoading: authLoading, initializeAuth } = useAuth()
+  const { user, isAuthenticated, isLoading: authLoading, initializeAuth } = useAuthStore()
   const [userImages, setUserImages] = useState<ImageItem[]>([])
   const [loading, setLoading] = useState(true)
   const [userInfoLoading, setUserInfoLoading] = useState(false)
@@ -274,7 +274,9 @@ function MyRoomContent() {
   const handleUploadSelfie = () => {
     // 이미 MyRoom에 있으므로 UploadSelfieModal을 열거나 해당 섹션으로 이동
     console.log('📸 UPLOAD SELFIE 클릭');
-    // UploadSelfieModal 열기 로직 추가 예정
+    // TODO: UploadSelfieModal 열기 로직 추가
+    // 현재는 /upload-photo 페이지로 이동
+    router.push('/upload-photo');
   };
 
   // 🚀 프로필 설정 페이지로 이동
@@ -285,9 +287,16 @@ function MyRoomContent() {
   // 🚀 로그아웃
   const handleLogout = () => {
     if (confirm('로그아웃하시겠습니까?')) {
-      // 로그아웃 로직 추가 예정
-      console.log('🚪 로그아웃');
-      router.push('/');
+      try {
+        // useAuthStore의 logout 함수 사용
+        const { logout } = useAuthStore.getState();
+        logout();
+        console.log('🚪 로그아웃');
+        router.push('/');
+      } catch (error) {
+        console.error('❌ 로그아웃 실패:', error);
+        alert('로그아웃에 실패했습니다.');
+      }
     }
   };
 
@@ -320,15 +329,12 @@ function MyRoomContent() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* 새로운 헤더 스타일 적용 */}
-        <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
-          <div className="flex items-center justify-between p-4">
-            <div className="text-center">
-              <h1 className="text-lg font-semibold text-gray-900">My Room</h1>
-              <p className="text-xs text-gray-500">인증 상태 확인 중...</p>
-            </div>
-          </div>
-        </div>
+        <MyRoomHeader
+          user={null}
+          onUploadSelfie={() => {}}
+          onAccount={() => {}}
+          onLogout={() => {}}
+        />
         <div className="flex min-h-[calc(100vh-80px)] items-center justify-center">
           <div className="text-center">
             <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
@@ -384,15 +390,12 @@ function MyRoomContent() {
     console.log('⏳ 기본 로딩 상태 - 사용자 정보 확인 중')
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* 새로운 헤더 스타일 적용 */}
-        <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
-          <div className="flex items-center justify-between p-4">
-            <div className="text-center">
-              <h1 className="text-lg font-semibold text-gray-900">My Room</h1>
-              <p className="text-xs text-gray-500">프로필 정보를 불러오는 중...</p>
-            </div>
-          </div>
-        </div>
+        <MyRoomHeader
+          user={null}
+          onUploadSelfie={() => {}}
+          onAccount={() => {}}
+          onLogout={() => {}}
+        />
         <div className="flex min-h-[calc(100vh-80px)] items-center justify-center">
           <div className="text-center">
             <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
@@ -421,9 +424,9 @@ function MyRoomContent() {
     <div className="min-h-screen bg-gray-50">
       <MyRoomHeader
         user={user}
-        onUploadSelfie={() => router.push('/upload-photo')}
-        onAccount={() => router.push('/profile')}
-        onLogout={() => router.push('/login')}
+        onUploadSelfie={handleUploadSelfie}
+        onAccount={handleAccount}
+        onLogout={handleLogout}
       />
 
       {/* Dashboard - 전체 너비 사용 */}

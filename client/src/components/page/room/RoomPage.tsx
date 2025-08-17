@@ -58,23 +58,44 @@ export default function RoomPage({ roomName }: RoomPageProps) {
       })
 
       const response = await fetch(url.toString())
+      
+      // 더 자세한 에러 정보 로깅
       if (!response.ok) {
+        const errorText = await response.text()
+        console.error('❌ API Response Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText: errorText
+        })
+        
         throw new Error(
-          `Failed to fetch connection details: ${response.statusText}`
+          `Failed to fetch connection details: ${response.status} ${response.statusText}`
         )
       }
 
       const data: ConnectionDetails = await response.json()
+      console.log('✅ Connection details received:', data)
       setConnectionDetails(data)
     } catch (error) {
-      console.error('Error fetching connection details:', error)
-      setConnectionError(
-        error instanceof Error ? error.message : 'Unknown error'
-      )
+      console.error('❌ Error fetching connection details:', error)
+      
+      // 더 구체적인 에러 메시지
+      let errorMessage = 'Unknown error'
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch')) {
+          errorMessage = '서버에 연결할 수 없습니다. 네트워크 연결을 확인해주세요.'
+        } else if (error.message.includes('500')) {
+          errorMessage = '서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+        } else {
+          errorMessage = error.message
+        }
+      }
+      
+      setConnectionError(errorMessage)
     } finally {
       setIsConnecting(false)
     }
-  }, [username, roomName])
+  }, [username, roomName, user?.faceImageUrl])
 
   // 마운트 체크
   useEffect(() => {
@@ -159,15 +180,40 @@ export default function RoomPage({ roomName }: RoomPageProps) {
 
   if (connectionError) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg text-red-600">연결 오류: {connectionError}</p>
-          <button
-            onClick={fetchConnectionDetails}
-            className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-          >
-            다시 시도
-          </button>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md mx-auto p-8">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">연결 오류</h2>
+          <p className="text-gray-500 mb-6">{connectionError}</p>
+          
+          <div className="space-y-3">
+            <button
+              onClick={fetchConnectionDetails}
+              className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+            >
+              다시 시도
+            </button>
+            
+            <button
+              onClick={() => router.push('/myroom')}
+              className="w-full px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
+            >
+              My Room으로 돌아가기
+            </button>
+          </div>
+          
+          <div className="mt-6 p-4 bg-gray-100 rounded-lg text-left">
+            <p className="text-sm text-gray-600 mb-2">문제 해결 방법:</p>
+            <ul className="text-sm text-gray-500 space-y-1">
+              <li>• 네트워크 연결을 확인해주세요</li>
+              <li>• 브라우저를 새로고침해보세요</li>
+              <li>• 잠시 후 다시 시도해보세요</li>
+            </ul>
+          </div>
         </div>
       </div>
     )

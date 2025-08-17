@@ -115,7 +115,7 @@ export default function AboutUsSection() {
   return (
     <section className="relative bg-white">
       {/* 🔹 ABOUT US 대형 스크롤 텍스트 */}
-      <div className="relative overflow-hidden pt-16 pb-10">
+      <div className="relative overflow-hidden pt-8 pb-10">
         {/* 그라데이션 오버레이 */}
         <div className="absolute inset-0 bg-gradient-to-r from-white via-transparent to-white z-10 pointer-events-none"></div>
         

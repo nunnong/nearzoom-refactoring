@@ -10,7 +10,7 @@ import { myroomService, MyPhotoListCondition } from '@/services/myroomService'
 import ImageArchive from './ImageArchive'
 import SearchBox from './SearchBox'
 import UploadSelfieModal from './UploadSelfieModal'
-import { useAuth } from '@/hooks/auth'
+import { useAuthStore } from '@/stores/authStore'
 
 export interface ImageItem {
   photoId: string
@@ -28,6 +28,8 @@ interface Filter {
   value: string
   display: string
 }
+
+
 
 interface DashboardProps {
   images?: ImageItem[]
@@ -53,7 +55,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   onEdit
 }) => {
   const router = useRouter()
-  const { handleLogout, handleDeleteAccount, isLoading } = useAuth()
+  const { logout, isLoading } = useAuthStore()
   const actualUser = userProfile
   
   const [activeModal, setActiveModal] = useState<string | null>(null)
@@ -166,52 +168,58 @@ const Dashboard: React.FC<DashboardProps> = ({
   // 🚀 로그아웃
   const handleLogoutClick = useCallback(async () => {
     if (confirm('로그아웃하시겠습니까?')) {
-      await handleLogout()
-      router.push('/')
-    }
-  }, [handleLogout, router])
-
-  // 🚀 계정 삭제
-  const handleDeleteAccountClick = useCallback(async () => {
-    const confirmMsg1 = '정말로 계정을 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다.'
-    const confirmMsg2 = '모든 게시물, 팔로우 관계, 개인 정보가 영구적으로 삭제됩니다.\n\n정말로 계속하시겠습니까?'
-    
-    if (confirm(confirmMsg1)) {
-      if (confirm(confirmMsg2)) {
-        try {
-          await handleDeleteAccount()
-          alert('계정이 성공적으로 삭제되었습니다.')
-          router.push('/')
-        } catch (error) {
-          console.error('계정 삭제 실패:', error)
-          alert('계정 삭제에 실패했습니다.')
-        }
+      try {
+        logout()
+        router.push('/')
+      } catch (error) {
+        console.error('로그아웃 실패:', error)
+        alert('로그아웃에 실패했습니다.')
       }
     }
-  }, [handleDeleteAccount, router])
+  }, [logout, router])
+
+  // 🚀 계정 삭제 (현재는 구현되지 않음)
+  const handleDeleteAccountClick = useCallback(async () => {
+    alert('계정 삭제 기능은 현재 구현되지 않았습니다.')
+  }, [])
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* 🚀 검색 및 필터 영역 - 전체 너비 사용 */}
-      <div className="bg-white border-b border-gray-200 p-4">
-        <div className="mx-auto max-w-3xl">
-          <SearchBox 
-            onFiltersChange={handleFiltersChange}
-          />
+    <div className="min-h-screen bg-gray-100">
+      {/* 🚀 검색 및 필터 영역 */}
+      <div className="bg-gray-100 border-b border-gray-200 p-4">
+        <div className="flex justify-center">
+          <div className="w-[30rem] ml-16">
+            <SearchBox
+              onFiltersChange={handleFiltersChange}
+            />
+          </div>
         </div>
       </div>
 
-      {/* 🚀 이미지 아카이브 - 전체 너비 사용 */}
-      <div className="flex-1 p-4">
-        <ImageArchive
-          images={filteredImages}
-          onLoadMore={handleLoadMore}
-          hasMore={hasMore}
-          onLike={handleLike}
-          onDelete={handleDelete}
-          onEdit={handleEdit}
-          onShareKakao={handleShareKakao}
-        />
+      {/* 🚀 이미지 아카이브 - 전체 한 톤 */}
+      <div className="flex-1">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-12 gap-0">
+            {/* 왼쪽 공간 */}
+            <div className="col-span-1 bg-gray-100 min-h-screen"></div>
+            
+            {/* 중앙 콘텐츠 영역 */}
+            <div className="col-span-10 p-4 bg-gray-100">
+              <ImageArchive
+                images={filteredImages}
+                onLoadMore={handleLoadMore}
+                hasMore={hasMore}
+                onLike={handleLike}
+                onDelete={handleDelete}
+                onEdit={handleEdit}
+                onShareKakao={handleShareKakao}
+              />
+            </div>
+            
+            {/* 오른쪽 공간 */}
+            <div className="col-span-1 bg-gray-100 min-h-screen"></div>
+          </div>
+        </div>
       </div>
 
       {/* 🚀 셀피 업로드 모달 */}

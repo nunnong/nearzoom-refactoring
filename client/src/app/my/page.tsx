@@ -1,5 +1,5 @@
 // =============================================================================
-// 📁 /app/my/page.tsx - 수정 완료 버전
+// �� /app/my/page.tsx - MyRoomHeader 적용 버전
 // =============================================================================
 
 'use client';
@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/authStore';
 
 // 🔥 올바른 import 경로로 수정 (default export 사용)
 import MyProfile from '@/components/page/profile/MyProfile';
+import MyRoomHeader from '@/components/page/myroom/MyRoomHeader';
 
 // ============================================================================
 // 내 프로필 페이지 컴포넌트
@@ -71,19 +72,23 @@ const MyProfilePage: React.FC = (): JSX.Element => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 페이지 헤더 */}
-      <div className="bg-white border-b border-gray-200 py-8">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              내 프로필
-            </h1>
-            <p className="text-gray-600">
-              내 정보와 게시물을 확인하고 관리하세요
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* MyRoomHeader로 통일 */}
+      <MyRoomHeader
+        user={{
+          name: user.name,
+          email: user.email,
+          profileImage: user.profileImage
+        }}
+        onUploadSelfie={() => {
+          // 셀피 업로드 기능 (필요시 구현)
+          console.log('Upload selfie clicked')
+        }}
+        onAccount={() => router.push('/profile')}
+        onLogout={() => {
+          // 로그아웃 기능 (필요시 구현)
+          console.log('Logout clicked')
+        }}
+      />
 
       {/* 메인 컨텐츠 */}
       <div className="py-8">
