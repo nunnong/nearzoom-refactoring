@@ -92,7 +92,6 @@ const MyProfilePage: React.FC = (): JSX.Element => {
           <MyProfile 
             className="w-full"
             postsPerPage={12}
-            enableAutoLoad={true}
           />
         </div>
       </div>

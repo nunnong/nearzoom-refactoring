@@ -55,6 +55,14 @@ interface ApiResponse<T> {
   data: T | null;
 }
 
+// 🔥 백엔드 UserInfoResponse와 정확히 일치하는 타입 (다른 컴포넌트와 일치)
+interface UserInfoResponse {
+  userName: string;
+  userEmail: string;
+  userProfileImage: string | null;
+  faceImageUrl: string | null;
+}
+
 // 🔥 백엔드 UserProfileResponse와 정확히 일치하는 타입
 interface UserProfileResponse {
   userId: number;
@@ -87,26 +95,83 @@ interface UploadProfileImageResponse {
 // ============================================================================
 
 const profileSettingsAPI = {
-  // 🔥 GET /user/profile - 현재 사용자 프로필 조회
+  // 🔥 GET /user/userInfo - 현재 사용자 프로필 조회 (다른 컴포넌트와 일치)
   getCurrentProfile: async (): Promise<UserProfileResponse> => {
     try {
-      console.log('🔍 현재 사용자 프로필 조회');
+      console.log('🔍 현재 사용자 프로필 조회 시작');
       
-      const response = await api.get<ApiResponse<UserProfileResponse>>('/user/profile');
+      // API 요청 전 상태 확인
+      console.log('🔍 API 요청 전 상태 확인');
+      
+      const response = await api.get<ApiResponse<UserInfoResponse>>('/user/userInfo');
+      
+      console.log('📡 API 응답 전체:', response);
+      console.log('📡 API 응답 상태:', response.status);
+      console.log('📡 API 응답 헤더:', response.headers);
+      console.log('📡 API 응답 데이터:', response.data);
       
       if (response.data.error) {
+        console.error('❌ API 응답에 에러 플래그가 설정됨:', response.data.message);
         throw new Error(response.data.message || '프로필 조회에 실패했습니다.');
       }
       
       if (!response.data.data) {
+        console.error('❌ API 응답에 데이터가 없음:', response.data);
         throw new Error('프로필 데이터를 받을 수 없습니다.');
       }
       
-      console.log('✅ 프로필 조회 성공:', response.data.data);
-      return response.data.data;
-    } catch (error) {
-      console.error('❌ 프로필 조회 실패:', error);
-      throw error;
+      const userInfo = response.data.data;
+      console.log('✅ UserInfo 조회 성공:', userInfo);
+      
+      // UserInfoResponse를 UserProfileResponse로 변환
+      // accountName은 이메일에서 추출하거나 기본값 사용
+      const accountName = userInfo.userEmail ? userInfo.userEmail.split('@')[0] : 'user';
+      
+      // 필수 필드 검증
+      if (!userInfo.userName || !userInfo.userEmail) {
+        console.error('❌ 필수 프로필 정보 누락:', userInfo);
+        throw new Error('필수 프로필 정보가 누락되었습니다.');
+      }
+      
+      const userProfile: UserProfileResponse = {
+        userId: 0, // userInfo에는 userId가 없으므로 기본값 사용
+        accountName: accountName,
+        userName: userInfo.userName,
+        userEmail: userInfo.userEmail,
+        userProfileImage: userInfo.userProfileImage,
+        faceImageUrl: userInfo.faceImageUrl
+      };
+      
+      console.log('✅ UserProfileResponse로 변환 완료:', userProfile);
+      return userProfile;
+    } catch (error: any) {
+      console.error('❌ 프로필 조회 실패 - 상세 에러 정보:');
+      console.error('  - 에러 타입:', typeof error);
+      console.error('  - 에러 메시지:', error?.message);
+      console.error('  - 에러 스택:', error?.stack);
+      console.error('  - 에러 응답:', error?.response);
+      console.error('  - 에러 상태:', error?.response?.status);
+      console.error('  - 에러 데이터:', error?.response?.data);
+      console.error('  - 전체 에러 객체:', error);
+      
+      // 더 구체적인 에러 메시지 생성
+      let errorMessage = '프로필 조회에 실패했습니다.';
+      
+      if (error?.response?.status === 401) {
+        errorMessage = '로그인이 필요합니다.';
+      } else if (error?.response?.status === 403) {
+        errorMessage = '프로필에 접근할 권한이 없습니다.';
+      } else if (error?.response?.status === 404) {
+        errorMessage = '프로필을 찾을 수 없습니다.';
+      } else if (error?.response?.status >= 500) {
+        errorMessage = '서버 오류가 발생했습니다.';
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      const enhancedError = new Error(errorMessage);
+      enhancedError.cause = error; // 원본 에러를 cause로 저장
+      throw enhancedError;
     }
   },
 
@@ -243,15 +308,24 @@ const ProfileSettingsPage: React.FC = () => {
       setEditForm({
         accountName: profile.accountName
       });
+      
+      console.log('✅ 편집 폼 초기화 완료:', profile.accountName);
 
       console.log('✅ 사용자 프로필 로딩 완료:', profile);
 
     } catch (error: any) {
-      console.error('❌ 사용자 프로필 로딩 실패:', error);
+      console.error('❌ 사용자 프로필 로딩 실패 - 상세 에러 정보:');
+      console.error('  - 에러 타입:', typeof error);
+      console.error('  - 에러 메시지:', error?.message);
+      console.error('  - 에러 스택:', error?.stack);
+      console.error('  - 에러 응답:', error?.response);
+      console.error('  - 에러 상태:', error?.response?.status);
+      console.error('  - 에러 데이터:', error?.response?.data);
+      console.error('  - 전체 에러 객체:', error);
       
       let errorMessage = '프로필을 불러오는데 실패했습니다.';
       
-      if (error.response?.status === 401) {
+      if (error?.response?.status === 401) {
         errorMessage = '로그인이 필요합니다.';
         try {
           await useAuthStore.getState().logout();
@@ -261,14 +335,19 @@ const ProfileSettingsPage: React.FC = () => {
         }
         router.push('/login');
         return;
-      } else if (error.response?.status === 403) {
+      } else if (error?.response?.status === 403) {
         errorMessage = '프로필에 접근할 권한이 없습니다.';
-      } else if (error.response?.data?.message) {
+      } else if (error?.response?.status === 404) {
+        errorMessage = '프로필을 찾을 수 없습니다.';
+      } else if (error?.response?.status >= 500) {
+        errorMessage = '서버 오류가 발생했습니다.';
+      } else if (error?.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error?.message) {
         errorMessage = error.message;
       }
       
+      console.error('❌ 최종 에러 메시지:', errorMessage);
       setError(errorMessage);
     } finally {
       setLoading(prev => ({ ...prev, initial: false }));
