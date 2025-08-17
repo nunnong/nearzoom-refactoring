@@ -892,7 +892,6 @@ const ProfileSettingsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 🔥 계정 관리 섹션 */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <ShieldExclamationIcon className="h-5 w-5 mr-2" />
@@ -948,31 +947,6 @@ const ProfileSettingsPage: React.FC = () => {
                     </ul>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* 🔥 추가 기능 안내 */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h3 className="text-blue-800 font-medium text-sm mb-2">💡 추가 기능</h3>
-              <div className="space-y-2 text-blue-700 text-xs">
-                <button
-                  onClick={handleUploadSelfie}
-                  className="block w-full text-left p-2 hover:bg-blue-100 rounded transition-colors"
-                >
-                  📸 <strong>MyRoom</strong>에서 셀피를 촬영하여 AI 프로필 이미지 생성
-                </button>
-                <button
-                  onClick={() => router.push('/my')}
-                  className="block w-full text-left p-2 hover:bg-blue-100 rounded transition-colors"
-                >
-                  👤 <strong>내 페이지</strong>에서 피드와 게시물 관리
-                </button>
-                <button
-                  onClick={() => router.push('/feeds/timeline')}
-                  className="block w-full text-left p-2 hover:bg-blue-100 rounded transition-colors"
-                >
-                  🏠 <strong>타임라인</strong>에서 팔로잉 사용자들의 최신 게시물 확인
-                </button>
               </div>
             </div>
           </>

@@ -1,46 +1,95 @@
-const steps = [
-  {
-    number: "01",
-    title: "인생샷 업로드",
-    description: "자신의 얼굴이 잘 드러난 사진 한 장을 업로드해 주세요."
-  },
-  {
-    number: "02", 
-    title: "사진 촬영",
-    description: "친구들과 함께 사진을 찍고, 특별한 순간을 포착해 보세요."
-  },
-  {
-    number: "03",
-    title: "편집 및 공유", 
-    description: "다양한 도구로 사진을 꾸미고, SNS에 공유해 보세요."
-  }
-]
+"use client"
+
+import Image from 'next/image'
 
 export default function Footer() {
   return (
-    <footer className="bg-black text-white py-12">
-      <div className="max-w-6xl mx-auto px-6">
-        <div className="grid md:grid-cols-3 gap-8 mb-12">
-          {steps.map((step) => (
-            <div key={step.number} className="text-center">
-              <div className="text-4xl font-bold mb-4 text-white font-serif">
-                {step.number}
-              </div>
-              <h3 className="text-xl font-bold mb-4 text-white">
-                {step.title}
-              </h3>
-              <p className="text-gray-400 leading-relaxed">
-                {step.description}
-              </p>
-            </div>
-          ))}
+    <footer className="bg-black text-white mt-20">
+      <div className="max-w-6xl mx-auto px-6 py-12 border-t border-gray-800 text-center">
+        {/* 개별 PNG로 구성된 NEARZOOM 로고 */}
+        <div className="flex items-center justify-center gap-1 mb-5">
+          <div className="relative w-6 h-8">
+            <Image
+              src="/letter-nn.png"
+              alt="N"
+              fill
+              className="object-contain brightness-0 invert"
+              priority
+            />
+          </div>
+          <div className="relative w-6 h-8">
+            <Image
+              src="/letter-ee.png"
+              alt="E"
+              fill
+              className="object-contain brightness-0 invert"
+              priority
+            />
+          </div>
+          <div className="relative w-7 h-9">
+            <Image
+              src="/letter-aa.png"
+              alt="A"
+              fill
+              className="object-contain brightness-0 invert"
+              priority
+            />
+          </div>
+          <div className="relative w-6 h-8">
+            <Image
+              src="/letter-rr.png"
+              alt="R"
+              fill
+              className="object-contain brightness-0 invert"
+              priority
+            />
+          </div>
+          {/* 공백 */}
+          <div className="w-2"></div>
+          <div className="relative w-6 h-8">
+            <Image
+              src="/letter-zz.png"
+              alt="Z"
+              fill
+              className="object-contain brightness-0 invert"
+              priority
+            />
+          </div>
+          <div className="relative w-7 h-9">
+            <Image
+              src="/letter-oo.png"
+              alt="O"
+              fill
+              className="object-contain brightness-0 invert"
+              priority
+            />
+          </div>
+          <div className="relative w-7 h-9">
+            <Image
+              src="/letter-oo.png"
+              alt="O"
+              fill
+              className="object-contain brightness-0 invert"
+              priority
+            />
+          </div>
+          <div className="relative w-8 h-12">
+            <Image
+              src="/letter-mm.png"
+              alt="M"
+              fill
+              className="object-contain brightness-0 invert"
+              priority
+            />
+          </div>
         </div>
-
-        <div className="text-center border-t border-gray-800 pt-8">
-          <h3 className="text-2xl font-bold mb-4">NearZoom</h3>
-          <p className="text-gray-400 mb-8">따로 또 같이, 어디서든 즐기는 네컷 사진</p>
-          <p className="text-sm text-gray-500">© 2025 NearZoom. All rights reserved.</p>
-        </div>
+        
+        <p className="text-gray-400 italic mb-6 max-w-md mx-auto text-base sm:text-lg">
+          따로 또 같이, 어디서든 즐기는 네컷 사진
+        </p>
+        <p className="text-gray-500 text-sm sm:text-base tracking-wide">
+          © 2025 NEAR ZOOM. All rights reserved.
+        </p>
       </div>
     </footer>
   )

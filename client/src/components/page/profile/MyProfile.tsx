@@ -744,13 +744,36 @@ const MyProfile: React.FC<MyProfileProps> = ({
       onProfileUpdate?.(profileData);
 
     } catch (err: any) {
-      console.error('Failed to load profile:', err);
+      console.error('❌ 프로필 로드 실패 - 상세 정보:', {
+        error: err,
+        errorType: typeof err,
+        errorKeys: err ? Object.keys(err) : 'undefined',
+        errorMessage: err?.message,
+        errorCode: err?.code,
+        errorStatus: err?.response?.status,
+        errorResponse: err?.response?.data,
+        errorConfig: err?.config,
+        errorStack: err?.stack,
+        errorName: err?.name,
+        errorConstructor: err?.constructor?.name
+      })
       
       // 인증 관련 에러 처리
       if (err?.response?.status === 401 || err?.response?.status === 403) {
-        handleError(new Error('인증이 만료되었습니다. 다시 로그인해주세요.'), '프로필 로드');
+        handleError(new Error('인증이 만료되었습니다. 다시 로그인해주세요.'), '프로필 로드')
       } else {
-        handleError(err, '프로필 로드');
+        // 구체적인 에러 메시지 생성
+        let errorMessage = '프로필을 불러오는데 실패했습니다.'
+        
+        if (err?.message) {
+          errorMessage += `\n\n오류 내용: ${err.message}`
+        } else if (err?.response?.data?.message) {
+          errorMessage += `\n\n서버 응답: ${err.response.data.message}`
+        } else if (err?.response?.status) {
+          errorMessage += `\n\nHTTP 상태: ${err.response.status}`
+        }
+        
+        handleError(new Error(errorMessage), '프로필 로드')
       }
     } finally {
       setIsLoading(false);

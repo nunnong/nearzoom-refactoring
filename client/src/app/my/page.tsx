@@ -206,19 +206,48 @@ const FollowModal: React.FC<{
 const myPageAPI = {
   getUserFeedWithPosts: async (accountName: string, limit: number = 20, cursor?: number): Promise<FeedWithPostsResponse> => {
     try {
-      const params: any = { limit };
-      if (cursor) params.cursor = cursor;
+      const queryParams = new URLSearchParams();
+      queryParams.append('limit', limit.toString());
+      if (cursor) queryParams.append('cursor', cursor.toString());
       
-      const response = await api.get<ApiResponse<FeedWithPostsResponse>>(`/feeds/users/account/${accountName}`, { params });
+      const response = await api.get<ApiResponse<FeedWithPostsResponse>>(`/feeds/user/${accountName}?${queryParams}`);
       
       if (response.data.error || !response.data.data) {
         throw new Error(response.data.message || '피드를 가져올 수 없습니다.');
       }
       
       return response.data.data;
-    } catch (error) {
-      console.error('❌ 피드 조회 실패:', error);
-      throw error;
+    } catch (error: any) {
+      console.error('❌ 피드 조회 실패 - 상세 정보:', {
+        error: error,
+        errorType: typeof error,
+        errorKeys: error ? Object.keys(error) : 'undefined',
+        errorMessage: error?.message,
+        errorCode: error?.code,
+        errorStatus: error?.response?.status,
+        errorResponse: error?.response?.data,
+        errorConfig: error?.config,
+        errorStack: error?.stack,
+        errorName: error?.name,
+        errorConstructor: error?.constructor?.name,
+        accountName: accountName,
+        limit: limit,
+        cursor: cursor,
+        apiUrl: `/feeds/user/${accountName}?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`
+      });
+      
+      // 구체적인 에러 메시지 생성
+      let errorMessage = '피드를 가져오는데 실패했습니다.';
+      
+      if (error?.message) {
+        errorMessage += `\n\n오류 내용: ${error.message}`;
+      } else if (error?.response?.data?.message) {
+        errorMessage += `\n\n서버 응답: ${error.response.data.message}`;
+      } else if (error?.response?.status) {
+        errorMessage += `\n\nHTTP 상태: ${error.response.status}`;
+      }
+      
+      throw new Error(errorMessage);
     }
   },
 
@@ -231,9 +260,35 @@ const myPageAPI = {
       }
       
       return response.data.data;
-    } catch (error) {
-      console.error('❌ 팔로우 통계 조회 실패:', error);
-      throw error;
+    } catch (error: any) {
+      console.error('❌ 팔로우 통계 조회 실패 - 상세 정보:', {
+        error: error,
+        errorType: typeof error,
+        errorKeys: error ? Object.keys(error) : 'undefined',
+        errorMessage: error?.message,
+        errorCode: error?.code,
+        errorStatus: error?.response?.status,
+        errorResponse: error?.response?.data,
+        errorConfig: error?.config,
+        errorStack: error?.stack,
+        errorName: error?.name,
+        errorConstructor: error?.constructor?.name,
+        accountName: accountName,
+        apiUrl: `/follows/count/${accountName}`
+      });
+      
+      // 구체적인 에러 메시지 생성
+      let errorMessage = '팔로우 통계를 가져오는데 실패했습니다.';
+      
+      if (error?.message) {
+        errorMessage += `\n\n오류 내용: ${error.message}`;
+      } else if (error?.response?.data?.message) {
+        errorMessage += `\n\n서버 응답: ${error.response.data.message}`;
+      } else if (error?.response?.status) {
+        errorMessage += `\n\nHTTP 상태: ${error.response.status}`;
+      }
+      
+      throw new Error(errorMessage);
     }
   },
 
@@ -244,8 +299,23 @@ const myPageAPI = {
       } else {
         await api.post<ApiResponse<void>>(`/likes/posts/${postId}`);
       }
-    } catch (error) {
-      console.error('❌ 좋아요 처리 실패:', error);
+    } catch (error: any) {
+      console.error('❌ 좋아요 처리 실패 - 상세 정보:', {
+        error: error,
+        errorType: typeof error,
+        errorKeys: error ? Object.keys(error) : 'undefined',
+        errorMessage: error?.message,
+        errorCode: error?.code,
+        errorStatus: error?.response?.status,
+        errorResponse: error?.response?.data,
+        errorConfig: error?.config,
+        errorStack: error?.stack,
+        errorName: error?.name,
+        errorConstructor: error?.constructor?.name,
+        postId: postId,
+        isCurrentlyLiked: isCurrentlyLiked,
+        apiUrl: `/likes/posts/${postId}`
+      });
       throw error;
     }
   },
@@ -254,8 +324,23 @@ const myPageAPI = {
     try {
       const feedData = await myPageAPI.getUserFeedWithPosts(accountName, limit, cursor);
       return feedData.posts;
-    } catch (error) {
-      console.error('❌ 추가 게시물 로드 실패:', error);
+    } catch (error: any) {
+      console.error('❌ 추가 게시물 로드 실패 - 상세 정보:', {
+        error: error,
+        errorType: typeof error,
+        errorKeys: error ? Object.keys(error) : 'undefined',
+        errorMessage: error?.message,
+        errorCode: error?.code,
+        errorStatus: error?.response?.status,
+        errorResponse: error?.response?.data,
+        errorConfig: error?.config,
+        errorStack: error?.stack,
+        errorName: error?.name,
+        errorConstructor: error?.constructor?.name,
+        accountName: accountName,
+        cursor: cursor,
+        limit: limit
+      });
       throw error;
     }
   }

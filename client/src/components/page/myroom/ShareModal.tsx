@@ -16,6 +16,8 @@ interface ImageItem {
   isEdited?: boolean
   hashtags?: string[]
   partnerEmails?: string
+  takenAt?: string  // 촬영 날짜 추가
+  createdAt?: string  // 생성 날짜 추가
 }
 
 interface ShareModalProps {
@@ -35,6 +37,24 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
 }) => {
   const router = useRouter()
   const [copySuccess, setCopySuccess] = useState<string | null>(null)
+  
+  // 날짜 포맷팅 함수
+  const formatDate = useCallback((dateString?: string) => {
+    if (!dateString) return '날짜 정보 없음'
+    
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch (error) {
+      return '날짜 형식 오류'
+    }
+  }, [])
   
   if (!isOpen || !image) return null
 
@@ -200,6 +220,32 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
                 <p className="text-sm text-gray-400">함께 찍은 사람이 없습니다</p>
               </div>
             )}
+          </div>
+
+          {/* Date Information Section */}
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h4 className="text-sm font-medium text-gray-700 mb-3">📅 날짜 정보</h4>
+            <div className="space-y-2">
+              {image.takenAt && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-gray-500">📸 촬영:</span>
+                  <span className="text-sm text-gray-900 font-medium">
+                    {formatDate(image.takenAt)}
+                  </span>
+                </div>
+              )}
+              {image.createdAt && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-gray-500">💾 저장:</span>
+                  <span className="text-sm text-gray-900 font-medium">
+                    {formatDate(image.createdAt)}
+                  </span>
+                </div>
+              )}
+              {!image.takenAt && !image.createdAt && (
+                <p className="text-sm text-gray-400">날짜 정보가 없습니다</p>
+              )}
+            </div>
           </div>
 
           {/* Share Options */}

@@ -1,8 +1,8 @@
 @import 'tailwindcss';
 
 :root {
-  --background: #000000;
-  --foreground: #171717;
+  --background: #ffffff;
+  --foreground: #000000;
 }
 
 @theme inline {
@@ -19,15 +19,17 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #ffffff;
+    --foreground: #000000;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: #ffffff;
+  color: #000000;
   font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding: 0;
 }
 
 @keyframes selectButton {
@@ -75,4 +77,36 @@ body {
 
 .animate-scroll-left {
   animation: scroll-left 20s linear infinite;
+}
+
+/* 폰트 클래스 정의 */
+.didot-font {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+}
+
+.jaso-sans-font {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+}
+
+/* 애니메이션 갤러리 스타일 */
+.gallery-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.gallery-item {
+  transition: all 0.3s ease;
+}
+
+.gallery-item:hover {
+  transform: scale(1.05);
+}
+
+/* 반응형 조정 */
+@media (max-width: 768px) {
+  .didot-font {
+    font-size: 2rem;
+  }
 }
