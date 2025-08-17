@@ -67,17 +67,17 @@ interface CursorPaginationParams {
 // ============================================================================
 
 const profileAPI = {
-  // 🔥 백엔드 API와 완전 일치: GET /feeds/users/account/{accountName}
+  // 🔥 백엔드 API와 완전 일치: GET /feeds/user/account/{accountName}
   getUserProfile: async (accountName: string): Promise<UserProfile> => {
     // @ 기호 제거 (URL에서 온 경우)
     const cleanAccountName = accountName.replace(/^@/, '');
     
     try {
       console.log(`🔍 사용자 프로필 조회: ${cleanAccountName}`);
-      console.log(`🔍 API 요청 URL: /feeds/users/account/${cleanAccountName}?limit=1`);
+      console.log(`🔍 API 요청 URL: /feeds/user/account/${cleanAccountName}?limit=1`);
       
       // 🔥 백엔드 FeedController.getUserFeedByAccountName 사용
-      const response = await api.get<ApiResponse<any>>(`/feeds/users/account/${cleanAccountName}?limit=1`);
+      const response = await api.get<ApiResponse<any>>(`/feeds/user/account/${cleanAccountName}?limit=1`);
       
       console.log(`📡 API 응답:`, response.data);
       

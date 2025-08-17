@@ -166,15 +166,15 @@ const feedViewerAPI = {
     return response.data.data;
   },
 
-  // 🔥 GET /feeds/users/{userId}?limit=20&cursor=12345 - 사용자 피드 조회
+  // 🔥 GET /feeds/user/{userId}?limit=20&cursor=12345 - 사용자 피드 조회
   getUserFeedWithPosts: async (userId: number, limit: number = 20, cursor?: number): Promise<FeedWithPostsResponse> => {
     const params: Record<string, any> = { limit };
     if (cursor) params.cursor = cursor;
 
-    console.log('🔥 API 요청 - GET /feeds/users/' + userId, params);
+    console.log('🔥 API 요청 - GET /feeds/user/' + userId, params);
 
     const response = await api.get<ApiResponse<FeedWithPostsResponse>>(
-      `/feeds/users/${userId}`,
+      `/feeds/user/${userId}`,
       { params }
     );
     
@@ -186,15 +186,15 @@ const feedViewerAPI = {
     return response.data.data;
   },
 
-  // 🔥 GET /feeds/users/account/{accountName}?limit=20&cursor=12345 - 계정명으로 사용자 피드 조회
+  // 🔥 GET /feeds/user/account/{accountName}?limit=20&cursor=12345 - 계정명으로 사용자 피드 조회
   getUserFeedByAccountName: async (accountName: string, limit: number = 20, cursor?: number): Promise<FeedWithPostsResponse> => {
     const params: Record<string, any> = { limit };
     if (cursor) params.cursor = cursor;
 
-    console.log('🔥 API 요청 - GET /feeds/users/account/' + accountName, params);
+    console.log('🔥 API 요청 - GET /feeds/user/account/' + accountName, params);
 
     const response = await api.get<ApiResponse<FeedWithPostsResponse>>(
-      `/feeds/users/account/${accountName}`,
+      `/feeds/user/account/${accountName}`,
       { params }
     );
     

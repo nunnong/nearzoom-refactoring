@@ -764,7 +764,7 @@ export function useUserFeedInfiniteScroll(
 ) {
   const apiFunction = useCallback(async (params: CursorPaginationParams) => {
     const query = buildPaginationQuery(params)
-    const response = await api.get<ApiResponse<any>>(`/feeds/users/account/${accountName}?${query}`)
+    const response = await api.get<ApiResponse<any>>(`/feeds/user/account/${accountName}?${query}`)
     
     if (response.data.error) {
       throw new Error(response.data.message || '사용자 피드 로드에 실패했습니다.')
@@ -1108,7 +1108,7 @@ export function useFeedPosts(type: 'timeline' | 'explore' | 'user', accountName?
         break
       case 'user':
         if (!accountName) throw new Error('accountName is required for user feed')
-        endpoint = `/feeds/users/account/${accountName}?${query}`
+        endpoint = `/feeds/user/account/${accountName}?${query}`
         break
       default:
         throw new Error(`Unknown feed type: ${type}`)

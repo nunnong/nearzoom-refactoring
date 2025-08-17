@@ -1,5 +1,5 @@
 // =============================================================================
-// 📁 RandomPhotoGrid.tsx - 올바른 아키텍처 원칙 완전 준수
+// 📁 RandomPhotoGrid.tsx - 수정된 프로필 클릭 핸들러 적용
 // =============================================================================
 
 'use client'
@@ -230,17 +230,24 @@ const RandomPhotoGrid: React.FC<RandomPhotoGridProps> = ({
   }, [isAuthenticated, accessToken, user, likingPosts, onLikeToggle, logout]);
 
   // ============================================================================
-  // 이벤트 핸들러들
+  // 이벤트 핸들러들 (🔥 수정된 프로필 클릭 핸들러 적용)
   // ============================================================================
   
-  // 작성자 클릭 핸들러
-  const handleAuthorClick = useCallback((e: React.MouseEvent, authorId: string) => {
+  // 🔥 작성자 클릭 핸들러 - 통합 프로필 핸들러 사용
+  const handleAuthorClick = useCallback((e: React.MouseEvent, authorAccountName: string) => {
     e.stopPropagation(); // 부모 클릭 이벤트 방지
     console.log('🔥 작성자 클릭:', { 
-      authorId, 
+      authorAccountName, 
       currentUser: user?.accountName 
     });
-    onAuthorClick?.(authorId);
+    
+    // 🔥 기존 onAuthorClick 콜백이 있으면 그것을 사용 (하위 호환성)
+    if (onAuthorClick) {
+      onAuthorClick(authorAccountName);
+    } else {
+      // 🔥 없으면 통합 프로필 핸들러 직접 사용 (이 경우 router가 필요하므로 상위에서 처리해야 함)
+      console.warn('onAuthorClick prop이 없습니다. 상위 컴포넌트에서 처리해주세요.');
+    }
   }, [onAuthorClick, user]);
 
   // 이미지 로드 에러 핸들러
@@ -371,7 +378,7 @@ const RandomPhotoGrid: React.FC<RandomPhotoGridProps> = ({
                 {/* 작성자 정보 */}
                 <div 
                   className="flex items-center space-x-2 mb-2 cursor-pointer hover:bg-white/10 rounded p-1 -m-1 transition-colors"
-                  onClick={(e) => handleAuthorClick(e, feed.authorId)}
+                  onClick={(e) => handleAuthorClick(e, feed.authorName)}
                 >
                   {/* 프로필 이미지 */}
                   <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center overflow-hidden flex-shrink-0">

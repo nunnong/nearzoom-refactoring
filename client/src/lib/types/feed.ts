@@ -375,8 +375,8 @@ export const API_ENDPOINTS = {
   // 피드 관련 (마이룸 방식 무한 스크롤) - 🔐 모든 엔드포인트 인증 필수
   EXPLORE: '/feeds/explore',  // ?limit=20&cursor=12345
   TIMELINE: '/feeds/timeline',  // ?limit=20&cursor=12345 - 🔐 인증 필수 (팔로잉 기반)
-  USER_FEED_BY_ID: (userId: number) => `/feeds/users/${userId}`,  // ?limit=20&cursor=12345
-  USER_FEED_BY_ACCOUNT: (accountName: string) => `/feeds/users/account/${accountName}`,  // ?limit=20&cursor=12345
+  USER_FEED_BY_ID: (userId: number) => `/feeds/user/${userId}`,  // ?limit=20&cursor=12345
+  USER_FEED_BY_ACCOUNT: (accountName: string) => `/feeds/user/account/${accountName}`,  // ?limit=20&cursor=12345
   SEARCH_FEEDS: '/feeds/search',  // ?query=user&limit=10&cursor=12345
   
   // 게시물 관련 - 🔐 모든 엔드포인트 인증 필수

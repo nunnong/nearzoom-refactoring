@@ -101,8 +101,8 @@ const navigationAPI = {
   // 🔥 현재 사용자 정보 조회 (여러 엔드포인트 시도)
   getCurrentUser: async (): Promise<BackendUserInfo> => {
     const endpoints = [
-      '/users/me',
-      '/users/profile', 
+      '/user/my',
+      '/user/profile', 
       '/auth/me',
     ];
 
@@ -171,7 +171,7 @@ const navigationAPI = {
     try {
       // FeedController의 getUserFeedByAccountName을 활용
       const response = await api.get<ApiResponse<any>>(
-        `/feeds/users/account/${accountName}?limit=1`
+        `/feeds/user/account/${accountName}?limit=1`
       );
       
       if (response.data.error) {
@@ -362,14 +362,14 @@ const MainNavigation: React.FC<MainNavigationProps> = ({
           id: 'profile',
           label: 'My Profile',
           href: currentUser 
-            ? `/feeds/users/account/${currentUser.accountName}` 
+            ? `/feeds/user/account/${currentUser.accountName}` 
             : '/profile',
           icon: UserIcon,
           solidIcon: UserSolidIcon,
           showLabel: variant === 'sidebar',
           requireAuth: true,
           isDynamic: true,
-          apiEndpoint: currentUser ? `/feeds/users/account/${currentUser.accountName}` : undefined,
+          apiEndpoint: currentUser ? `/feeds/user/account/${currentUser.accountName}` : undefined,
           description: '내 프로필 및 게시물',
           category: 'personal',
           badge: feedStats.postCount > 0 ? feedStats.postCount : undefined,
@@ -390,7 +390,7 @@ const MainNavigation: React.FC<MainNavigationProps> = ({
           id: 'followers',
           label: 'Followers',
           href: currentUser 
-            ? `/feeds/users/account/${currentUser.accountName}/followers` 
+            ? `/feeds/user/account/${currentUser.accountName}/followers` 
             : '/followers',
           icon: UsersIcon,
           solidIcon: UsersSolidIcon,
@@ -472,7 +472,7 @@ const MainNavigation: React.FC<MainNavigationProps> = ({
 
     // 동적 프로필 페이지 체크
     if (item.id === 'profile' && currentUser) {
-      return pathname.startsWith(`/feeds/users/account/${currentUser.accountName}`) ||
+      return pathname.startsWith(`/feeds/user/account/${currentUser.accountName}`) ||
              pathname === '/profile' ||
              pathname === '/my';
     }

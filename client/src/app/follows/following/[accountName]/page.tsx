@@ -10,7 +10,25 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
-import { useFollow } from '@/hooks/useFollow';
+
+// 🔧 올바른 API import
+import api from '@/lib/axios';
+
+// 타입 정의
+interface BackendUserProfileResponse {
+  userId: number;
+  accountName: string;
+  userName: string;
+  userEmail: string;
+  profileImage?: string;
+  prettyFace?: string;
+}
+
+interface ApiResponse<T> {
+  error: boolean;
+  message: string | null;
+  data: T | null;
+}
 
 // LoadingSpinner 컴포넌트
 const LoadingSpinner = ({ size = 'md', text }: { 
@@ -31,8 +49,13 @@ const LoadingSpinner = ({ size = 'md', text }: {
   );
 };
 
-// FollowButton 컴포넌트 (간단 버전)
-const FollowButton = ({ accountName, isFollowing, onToggle, loading }: {
+// FollowButton 컴포넌트
+const FollowButton = ({ 
+  accountName, 
+  isFollowing, 
+  onToggle, 
+  loading 
+}: {
   accountName: string;
   isFollowing: boolean;
   onToggle: () => void;
@@ -53,6 +76,108 @@ const FollowButton = ({ accountName, isFollowing, onToggle, loading }: {
   );
 };
 
+// API 함수들
+const followingAPI = {
+  // 팔로잉 목록 조회
+  getFollowing: async (accountName: string): Promise<BackendUserProfileResponse[]> => {
+    try {
+      console.log(`🔍 팔로잉 목록 조회: ${accountName}`);
+      
+      const response = await api.get<ApiResponse<BackendUserProfileResponse[]>>(
+        `/follows/following/${accountName}`
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '팔로잉 목록을 가져올 수 없습니다.');
+      }
+      
+      const following = response.data.data || [];
+      console.log(`✅ 팔로잉 목록 조회 성공: ${following.length}명`);
+      
+      return following;
+    } catch (error) {
+      console.error('❌ 팔로잉 목록 조회 실패:', error);
+      throw error;
+    }
+  },
+
+  // 팔로우
+  followUser: async (accountName: string): Promise<void> => {
+    try {
+      console.log(`🔍 팔로우 요청: ${accountName}`);
+      
+      const response = await api.post<ApiResponse<void>>(
+        `/follows/${accountName}`
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '팔로우에 실패했습니다.');
+      }
+      
+      console.log(`✅ 팔로우 성공: ${accountName}`);
+    } catch (error) {
+      console.error('❌ 팔로우 실패:', error);
+      throw error;
+    }
+  },
+
+  // 언팔로우
+  unfollowUser: async (accountName: string): Promise<void> => {
+    try {
+      console.log(`🔍 언팔로우 요청: ${accountName}`);
+      
+      const response = await api.delete<ApiResponse<void>>(
+        `/follows/${accountName}`
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '언팔로우에 실패했습니다.');
+      }
+      
+      console.log(`✅ 언팔로우 성공: ${accountName}`);
+    } catch (error) {
+      console.error('❌ 언팔로우 실패:', error);
+      throw error;
+    }
+  },
+
+  // 팔로우 상태 확인
+  checkFollowStatus: async (accountName: string): Promise<boolean> => {
+    try {
+      const response = await api.get<ApiResponse<boolean>>(
+        `/follows/check/${accountName}`
+      );
+      
+      if (response.data.error) {
+        return false;
+      }
+      
+      return response.data.data || false;
+    } catch (error) {
+      console.warn(`⚠️ 팔로우 상태 확인 실패 (${accountName}):`, error);
+      return false;
+    }
+  },
+
+  // 팔로우 수 조회
+  getFollowCounts: async (accountName: string): Promise<{ followerCount: number; followingCount: number }> => {
+    try {
+      const response = await api.get<ApiResponse<{ followerCount: number; followingCount: number }>>(
+        `/follows/count/${accountName}`
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '팔로우 수를 가져올 수 없습니다.');
+      }
+      
+      return response.data.data || { followerCount: 0, followingCount: 0 };
+    } catch (error) {
+      console.warn('⚠️ 팔로우 수 조회 실패:', error);
+      return { followerCount: 0, followingCount: 0 };
+    }
+  }
+};
+
 export default function FollowingPage() {
   const router = useRouter();
   const params = useParams();
@@ -64,20 +189,11 @@ export default function FollowingPage() {
   
   const { user, isAuthenticated } = useAuthStore();
   
-  // useFollow 훅 사용
-  const followHook = useFollow({
-    enableOptimisticUpdates: true,
-    autoRefreshStats: true,
-    onError: (error) => {
-      console.error('팔로우 에러:', error);
-      setError(error);
-    }
-  });
-
-  const [following, setFollowing] = useState<any[]>([]);
+  const [following, setFollowing] = useState<BackendUserProfileResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
+  const [loadingUsers, setLoadingUsers] = useState<Set<string>>(new Set());
 
   // accountName이 없으면 에러 처리
   if (!accountName) {
@@ -108,16 +224,59 @@ export default function FollowingPage() {
 
       console.log('🔍 팔로잉 목록 로드:', accountName);
       
-      // useFollow 훅의 getFollowing 사용
-      const followingList = await followHook.getFollowing(accountName);
+      // 팔로잉 목록과 팔로우 수를 병렬로 조회
+      const [followingList, followCounts] = await Promise.allSettled([
+        followingAPI.getFollowing(accountName),
+        followingAPI.getFollowCounts(accountName)
+      ]);
       
-      // 팔로우 통계도 가져오기
-      const stats = followHook.getFollowStats(accountName);
-      
-      setFollowing(followingList);
-      setTotalCount(stats?.followingCount || followingList.length);
+      if (followingList.status === 'fulfilled') {
+        setFollowing(followingList.value);
+        
+        // 각 사용자의 팔로우 상태 확인 (현재 로그인한 사용자가 있는 경우)
+        if (isAuthenticated && user && followingList.value.length > 0) {
+          const followStatusPromises = followingList.value.map(async (followingUser) => {
+            try {
+              const isFollowing = await followingAPI.checkFollowStatus(followingUser.accountName);
+              return { accountName: followingUser.accountName, isFollowing };
+            } catch (error) {
+              console.warn(`팔로우 상태 확인 실패 (${followingUser.accountName}):`, error);
+              return { accountName: followingUser.accountName, isFollowing: false };
+            }
+          });
 
-      console.log('✅ 팔로잉 목록 로드 완료:', followingList.length);
+          const followStatuses = await Promise.allSettled(followStatusPromises);
+          
+          // 팔로우 상태를 사용자 객체에 추가
+          const followingWithStatus = followingList.value.map(followingUser => {
+            const statusResult = followStatuses.find((result, index) => 
+              followingList.value[index].accountName === followingUser.accountName
+            );
+            
+            let isFollowing = false;
+            if (statusResult && statusResult.status === 'fulfilled') {
+              isFollowing = statusResult.value.isFollowing;
+            }
+
+            return {
+              ...followingUser,
+              isFollowing
+            };
+          });
+
+          setFollowing(followingWithStatus);
+        }
+      } else {
+        throw new Error('팔로잉 목록을 불러오는데 실패했습니다.');
+      }
+
+      if (followCounts.status === 'fulfilled') {
+        setTotalCount(followCounts.value.followingCount);
+      } else {
+        setTotalCount(followingList.status === 'fulfilled' ? followingList.value.length : 0);
+      }
+
+      console.log('✅ 팔로잉 목록 로드 완료:', followingList.status === 'fulfilled' ? followingList.value.length : 0);
 
     } catch (error: any) {
       console.error('❌ 팔로잉 목록 로드 실패:', error);
@@ -154,11 +313,21 @@ export default function FollowingPage() {
       return;
     }
 
+    // 현재 팔로우 상태 확인
+    const currentUser = following.find(u => u.accountName === followingAccountName);
+    const isCurrentlyFollowing = (currentUser as any)?.isFollowing || false;
+
+    // 로딩 상태 설정
+    setLoadingUsers(prev => new Set([...prev, followingAccountName]));
+
     try {
-      const isCurrentlyFollowing = followHook.isFollowing(followingAccountName);
-      await followHook.toggleFollow(followingAccountName, isCurrentlyFollowing);
+      if (isCurrentlyFollowing) {
+        await followingAPI.unfollowUser(followingAccountName);
+      } else {
+        await followingAPI.followUser(followingAccountName);
+      }
       
-      // 팔로잉 목록의 상태도 업데이트
+      // 팔로잉 목록의 상태 업데이트
       setFollowing(prev => 
         prev.map(followingUser => 
           followingUser.accountName === followingAccountName 
@@ -170,6 +339,13 @@ export default function FollowingPage() {
     } catch (error: any) {
       console.error('팔로우 토글 실패:', error);
       setError(error?.message || '팔로우 처리에 실패했습니다.');
+    } finally {
+      // 로딩 상태 해제
+      setLoadingUsers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(followingAccountName);
+        return newSet;
+      });
     }
   };
 
@@ -302,9 +478,9 @@ export default function FollowingPage() {
                   {user && followingUser.accountName !== (user as any)?.accountName && (
                     <FollowButton
                       accountName={followingUser.accountName}
-                      isFollowing={followHook.isFollowing(followingUser.accountName)}
+                      isFollowing={(followingUser as any)?.isFollowing || false}
                       onToggle={() => handleFollowToggle(followingUser.accountName)}
-                      loading={followHook.loadingUsers.has(followingUser.accountName)}
+                      loading={loadingUsers.has(followingUser.accountName)}
                     />
                   )}
                 </div>

@@ -224,7 +224,7 @@ const fetchExploreFeed = async (params: CursorPaginationParams): Promise<PostLis
   return response.data.data
 }
 
-// 👤 사용자 피드 - GET /feeds/users/account/{accountName}
+// 👤 사용자 피드 - GET /feeds/user/account/{accountName}
 const fetchUserFeed = async (accountName: string, params: CursorPaginationParams): Promise<FeedWithPostsResponse> => {
   const query = buildPaginationQuery(params)
   const response = await api.get<ApiResponse<FeedWithPostsResponse>>(
@@ -427,7 +427,7 @@ export const useFeedViewer = (options: UseFeedViewerOptions = {}): UseFeedViewer
         }
         
         case 'user': {
-          // GET /feeds/users/account/{accountName}?limit=20&cursor=12345
+          // GET /feeds/user/account/{accountName}?limit=20&cursor=12345
           if (!accountName) {
             throw new Error('사용자 계정명이 필요합니다.')
           }
