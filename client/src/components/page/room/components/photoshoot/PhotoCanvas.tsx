@@ -115,6 +115,7 @@ export default function PhotoCanvas({
           scaleX: 1,
           scaleY: 1,
           lastInteractionTime: Date.now(),
+          aspectRatio: 4/3, // Default aspect ratio, will be updated when video loads
         }
       })
 
@@ -185,7 +186,7 @@ export default function PhotoCanvas({
         })))
         
         const sortedPersonIds = Object.entries(participants)
-          .sort(([, a], [, b]) => a.x - b.x)  // x 좌표 기준 정렬 (왼쪽 → 오른쪽)
+          .sort(([, a], [, b]) => (a.x + a.width/2) - (b.x + b.width/2))  // Center position sorting (left → right)
           .map(([participantId]) => {
             console.log(`🔍 Processing participant: ${participantId}, position: (${participants[participantId]?.x}, ${participants[participantId]?.y})`)
             
@@ -314,6 +315,39 @@ export default function PhotoCanvas({
         try {
           track.attach(video)
           document.body.appendChild(video)
+
+          // Video metadata 로드 시 실제 해상도 감지 및 참가자 크기 업데이트
+          video.onloadedmetadata = () => {
+            const actualWidth = video.videoWidth
+            const actualHeight = video.videoHeight
+            const aspectRatio = actualWidth / actualHeight
+            
+            console.log(`📐 Video dimensions detected for ${participantId}:`, {
+              width: actualWidth,
+              height: actualHeight,
+              aspectRatio: aspectRatio.toFixed(2)
+            })
+
+            // Calculate dynamic size based on aspect ratio (keep base width 320)
+            const baseWidth = 320
+            const dynamicHeight = Math.round(baseWidth / aspectRatio)
+            
+            // Update participant with aspect ratio and dynamic size
+            if (roomName && participants[participantId]) {
+              const updatedParticipants = {
+                ...participants,
+                [participantId]: {
+                  ...participants[participantId],
+                  width: baseWidth,
+                  height: dynamicHeight,
+                  aspectRatio: aspectRatio,
+                  lastInteractionTime: Date.now(),
+                }
+              }
+              updatePhotoCanvasState(roomName, { participants: updatedParticipants })
+              console.log(`🔄 Updated ${participantId} size to ${baseWidth}x${dynamicHeight} (${aspectRatio.toFixed(2)})`)
+            }
+          }
 
           newVideoElements[participantId] = video
 
