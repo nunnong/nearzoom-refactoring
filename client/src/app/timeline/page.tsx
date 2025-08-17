@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
+import {
   HomeIcon,
   MagnifyingGlassIcon,
   UserIcon,
@@ -43,7 +43,7 @@ import { useAuthStore } from '@/stores/authStore'
 // 디바이스별 최적 limit 계산
 const getOptimalLimit = (): number => {
   if (typeof window === 'undefined') return 20;
-  
+
   const width = window.innerWidth;
   if (width < 768) return 12;      // 모바일
   if (width < 1024) return 18;     // 태블릿
@@ -51,8 +51,8 @@ const getOptimalLimit = (): number => {
 };
 
 // LoadingSpinner 컴포넌트
-const LoadingSpinner = ({ size = 'md', className = '', text }: { 
-  size?: 'sm' | 'md' | 'lg'; 
+const LoadingSpinner = ({ size = 'md', className = '', text }: {
+  size?: 'sm' | 'md' | 'lg';
   className?: string;
   text?: string;
 }) => {
@@ -87,11 +87,11 @@ interface BackendUserInfo {
 // Timeline 컴포넌트
 const Timeline: React.FC = () => {
   const router = useRouter();
-  
+
   // ============================================================================
   // 🔥 상태 관리
   // ============================================================================
-  
+
   const [posts, setPosts] = useState<PostResponse[]>([]);
   const [loading, setLoading] = useState({
     initial: true,
@@ -113,8 +113,8 @@ const Timeline: React.FC = () => {
 
       // 커서 기반 무한스크롤 트리거 (하단 500px 전에 로드)
       if (
-        hasMore && 
-        !loading.loadMore && 
+        hasMore &&
+        !loading.loadMore &&
         nextCursor &&
         window.innerHeight + window.scrollY >= document.documentElement.offsetHeight - 500
       ) {
@@ -141,7 +141,7 @@ const Timeline: React.FC = () => {
       setError(null);
 
       console.log('=== 팔로잉 타임라인 로딩 시작 ===');
-      
+
       // 🔥 인증 상태 디버깅
       const { isAuthenticated, accessToken, user } = useAuthStore.getState();
       console.log('🔐 인증 상태:', {
@@ -153,21 +153,21 @@ const Timeline: React.FC = () => {
       });
 
       const limit = getOptimalLimit();
-      
+
       // 🔥 올바른 API 함수 사용
       const result = await getFollowingTimeline({ limit });
-      
+
       if (!result.success) {
         throw new Error(result.error || '타임라인을 불러오는데 실패했습니다.');
       }
-      
+
       if (!result.data) {
         throw new Error('타임라인 데이터가 없습니다.');
       }
-      
+
       // 타입 안전성을 위한 null 체크
       const timelineData = result.data;
-      
+
       setPosts(timelineData.posts);
       setHasMore(timelineData.hasNext);
       setNextCursor(timelineData.nextCursor);
@@ -181,7 +181,7 @@ const Timeline: React.FC = () => {
 
     } catch (error: any) {
       console.error('❌ 팔로잉 타임라인 로딩 실패:', error);
-      
+
       // 🔥 더 자세한 에러 분석
       console.error('🔍 Error details:', {
         errorType: typeof error,
@@ -195,10 +195,10 @@ const Timeline: React.FC = () => {
         errorKeys: Object.keys(error || {}),
         errorValues: Object.values(error || {})
       });
-      
+
       // 백엔드 에러 메시지 처리
       let errorMessage = '팔로잉 타임라인을 불러오는데 실패했습니다.';
-      
+
       if (error?.response?.status === 401) {
         errorMessage = '로그인이 필요합니다.';
         console.log('🔒 인증 에러 - 로그인 페이지로 이동');
@@ -215,7 +215,7 @@ const Timeline: React.FC = () => {
       } else if (error?.code === 'ECONNREFUSED') {
         errorMessage = '서버에 연결할 수 없습니다.';
       }
-      
+
       console.error('🚨 최종 에러 메시지:', errorMessage);
       setError(errorMessage);
     } finally {
@@ -241,21 +241,21 @@ const Timeline: React.FC = () => {
       console.log('🔍 커서 기반 추가 게시물 로드:', { cursor: nextCursor });
 
       const limit = getOptimalLimit();
-      
+
       // 🔥 올바른 API 함수 사용
       const result = await getFollowingTimeline({ limit, cursor: nextCursor });
-      
+
       if (!result.success) {
         throw new Error(result.error || '추가 게시물을 불러오는데 실패했습니다.');
       }
-      
+
       if (!result.data) {
         throw new Error('추가 게시물 데이터가 없습니다.');
       }
-      
+
       // 타입 안전성을 위한 null 체크
       const moreData = result.data;
-      
+
       setPosts(prev => [...prev, ...moreData.posts]);
       setHasMore(moreData.hasNext);
       setNextCursor(moreData.nextCursor);
@@ -264,9 +264,9 @@ const Timeline: React.FC = () => {
 
     } catch (error: any) {
       console.error('❌ 추가 게시물 로드 실패:', error);
-      
+
       const errorMessage = error?.message || '추가 게시물을 불러오는데 실패했습니다.';
-      
+
       // 토스트나 간단한 알림 표시 (alert 대신)
       if (window.confirm(`${errorMessage}\n다시 시도하시겠습니까?`)) {
         setTimeout(() => loadMorePosts(), 1000);
@@ -284,32 +284,32 @@ const Timeline: React.FC = () => {
   const handleLike = async (post: PostCardForUI) => {
     try {
       // 낙관적 업데이트
-      setPosts(prev => prev.map(p => 
-        p.postId === post.postId 
-          ? { 
-              ...p, 
-              isLikedByMe: !p.isLikedByMe,
-              likeCount: p.isLikedByMe ? p.likeCount - 1 : p.likeCount + 1
-            }
+      setPosts(prev => prev.map(p =>
+        p.postId === post.postId
+          ? {
+            ...p,
+            isLikedByMe: !p.isLikedByMe,
+            likeCount: p.isLikedByMe ? p.likeCount - 1 : p.likeCount + 1
+          }
           : p
       ));
 
       // 🔥 올바른 API 함수 사용
       const result = await toggleTimelinePostLike(post.postId, post.isLikedByMe);
-      
+
       if (!result.success) {
         // 실패 시 롤백
-        setPosts(prev => prev.map(p => 
+        setPosts(prev => prev.map(p =>
           p.postId === post.postId ? post : p
         ));
         throw new Error(result.error || '좋아요 처리에 실패했습니다.');
       }
-      
+
       console.log(`✅ 좋아요 ${post.isLikedByMe ? '취소' : '추가'} 완료: postId=${post.postId}`);
-      
+
     } catch (error: any) {
       console.error('❌ 좋아요 처리 실패:', error);
-      
+
       const errorMessage = error?.message || '좋아요 처리에 실패했습니다.';
       alert(errorMessage);
     }
@@ -323,15 +323,22 @@ const Timeline: React.FC = () => {
   // 작성자 프로필로 이동
   const handleAuthorClick = (post: PostCardForUI, event: React.MouseEvent) => {
     event.stopPropagation();
-    router.push(`/profile/${post.authorAccountName}`);
+
+    console.log('🔍 프로필 클릭 - 원본:', post.authorAccountName);
+
+    // 이메일을 URL에 안전하게 인코딩
+    const encodedAccountName = encodeURIComponent(post.authorAccountName);
+    console.log('🔍 인코딩된 URL:', `/profile/${encodedAccountName}`);
+
+    router.push(`/profile/${encodedAccountName}`);
   };
 
   // 공유 기능
   const handleShare = (post: PostCardForUI, event: React.MouseEvent) => {
     event.stopPropagation();
-    
+
     const shareUrl = `${window.location.origin}/feeds/posts/${post.postId}`;
-    
+
     if (navigator.share) {
       navigator.share({
         title: `${post.authorAccountName}님의 게시물`,
@@ -366,8 +373,8 @@ const Timeline: React.FC = () => {
     return (
       <div className="max-w-2xl mx-auto">
         <div className="text-center py-12">
-          <LoadingSpinner 
-            size="lg" 
+          <LoadingSpinner
+            size="lg"
             text="팔로잉 타임라인을 불러오는 중..."
           />
         </div>
@@ -470,8 +477,8 @@ const Timeline: React.FC = () => {
                   </p>
                 </div>
               </button>
-              
-              <button 
+
+              <button
                 onClick={(e) => e.stopPropagation()}
                 className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
               >
@@ -492,7 +499,7 @@ const Timeline: React.FC = () => {
                 target.src = `https://picsum.photos/600/600?seed=${post.postId}`;
               }}
             />
-            
+
             {/* 게시물 순서 표시 (displayOrder가 있는 경우) */}
             {post.displayOrder !== null && post.displayOrder !== undefined && (
               <div className="absolute top-3 left-3 px-2 py-1 bg-black/50 text-white text-xs rounded-full">
@@ -516,7 +523,7 @@ const Timeline: React.FC = () => {
                   )}
                   <span className="text-sm font-medium">{post.likeCount}</span>
                 </button>
-                
+
                 <button
                   onClick={(e) => handleShare(post, e)}
                   className="flex items-center space-x-1 text-gray-600 hover:text-green-500 transition-colors"
@@ -554,8 +561,8 @@ const Timeline: React.FC = () => {
       {/* 🔥 커서 기반 무한스크롤 로딩 인디케이터 */}
       {loading.loadMore && (
         <div className="text-center py-6">
-          <LoadingSpinner 
-            size="md" 
+          <LoadingSpinner
+            size="md"
             text="추가 게시물을 불러오는 중..."
           />
         </div>
@@ -702,8 +709,8 @@ const TimelinePage: React.FC = () => {
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <LoadingSpinner 
-          size="lg" 
+        <LoadingSpinner
+          size="lg"
           text="인증 확인 중..."
         />
       </div>
@@ -754,11 +761,10 @@ const TimelinePage: React.FC = () => {
                     <button
                       key={item.name}
                       onClick={() => handleNavigation(item.href)}
-                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${
-                        item.current
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${item.current
                           ? 'bg-blue-100 text-blue-700'
                           : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                      }`}
+                        }`}
                       title={item.name}
                     >
                       <Icon className="h-5 w-5" />
@@ -851,11 +857,10 @@ const TimelinePage: React.FC = () => {
                   <button
                     key={item.name}
                     onClick={() => handleNavigation(item.href)}
-                    className={`w-full text-left px-3 py-2 rounded-md text-base font-medium transition-colors flex items-center space-x-3 ${
-                      item.current
+                    className={`w-full text-left px-3 py-2 rounded-md text-base font-medium transition-colors flex items-center space-x-3 ${item.current
                         ? 'bg-blue-100 text-blue-700'
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                    }`}
+                      }`}
                   >
                     <Icon className="h-5 w-5" />
                     <span>{item.name}</span>
@@ -892,11 +897,10 @@ const TimelinePage: React.FC = () => {
               <button
                 key={item.name}
                 onClick={() => handleNavigation(item.href)}
-                className={`flex flex-col items-center py-2 px-1 transition-colors ${
-                  item.current
+                className={`flex flex-col items-center py-2 px-1 transition-colors ${item.current
                     ? 'text-blue-600'
                     : 'text-gray-400 hover:text-gray-600'
-                }`}
+                  }`}
               >
                 <Icon className="h-6 w-6" />
                 <span className="text-xs mt-1 font-medium">{item.name}</span>

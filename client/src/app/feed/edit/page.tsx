@@ -165,7 +165,7 @@ const feedEditAPI = {
 
   // 🔥 사용자 정보 조회 - my/page.tsx와 동일한 패턴
   getCurrentUser: async (): Promise<BackendUserInfo> => {
-    const endpoints = ['/users/me', '/auth/me', '/users/profile', '/user/info'];
+    const endpoints = ['/user/my', '/auth/me', '/user/profile', '/user/info'];
 
     for (const endpoint of endpoints) {
       try {
@@ -805,7 +805,7 @@ const FeedEditContent: React.FC = () => {
                 <div className="ml-2 text-xs space-y-1">
                   <div>GET /myroom/photos/{photoId}/feed-upload-info</div>
                   <div>POST /feeds/posts/from-myroom</div>
-                  <div>GET /users/me (fallbacks 포함)</div>
+                  <div>GET /user/my (fallbacks 포함)</div>
                 </div>
               </div>
               

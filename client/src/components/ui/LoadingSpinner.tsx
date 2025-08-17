@@ -127,7 +127,7 @@ const BACKEND_LOADING_PRESETS = {
     minShowTime: 400,
     showApiInfo: true,
     overlayMode: false,
-    apiEndpoint: '/users/*',
+    apiEndpoint: '/user/*',
   },
   follow: {
     text: '팔로우 처리 중...',

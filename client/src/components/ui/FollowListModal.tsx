@@ -405,8 +405,8 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
     onClose(); // 모달 먼저 닫기
     
     // 🔥 FeedController의 getUserFeedByAccountName 엔드포인트 활용
-    // /feeds/users/account/{accountName} 페이지로 이동
-    router.push(`/feeds/users/account/${clickedUser.username}`);
+    // /feeds/user/account/{accountName} 페이지로 이동
+    router.push(`/feeds/user/account/${clickedUser.username}`);
   }, [onClose, router]);
 
   // 🔥 백엔드 연동 팔로우/언팔로우 토글

@@ -1,5 +1,5 @@
 // =============================================================================
-// 📁 InfiniteScrollTimeline.tsx - 백엔드 완벽 연동 최종 버전
+// 📁 InfiniteScrollTimeline.tsx - 수정된 프로필 클릭 핸들러 적용
 // =============================================================================
 
 'use client'
@@ -11,6 +11,12 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 // 🔥 백엔드 연동
 import api from '@/lib/axios'
+
+// 🔥 통합 프로필 라우팅 유틸리티 import
+import { handleUserProfileClick } from '@/utils/profileNavigation'
+
+// 🔥 Zustand 토큰 스토어 (로그인 상태 관리)
+import { useAuthStore } from '@/stores/authStore'
 
 // ============================================================================
 // 간단한 무한스크롤 훅 (로컬 정의)
@@ -247,6 +253,9 @@ function InfiniteScrollTimeline({
   type = 'explore'
 }: InfiniteScrollTimelineProps): React.ReactElement {
   const router = useRouter();
+  
+  // 🔥 Zustand 토큰 스토어에서 로그인 상태 및 사용자 정보 가져오기
+  const { user, isAuthenticated } = useAuthStore();
 
   // ============================================================================
   // 상태 관리
@@ -463,16 +472,22 @@ function InfiniteScrollTimeline({
   }, [loadInitialPosts]);
 
   // ============================================================================
-  // 이벤트 핸들러들
+  // 이벤트 핸들러들 (🔥 수정된 프로필 클릭 핸들러 적용)
   // ============================================================================
 
   const handleLike = useCallback((postId: string) => {
     toggleLike(postId);
   }, [toggleLike]);
 
+  // 🔥 사용자 클릭 - 통합 프로필 핸들러 사용
   const handleUserClick = useCallback((accountName: string) => {
-    router.push(`/profile/${accountName}`); // ✅ Timeline과 동일한 패턴
-  }, [router]);
+    console.log('🔥 Timeline 사용자 클릭:', { 
+      accountName, 
+      currentUser: user?.accountName 
+    });
+    // 🔥 통합 프로필 핸들러 사용
+    handleUserProfileClick(accountName, router, user, { debug: true });
+  }, [router, user]);
 
   const handlePhotoClick = useCallback((postId: string) => {
     router.push(`/feeds/posts/${postId}`);
@@ -688,6 +703,7 @@ function InfiniteScrollTimeline({
           <div>로딩 중: {loading ? 'Yes' : 'No'}</div>
           <div>초기 로딩: {isInitialLoading ? 'Yes' : 'No'}</div>
           <div>에러: {error ? 'Yes' : 'No'}</div>
+          <div>현재 사용자: {user?.accountName || 'None'}</div>
         </div>
       )}
     </div>

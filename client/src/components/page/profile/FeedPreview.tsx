@@ -137,10 +137,10 @@ const feedPreviewAPI = {
     const params: Record<string, any> = { limit };
     if (cursor) params.cursor = cursor;
 
-    console.log('🔥 API 요청 - GET /feeds/users/account/' + accountName, params);
+    console.log('🔥 API 요청 - GET /feeds/user/account/' + accountName, params);
 
     const response = await api.get<ApiResponse<FeedWithPostsResponse>>(
-      `/feeds/users/account/${accountName}`,
+      `/feeds/user/account/${accountName}`,
       { params }
     );
     

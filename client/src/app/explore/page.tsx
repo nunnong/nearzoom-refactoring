@@ -69,9 +69,12 @@ interface BackendUserInfo {
 // 🔥 백엔드 API 함수들
 // ============================================================================
 
+// Explore page에서 수정할 부분 (exploreAPI.getCurrentUser)
+
 const exploreAPI = {
   getCurrentUser: async (): Promise<BackendUserInfo> => {
-    const endpoints = ['/users/me', '/users/profile', '/auth/me'];
+    // ✅ 백엔드 실제 경로들로 수정
+    const endpoints = ['/user/profile', '/user/userInfo', '/user/my'];
 
     for (const endpoint of endpoints) {
       try {
