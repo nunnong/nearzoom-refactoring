@@ -48,7 +48,7 @@ public class PhotoPromptService {
 
     String promptId = null;
 
-    if ("prompt".equals(promptText)) { // save to prompt table
+    if ("prompt".equals(backgroundRequest.backgroundType())) { // save to prompt table
       PhotoPrompt photoPrompt = new PhotoPrompt(promptText);
       photoPromptRepository.save(photoPrompt);
       promptId = String.valueOf(photoPrompt.getPromptId());
