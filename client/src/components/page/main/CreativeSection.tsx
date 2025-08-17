@@ -93,7 +93,7 @@ function NavigationMenu({
         <>
           <button
             onClick={onMyPage}
-            className="jaso-sans-font text-xl font-medium text-black transition-colors hover:text-gray-600"
+            className=" text-xl font-medium text-black transition-colors hover:text-gray-600"
           >
             ALBUM
           </button>
@@ -107,7 +107,7 @@ function NavigationMenu({
 
           <button
             onClick={onMyFeed}
-            className="jaso-sans-font text-xl font-medium text-black transition-colors hover:text-gray-600"
+            className=" text-xl font-medium text-black transition-colors hover:text-gray-600"
           >
             FEED
           </button>
@@ -115,7 +115,7 @@ function NavigationMenu({
       ) : (
         <>
           <button
-            className="jaso-sans-font cursor-not-allowed text-xl font-medium text-black opacity-50 transition-colors hover:text-gray-600"
+            className="cursor-not-allowed text-xl font-medium text-black opacity-50 transition-colors hover:text-gray-600"
             disabled
           >
             ALBUM
@@ -129,7 +129,7 @@ function NavigationMenu({
           </button>
 
           <button
-            className="jaso-sans-font cursor-not-allowed text-xl font-medium text-black opacity-50 transition-colors hover:text-gray-600"
+            className="cursor-not-allowed text-xl font-medium text-black opacity-50 transition-colors hover:text-gray-600"
             disabled
           >
             FEED

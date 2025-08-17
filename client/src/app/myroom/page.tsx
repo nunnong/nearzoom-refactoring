@@ -1,6 +1,7 @@
 'use client'
 
 import Dashboard from '@/components/page/myroom/Dashboard'
+import MyRoomHeader from '@/components/page/myroom/MyRoomHeader'
 import { useAuth } from '@/hooks/auth'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -168,6 +169,25 @@ export default function MyRoom() {
     }
   }
 
+  // 헤더 핸들러들
+  const handleUploadSelfie = () => {
+    console.log('Upload selfie clicked')
+    // 셀피 업로드 페이지로 이동
+    router.push('/upload')
+  }
+
+  const handleAccount = () => {
+    console.log('Account clicked')
+    // 계정 설정 페이지로 이동
+    router.push('/account')
+  }
+
+  const handleLogout = () => {
+    console.log('Logout clicked')
+    // 로그아웃 처리
+    // useAuth의 logout 함수 호출 등
+  }
+
   useEffect(() => {
     // 인증 로딩이 완료되고 로그인된 상태일 때만 이미지 가져오기
     if (!authLoading && isAuthenticated && user) {
@@ -178,10 +198,18 @@ export default function MyRoom() {
   // 인증 로딩 중이거나 사용자 정보가 없을 때
   if (authLoading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-          <p className="text-gray-600">사용자 정보를 불러오는 중...</p>
+      <div className="min-h-screen bg-gray-50">
+        <MyRoomHeader 
+          user={user}
+          onUploadSelfie={handleUploadSelfie}
+          onAccount={handleAccount}
+          onLogout={handleLogout}
+        />
+        <div className="flex min-h-[calc(100vh-80px)] items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+            <p className="text-gray-600">사용자 정보를 불러오는 중...</p>
+          </div>
         </div>
       </div>
     )
@@ -189,8 +217,16 @@ export default function MyRoom() {
 
   if (!isAuthenticated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <p className="text-gray-600">로그인이 필요합니다.</p>
+      <div className="min-h-screen bg-gray-50">
+        <MyRoomHeader 
+          user={user}
+          onUploadSelfie={handleUploadSelfie}
+          onAccount={handleAccount}
+          onLogout={handleLogout}
+        />
+        <div className="flex min-h-[calc(100vh-80px)] items-center justify-center">
+          <p className="text-gray-600">로그인이 필요합니다.</p>
+        </div>
       </div>
     )
   }
@@ -198,10 +234,18 @@ export default function MyRoom() {
   // 프로필 이미지가 준비되지 않았을 때
   if (!user.profileImage) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-          <p className="text-gray-600">프로필 정보를 불러오는 중...</p>
+      <div className="min-h-screen bg-gray-50">
+        <MyRoomHeader 
+          user={user}
+          onUploadSelfie={handleUploadSelfie}
+          onAccount={handleAccount}
+          onLogout={handleLogout}
+        />
+        <div className="flex min-h-[calc(100vh-80px)] items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+            <p className="text-gray-600">프로필 정보를 불러오는 중...</p>
+          </div>
         </div>
       </div>
     )
@@ -209,25 +253,41 @@ export default function MyRoom() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-          <p className="text-gray-600">사진을 불러오는 중...</p>
+      <div className="min-h-screen bg-gray-50">
+        <MyRoomHeader 
+          user={user}
+          onUploadSelfie={handleUploadSelfie}
+          onAccount={handleAccount}
+          onLogout={handleLogout}
+        />
+        <div className="flex min-h-[calc(100vh-80px)] items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+            <p className="text-gray-600">사진을 불러오는 중...</p>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <Dashboard
-      images={userImages}
-      userProfile={user}
-      onRefresh={fetchUserImages}
-      onLoadMore={loadMoreImages}
-      hasMore={hasMore}
-      onLike={handleLike}
-      onDelete={handleDelete}
-      onEdit={handleEdit}
-    />
+    <div className="min-h-screen bg-gray-50">
+      <MyRoomHeader 
+        user={user}
+        onUploadSelfie={handleUploadSelfie}
+        onAccount={handleAccount}
+        onLogout={handleLogout}
+      />
+      <Dashboard
+        images={userImages}
+        userProfile={user}
+        onRefresh={fetchUserImages}
+        onLoadMore={loadMoreImages}
+        hasMore={hasMore}
+        onLike={handleLike}
+        onDelete={handleDelete}
+        onEdit={handleEdit}
+      />
+    </div>
   )
 }

@@ -126,12 +126,12 @@ export default function LandingPage() {
 
   // 각 글자에 해당하는 PNG 파일 경로
   const letterImages = [
-    { src: '/letter-n.png', alt: 'n' },
-    { src: '/letter-e.png', alt: 'e' },
-    { src: '/letter-a.png', alt: 'a' },
-    { src: '/letter-r.png', alt: 'r' },
-    { src: '/letter-z.png', alt: 'z' },
-    { src: '/letter-m.png', alt: 'm' },
+    { src: '/letter-nn.png', alt: 'n' },
+    { src: '/letter-ee.png', alt: 'e' },
+    { src: '/letter-aa.png', alt: 'a' },
+    { src: '/letter-rr.png', alt: 'r' },
+    { src: '/letter-zz.png', alt: 'z' },
+    { src: '/letter-mm.png', alt: 'm' },
   ]
 
   return (
