@@ -247,7 +247,7 @@ function MyRoomContent() {
   };
 
   // 🚀 이미지 편집
-  const handleEdit = async (photoId: string, editedImageUrl: string): Promise<void> => {
+  const handleEdit = async (photoId: string, editedImageUrl?: string): Promise<void> => {
     console.log('✏️ 이미지 편집:', photoId, editedImageUrl);
     router.push(`/drawing?photoId=${photoId}`);
   };
@@ -447,8 +447,8 @@ function MyRoomContent() {
                 }`}
               >
                 <span className="text-white text-sm font-bold">
-                  {user?.name ? user.name.charAt(0).toUpperCase() : 
-                   user?.email ? user.email.charAt(0).toUpperCase() : 'U'}
+                  {user?.name ? user?.name.charAt(0).toUpperCase() : 
+                   user?.email ? user?.email.charAt(0).toUpperCase() : 'U'}
                 </span>
               </div>
             </div>
