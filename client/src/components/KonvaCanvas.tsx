@@ -250,11 +250,10 @@ const KonvaCanvas: React.FC<KonvaCanvasProps> = ({
         {originalImage && (
           <KonvaImage
             image={originalImage}
+            // width와 height만 설정하고 scale은 제거하여 이미지가 적절한 크기로 표시
             width={stageSize.width}
             height={stageSize.height}
-            // 원본 이미지의 비율을 유지하면서 스테이지 크기에 맞게 조정
-            scaleX={stageSize.width / (originalImage.naturalWidth || originalImage.width)}
-            scaleY={stageSize.height / (originalImage.naturalHeight || originalImage.height)}
+            // scaleX, scaleY 제거 - 이미 stageSize로 크기가 조정됨
           />
         )}
 

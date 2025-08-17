@@ -182,9 +182,26 @@ const DrawingPage: React.FC = () => {
         })
         
         // 이미지 크기에 맞게 스테이지 크기 조정 (화면 표시용)
-        const maxWidth = Math.min(img.naturalWidth || img.width, 1200)
-        const maxHeight = Math.min(img.naturalHeight || img.height, 800)
-        const scale = Math.min(maxWidth / (img.naturalWidth || img.width), maxHeight / (img.naturalHeight || img.height))
+        // 더 큰 크기로 표시하도록 수정
+        const maxWidth = Math.min(img.naturalWidth || img.width, 1600) // 1200 → 1600으로 증가
+        const maxHeight = Math.min(img.naturalHeight || img.height, 1000) // 800 → 1000으로 증가
+        
+        // 이미지가 너무 작게 보이지 않도록 최소 크기 보장
+        const minScale = 0.8 // 최소 80% 크기
+        const scale = Math.max(
+          Math.min(maxWidth / (img.naturalWidth || img.width), maxHeight / (img.naturalHeight || img.height)),
+          minScale
+        )
+
+        console.log('📏 이미지 크기 계산:', {
+          originalWidth: img.naturalWidth || img.width,
+          originalHeight: img.naturalHeight || img.height,
+          maxWidth,
+          maxHeight,
+          scale,
+          finalWidth: (img.naturalWidth || img.width) * scale,
+          finalHeight: (img.naturalHeight || img.height) * scale
+        })
 
         setStageSize({
           width: (img.naturalWidth || img.width) * scale,

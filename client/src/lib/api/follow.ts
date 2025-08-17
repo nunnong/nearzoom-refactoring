@@ -1,461 +1,288 @@
-// src/lib/api/follow.ts
+// =============================================
+// 📁 lib/api/follow.ts - 타입 호환성 수정 버전
+// =============================================
+
 import api from '@/lib/axios'
-import { API_ENDPOINTS } from '@/constants/api'
-import {
-  BackendApiResponse,
-  BackendFollowCountsResponse,
-  BackendUserInfoResponse
-} from '@/lib/types/feed'
-
-import { getCurrentUser, handleApiError } from './feed'
 
 // ============================================================================
-// 타입 정의 (내부용 - export 하지 않음)
+// 🎯 타입 정의 - feed.ts와 호환되도록 수정
 // ============================================================================
 
-// 🔥 백엔드 ApiResponse 타입 (feed.ts와 통일)
-type ApiResponse<T> = BackendApiResponse<T>
+interface ApiResponse<T> {
+  error: boolean
+  message: string | null
+  data: T
+}
 
-// 🔥 내부 전용 타입 (export 제거)
-interface UserProfile {
-  id: string          // accountName
-  username: string    // 표시 이름
-  email: string
-  avatar?: string
-  prettyFace?: string
-  bio?: string
-  feedsCount: number
-  followersCount: number
+interface FollowCountsResponse {
+  followerCount: number
   followingCount: number
-  isFollowing: boolean
-  isFollowedBy: boolean
-  joinedAt: string
+}
+
+// 🔥 feed.ts와 완전히 동일하게 수정
+interface UserProfileResponse {
+  userId: number
+  accountName: string
+  userName: string
+  userEmail: string
+  profileImage: string | null
+  prettyFace: string | null  // 🔥 feed.ts에 맞춰 string | null로 변경
+}
+
+interface ApiResult<T> {
+  success: boolean
+  data?: T
+  error?: string
 }
 
 // ============================================================================
-// 유틸 - Backend → UserProfile 변환
+// 🔧 유틸리티 함수
 // ============================================================================
 
-const transformBackendUserToProfile = async (
-  backendUser: BackendUserInfoResponse,
-  currentAccountName?: string,
-  followCounts?: BackendFollowCountsResponse
-): Promise<UserProfile> => {
-  try {
-    // 이메일에서 accountName 추출 (@ 앞부분)
-    const accountName = backendUser.userEmail.split('@')[0]
-    
-    const isFollowing =
-      currentAccountName && currentAccountName !== accountName
-        ? await checkFollowStatusByAccountName(accountName)
-        : false
+const handleApiError = (error: unknown): string => {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const axiosError = error as any
 
-    return {
-      id: accountName,
-      username: backendUser.userName,
-      email: backendUser.userEmail,
-      avatar: backendUser.profileImage || undefined,
-      prettyFace: backendUser.faceImageUrl || undefined,
-      bio: '',
-      feedsCount: 0,
-      followersCount: followCounts?.followerCount || 0,
-      followingCount: followCounts?.followingCount || 0,
-      isFollowing,
-      isFollowedBy: false,
-      joinedAt: new Date().toISOString()
+    if (axiosError.response?.data?.message) {
+      return axiosError.response.data.message
     }
-  } catch (error) {
-    console.error('Failed to transform user profile:', error)
-    const accountName = backendUser.userEmail.split('@')[0]
-    return {
-      id: accountName,
-      username: backendUser.userName,
-      email: backendUser.userEmail,
-      avatar: backendUser.profileImage || undefined,
-      prettyFace: backendUser.faceImageUrl || undefined,
-      bio: '',
-      feedsCount: 0,
-      followersCount: followCounts?.followerCount || 0,
-      followingCount: followCounts?.followingCount || 0,
-      isFollowing: false,
-      isFollowedBy: false,
-      joinedAt: new Date().toISOString()
+
+    switch (axiosError.response?.status) {
+      case 401:
+        return '인증이 필요합니다. 다시 로그인해주세요.'
+      case 403:
+        return '접근 권한이 없습니다.'
+      case 404:
+        return '사용자를 찾을 수 없습니다.'
+      case 409:
+        return '이미 처리된 요청입니다.'
+      case 500:
+        return '서버 오류가 발생했습니다.'
+      default:
+        return '네트워크 오류가 발생했습니다.'
     }
   }
-}
 
-// ============================================================================
-// accountName → userId 변환 헬퍼 (백엔드는 userId 사용)
-// ============================================================================
-
-const getAccountNameToUserIdMap = async (accountName: string): Promise<number | null> => {
-  try {
-    // 🔥 피드 검색 API를 활용해서 accountName으로 userId 찾기
-    const response = await api.get<ApiResponse<any[]>>(`${API_ENDPOINTS.SEARCH_FEEDS}`, {
-      params: { query: accountName, size: 1 }
-    })
-    
-    const result = response.data
-    if (!result.error && Array.isArray(result.data) && result.data.length > 0) {
-      return result.data[0].authorId  // userId 반환
-    }
-    
-    return null
-  } catch (error) {
-    console.error('Failed to get userId from accountName:', error)
-    return null
+  if (error instanceof Error) {
+    return error.message
   }
+
+  return '알 수 없는 오류가 발생했습니다.'
 }
 
+// 🔥 데이터 변환 헬퍼 함수 수정 - feed.ts 타입에 맞춤
+const normalizeUserProfile = (user: any): UserProfileResponse => ({
+  userId: user.userId,
+  accountName: user.accountName,
+  userName: user.userName,
+  userEmail: user.userEmail,
+  profileImage: user.profileImage ?? null, // 🔥 undefined를 null로 변환
+  prettyFace: user.prettyFace ?? null      // 🔥 feed.ts에 맞춰 string | null
+})
+
 // ============================================================================
-// 팔로우 상태 확인 (GET /follows/check/{followeeId})
+// 🔥 기본 Follow API 함수들
 // ============================================================================
 
-export const checkFollowStatusByAccountName = async (accountName: string): Promise<boolean> => {
+/**
+ * 팔로우
+ */
+export const followUser = async (accountName: string): Promise<ApiResult<void>> => {
   try {
-    console.log('=== 팔로우 상태 확인 API 호출 ===', accountName)
+    console.log('🔥 팔로우:', accountName)
     
-    // accountName으로 userId 찾기
-    const userId = await getAccountNameToUserIdMap(accountName)
-    if (!userId) {
-      console.warn('사용자를 찾을 수 없음:', accountName)
-      return false
+    const response = await api.post<ApiResponse<void>>(`/follows/${accountName}`)
+    
+    if (response.data.error) {
+      return {
+        success: false,
+        error: response.data.message || '팔로우에 실패했습니다.'
+      }
     }
-
-    const response = await api.get<ApiResponse<boolean>>(`${API_ENDPOINTS.FOLLOW_CHECK}/${userId}`)
-    const result = response.data
-
-    if (!result.error) {
-      return result.data ?? false
-    }
-    return false
-  } catch (error) {
-    console.error('Failed to check follow status by account name:', error)
-    return false
-  }
-}
-
-// ============================================================================
-// 팔로우 (POST /follows/{followeeId})
-// ============================================================================
-
-export const followUser = async (targetAccountName: string): Promise<{ success: boolean; error?: string }> => {
-  try {
-    if (!targetAccountName?.trim()) {
-      return { success: false, error: '유효하지 않은 계정명입니다.' }
-    }
-
-    console.log('=== 팔로우 API 호출 ===', targetAccountName)
-
-    const currentUser = await getCurrentUser()
-    if (!currentUser) {
-      return { success: false, error: '로그인이 필요합니다.' }
-    }
-    if (currentUser.accountName === targetAccountName) {
-      return { success: false, error: '자기 자신을 팔로우할 수 없습니다.' }
-    }
-
-    // accountName으로 userId 찾기
-    const userId = await getAccountNameToUserIdMap(targetAccountName)
-    if (!userId) {
-      return { success: false, error: '사용자를 찾을 수 없습니다.' }
-    }
-
-    const isAlreadyFollowing = await checkFollowStatusByAccountName(targetAccountName)
-    if (isAlreadyFollowing) {
-      return { success: false, error: '이미 팔로우 중인 사용자입니다.' }
-    }
-
-    const response = await api.post<ApiResponse<void>>(`${API_ENDPOINTS.FOLLOWS}/${userId}`)
-    const result = response.data
-
-    if (!result.error) {
-      return { success: true }
-    }
-
-    return { success: false, error: result.message || '팔로우 처리에 실패했습니다.' }
+    
+    return { success: true }
   } catch (error) {
     console.error('Failed to follow user:', error)
-    return { success: false, error: handleApiError(error) }
-  }
-}
-
-// ============================================================================
-// 언팔로우 (DELETE /follows/{followeeId})
-// ============================================================================
-
-export const unfollowUser = async (targetAccountName: string): Promise<{ success: boolean; error?: string }> => {
-  try {
-    if (!targetAccountName?.trim()) {
-      return { success: false, error: '유효하지 않은 계정명입니다.' }
-    }
-
-    console.log('=== 언팔로우 API 호출 ===', targetAccountName)
-
-    const currentUser = await getCurrentUser()
-    if (!currentUser) {
-      return { success: false, error: '로그인이 필요합니다.' }
-    }
-
-    // accountName으로 userId 찾기
-    const userId = await getAccountNameToUserIdMap(targetAccountName)
-    if (!userId) {
-      return { success: false, error: '사용자를 찾을 수 없습니다.' }
-    }
-
-    const isFollowing = await checkFollowStatusByAccountName(targetAccountName)
-    if (!isFollowing) {
-      return { success: false, error: '팔로우 관계를 찾을 수 없습니다.' }
-    }
-
-    const response = await api.delete<ApiResponse<void>>(`${API_ENDPOINTS.FOLLOWS}/${userId}`)
-    const result = response.data
-
-    if (!result.error) {
-      return { success: true }
-    }
-
-    return { success: false, error: result.message || '언팔로우 처리에 실패했습니다.' }
-  } catch (error) {
-    console.error('Failed to unfollow user:', error)
-    return { success: false, error: handleApiError(error) }
-  }
-}
-
-// ============================================================================
-// 팔로우 토글
-// ============================================================================
-
-export const toggleFollow = async (targetAccountName: string): Promise<{ success: boolean; data?: { isFollowing: boolean }; error?: string }> => {
-  try {
-    console.log('=== 팔로우 토글 API 호출 ===', targetAccountName)
-    
-    const isCurrentlyFollowing = await checkFollowStatusByAccountName(targetAccountName)
-
-    let result
-    if (isCurrentlyFollowing) {
-      result = await unfollowUser(targetAccountName)
-    } else {
-      result = await followUser(targetAccountName)
-    }
-
-    if (!result.success) {
-      return result
-    }
-
-    return { success: true, data: { isFollowing: !isCurrentlyFollowing } }
-  } catch (error) {
-    console.error('Failed to toggle follow:', error)
-    return { success: false, error: handleApiError(error) }
-  }
-}
-
-// ============================================================================
-// 팔로워 목록 조회 (GET /follows/followers/{userId})
-// ============================================================================
-
-export const getFollowers = async (accountName: string) => {
-  try {
-    if (!accountName?.trim()) {
-      return { success: false, error: '유효하지 않은 계정명입니다.' }
-    }
-
-    console.log('=== 팔로워 목록 조회 API 호출 ===', accountName)
-
-    // accountName으로 userId 찾기
-    const userId = await getAccountNameToUserIdMap(accountName)
-    if (!userId) {
-      return { success: false, error: '사용자를 찾을 수 없습니다.' }
-    }
-
-    const response = await api.get<ApiResponse<BackendUserInfoResponse[]>>(`${API_ENDPOINTS.FOLLOW_FOLLOWERS}/${userId}`)
-    const result = response.data
-
-    if (result.error || !Array.isArray(result.data)) {
-      return { success: false, error: result.message || '팔로워 목록 조회 실패' }
-    }
-
-    const currentUser = await getCurrentUser()
-    const users: UserProfile[] = []
-
-    for (const userInfo of result.data) {
-      const userProfile = await transformBackendUserToProfile(
-        userInfo,
-        currentUser?.accountName
-      )
-      users.push(userProfile)
-    }
-
-    return { success: true, data: { users, hasMore: false, total: users.length } }
-  } catch (error) {
-    console.error('Failed to get followers:', error)
-    return { success: false, error: handleApiError(error) }
-  }
-}
-
-// ============================================================================
-// 팔로잉 목록 조회 (GET /follows/following/{userId})
-// ============================================================================
-
-export const getFollowing = async (accountName: string) => {
-  try {
-    if (!accountName?.trim()) {
-      return { success: false, error: '유효하지 않은 계정명입니다.' }
-    }
-
-    console.log('=== 팔로잉 목록 조회 API 호출 ===', accountName)
-
-    // accountName으로 userId 찾기
-    const userId = await getAccountNameToUserIdMap(accountName)
-    if (!userId) {
-      return { success: false, error: '사용자를 찾을 수 없습니다.' }
-    }
-
-    const response = await api.get<ApiResponse<BackendUserInfoResponse[]>>(`${API_ENDPOINTS.FOLLOW_FOLLOWING}/${userId}`)
-    const result = response.data
-
-    if (result.error || !Array.isArray(result.data)) {
-      return { success: false, error: result.message || '팔로잉 목록 조회 실패' }
-    }
-
-    const currentUser = await getCurrentUser()
-    const users: UserProfile[] = []
-
-    for (const userInfo of result.data) {
-      const userProfile = await transformBackendUserToProfile(
-        userInfo,
-        currentUser?.accountName
-      )
-      users.push(userProfile)
-    }
-
-    return { success: true, data: { users, hasMore: false, total: users.length } }
-  } catch (error) {
-    console.error('Failed to get following:', error)
-    return { success: false, error: handleApiError(error) }
-  }
-}
-
-// ============================================================================
-// 팔로우 통계 조회 (GET /follows/count/{userId})
-// ============================================================================
-
-export const getFollowStats = async (accountName: string) => {
-  try {
-    if (!accountName?.trim()) {
-      return { success: false, error: '유효하지 않은 계정명입니다.' }
-    }
-
-    console.log('=== 팔로우 통계 조회 API 호출 ===', accountName)
-
-    // accountName으로 userId 찾기
-    const userId = await getAccountNameToUserIdMap(accountName)
-    if (!userId) {
-      return { success: false, error: '사용자를 찾을 수 없습니다.' }
-    }
-
-    const response = await api.get<ApiResponse<BackendFollowCountsResponse>>(`${API_ENDPOINTS.FOLLOW_COUNT}/${userId}`)
-    const result = response.data
-
-    if (result.error || !result.data) {
-      return { success: false, error: result.message || '팔로우 통계 조회 실패' }
-    }
-
-    return {
-      success: true,
-      data: {
-        followersCount: result.data.followerCount,
-        followingCount: result.data.followingCount
-      }
-    }
-  } catch (error) {
-    console.error('Failed to get follow stats:', error)
-    return { success: false, error: handleApiError(error) }
-  }
-}
-
-// ============================================================================
-// 사용자 검색 (GET /feeds/search - accountName 기반)
-// ============================================================================
-
-export const searchUsers = async (
-  query: string, 
-  cursor?: string, 
-  limit = 20
-): Promise<{ 
-  success: boolean; 
-  data?: { 
-    users: UserProfile[]; 
-    hasMore: boolean; 
-    total: number 
-  }; 
-  error?: string 
-}> => {
-  try {
-    if (!query || query.trim().length < 2) {
-      return {
-        success: true,
-        data: { users: [], hasMore: false, total: 0 }
-      }
-    }
-
-    console.log('=== 사용자 검색 API 호출 ===', { query, limit })
-
-    const params = {
-      query: query.trim(),
-      size: limit
-    }
-
-    const response = await api.get<ApiResponse<any[]>>(`${API_ENDPOINTS.SEARCH_FEEDS}`, { params })
-    const result = response.data
-    
-    if (!result.error && Array.isArray(result.data)) {
-      const currentUser = await getCurrentUser()
-      const users: UserProfile[] = []
-
-      // 중복 제거를 위한 Set
-      const processedAccountNames = new Set<string>()
-
-      for (const feedData of result.data) {
-        const accountName = feedData.accountName
-        
-        // 중복 체크
-        if (processedAccountNames.has(accountName)) {
-          continue
-        }
-        processedAccountNames.add(accountName)
-
-        // BackendUserInfoResponse 형태로 변환
-        const userInfo: BackendUserInfoResponse = {
-          userName: feedData.accountName,
-          userEmail: `${accountName}@example.com`, // 임시 이메일
-          profileImage: feedData.profileImage,
-          prettyFace: ''
-        }
-
-        const userProfile = await transformBackendUserToProfile(
-          userInfo,
-          currentUser?.accountName
-        )
-        users.push(userProfile)
-      }
-      
-      return {
-        success: true,
-        data: {
-          users,
-          hasMore: false,
-          total: users.length
-        }
-      }
-    }
-
     return {
       success: false,
-      error: result.message || '사용자 검색에 실패했습니다.'
+      error: handleApiError(error)
+    }
+  }
+}
+
+/**
+ * 언팔로우
+ */
+export const unfollowUser = async (accountName: string): Promise<ApiResult<void>> => {
+  try {
+    console.log('🔥 언팔로우:', accountName)
+    
+    const response = await api.delete<ApiResponse<void>>(`/follows/${accountName}`)
+    
+    if (response.data.error) {
+      return {
+        success: false,
+        error: response.data.message || '언팔로우에 실패했습니다.'
+      }
+    }
+    
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to unfollow user:', error)
+    return {
+      success: false,
+      error: handleApiError(error)
+    }
+  }
+}
+
+/**
+ * 팔로우 상태 확인
+ */
+export const checkFollowStatus = async (accountName: string): Promise<ApiResult<boolean>> => {
+  try {
+    console.log('🔥 팔로우 상태 확인:', accountName)
+    
+    const response = await api.get<ApiResponse<boolean>>(`/follows/check/${accountName}`)
+    
+    if (response.data.error) {
+      return {
+        success: false,
+        error: response.data.message || '팔로우 상태 확인에 실패했습니다.'
+      }
+    }
+    
+    return {
+      success: true,
+      data: response.data.data || false
     }
   } catch (error) {
-    console.error('Failed to search users:', error)
+    console.error('Failed to check follow status:', error)
+    return {
+      success: false,
+      error: handleApiError(error)
+    }
+  }
+}
+
+/**
+ * 팔로우 수 조회
+ */
+export const getFollowCounts = async (accountName: string): Promise<ApiResult<FollowCountsResponse>> => {
+  try {
+    console.log('🔥 팔로우 수 조회:', accountName)
+    
+    const response = await api.get<ApiResponse<FollowCountsResponse>>(`/follows/count/${accountName}`)
+    
+    if (response.data.error) {
+      return {
+        success: false,
+        error: response.data.message || '팔로우 수 조회에 실패했습니다.'
+      }
+    }
+    
+    return {
+      success: true,
+      data: response.data.data
+    }
+  } catch (error) {
+    console.error('Failed to get follow counts:', error)
+    return {
+      success: false,
+      error: handleApiError(error)
+    }
+  }
+}
+
+/**
+ * 팔로잉 목록 조회 - 🔥 데이터 정규화 추가
+ */
+export const getFollowingList = async (accountName: string): Promise<ApiResult<UserProfileResponse[]>> => {
+  try {
+    console.log('🔥 팔로잉 목록 조회:', accountName)
+    
+    const response = await api.get<ApiResponse<any[]>>(`/follows/following/${accountName}`)
+    
+    if (response.data.error) {
+      return {
+        success: false,
+        error: response.data.message || '팔로잉 목록 조회에 실패했습니다.'
+      }
+    }
+    
+    // 🔥 데이터 정규화
+    const normalizedData = (response.data.data || []).map(normalizeUserProfile)
+    
+    return {
+      success: true,
+      data: normalizedData
+    }
+  } catch (error) {
+    console.error('Failed to get following list:', error)
+    return {
+      success: false,
+      error: handleApiError(error)
+    }
+  }
+}
+
+/**
+ * 팔로워 목록 조회 - 🔥 데이터 정규화 추가
+ */
+export const getFollowersList = async (accountName: string): Promise<ApiResult<UserProfileResponse[]>> => {
+  try {
+    console.log('🔥 팔로워 목록 조회:', accountName)
+    
+    const response = await api.get<ApiResponse<any[]>>(`/follows/followers/${accountName}`)
+    
+    if (response.data.error) {
+      return {
+        success: false,
+        error: response.data.message || '팔로워 목록 조회에 실패했습니다.'
+      }
+    }
+    
+    // 🔥 데이터 정규화
+    const normalizedData = (response.data.data || []).map(normalizeUserProfile)
+    
+    return {
+      success: true,
+      data: normalizedData
+    }
+  } catch (error) {
+    console.error('Failed to get followers list:', error)
+    return {
+      success: false,
+      error: handleApiError(error)
+    }
+  }
+}
+
+/**
+ * 상호 팔로우 목록 조회 - 🔥 데이터 정규화 추가
+ */
+export const getMutualFollowsList = async (accountName: string): Promise<ApiResult<UserProfileResponse[]>> => {
+  try {
+    console.log('🔥 상호 팔로우 목록 조회:', accountName)
+    
+    const response = await api.get<ApiResponse<any[]>>(`/follows/mutual/${accountName}`)
+    
+    if (response.data.error) {
+      return {
+        success: false,
+        error: response.data.message || '상호 팔로우 목록 조회에 실패했습니다.'
+      }
+    }
+    
+    // 🔥 데이터 정규화
+    const normalizedData = (response.data.data || []).map(normalizeUserProfile)
+    
+    return {
+      success: true,
+      data: normalizedData
+    }
+  } catch (error) {
+    console.error('Failed to get mutual follows list:', error)
     return {
       success: false,
       error: handleApiError(error)
@@ -464,7 +291,208 @@ export const searchUsers = async (
 }
 
 // ============================================================================
-// 타입 내보내기 (제거 - 충돌 방지)
+// 🔥 고급 팔로우 함수들
 // ============================================================================
 
-// export type 제거 - 내부에서만 사용
+/**
+ * 낙관적 업데이트를 사용한 팔로우 토글
+ */
+export const toggleFollowOptimistic = async (
+  accountName: string,
+  currentlyFollowing: boolean,
+  onOptimisticUpdate: (newState: boolean) => void,
+  onRollback: (originalState: boolean) => void
+): Promise<void> => {
+  // 즉시 UI 업데이트
+  const newState = !currentlyFollowing
+  onOptimisticUpdate(newState)
+  
+  try {
+    // 백엔드 API 호출
+    if (currentlyFollowing) {
+      const result = await unfollowUser(accountName)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+    } else {
+      const result = await followUser(accountName)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+    }
+  } catch (error) {
+    // 실패 시 롤백
+    onRollback(currentlyFollowing)
+    throw error
+  }
+}
+
+/**
+ * 안전한 팔로우 토글 (서버 상태 확인 후 토글)
+ */
+export const safeToggleFollow = async (
+  accountName: string,
+  clientState: boolean
+): Promise<{ success: boolean; newState: boolean; error?: string }> => {
+  try {
+    // 1. 서버에서 현재 상태 확인
+    const statusResult = await checkFollowStatus(accountName)
+    if (!statusResult.success) {
+      return {
+        success: false,
+        newState: clientState,
+        error: statusResult.error
+      }
+    }
+    
+    const serverState = statusResult.data || false
+    
+    // 2. 클라이언트와 서버 상태가 다르면 서버 상태를 우선
+    const actualCurrentState = serverState
+    
+    // 3. 토글 실행
+    if (actualCurrentState) {
+      const result = await unfollowUser(accountName)
+      return {
+        success: result.success,
+        newState: false,
+        error: result.error
+      }
+    } else {
+      const result = await followUser(accountName)
+      return {
+        success: result.success,
+        newState: true,
+        error: result.error
+      }
+    }
+  } catch (error) {
+    return {
+      success: false,
+      newState: clientState,
+      error: handleApiError(error)
+    }
+  }
+}
+
+// ============================================================================
+// 🔥 배치 처리 함수들
+// ============================================================================
+
+/**
+ * 여러 사용자의 팔로우 상태를 일괄 확인
+ */
+export const checkMultipleFollowStatus = async (accountNames: string[]): Promise<Record<string, boolean>> => {
+  try {
+    console.log('🔥 배치 팔로우 상태 확인:', accountNames)
+    
+    const results: Record<string, boolean> = {}
+    
+    const promises = accountNames.map(async (accountName) => {
+      try {
+        const result = await checkFollowStatus(accountName)
+        return {
+          accountName,
+          isFollowing: result.success ? (result.data || false) : false
+        }
+      } catch (error) {
+        return {
+          accountName,
+          isFollowing: false
+        }
+      }
+    })
+    
+    const resolvedResults = await Promise.allSettled(promises)
+    
+    resolvedResults.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        results[result.value.accountName] = result.value.isFollowing
+      }
+    })
+    
+    return results
+  } catch (error) {
+    console.error('Failed to check multiple follow status:', error)
+    return {}
+  }
+}
+
+/**
+ * 여러 사용자의 팔로우 수를 일괄 조회
+ */
+export const getMultipleFollowCounts = async (accountNames: string[]): Promise<Record<string, FollowCountsResponse>> => {
+  try {
+    console.log('🔥 배치 팔로우 수 조회:', accountNames)
+    
+    const results: Record<string, FollowCountsResponse> = {}
+    
+    const promises = accountNames.map(async (accountName) => {
+      try {
+        const result = await getFollowCounts(accountName)
+        return {
+          accountName,
+          counts: result.success && result.data ? result.data : { followerCount: 0, followingCount: 0 }
+        }
+      } catch (error) {
+        return {
+          accountName,
+          counts: { followerCount: 0, followingCount: 0 }
+        }
+      }
+    })
+    
+    const resolvedResults = await Promise.allSettled(promises)
+    
+    resolvedResults.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        results[result.value.accountName] = result.value.counts
+      }
+    })
+    
+    return results
+  } catch (error) {
+    console.error('Failed to get multiple follow counts:', error)
+    return {}
+  }
+}
+
+/**
+ * 팔로우 매트릭스 생성 (사용자들의 팔로우 관계 매트릭스)
+ */
+export const buildFollowMatrix = async (accountNames: string[]): Promise<Record<string, { isFollowing: boolean; followerCount: number; followingCount: number }>> => {
+  try {
+    console.log('🔥 팔로우 매트릭스 생성:', accountNames)
+    
+    const [followStatuses, followCounts] = await Promise.all([
+      checkMultipleFollowStatus(accountNames),
+      getMultipleFollowCounts(accountNames)
+    ])
+    
+    const matrix: Record<string, { isFollowing: boolean; followerCount: number; followingCount: number }> = {}
+    
+    accountNames.forEach(accountName => {
+      matrix[accountName] = {
+        isFollowing: followStatuses[accountName] || false,
+        followerCount: followCounts[accountName]?.followerCount || 0,
+        followingCount: followCounts[accountName]?.followingCount || 0
+      }
+    })
+    
+    return matrix
+  } catch (error) {
+    console.error('Failed to build follow matrix:', error)
+    return {}
+  }
+}
+
+// ============================================================================
+// 🔥 타입 exports
+// ============================================================================
+
+export type {
+  ApiResponse,
+  FollowCountsResponse,
+  UserProfileResponse,
+  ApiResult
+}

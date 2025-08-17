@@ -11,6 +11,7 @@ interface AuthActions {
   setLoading: (isLoading: boolean) => void
   clearTokens: () => void
   initializeAuth: () => Promise<void>
+  loadUserInfoInBackground: (token: string) => Promise<void>
   logout: () => Promise<void>
   logoutDueToInactivity: () => void
 }
@@ -64,43 +65,97 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   initializeAuth: async () => {
     if (typeof window === 'undefined') return
 
+    const startTime = performance.now()
+    console.log('🚀 인증 초기화 시작:', new Date().toISOString())
+
     // 먼저 세션이 만료되었는지 확인
     if (sessionManager.isExpired()) {
-      console.log('세션이 만료됨, 자동 로그아웃')
-      get().logoutDueToInactivity()
+      console.log('⏰ 세션이 만료됨, 자동 로그아웃')
+      get().clearTokens()
       return
     }
 
+    const tokenStartTime = performance.now()
     const savedToken = tokenStorage.get()
+    const tokenEndTime = performance.now()
+    console.log(
+      `🔑 토큰 복원 시간: ${(tokenEndTime - tokenStartTime).toFixed(2)}ms`
+    )
+
     if (!savedToken) {
+      console.log('❌ 저장된 토큰 없음')
       set({ isLoading: false })
       return
     }
 
-    set({ accessToken: savedToken, isLoading: true })
+    // 🚀 1단계: 토큰만 먼저 설정 (즉시 인증 완료)
+    console.log('✅ 토큰 발견, 즉시 인증 상태 설정')
+    set({
+      accessToken: savedToken,
+      isAuthenticated: true,
+      isLoading: false,
+    })
 
+    const tokenSetupTime = performance.now()
+    console.log(
+      `⚡ 토큰 설정 완료 시간: ${(tokenSetupTime - startTime).toFixed(2)}ms`
+    )
+
+    // 🚀 2단계: 백그라운드에서 사용자 정보 로드 (비동기)
+    console.log('🔄 백그라운드에서 사용자 정보 로드 시작')
+    get().loadUserInfoInBackground(savedToken)
+  },
+
+  // 백그라운드에서 사용자 정보 로드 (새로 추가)
+  loadUserInfoInBackground: async (token: string) => {
     try {
-      // 토큰이 유효한지 사용자 정보로 검증
-      const userResponse = await api.get(API_ENDPOINTS.USER_INFO)
+      const userApiStartTime = performance.now()
+      console.log('📡 사용자 정보 API 호출 시작')
+
+      // 🚀 강제 타임아웃 구현 (10초)
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('사용자 정보 API 호출 타임아웃 (10초)'))
+        }, 10000)
+      })
+
+      const apiPromise = api.get(API_ENDPOINTS.USER_INFO)
+
+      // 🚀 경쟁: API 응답 vs 타임아웃
+      const userResponse = (await Promise.race([
+        apiPromise,
+        timeoutPromise,
+      ])) as any
+
+      const userApiEndTime = performance.now()
+      console.log(
+        `📡 사용자 정보 API 응답 시간: ${(userApiEndTime - userApiStartTime).toFixed(2)}ms`
+      )
 
       const rawData = userResponse.data.data || userResponse.data
       const userData = userTransformer.fromBackend(rawData)
 
-      set({
-        user: userData,
-        isAuthenticated: true,
-      })
+      console.log('👤 사용자 정보 변환 완료:', userData.name || userData.email)
 
-      // 프로필 이미지가 있으면 미리 로드
-      if (userData.profileImage) {
-        const img = new Image()
-        img.src = userData.profileImage
-        // 에러가 나도 무시 (프로필 이미지 로딩 실패가 전체 인증을 막지 않음)
+      // 사용자 정보만 업데이트 (인증 상태는 이미 true)
+      set({ user: userData })
+
+      const totalTime = performance.now()
+      console.log(
+        `🎉 백그라운드 사용자 정보 로드 완료! API 소요시간: ${(userApiEndTime - userApiStartTime).toFixed(2)}ms`
+      )
+    } catch (error: any) {
+      console.error('❌ 백그라운드 사용자 정보 로드 실패:', error)
+
+      // 🚀 타임아웃 에러 처리
+      if (error.message?.includes('타임아웃')) {
+        console.warn(
+          '⚠️ 사용자 정보 API 타임아웃 - 인증 상태는 유지하되 사용자 정보는 로드 실패'
+        )
+        // 타임아웃 시에도 인증 상태는 유지
+      } else {
+        console.warn('⚠️ 사용자 정보 로드 실패했지만 인증 상태는 유지됨')
       }
-    } catch (error) {
-      get().clearTokens()
-    } finally {
-      set({ isLoading: false })
     }
   },
 

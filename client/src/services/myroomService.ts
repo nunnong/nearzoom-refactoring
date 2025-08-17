@@ -57,9 +57,13 @@ export interface PhotoForFeedUploadResponse {
 export const myroomService = {
   // 사진 목록 조회 (필터링 및 페이징 지원)
   getPhotos: async (
-    condition: MyPhotoListCondition = {}
+    condition: MyPhotoListCondition = {},
+    retryCount: number = 0
   ): Promise<MyPhotoListResponse> => {
-    console.log('📸 getPhotos API 호출 - condition:', condition)
+    console.log(
+      `📸 getPhotos API 호출 (시도 ${retryCount + 1}/5) - condition:`,
+      condition
+    )
 
     const params = new URLSearchParams()
 
@@ -98,11 +102,54 @@ export const myroomService = {
     console.log('🌐 Final API URL:', finalUrl)
 
     try {
-      const response = await api.get(finalUrl)
-      console.log('✅ getPhotos API 성공:', response.data)
+      const startTime = performance.now()
+
+      // 🚀 마이룸 사진 API는 더 긴 타임아웃 설정 (로깅 최소화)
+      const response = await api.get(finalUrl, {
+        timeout: 45000, // 45초 타임아웃 직접 설정
+      })
+
+      const endTime = performance.now()
+
+      console.log(
+        `✅ getPhotos API 성공 (${(endTime - startTime).toFixed(2)}ms)`
+      )
       return response.data
-    } catch (error) {
-      console.error('❌ getPhotos API 실패:', error)
+    } catch (error: any) {
+      const isTimeout =
+        error?.code === 'ECONNABORTED' ||
+        error?.message?.includes('timeout') ||
+        error?.code === 'TIMEOUT'
+
+      // 🚀 상세한 에러 정보 로깅
+      console.error('❌ getPhotos API 상세 에러 정보:', {
+        error,
+        errorType: typeof error,
+        errorKeys: error ? Object.keys(error) : 'undefined',
+        errorMessage: error?.message,
+        errorCode: error?.code,
+        errorStatus: error?.response?.status,
+        errorResponse: error?.response?.data,
+        errorConfig: error?.config,
+        errorStack: error?.stack,
+        isTimeout,
+        retryCount,
+      })
+
+      if (isTimeout && retryCount < 4) {
+        // 5회까지 시도
+        console.warn(`⏰ 타임아웃 발생 (${retryCount + 1}/5), 재시도 중...`)
+
+        // 🚀 지수 백오프로 재시도 (2초, 4초, 8초, 16초)
+        const delay = Math.pow(2, retryCount + 1) * 1000
+        console.log(`⏳ ${delay}ms 후 재시도...`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+
+        return myroomService.getPhotos(condition, retryCount + 1)
+      }
+
+      // 🚀 에러를 다시 throw하기 전에 한 번 더 로깅
+      console.error('❌ getPhotos API 최종 실패 - 에러를 throw합니다:', error)
       throw error
     }
   },

@@ -1,7 +1,7 @@
 'use client'
 
 import { MagnifyingGlassIcon, XMarkIcon, HeartIcon, CalendarIcon, PencilIcon } from '@heroicons/react/24/outline'
-import React, { useState, ChangeEvent, useCallback, useMemo } from 'react'
+import React, { useState, ChangeEvent, useCallback, useMemo, useEffect } from 'react'
 
 interface Filter {
   id: string
@@ -25,6 +25,63 @@ const SearchBox: React.FC<SearchBoxProps> = React.memo(({
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
 
+  // 🚀 로컬스토리지에서 필터 상태 복원
+  useEffect(() => {
+    const savedFilters = localStorage.getItem('myroom-filters')
+    if (savedFilters) {
+      try {
+        const parsedFilters = JSON.parse(savedFilters)
+        setFilters(parsedFilters)
+        console.log('💾 저장된 필터 복원됨:', parsedFilters)
+        
+        // 🚀 복원된 필터가 있으면 자동으로 적용
+        if (parsedFilters.length > 0) {
+          setTimeout(() => {
+            onFiltersChange?.(parsedFilters)
+            console.log('🔄 복원된 필터 자동 적용됨')
+          }, 100) // 약간의 지연으로 안정성 확보
+        }
+      } catch (error) {
+        console.error('❌ 저장된 필터 파싱 실패:', error)
+        localStorage.removeItem('myroom-filters')
+      }
+    }
+  }, [onFiltersChange]) // onFiltersChange 의존성 복원
+
+  // 🚀 필터 상태를 로컬스토리지에 저장
+  const saveFiltersToStorage = useCallback((newFilters: Filter[]) => {
+    try {
+      localStorage.setItem('myroom-filters', JSON.stringify(newFilters))
+      console.log('💾 필터 상태 저장됨:', newFilters)
+    } catch (error) {
+      console.error('❌ 필터 상태 저장 실패:', error)
+    }
+  }, [])
+
+  // 🚀 성능 최적화: 디바운스된 필터 변경
+  const debouncedFiltersChange = useMemo(() => {
+    let timeoutId: NodeJS.Timeout
+    return (newFilters: Filter[]) => {
+      clearTimeout(timeoutId)
+      timeoutId = setTimeout(() => {
+        // 🚀 필터 변경됨 시 자동 적용
+        console.log('⏱️ 디바운스 타이머 완료, onFiltersChange 호출:', newFilters)
+        onFiltersChange?.(newFilters)
+        console.log('🔍 필터 변경됨 (자동 적용):', newFilters)
+      }, 300) // 300ms 디바운스
+    }
+  }, [onFiltersChange]) // onFiltersChange 의존성 복원
+
+  // 🚀 필터 상태 관리 최적화 (로컬스토리지 저장 포함)
+  const updateFilters = useCallback((newFilters: Filter[]) => {
+    console.log('🔄 updateFilters 호출됨:', newFilters)
+    setFilters(newFilters)
+    saveFiltersToStorage(newFilters) // 로컬스토리지에 저장
+    console.log('💾 로컬스토리지 저장 완료')
+    debouncedFiltersChange(newFilters)
+    console.log('⏱️ 디바운스된 필터 변경 예약됨')
+  }, [saveFiltersToStorage, debouncedFiltersChange]) // debouncedFiltersChange 의존성 복원
+
   // 날짜 관련 함수
   const addDateFilter = useCallback((start: string, end?: string) => {
     const dateValue = end ? `${start} ~ ${end}` : start
@@ -36,76 +93,90 @@ const SearchBox: React.FC<SearchBoxProps> = React.memo(({
     }
 
     const updatedFilters = [...filters, newFilter]
-    setFilters(updatedFilters)
-    onFiltersChange?.(updatedFilters)
+    updateFilters(updatedFilters)
     setShowDatePicker(false)
     setStartDate('')
     setEndDate('')
-  }, [filters, onFiltersChange])
+  }, [filters, updateFilters])
 
-  // 좋아요
-  const handleInputChange = useCallback((e: ChangeEvent<HTMLInputElement>): void => {
-    setSearchValue(e.target.value)
-  }, [])
-  // 하트 필터 여부
-  const addHeartFilter = useCallback(() => {
-    console.log('🔥 addHeartFilter 호출됨, 현재 필터들:', filters)
-    
-    // 이미 하트 필터가 있는지 확인
+  // 🚀 개선된 하트 필터 (토글 가능)
+  const toggleHeartFilter = useCallback(() => {
     const existingHeartFilter = filters.find(f => f.type === 'heart')
     
     if (existingHeartFilter) {
-      console.log('⚠️ 이미 하트 필터가 적용되어 있습니다')
-      return // 이미 있으면 아무것도 하지 않음
-    }
-    
-    console.log('➕ 새로운 하트 필터 추가')
-    
-    // 새로운 하트 필터 추가 (좋아요한 사진만 보기)
-    const newFilter: Filter = {
-      id: Date.now().toString(),
-      type: 'heart',
-      value: 'liked',
-      display: '♥좋아요♥'
-    }
-
-    const updatedFilters = [...filters, newFilter]
-    console.log('➕ 추가된 필터들:', updatedFilters)
-    setFilters(updatedFilters)
-    onFiltersChange?.(updatedFilters)
-  }, [filters, onFiltersChange])
-
-  // 편집 되어 있는지 확인
-  const addEditedFilter = useCallback(() => {
-    // 기존 편집 필터가 있는지 확인
-    const existingEditFilter = filters.find(f => f.type === 'edited')
-    
-    if (existingEditFilter) {
-      // 기존 필터가 있으면 토글
-      const newValue = existingEditFilter.value === 'edited' ? 'not_edited' : 'edited'
-      const newDisplay = newValue === 'edited' ? '✏️ 편집됨' : '📝 편집안됨'
-      
-      const updatedFilters = filters.map(f => 
-        f.type === 'edited' 
-          ? { ...f, value: newValue, display: newDisplay }
-          : f
-      )
-      setFilters(updatedFilters)
-      onFiltersChange?.(updatedFilters)
+      // 기존 하트 필터 제거
+      const updatedFilters = filters.filter(f => f.id !== existingHeartFilter.id)
+      updateFilters(updatedFilters)
     } else {
-      // 새로운 편집 필터 추가
+      // 새로운 하트 필터 추가
+      const newFilter: Filter = {
+        id: Date.now().toString(),
+        type: 'heart',
+        value: 'true',
+        display: '♥ 좋아요'
+      }
+      const updatedFilters = [...filters, newFilter]
+      updateFilters(updatedFilters)
+    }
+  }, [filters, updateFilters])
+
+  const toggleEditedFilter = useCallback(() => {
+    console.log('🔍 toggleEditedFilter 호출됨')
+    console.log('📋 현재 필터 상태:', filters)
+    
+    const existingEditFilter = filters.find(f => f.type === 'edited')
+    console.log('🔍 기존 편집 필터:', existingEditFilter)
+    
+    if (!existingEditFilter) {
+      // 1단계: 편집된 사진만
       const newFilter: Filter = {
         id: Date.now().toString(),
         type: 'edited',
         value: 'edited',
         display: '✏️ 편집됨'
       }
-
       const updatedFilters = [...filters, newFilter]
-      setFilters(updatedFilters)
-      onFiltersChange?.(updatedFilters)
+      console.log('✏️ 편집됨 필터 추가:', newFilter)
+      console.log('🔄 업데이트된 필터:', updatedFilters)
+      updateFilters(updatedFilters)
+      console.log('✏️ 편집됨 필터 추가 완료')
+    } else if (existingEditFilter.value === 'edited') {
+      // 2단계: 편집 안된 사진만
+      const updatedFilters = filters.map(f => 
+        f.id === existingEditFilter.id 
+          ? { ...f, value: 'not_edited', display: '📝 편집안됨' }
+          : f
+      )
+      console.log('📝 편집안됨 필터로 변경:', updatedFilters)
+      updateFilters(updatedFilters)
+      console.log('📝 편집안됨 필터로 변경 완료')
+    } else {
+      // 3단계: 필터 제거
+      const updatedFilters = filters.filter(f => f.id !== existingEditFilter.id)
+      console.log('🚫 편집 필터 제거:', updatedFilters)
+      updateFilters(updatedFilters)
+      console.log('🚫 편집 필터 제거 완료')
     }
-  }, [filters, onFiltersChange])
+  }, [filters, updateFilters])
+
+  // �� 개선된 날짜 필터 (토글 가능)
+  const toggleDateFilter = useCallback(() => {
+    const existingDateFilter = filters.find(f => f.type === 'date')
+    
+    if (existingDateFilter) {
+      // 기존 날짜 필터 제거
+      const updatedFilters = filters.filter(f => f.id !== existingDateFilter.id)
+      updateFilters(updatedFilters)
+      console.log('📅 날짜 필터 제거됨')
+    } else {
+      // 날짜 선택 모달 열기
+      setShowDatePicker(true)
+    }
+  }, [filters, updateFilters])
+
+  const handleInputChange = useCallback((e: ChangeEvent<HTMLInputElement>): void => {
+    setSearchValue(e.target.value)
+  }, [])
 
   const detectFilterType = (value: string): 'heart' | 'name' | 'date' => {
     // 날짜 범위 패턴 감지 (YYYY.MM.DD ~ YYYY.MM.DD 형식)
@@ -116,11 +187,11 @@ const SearchBox: React.FC<SearchBoxProps> = React.memo(({
     if (/^\d{4}\.\d{1,2}\.\d{1,2}$/.test(value)) {
       return 'date'
     }
-    // 그 외는 이름으로 처리 (하트 키워드 제거)
+    // 그 외는 이름으로 처리
     return 'name'
   }
 
-  const addFilter = (value: string) => {
+  const addFilter = useCallback((value: string) => {
     if (!value.trim()) return
 
     const type = detectFilterType(value.trim())
@@ -128,31 +199,51 @@ const SearchBox: React.FC<SearchBoxProps> = React.memo(({
       id: Date.now().toString(),
       type,
       value: value.trim(),
-      display: type === 'heart' ? '♥ 좋아요' : value.trim()
+      display: value.trim()
     }
 
     const updatedFilters = [...filters, newFilter]
-    setFilters(updatedFilters)
+    updateFilters(updatedFilters)
     setSearchValue('')
-    onFiltersChange?.(updatedFilters)
-  }
+  }, [filters, updateFilters])
 
-  const removeFilter = (filterId: string) => {
+  const removeFilter = useCallback((filterId: string) => {
     const updatedFilters = filters.filter(f => f.id !== filterId)
-    setFilters(updatedFilters)
-    onFiltersChange?.(updatedFilters)
-  }
+    updateFilters(updatedFilters)
+  }, [filters, updateFilters])
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>): void => {
+  const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
       addFilter(searchValue)
     } else if (e.key === ' ' && searchValue.trim()) {
-      e.preventDefault() // 스페이스바가 입력창에 공백을 추가하는 것을 방지
+      e.preventDefault()
       addFilter(searchValue.trim())
     }
-  }
+  }, [searchValue, addFilter])
 
-  const getFilterColor = (type: Filter['type']) => {
+  // 🚀 필터 상태에 따른 버튼 스타일 계산
+  const getFilterButtonStyle = useCallback((type: 'heart' | 'edited' | 'date') => {
+    const hasFilter = filters.some(f => f.type === type)
+    
+    switch (type) {
+      case 'heart':
+        return hasFilter 
+          ? 'text-red-500 bg-red-50 rounded-full shadow-sm' 
+          : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+      case 'edited':
+        return hasFilter 
+          ? 'text-purple-500 bg-purple-50 rounded-full shadow-sm' 
+          : 'text-gray-400 hover:text-purple-500 hover:bg-purple-50'
+      case 'date':
+        return hasFilter 
+          ? 'text-green-500 bg-green-50 rounded-full shadow-sm' 
+          : 'text-gray-400 hover:text-green-500 hover:bg-green-50'
+      default:
+        return 'text-gray-400 hover:text-gray-600'
+    }
+  }, [filters])
+
+  const getFilterColor = useCallback((type: Filter['type']) => {
     switch (type) {
       case 'heart':
         return 'bg-red-100 text-red-700 border-red-200'
@@ -165,18 +256,26 @@ const SearchBox: React.FC<SearchBoxProps> = React.memo(({
       default:
         return 'bg-gray-100 text-gray-700 border-gray-200'
     }
-  }
+  }, [])
 
-  // 메모이제이션된 값들
+  // 🚀 메모이제이션된 값들
   const hasFilters = useMemo(() => filters.length > 0, [filters])
   
-  const heartFilterCount = useMemo(() => 
-    filters.filter(f => f.type === 'heart').length, [filters]
-  )
-  
-  const editedFilterCount = useMemo(() => 
-    filters.filter(f => f.type === 'edited').length, [filters]
-  )
+  const activeFiltersCount = useMemo(() => ({
+    heart: filters.filter(f => f.type === 'heart').length,
+    edited: filters.filter(f => f.type === 'edited').length,
+    date: filters.filter(f => f.type === 'date').length,
+    name: filters.filter(f => f.type === 'name').length
+  }), [filters])
+
+  // 🚀 필터 초기화
+  const clearAllFilters = useCallback(() => {
+    setFilters([])
+    localStorage.removeItem('myroom-filters') // 로컬스토리지에서도 제거
+    // 🚀 필터 초기화 시 자동 적용
+    onFiltersChange?.([])
+    console.log('🧹 모든 필터 초기화 (로컬스토리지 포함)')
+  }, [onFiltersChange]) // onFiltersChange 의존성 복원
 
   return (
     <div className="w-full max-w-2xl">
@@ -191,36 +290,37 @@ const SearchBox: React.FC<SearchBoxProps> = React.memo(({
           placeholder={placeholder}
           className="flex-1 bg-transparent outline-none text-sm text-gray-900 font-medium"
         />
+        
+        {/* 🚀 개선된 하트 필터 버튼 */}
         <button
-          onClick={addHeartFilter}
-          className={`ml-2 p-2 transition-colors ${
-            filters.some(f => f.type === 'heart')
-              ? 'text-red-500 bg-red-50 rounded-full' // 꽉 찬 하트
-              : 'text-gray-400 hover:text-red-500' // 회색 하트
-          }`}
-          title={filters.some(f => f.type === 'heart') ? '좋아요 필터 적용됨' : '좋아요 필터 추가'}
+          onClick={toggleHeartFilter}
+          className={`ml-2 p-2 transition-all duration-200 ${getFilterButtonStyle('heart')}`}
+          title={activeFiltersCount.heart > 0 ? '좋아요 필터 제거' : '좋아요 필터 추가'}
         >
           <HeartIcon className="h-5 w-5" />
         </button>
         
+        {/* 🚀 개선된 편집 필터 버튼 */}
         <button
-          onClick={addEditedFilter}
-          className={`ml-2 p-2 transition-colors ${
-            filters.some(f => f.type === 'edited')
-              ? 'text-purple-500 bg-purple-50 rounded-full'
-              : 'text-gray-400 hover:text-blue-500'
-          }`}
-          title={filters.some(f => f.type === 'edited') ? '편집됨 필터 적용됨' : '편집됨 필터 추가'}
+          onClick={toggleEditedFilter}
+          className={`ml-2 p-2 transition-all duration-200 ${getFilterButtonStyle('edited')}`}
+          title={
+            activeFiltersCount.edited === 0 ? '편집 필터 추가' :
+            activeFiltersCount.edited > 0 ? '편집 필터 변경/제거' : '편집 필터 제거'
+          }
         >
           <PencilIcon className="h-5 w-5" />
         </button>
+        
+        {/* 🚀 개선된 날짜 필터 버튼 */}
         <button
-          onClick={() => setShowDatePicker(true)}
-          className="ml-2 p-2 text-gray-400 hover:text-gray-600 transition-colors"
-          title="날짜 필터 추가"
+          onClick={toggleDateFilter}
+          className={`ml-2 p-2 transition-all duration-200 ${getFilterButtonStyle('date')}`}
+          title={activeFiltersCount.date > 0 ? '날짜 필터 제거' : '날짜 필터 추가'}
         >
           <CalendarIcon className="h-5 w-5" />
         </button>
+        
         {searchValue && (
           <button
             onClick={() => addFilter(searchValue)}
@@ -231,9 +331,24 @@ const SearchBox: React.FC<SearchBoxProps> = React.memo(({
         )}
       </div>
 
-      {/* 필터 버튼들 */}
+      {/* 🚀 필터 상태 표시 및 관리 */}
       {hasFilters && (
-        <div className="flex flex-wrap gap-2 mt-3">
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          {/* 필터 개수 표시 */}
+          <div className="text-xs text-gray-500 mr-2">
+            활성 필터: {filters.length}개
+          </div>
+          
+          {/* 모든 필터 초기화 버튼 */}
+          <button
+            onClick={clearAllFilters}
+            className="text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded hover:bg-gray-100"
+            title="모든 필터 초기화"
+          >
+            🧹 전체 초기화
+          </button>
+          
+          {/* 개별 필터 태그들 */}
           {filters.map((filter) => (
             <div
               key={filter.id}
@@ -245,10 +360,14 @@ const SearchBox: React.FC<SearchBoxProps> = React.memo(({
               {filter.type === 'edited' && (
                 <PencilIcon className="h-3 w-3 mr-1" />
               )}
+              {filter.type === 'date' && (
+                <CalendarIcon className="h-3 w-3 mr-1" />
+              )}
               <span>{filter.display}</span>
               <button
                 onClick={() => removeFilter(filter.id)}
-                className="ml-2 hover:bg-black hover:bg-opacity-10 rounded-full p-0.5"
+                className="ml-2 hover:bg-black hover:bg-opacity-10 rounded-full p-0.5 transition-colors"
+                title="필터 제거"
               >
                 <XMarkIcon className="h-3 w-3" />
               </button>
@@ -299,7 +418,6 @@ const SearchBox: React.FC<SearchBoxProps> = React.memo(({
               <button
                 onClick={() => {
                   if (startDate) {
-                    // 날짜를 YYYY.MM.DD 형식으로 변환
                     const formattedStart = startDate.replace(/-/g, '.')
                     const formattedEnd = endDate ? endDate.replace(/-/g, '.') : undefined
                     addDateFilter(formattedStart, formattedEnd)

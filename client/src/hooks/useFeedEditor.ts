@@ -1,257 +1,467 @@
-// src/hooks/useFeedEditor.ts - 단순 피드 생성용
+// ============================================================================
+// useFeedEditor.ts - 아키텍처 원칙 100% 준수 완전 수정 버전
+// ============================================================================
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
+import api from '@/lib/axios' // 🔧 올바른 API 사용 - default export
 
-// 🔥 올바른 백엔드 연동 - api from '@/lib/axios' 사용
-import api from '@/lib/axios'
-
-// ============================================================================
-// 백엔드 연동 타입 정의 (단순화)
-// ============================================================================
-
-// 백엔드 ApiResponse 표준 형식
+// 타입 정의들
 interface ApiResponse<T> {
-  error: boolean;
-  message: string;
-  data: T;
+  error: boolean
+  message: string | null
+  data: T | null
 }
 
-// CreateFeedRequest.java 기반
-interface CreateFeedRequest {
-  photoId: number;
-  caption: string;
-}
-
-// FeedDetailResponse.java 기반 (생성된 피드 정보)
-interface CreatedFeedResponse {
-  feedId: number;
-  imgUrl: string;
-  caption: string;
-  authorId: number;
-  accountName: string;
-  profileImage: string;
-  createdAt: string;
-  liked: boolean;
-}
-
-// 사진 정보 타입
 interface PhotoInfo {
-  photoId: number;
-  imgUrl: string;
-  fileName?: string;
-  createdAt?: string;
+  photoId: number
+  imgUrl: string
+  fileName?: string
+  takenAt?: string
+  alreadyInFeed?: boolean
 }
 
-// ============================================================================
-// 단순화된 훅 인터페이스
-// ============================================================================
-
-interface UseSimpleFeedEditorOptions {
-  photoId?: number;        // 선택된 사진 ID
-  initialCaption?: string; // 초기 캡션
+interface BackendPhotoForFeedResponse {
+  photoId: number
+  imgUrl: string
+  takenAt: string
+  alreadyInFeed: boolean
 }
 
-interface UseSimpleFeedEditorReturn {
-  // 상태
-  caption: string;
-  photoInfo: PhotoInfo | null;
-  isLoading: boolean;
-  isSaving: boolean;
-  error: string | null;
-  
-  // 액션
-  setCaption: (caption: string) => void;
-  loadPhotoInfo: (photoId: number) => Promise<void>;
-  saveFeed: () => Promise<CreatedFeedResponse | null>;
-  
-  // 유틸리티
-  clearError: () => void;
-  reset: () => void;
-  
-  // 유효성 검사
-  canSave: boolean;
+type FeedEditorMode = 'create' | 'edit'
+
+interface PostDetailResponse {
+  postId: number
+  caption: string
+  imgUrl: string
+  isMyPost: boolean
+  createdAt: string
 }
 
-// ============================================================================
-// 백엔드 API 함수들
-// ============================================================================
+interface CreatePostFromMyRoomRequest {
+  photoId: number
+  caption: string
+}
 
-const simpleFeedAPI = {
-  // POST /feeds - 새 피드 생성
-  createFeed: async (request: CreateFeedRequest): Promise<CreatedFeedResponse> => {
-    const response = await api.post<ApiResponse<CreatedFeedResponse>>('/feeds', request);
-    
+interface UseFeedEditorOptions {
+  mode?: FeedEditorMode
+  photoId?: number
+  postId?: number
+  initialCaption?: string
+  onSuccess?: (result: PostDetailResponse) => void
+  onError?: (error: string) => void
+}
+
+interface UseFeedEditorReturn {
+  mode: FeedEditorMode
+  caption: string
+  photoInfo: PhotoInfo | null
+  postDetail: PostDetailResponse | null
+  isLoading: boolean
+  isSaving: boolean
+  isDeleting: boolean
+  error: string | null
+  setCaption: (caption: string) => void
+  loadPhotoInfo: (photoId: number) => Promise<void>
+  loadPostDetail: (postId: number) => Promise<void>
+  saveFeed: () => Promise<PostDetailResponse | null>
+  deleteFeed: () => Promise<boolean>
+  clearError: () => void
+  reset: () => void
+  canSave: boolean
+  canDelete: boolean
+  validationErrors: string[]
+}
+
+// 🚀 백엔드 API 함수들 - 자동 토큰 갱신 지원
+const feedEditorAPI = {
+  getPhotoForFeedUpload: async (photoId: number): Promise<PhotoInfo> => {
+    const response = await api.get<ApiResponse<BackendPhotoForFeedResponse>>(
+      `/myroom/photos/${photoId}/feed-upload-info`
+    )
+    if (response.data.error || !response.data.data) {
+      throw new Error(response.data.message || '사진 정보를 불러올 수 없습니다.')
+    }
+    const photoData = response.data.data
+    return {
+      photoId: photoData.photoId,
+      imgUrl: photoData.imgUrl,
+      takenAt: photoData.takenAt,
+      alreadyInFeed: photoData.alreadyInFeed,
+    }
+  },
+
+  createPost: async (request: CreatePostFromMyRoomRequest): Promise<number> => {
+    const response = await api.post<ApiResponse<number>>('/feeds/posts/from-myroom', request)
+    if (response.data.error || !response.data.data) {
+      throw new Error(response.data.message || '게시물 생성에 실패했습니다.')
+    }
+    return response.data.data
+  },
+
+  getPost: async (postId: number): Promise<PostDetailResponse> => {
+    const response = await api.get<ApiResponse<PostDetailResponse>>(`/feeds/posts/${postId}`)
+    if (response.data.error || !response.data.data) {
+      throw new Error(response.data.message || '게시물을 불러올 수 없습니다.')
+    }
+    return response.data.data
+  },
+
+  updatePost: async (postId: number, caption: string): Promise<void> => {
+    const response = await api.put<ApiResponse<void>>(`/feeds/posts/${postId}`, { caption })
     if (response.data.error) {
-      throw new Error(response.data.message);
-    }
-    
-    return response.data.data;
-  },
-
-  // GET /photos/{photoId} - 사진 정보 조회 (필요시)
-  getPhotoInfo: async (photoId: number): Promise<PhotoInfo> => {
-    try {
-      // TODO: 실제 사진 정보 API가 있다면 사용
-      // const response = await api.get<ApiResponse<PhotoInfo>>(`/photos/${photoId}`);
-      // return response.data.data;
-      
-      // 임시 Mock 데이터
-      return {
-        photoId,
-        imgUrl: `/api/placeholder/600/600?photoId=${photoId}`,
-        fileName: `photo_${photoId}.jpg`,
-        createdAt: new Date().toISOString()
-      };
-    } catch (error) {
-      console.error('Failed to get photo info:', error);
-      throw new Error('사진 정보를 불러올 수 없습니다.');
+      throw new Error(response.data.message || '게시물 수정에 실패했습니다.')
     }
   },
-};
 
-// ============================================================================
-// 단순화된 피드 에디터 훅
-// ============================================================================
+  deletePost: async (postId: number): Promise<void> => {
+    const response = await api.delete<ApiResponse<void>>(`/feeds/posts/${postId}`)
+    if (response.data.error) {
+      throw new Error(response.data.message || '게시물 삭제에 실패했습니다.')
+    }
+  },
+}
 
-export const useSimpleFeedEditor = ({
+export const useFeedEditor = ({
+  mode = 'create',
   photoId: initialPhotoId,
-  initialCaption = ''
-}: UseSimpleFeedEditorOptions = {}): UseSimpleFeedEditorReturn => {
+  postId: initialPostId,
+  initialCaption = '',
+  onSuccess,
+  onError,
+}: UseFeedEditorOptions = {}): UseFeedEditorReturn => {
   
-  // ============================================================================
-  // 상태 관리 (단순화)
-  // ============================================================================
+  const router = useRouter()
   
-  const [caption, setCaption] = useState<string>(initialCaption);
-  const [photoInfo, setPhotoInfo] = useState<PhotoInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // 🔐 무조건 로그인 필수: Zustand 상태 관리
+  const { isAuthenticated, user } = useAuthStore()
+  
+  // 🔄 컴포넌트 언마운트 체크용
+  const isMountedRef = useRef(true)
+  
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
-  // 인증 상태
-  const { isAuthenticated } = useAuthStore();
+  // 상태 관리
+  const [caption, setCaption] = useState<string>(initialCaption)
+  const [photoInfo, setPhotoInfo] = useState<PhotoInfo | null>(null)
+  const [postDetail, setPostDetail] = useState<PostDetailResponse | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // ============================================================================
-  // 사진 정보 로드
-  // ============================================================================
+  // 🔐 무조건 로그인 필수 - 미인증시 즉시 리다이렉트
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      console.warn('🔐 인증되지 않은 사용자 - 로그인 페이지로 리다이렉트')
+      router.replace('/auth/login')
+      return
+    }
+  }, [isAuthenticated, user, router])
+
+  // 🔐 인증 체크 헬퍼 - 모든 API 호출 전 필수
+  const checkAuth = useCallback((): boolean => {
+    if (!isAuthenticated || !user) {
+      const errorMessage = '로그인이 필요합니다.'
+      setError(errorMessage)
+      onError?.(errorMessage)
+      router.replace('/auth/login')
+      return false
+    }
+    return true
+  }, [isAuthenticated, user, onError, router])
+
+  // 🔄 안전한 상태 업데이트 헬퍼
+  const safeSetState = useCallback((updateFn: () => void) => {
+    if (isMountedRef.current) {
+      updateFn()
+    }
+  }, [])
 
   const loadPhotoInfo = useCallback(async (photoId: number) => {
-    setIsLoading(true);
-    setError(null);
+    // 🔐 인증 체크 (모든 API 호출 전 필수)
+    if (!checkAuth()) return
+
+    safeSetState(() => {
+      setIsLoading(true)
+      setError(null)
+    })
 
     try {
-      const info = await simpleFeedAPI.getPhotoInfo(photoId);
-      setPhotoInfo(info);
-      console.log('사진 정보 로드 완료:', info);
+      const info = await feedEditorAPI.getPhotoForFeedUpload(photoId)
+      
+      safeSetState(() => {
+        setPhotoInfo(info)
+        
+        if (info.alreadyInFeed) {
+          setError('이미 피드에 올린 사진입니다.')
+        }
+      })
     } catch (err) {
-      console.error('Failed to load photo info:', err);
-      const errorMessage = err instanceof Error ? err.message : '사진 정보를 불러오는데 실패했습니다.';
-      setError(errorMessage);
+      const errorMessage = err instanceof Error ? err.message : '사진 정보 로드 실패'
+      safeSetState(() => {
+        setError(errorMessage)
+      })
+      onError?.(errorMessage)
     } finally {
-      setIsLoading(false);
+      safeSetState(() => {
+        setIsLoading(false)
+      })
     }
-  }, []);
+  }, [checkAuth, onError, safeSetState])
 
-  // ============================================================================
-  // 🔥 백엔드 연동 - 피드 저장 (단순화)
-  // ============================================================================
+  const loadPostDetail = useCallback(async (postId: number) => {
+    // 🔐 인증 체크
+    if (!checkAuth()) return
 
-  const saveFeed = useCallback(async (): Promise<CreatedFeedResponse | null> => {
-    if (!photoInfo || !caption.trim() || !isAuthenticated) {
-      setError('필수 정보가 누락되었습니다.');
-      return null;
-    }
-
-    setIsSaving(true);
-    setError(null);
+    safeSetState(() => {
+      setIsLoading(true)
+      setError(null)
+    })
 
     try {
-      console.log('=== 단순 피드 생성 시작 ===', {
-        photoId: photoInfo.photoId,
-        caption: caption.trim()
-      });
-
-      const createRequest: CreateFeedRequest = {
-        photoId: photoInfo.photoId,
-        caption: caption.trim()
-      };
-
-      // 🔥 백엔드 API 호출 (POST /feeds)
-      const createdFeed = await simpleFeedAPI.createFeed(createRequest);
-
-      console.log('=== 단순 피드 생성 완료 ===', createdFeed);
-
-      return createdFeed;
-
+      const detail = await feedEditorAPI.getPost(postId)
+      
+      safeSetState(() => {
+        setPostDetail(detail)
+        setCaption(detail.caption || '')
+      })
     } catch (err) {
-      console.error('Failed to save feed:', err);
-      const errorMessage = err instanceof Error ? err.message : '피드 저장에 실패했습니다.';
-      setError(errorMessage);
-      return null;
+      const errorMessage = err instanceof Error ? err.message : '게시물 로드 실패'
+      safeSetState(() => {
+        setError(errorMessage)
+      })
+      onError?.(errorMessage)
     } finally {
-      setIsSaving(false);
+      safeSetState(() => {
+        setIsLoading(false)
+      })
     }
-  }, [photoInfo, caption, isAuthenticated]);
+  }, [checkAuth, onError, safeSetState])
 
-  // ============================================================================
-  // 유틸리티 함수들
-  // ============================================================================
+  const saveFeed = useCallback(async (): Promise<PostDetailResponse | null> => {
+    // 🔐 인증 체크
+    if (!checkAuth()) return null
+
+    safeSetState(() => {
+      setIsSaving(true)
+      setError(null)
+    })
+
+    try {
+      let result: PostDetailResponse
+
+      if (mode === 'create') {
+        if (!photoInfo || !caption.trim()) {
+          throw new Error('필수 정보가 누락되었습니다.')
+        }
+
+        if (photoInfo.alreadyInFeed) {
+          throw new Error('이미 피드에 올린 사진입니다.')
+        }
+
+        const createRequest: CreatePostFromMyRoomRequest = {
+          photoId: photoInfo.photoId,
+          caption: caption.trim()
+        }
+
+        const createdPostId = await feedEditorAPI.createPost(createRequest)
+        result = await feedEditorAPI.getPost(createdPostId)
+        
+        safeSetState(() => {
+          setPostDetail(result)
+        })
+      } else {
+        if (!postDetail || !caption.trim()) {
+          throw new Error('필수 정보가 누락되었습니다.')
+        }
+
+        await feedEditorAPI.updatePost(postDetail.postId, caption.trim())
+        result = await feedEditorAPI.getPost(postDetail.postId)
+        
+        safeSetState(() => {
+          setPostDetail(result)
+          setCaption(result.caption || '')
+        })
+      }
+
+      onSuccess?.(result)
+      return result
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '저장 실패'
+      safeSetState(() => {
+        setError(errorMessage)
+      })
+      onError?.(errorMessage)
+      return null
+    } finally {
+      safeSetState(() => {
+        setIsSaving(false)
+      })
+    }
+  }, [mode, photoInfo, postDetail, caption, checkAuth, onSuccess, onError, safeSetState])
+
+  const deleteFeed = useCallback(async (): Promise<boolean> => {
+    // 🔐 인증 체크
+    if (!checkAuth()) return false
+
+    if (!postDetail) {
+      const errorMessage = '삭제할 게시물이 없습니다.'
+      setError(errorMessage)
+      return false
+    }
+
+    safeSetState(() => {
+      setIsDeleting(true)
+      setError(null)
+    })
+
+    try {
+      await feedEditorAPI.deletePost(postDetail.postId)
+      
+      safeSetState(() => {
+        setPostDetail(null)
+        setCaption('')
+      })
+      
+      return true
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '삭제 실패'
+      safeSetState(() => {
+        setError(errorMessage)
+      })
+      onError?.(errorMessage)
+      return false
+    } finally {
+      safeSetState(() => {
+        setIsDeleting(false)
+      })
+    }
+  }, [postDetail, checkAuth, onError, safeSetState])
 
   const clearError = useCallback(() => {
-    setError(null);
-  }, []);
+    setError(null)
+  }, [])
 
   const reset = useCallback(() => {
-    setCaption(initialCaption);
-    setPhotoInfo(null);
-    setError(null);
-  }, [initialCaption]);
+    setCaption(initialCaption)
+    setPhotoInfo(null)
+    setPostDetail(null)
+    setError(null)
+  }, [initialCaption])
 
-  // ============================================================================
-  // 유효성 검사
-  // ============================================================================
+  // 🔍 유효성 검사 - 실시간 검증
+  const validationErrors: string[] = []
 
+  if (!caption.trim()) {
+    validationErrors.push('캡션을 입력해주세요.')
+  } else if (caption.trim().length > 200) {
+    validationErrors.push('캡션은 200자 이하로 입력해주세요.')
+  }
+
+  if (mode === 'create') {
+    if (!photoInfo) {
+      validationErrors.push('사진을 선택해주세요.')
+    } else if (photoInfo.alreadyInFeed) {
+      validationErrors.push('이미 피드에 올린 사진입니다.')
+    }
+  } else {
+    if (!postDetail) {
+      validationErrors.push('편집할 게시물을 찾을 수 없습니다.')
+    }
+  }
+
+  if (!isAuthenticated || !user) {
+    validationErrors.push('로그인이 필요합니다.')
+  }
+
+  // 🚀 액션 가능 상태 계산
   const canSave = !!(
-    photoInfo && 
-    caption.trim() && 
+    validationErrors.length === 0 &&
     !isSaving && 
     !isLoading && 
-    isAuthenticated
-  );
+    !isDeleting &&
+    isAuthenticated &&
+    user
+  )
 
-  // ============================================================================
-  // 초기 사진 로드
-  // ============================================================================
+  const canDelete = !!(
+    mode === 'edit' &&
+    postDetail &&
+    postDetail.isMyPost &&
+    !isSaving &&
+    !isLoading &&
+    !isDeleting &&
+    isAuthenticated &&
+    user
+  )
 
-  useCallback(() => {
-    if (initialPhotoId) {
-      loadPhotoInfo(initialPhotoId);
+  // 🔄 초기 데이터 로딩 - 인증 상태 확인 후
+  useEffect(() => {
+    if (!isAuthenticated || !user) return
+
+    if (mode === 'create' && initialPhotoId) {
+      loadPhotoInfo(initialPhotoId)
+    } else if (mode === 'edit' && initialPostId) {
+      loadPostDetail(initialPostId)
     }
-  }, [initialPhotoId, loadPhotoInfo])();
+  }, [
+    mode, 
+    initialPhotoId, 
+    initialPostId, 
+    isAuthenticated, 
+    user,
+    loadPhotoInfo, 
+    loadPostDetail
+  ])
 
-  // ============================================================================
-  // 반환 값 (단순화)
-  // ============================================================================
+  // 🔐 미인증시 안전한 기본값 반환
+  if (!isAuthenticated || !user) {
+    return {
+      mode,
+      caption: '',
+      photoInfo: null,
+      postDetail: null,
+      isLoading: false,
+      isSaving: false,
+      isDeleting: false,
+      error: '로그인이 필요합니다.',
+      setCaption: () => {},
+      loadPhotoInfo: () => Promise.resolve(),
+      loadPostDetail: () => Promise.resolve(),
+      saveFeed: () => Promise.resolve(null),
+      deleteFeed: () => Promise.resolve(false),
+      clearError: () => {},
+      reset: () => {},
+      canSave: false,
+      canDelete: false,
+      validationErrors: ['로그인이 필요합니다.'],
+    }
+  }
 
   return {
-    // 상태
+    mode,
     caption,
     photoInfo,
+    postDetail,
     isLoading,
     isSaving,
+    isDeleting,
     error,
-    
-    // 액션
     setCaption,
     loadPhotoInfo,
+    loadPostDetail,
     saveFeed,
-    
-    // 유틸리티
+    deleteFeed,
     clearError,
     reset,
-    
-    // 유효성 검사
     canSave,
-  };
-};
+    canDelete,
+    validationErrors,
+  }
+}

@@ -5,6 +5,9 @@ import { X, Edit } from 'lucide-react'
 import api from '@/lib/axios'
 import { API_ENDPOINTS } from '@/constants/api'
 
+// 🚀 이미지 업로드 엔드포인트 상수
+const IMAGE_UPLOAD_URL = 'https://image.nearzoom.store/upload'
+
 interface UploadSelfieModalProps {
   isOpen: boolean
   onClose: () => void
@@ -30,40 +33,100 @@ export default function UploadSelfieModal({
 
   const fetchUserProfile = async () => {
     try {
+      console.log('🔍 사용자 프로필 가져오기 시작')
       const response = await api.get('/user/userInfo')
-      console.log('API 응답 전체:', response.data)
+      console.log('📡 API 응답 전체:', response)
+      console.log('📡 API 응답 데이터:', response.data)
+      console.log('📡 API 응답 상태:', response.status)
+      console.log('📡 API 응답 헤더:', response.headers)
       
       const profile = response.data.data
+      console.log('👤 프로필 데이터:', profile)
       
-      // faceImageUrl 필드 확인 (통일)
+      // 🚀 모든 프로필 키와 값 상세 분석
+      console.log('🔑 모든 프로필 키:', Object.keys(profile))
+      console.log('📋 모든 프로필 값:', profile)
+      
+      // 🚀 이미지 관련 필드들 찾기
+      const imageFields = Object.keys(profile).filter(key => 
+        key.toLowerCase().includes('image') || 
+        key.toLowerCase().includes('photo') || 
+        key.toLowerCase().includes('face') ||
+        key.toLowerCase().includes('profile') ||
+        key.toLowerCase().includes('avatar')
+      )
+      console.log('🖼️ 이미지 관련 필드들:', imageFields)
+      
+      // 🚀 각 이미지 필드의 값 확인
+      imageFields.forEach(field => {
+        console.log(`📸 ${field}:`, profile[field])
+      })
+      
+      // 🚀 faceImageUrl 필드 확인 (통일)
       const faceImageUrl = profile.faceImageUrl
-      console.log('모든 프로필 키:', Object.keys(profile)) // 디버깅용
-      console.log('faceImageUrl:', profile.faceImageUrl) // 디버깅용
-      console.log('찾은 이미지 URL:', faceImageUrl) // 디버깅용
+      console.log('📸 faceImageUrl 값:', faceImageUrl)
       
-      if (faceImageUrl) {
-        setCurrentReferenceImage(faceImageUrl)
+      // 🚀 다른 가능한 이미지 필드들도 확인
+      const possibleImageFields = [
+        'profileImage',
+        'profileImageUrl', 
+        'faceImage',
+        'faceImageUrl',
+        'avatar',
+        'avatarUrl',
+        'photo',
+        'photoUrl'
+      ]
+      
+      let foundImageUrl = null
+      for (const field of possibleImageFields) {
+        if (profile[field]) {
+          console.log(`✅ 이미지 URL 발견: ${field} = ${profile[field]}`)
+          foundImageUrl = profile[field]
+          break
+        }
+      }
+      
+      if (foundImageUrl) {
+        setCurrentReferenceImage(foundImageUrl)
         setHasExistingImage(true)
-        console.log('기존 이미지 발견:', faceImageUrl)
+        console.log('✅ 기존 이미지 설정 완료:', foundImageUrl)
       } else {
         setCurrentReferenceImage(null)
         setHasExistingImage(false)
-        console.log('기존 이미지 없음')
+        console.log('❌ 기존 이미지 없음 - 모든 이미지 필드 확인됨')
       }
     } catch (error) {
-      console.error('사용자 프로필 가져오기 실패:', error)
+      console.error('❌ 사용자 프로필 가져오기 실패:', error)
+      // 🚀 에러 발생 시에도 모달은 계속 열어둠
+      setHasExistingImage(false)
     }
   }
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
+      console.log('📁 파일 선택됨:', {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: new Date(file.lastModified).toISOString()
+      })
+      
       const reader = new FileReader()
       reader.onload = (e) => {
         const result = e.target?.result as string
+        console.log('📸 Base64 변환 완료, 길이:', result.length)
         setSelectedImage(result)
+        console.log('📸 이미지 미리보기 설정 완료')
+      }
+      reader.onerror = () => {
+        console.error('❌ 파일 읽기 실패')
+        alert('파일을 읽을 수 없습니다. 다른 이미지를 선택해주세요.')
       }
       reader.readAsDataURL(file)
+    } else {
+      console.log('📁 파일이 선택되지 않음')
     }
   }
 
@@ -72,18 +135,44 @@ export default function UploadSelfieModal({
   }
 
   const handleSave = async () => {
-    if (!selectedImage) return
+    if (!selectedImage) {
+      console.error('❌ 선택된 이미지가 없습니다')
+      return
+    }
 
     try {
       setIsUploading(true)
+      console.log('🚀 이미지 저장 시작')
+      console.log('📸 선택된 이미지:', selectedImage.substring(0, 100) + '...')
 
+      // 🚀 Base64를 Blob으로 변환
+      console.log('🔄 Base64 → Blob 변환 시작')
       const base64Response = await fetch(selectedImage)
+      console.log('📡 fetch 응답:', base64Response)
+      
       const blob = await base64Response.blob()
+      console.log('📸 Blob 변환 완료:', { 
+        size: blob.size, 
+        type: blob.type,
+        blobKeys: Object.keys(blob)
+      })
+
       const formData = new FormData()
       formData.append('file', blob, 'profile.jpg')
+      console.log('📦 FormData 생성 완료')
+      console.log('📋 FormData 내용:', {
+        fileCount: formData.getAll('file').length,
+        fileEntry: formData.get('file')
+      })
 
+      // 🚀 이미지 업로드
+      console.log('📤 이미지 업로드 시작:', IMAGE_UPLOAD_URL)
+      console.log('🔑 업로드 요청 헤더:', {
+        'Content-Type': 'multipart/form-data'
+      })
+      
       const uploadResponse = await api.post(
-        'https://image.nearzoom.store/upload',
+        IMAGE_UPLOAD_URL,
         formData,
         {
           headers: { 'Content-Type': 'multipart/form-data' },
@@ -91,34 +180,69 @@ export default function UploadSelfieModal({
         }
       )
 
+      console.log('📤 업로드 응답 전체:', uploadResponse)
+      console.log('📤 업로드 응답 데이터:', uploadResponse.data)
+
       const imageUrl = uploadResponse.data?.data?.file_url
-      if (!imageUrl) throw new Error('이미지 URL을 받아올 수 없습니다.')
+      if (!imageUrl) {
+        console.error('❌ 이미지 URL을 받아올 수 없습니다:', uploadResponse.data)
+        throw new Error('이미지 URL을 받아올 수 없습니다.')
+      }
 
-      console.log('이미지 저장 요청:', imageUrl)
+      console.log('✅ 이미지 업로드 성공, URL:', imageUrl)
 
-      await api.put(API_ENDPOINTS.SAVE_FACE_IMAGE, null, {
+      // 🚀 프로필에 이미지 URL 저장
+      console.log('💾 프로필에 이미지 URL 저장 시작:', API_ENDPOINTS.SAVE_FACE_IMAGE)
+      const saveResponse = await api.put(API_ENDPOINTS.SAVE_FACE_IMAGE, null, {
         params: { prettyFaceUrl: imageUrl }
       })
 
-      console.log('이미지 저장 완료')
+      console.log('💾 프로필 저장 응답:', saveResponse.data)
+      console.log('🎉 이미지 저장 완료!')
 
+      // 🚀 상태 업데이트
       setCurrentReferenceImage(imageUrl)
       setHasExistingImage(true)
       setSelectedImage(null)
       
+      // 🚀 콜백 호출
       onImageUpdated?.()
       onClose()
       
     } catch (error: any) {
-      console.error('프로필 이미지 저장 실패:', {
-        message: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status,
-        error
+      console.error('❌ 프로필 이미지 저장 실패 - 상세 정보:', {
+        error,
+        errorType: typeof error,
+        errorKeys: error ? Object.keys(error) : 'undefined',
+        errorMessage: error?.message,
+        errorCode: error?.code,
+        errorStatus: error?.response?.status,
+        errorResponse: error?.response?.data,
+        errorConfig: error?.config,
+        errorStack: error?.stack,
+        selectedImage: selectedImage ? '있음' : '없음'
       })
       
-      const errorMessage = error?.response?.data?.message || error?.message || '알 수 없는 오류가 발생했습니다.'
-      alert(`참조 이미지 저장에 실패했습니다: ${errorMessage}`)
+      // 🚀 구체적인 에러 메시지 생성
+      let errorMessage = '알 수 없는 오류가 발생했습니다.'
+      
+      if (error?.response?.status === 413) {
+        errorMessage = '이미지 파일이 너무 큽니다. 더 작은 이미지를 선택해주세요.'
+      } else if (error?.response?.status === 400) {
+        errorMessage = '잘못된 이미지 형식입니다. JPG, PNG 파일을 선택해주세요.'
+      } else if (error?.response?.status === 500) {
+        errorMessage = '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+      } else if (error?.response?.status === 401) {
+        errorMessage = '인증이 필요합니다. 다시 로그인해주세요.'
+      } else if (error?.response?.status === 403) {
+        errorMessage = '권한이 없습니다. 관리자에게 문의해주세요.'
+      } else if (error?.message) {
+        errorMessage = error.message
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message
+      }
+      
+      alert(`참조 이미지 저장에 실패했습니다:\n${errorMessage}`)
     } finally {
       setIsUploading(false)
     }

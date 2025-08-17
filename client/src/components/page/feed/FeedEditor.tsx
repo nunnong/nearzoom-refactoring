@@ -1,87 +1,458 @@
+// =============================================================================
+// 📁 FeedEditor.tsx - 🔥 무조건 로그인한 사람만 접근 가능 + 백엔드 완전 연동
+// =============================================================================
+
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
-import { PhotoIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline'
-import { useAuth } from '@/hooks/auth/useAuth'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { PhotoIcon, XMarkIcon, CheckIcon, ClockIcon, ArrowLeftIcon, TrashIcon, HeartIcon } from '@heroicons/react/24/outline'
+import { HeartIcon as HeartIconSolid } from '@heroicons/react/24/solid'
 
-// 🔥 올바른 백엔드 연동 - api from '@/lib/axios' 사용
-import api from '@/lib/axios'
+// 🔥 백엔드 연동 - api from '@/lib/api' 사용 (인터셉터 + Zustand 토큰 + 자동 갱신)
+import { api } from '@/lib/api'
+
+// 🔥 Zustand 토큰 스토어 (로그인 상태 관리)
+import { useAuthStore } from '@/stores/authStore'
 
 // ============================================================================
-// 백엔드 DTO 기반 타입 정의
+// 백엔드 API 응답 타입 정의 (백엔드와 완전 일치)
 // ============================================================================
-
-// CreateFeedRequest.java 기반
-interface CreateFeedRequest {
-  photoId: number;
-  caption: string;
-}
 
 // 백엔드 ApiResponse 표준 형식
 interface ApiResponse<T> {
   error: boolean;
-  message: string;
+  message: string | null;
   data: T;
 }
 
-// Photo 정보 타입
-interface PhotoInfo {
+// 🔥 CreatePostFromMyRoomRequest.java 기반 (백엔드와 100% 일치)
+interface CreatePostFromMyRoomRequest {
+  photoId: number;  // Long photoId in Java
+  caption: string;
+}
+
+// 🔥 UpdatePostRequest.java 기반 (백엔드와 100% 일치)
+interface UpdatePostRequest {
+  caption: string;
+}
+
+// 🔥 PostDetailResponse.java 기반 (백엔드와 100% 일치)
+interface PostDetailResponse {
+  // 게시물 정보
+  postId: number;           // Long postId
+  photoId: number;          // Long photoId  
+  imgUrl: string;           // String imgUrl
+  caption: string | null;   // String caption (nullable)
+  createdAt: string;        // LocalDateTime createdAt
+  // 좋아요 정보
+  likeCount: number;        // long likeCount
+  isLikedByMe: boolean;     // boolean isLikedByMe
+  // 작성자 정보
+  authorId: number;         // Long authorId
+  authorAccountName: string; // String authorAccountName
+  authorProfileImage: string | null; // String authorProfileImage (nullable)
+  authorFeedId: number;     // Long authorFeedId
+  // 현재 사용자와의 관계
+  isMyPost: boolean;        // boolean isMyPost
+  isFollowingAuthor: boolean; // boolean isFollowingAuthor
+}
+
+// 🔥 MyRoom에서 사용하는 Photo 타입 (백엔드 기반)
+interface PhotoForFeedUploadResponse {
   photoId: number;
   imgUrl: string;
-  fileName?: string;
-  createdAt?: string;
+  takenAt: string;
+  alreadyInFeed: boolean; // 이미 피드에 사용된 사진인지
+}
+
+// 🔥 커서 기반 무한스크롤을 위한 타입
+interface CursorPageResponse<T> {
+  content: T[];
+  hasNext: boolean;
+  nextCursor: string | null;
+  totalElements: number;
+}
+
+// 🔥 피드 목록 조회 응답 타입
+interface FeedListResponse {
+  postId: number;
+  photoId: number;
+  imgUrl: string;
+  caption: string | null;
+  createdAt: string;
+  likeCount: number;
+  isLikedByMe: boolean;
+  authorId: number;
+  authorAccountName: string;
+  authorProfileImage: string | null;
+  authorFeedId: number;
+  isMyPost: boolean;
+  isFollowingAuthor: boolean;
+}
+
+// 임시 저장용 Draft 타입 (메모리 기반)
+interface DraftData {
+  photoId: number;
+  caption: string;
+  lastModified: string;
+  userId: string;
+  postId?: number; // 편집 모드일 때 사용
 }
 
 interface FeedEditorProps {
-  userId?: string;         // 사용자 ID
-  feedId?: number;         // 기존 피드 편집용 (현재 미지원)
-  photoId?: number;        // 선택된 photoId (필수)
-  mode?: 'create' | 'edit'; // 생성 모드만 지원
+  userId?: string;
+  postId?: number;          // 🔥 편집 모드용 postId
+  photoId?: number;         // 🔥 생성 모드용 photoId
+  mode?: 'create' | 'edit'; // 생성/편집 모드
   className?: string;
-  onSave?: (caption: string) => Promise<void>; // 부모에서 처리
-  onComplete?: () => void;  // 완료 시 콜백
-  onCancel?: () => void;    // 취소 콜백
+  onSave?: (caption: string, postId?: number) => Promise<void>;
+  onComplete?: (postId?: number) => void;
+  onCancel?: () => void;
 }
 
 // ============================================================================
-// 백엔드 API 함수들
+// 🔥 ExitConfirmModal 컴포넌트 (내장)
 // ============================================================================
 
-const feedEditorAPI = {
-  // POST /feeds - 새 피드 생성
-  createFeed: async (request: CreateFeedRequest): Promise<number> => {
-    const response = await api.post<ApiResponse<number>>('/feeds', request);
-    return response.data.data;
-  },
+interface ExitConfirmModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+  confirmText: string;
+  cancelText: string;
+  confirmButtonClass?: string;
+}
 
-  // GET /photos/{photoId} - 사진 정보 조회 (필요시)
-  getPhotoInfo: async (photoId: number): Promise<PhotoInfo> => {
-    try {
-      // TODO: 실제 사진 정보 API가 있다면 사용
-      // const response = await api.get<ApiResponse<PhotoInfo>>(`/photos/${photoId}`);
-      // return response.data.data;
-      
-      // 임시 Mock 데이터
-      return {
-        photoId,
-        imgUrl: `/api/placeholder/400/300?photoId=${photoId}`,
-        fileName: `photo_${photoId}.jpg`,
-        createdAt: new Date().toISOString()
-      };
-    } catch (error) {
-      console.error('Failed to get photo info:', error);
-      throw new Error('사진 정보를 불러올 수 없습니다.');
-    }
-  },
+const ExitConfirmModal: React.FC<ExitConfirmModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmText,
+  cancelText,
+  confirmButtonClass = "bg-blue-600 hover:bg-blue-700 focus:ring-blue-500"
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        {/* Background overlay */}
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose}></div>
+
+        {/* Modal panel */}
+        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div className="sm:flex sm:items-start">
+              <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-2">
+                  {title}
+                </h3>
+                <div className="mt-2">
+                  <p className="text-sm text-gray-500">
+                    {message}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+            <button
+              type="button"
+              className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm ${confirmButtonClass}`}
+              onClick={onConfirm}
+            >
+              {confirmText}
+            </button>
+            <button
+              type="button"
+              className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+              onClick={onClose}
+            >
+              {cancelText}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 // ============================================================================
-// FeedEditor 컴포넌트
+// 백엔드 API 함수들 (로그인 필수 + 실제 Java Controller 엔드포인트)
+// ============================================================================
+
+const feedEditorAPI = {
+  // 🔥 POST /feeds/posts/from-myroom - 마이룸 사진으로 피드에 게시물 추가 (로그인 필수)
+  createPostFromMyRoom: async (request: CreatePostFromMyRoomRequest): Promise<number> => {
+    console.log('🔥 API 요청 - POST /feeds/posts/from-myroom (로그인 필수):', request);
+    
+    try {
+      // 🔥 api 인스턴스 사용 → 자동으로 인터셉터에서 토큰 처리 및 갱신
+      const response = await api.post<ApiResponse<number>>(
+        '/feeds/posts/from-myroom',
+        request
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '게시물 저장에 실패했습니다.');
+      }
+      
+      console.log('🔥 API 응답 - 새 게시물 생성 완료:', response.data.data);
+      return response.data.data;
+      
+    } catch (error: any) {
+      console.error('🚨 게시물 생성 실패:', error);
+      
+      if (error.response?.status === 401) {
+        throw new Error('로그인이 필요합니다.');
+      }
+      
+      throw new Error(error.response?.data?.message || '게시물 저장에 실패했습니다.');
+    }
+  },
+
+  // 🔥 GET /feeds/posts/{postId} - 게시물 상세 조회 (로그인 필수)
+  getPostDetail: async (postId: number): Promise<PostDetailResponse> => {
+    console.log('🔥 API 요청 - GET /feeds/posts/' + postId + ' (로그인 필수)');
+    
+    try {
+      // 🔥 api 인스턴스 사용 → 자동으로 인터셉터에서 토큰 처리 및 갱신
+      const response = await api.get<ApiResponse<PostDetailResponse>>(
+        `/feeds/posts/${postId}`
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '게시물 정보를 불러올 수 없습니다.');
+      }
+      
+      console.log('🔥 API 응답 - 게시물 상세 조회 완료:', response.data.data);
+      return response.data.data;
+      
+    } catch (error: any) {
+      console.error('🚨 게시물 조회 실패:', error);
+      
+      if (error.response?.status === 401) {
+        throw new Error('로그인이 필요합니다.');
+      }
+      
+      throw new Error(error.response?.data?.message || '게시물 정보를 불러올 수 없습니다.');
+    }
+  },
+
+  // 🔥 PUT /feeds/posts/{postId} - 게시물 수정 (캡션) (로그인 필수)
+  updatePost: async (postId: number, request: UpdatePostRequest): Promise<void> => {
+    console.log('🔥 API 요청 - PUT /feeds/posts/' + postId + ' (로그인 필수):', request);
+    
+    try {
+      // 🔥 api 인스턴스 사용 → 자동으로 인터셉터에서 토큰 처리 및 갱신
+      const response = await api.put<ApiResponse<void>>(
+        `/feeds/posts/${postId}`,
+        request
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '게시물 수정에 실패했습니다.');
+      }
+      
+      console.log('🔥 API 응답 - 게시물 수정 완료');
+      
+    } catch (error: any) {
+      console.error('🚨 게시물 수정 실패:', error);
+      
+      if (error.response?.status === 401) {
+        throw new Error('로그인이 필요합니다.');
+      }
+      
+      throw new Error(error.response?.data?.message || '게시물 수정에 실패했습니다.');
+    }
+  },
+
+  // 🔥 DELETE /feeds/posts/{postId} - 게시물 삭제 (로그인 필수)
+  deletePost: async (postId: number): Promise<void> => {
+    console.log('🔥 API 요청 - DELETE /feeds/posts/' + postId + ' (로그인 필수)');
+    
+    try {
+      // 🔥 api 인스턴스 사용 → 자동으로 인터셉터에서 토큰 처리 및 갱신
+      const response = await api.delete<ApiResponse<void>>(
+        `/feeds/posts/${postId}`
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '게시물 삭제에 실패했습니다.');
+      }
+      
+      console.log('🔥 API 응답 - 게시물 삭제 완료');
+      
+    } catch (error: any) {
+      console.error('🚨 게시물 삭제 실패:', error);
+      
+      if (error.response?.status === 401) {
+        throw new Error('로그인이 필요합니다.');
+      }
+      
+      throw new Error(error.response?.data?.message || '게시물 삭제에 실패했습니다.');
+    }
+  },
+
+  // 🔥 POST/DELETE /feeds/posts/{postId}/like - 좋아요 토글 (로그인 필수)
+  toggleLike: async (postId: number, isLike: boolean): Promise<{ likeCount: number; isLiked: boolean }> => {
+    console.log(`🔥 API 요청 - ${isLike ? 'POST' : 'DELETE'} /feeds/posts/${postId}/like (로그인 필수)`);
+    
+    try {
+      const response = await api({
+        method: isLike ? 'POST' : 'DELETE',
+        url: `/feeds/posts/${postId}/like`
+      });
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '좋아요 처리에 실패했습니다.');
+      }
+      
+      console.log('🔥 API 응답 - 좋아요 토글 완료:', response.data.data);
+      return response.data.data;
+      
+    } catch (error: any) {
+      console.error('🚨 좋아요 처리 실패:', error);
+      
+      if (error.response?.status === 401) {
+        throw new Error('로그인이 필요합니다.');
+      }
+      
+      throw new Error(error.response?.data?.message || '좋아요 처리에 실패했습니다.');
+    }
+  },
+
+  // 🔥 GET /feeds/posts - 피드 목록 조회 (커서 기반 무한스크롤) (로그인 필수)
+  getFeedPosts: async (cursor?: string, size: number = 20): Promise<CursorPageResponse<FeedListResponse>> => {
+    console.log('🔥 API 요청 - GET /feeds/posts (커서 기반 무한스크롤, 로그인 필수):', { cursor, size });
+    
+    try {
+      const params = new URLSearchParams();
+      if (cursor) params.append('cursor', cursor);
+      params.append('size', size.toString());
+      
+      const response = await api.get<ApiResponse<CursorPageResponse<FeedListResponse>>>(
+        `/feeds/posts?${params.toString()}`
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '피드를 불러올 수 없습니다.');
+      }
+      
+      console.log('🔥 API 응답 - 피드 목록 조회 완료:', response.data.data);
+      return response.data.data;
+      
+    } catch (error: any) {
+      console.error('🚨 피드 목록 조회 실패:', error);
+      
+      if (error.response?.status === 401) {
+        throw new Error('로그인이 필요합니다.');
+      }
+      
+      throw new Error(error.response?.data?.message || '피드를 불러올 수 없습니다.');
+    }
+  },
+
+  // 🔥 MyRoom에서 Photo 정보 조회 (실제 백엔드 API 연동) (로그인 필수)
+  getPhotoForFeedUpload: async (photoId: number): Promise<PhotoForFeedUploadResponse> => {
+    console.log('🔥 MyRoom Photo 조회 (로그인 필수):', photoId);
+    
+    try {
+      // 🔥 실제 MyRoom API 엔드포인트 사용 - 백엔드에 맞는 정확한 엔드포인트
+      // 백엔드에서 MyRoom 사진 정보 + 피드 사용 여부를 확인하는 API
+      const response = await api.get<ApiResponse<PhotoForFeedUploadResponse>>(
+        `/myroom/photos/${photoId}/feed-upload-check`
+      );
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '사진 정보를 불러올 수 없습니다.');
+      }
+      
+      console.log('🔥 MyRoom Photo 조회 성공:', response.data.data);
+      return response.data.data;
+      
+    } catch (error: any) {
+      console.error('🔥 MyRoom Photo 조회 실패:', error);
+      
+      if (error.response?.status === 401) {
+        throw new Error('로그인이 필요합니다.');
+      }
+      
+      if (error.response?.status === 404) {
+        throw new Error('사진을 찾을 수 없습니다.');
+      }
+      
+      if (error.response?.status === 403) {
+        throw new Error('본인의 사진만 피드에 올릴 수 있습니다.');
+      }
+      
+      throw new Error(error.response?.data?.message || '사진 정보를 불러올 수 없습니다.');
+    }
+  },
+
+  // 🔥 임시 저장 관리 (메모리 기반 - Claude.ai 브라우저 스토리지 제한)
+  saveDraftToMemory: (draftData: DraftData): void => {
+    try {
+      const drafts = (window as any).__FEED_DRAFTS__ || {};
+      const key = draftData.postId 
+        ? `edit_${draftData.userId}_${draftData.postId}`
+        : `create_${draftData.userId}_${draftData.photoId}`;
+      
+      drafts[key] = draftData;
+      (window as any).__FEED_DRAFTS__ = drafts;
+      
+      console.log('🔥 Draft saved to memory:', { key, draftData });
+    } catch (error) {
+      console.error('Draft 저장 실패:', error);
+      throw new Error('임시 저장에 실패했습니다.');
+    }
+  },
+
+  loadDraftFromMemory: (userId: string, photoId?: number, postId?: number): DraftData | null => {
+    try {
+      const drafts = (window as any).__FEED_DRAFTS__ || {};
+      const key = postId 
+        ? `edit_${userId}_${postId}`
+        : `create_${userId}_${photoId}`;
+      
+      const draft = drafts[key] || null;
+      console.log('🔥 Draft loaded from memory:', { key, draft });
+      return draft;
+    } catch (error) {
+      console.error('Draft 로드 실패:', error);
+      return null;
+    }
+  },
+
+  deleteDraftFromMemory: (userId: string, photoId?: number, postId?: number): void => {
+    try {
+      const drafts = (window as any).__FEED_DRAFTS__ || {};
+      const key = postId 
+        ? `edit_${userId}_${postId}`
+        : `create_${userId}_${photoId}`;
+      
+      delete drafts[key];
+      (window as any).__FEED_DRAFTS__ = drafts;
+      
+      console.log('🔥 Draft deleted from memory:', key);
+    } catch (error) {
+      console.error('Draft 삭제 실패:', error);
+    }
+  }
+};
+
+// ============================================================================
+// FeedEditor 컴포넌트 (🔥 무조건 로그인한 사람만 접근 가능)
 // ============================================================================
 
 const FeedEditor: React.FC<FeedEditorProps> = ({
   userId,
-  feedId,
+  postId,
   photoId,
   mode = 'create',
   className = '',
@@ -89,406 +460,718 @@ const FeedEditor: React.FC<FeedEditorProps> = ({
   onComplete,
   onCancel
 }) => {
-  const { user, isAuthenticated } = useAuth()
+  const router = useRouter();
+
+  // 🔥 Zustand 토큰 스토어에서 로그인 상태 확인
+  const { 
+    accessToken, 
+    user,
+    isAuthenticated,
+    logout 
+  } = useAuthStore();
   
   // ============================================================================
-  // 상태 관리
+  // 🔥 로그인 확인 - 로그인하지 않으면 아무것도 렌더링하지 않음
+  // ============================================================================
+  
+  // 로그인되지 않은 경우 즉시 리다이렉션하고 아무것도 렌더링하지 않음
+  useEffect(() => {
+    console.log('🔥 FeedEditor 접근 시도 - 로그인 상태 확인:', { 
+      isAuthenticated, 
+      accessToken: !!accessToken, 
+      user: user?.accountName 
+    });
+
+    if (!isAuthenticated || !accessToken || !user) {
+      console.log('🚨 로그인되지 않음 - 즉시 로그인 페이지로 리다이렉션');
+      router.replace('/login');
+      return;
+    }
+  }, [isAuthenticated, accessToken, user, router]);
+
+  // 🔥 로그인되지 않은 경우 아무것도 렌더링하지 않음 (보안 강화)
+  if (!isAuthenticated || !accessToken || !user) {
+    return null; // 아무것도 렌더링하지 않음
+  }
+  
+  // ============================================================================
+  // 상태 관리 (로그인된 사용자만 도달)
   // ============================================================================
   
   const [caption, setCaption] = useState<string>('')
-  const [photoInfo, setPhotoInfo] = useState<PhotoInfo | null>(null)
+  const [originalCaption, setOriginalCaption] = useState<string>('')
+  const [photoInfo, setPhotoInfo] = useState<PhotoForFeedUploadResponse | null>(null)
+  const [postInfo, setPostInfo] = useState<PostDetailResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+  const [showExitModal, setShowExitModal] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  
+  // 🔥 무한스크롤을 위한 상태
+  const [feedPosts, setFeedPosts] = useState<FeedListResponse[]>([])
+  const [hasNextPage, setHasNextPage] = useState(true)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
 
   // ============================================================================
-  // 유틸리티 함수들
+  // 에러 처리 헬퍼
   // ============================================================================
+  
+  const handleError = useCallback((err: unknown, context: string) => {
+    console.error(`Error in ${context}:`, err);
+    
+    if (err instanceof Error) {
+      setError(err.message);
+      showToast(err.message, 'error');
+    } else {
+      const message = '알 수 없는 오류가 발생했습니다.';
+      setError(message);
+      showToast(message, 'error');
+    }
+  }, []);
 
-  // 토스트 메시지 표시
-  const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
-    setToastMessage({ message, type })
-    setTimeout(() => setToastMessage(null), 3000)
-  }, [])
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToastMessage({ message, type });
+    setTimeout(() => setToastMessage(null), 3000);
+  }, []);
 
   // ============================================================================
-  // 초기화
+  // 초기 데이터 로드
   // ============================================================================
-
-  // 사진 정보 로드
+  
   useEffect(() => {
-    const loadPhotoInfo = async () => {
-      if (!photoId) {
-        setError('사진이 선택되지 않았습니다.')
-        return
-      }
-
-      setIsLoading(true)
-      setError(null)
-
+    const loadInitialData = async () => {
       try {
-        const info = await feedEditorAPI.getPhotoInfo(photoId)
-        setPhotoInfo(info)
-        showToast('사진이 로드되었습니다!')
-      } catch (err) {
-        console.error('Failed to load photo info:', err)
-        const errorMessage = err instanceof Error ? err.message : '사진 정보를 불러오는데 실패했습니다.'
-        setError(errorMessage)
-        showToast(errorMessage, 'error')
-      } finally {
-        setIsLoading(false)
-      }
-    }
+        setIsLoading(true);
+        setError(null);
 
-    loadPhotoInfo()
-  }, [photoId])
+        // 🔥 편집 모드: 기존 게시물 정보 로드
+        if (mode === 'edit' && postId) {
+          const postDetail = await feedEditorAPI.getPostDetail(postId);
+          setPostInfo(postDetail);
+          setCaption(postDetail.caption || '');
+          setOriginalCaption(postDetail.caption || '');
 
-  // 인증 확인
-  useEffect(() => {
-    if (!isAuthenticated || !user) {
-      setError('로그인이 필요합니다.')
-    }
-  }, [isAuthenticated, user])
-
-  // ============================================================================
-  // 이벤트 핸들러들
-  // ============================================================================
-
-  // 🔥 백엔드 연동 - 피드 저장
-  const handleSaveFeed = useCallback(async () => {
-    if (!photoId) {
-      showToast('사진이 선택되지 않았습니다.', 'error')
-      return
-    }
-
-    if (!caption.trim()) {
-      showToast('캡션을 입력해주세요.', 'error')
-      return
-    }
-
-    if (!isAuthenticated || !user) {
-      showToast('로그인이 필요합니다.', 'error')
-      return
-    }
-
-    setIsSaving(true)
-    setError(null)
-
-    try {
-      if (onSave) {
-        // 부모 컴포넌트에서 저장 처리
-        await onSave(caption.trim())
-      } else {
-        // 직접 백엔드 API 호출
-        const request: CreateFeedRequest = {
-          photoId,
-          caption: caption.trim()
+          // Draft 로드 시도
+          if (user?.id) {
+            const draft = feedEditorAPI.loadDraftFromMemory(user.id.toString(), undefined, postId);
+            if (draft && draft.caption !== postDetail.caption) {
+              setCaption(draft.caption);
+              showToast('임시 저장된 내용을 불러왔습니다.', 'info');
+            }
+          }
         }
 
-        const feedId = await feedEditorAPI.createFeed(request)
-        console.log('새 피드 생성 완료:', feedId)
-      }
+        // 🔥 생성 모드: MyRoom 사진 정보 로드
+        if (mode === 'create' && photoId) {
+          const photo = await feedEditorAPI.getPhotoForFeedUpload(photoId);
+          
+          if (photo.alreadyInFeed) {
+            throw new Error('이미 피드에 사용된 사진입니다.');
+          }
+          
+          setPhotoInfo(photo);
 
-      showToast('피드가 성공적으로 생성되었습니다!')
+          // Draft 로드 시도
+          if (user?.id) {
+            const draft = feedEditorAPI.loadDraftFromMemory(user.id.toString(), photoId);
+            if (draft) {
+              setCaption(draft.caption);
+              showToast('임시 저장된 내용을 불러왔습니다.', 'info');
+            }
+          }
+        }
+
+        // 🔥 피드 목록 로드 (무한스크롤)
+        await loadInitialFeedPosts();
+
+      } catch (err) {
+        handleError(err, 'loadInitialData');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadInitialData();
+  }, [mode, postId, photoId, user?.id, handleError]);
+
+  // ============================================================================
+  // 🔥 무한스크롤 관련 함수들
+  // ============================================================================
+  
+  const loadInitialFeedPosts = async () => {
+    try {
+      const response = await feedEditorAPI.getFeedPosts();
+      setFeedPosts(response.content);
+      setHasNextPage(response.hasNext);
+      setNextCursor(response.nextCursor);
+    } catch (err) {
+      handleError(err, 'loadInitialFeedPosts');
+    }
+  };
+
+  const loadMoreFeedPosts = async () => {
+    if (!hasNextPage || isLoadingMore || !nextCursor) return;
+
+    try {
+      setIsLoadingMore(true);
+      const response = await feedEditorAPI.getFeedPosts(nextCursor);
       
-      // 완료 콜백 호출 (페이지 이동 등)
-      if (onComplete) {
-        setTimeout(() => {
-          onComplete()
-        }, 1500)
+      setFeedPosts(prev => [...prev, ...response.content]);
+      setHasNextPage(response.hasNext);
+      setNextCursor(response.nextCursor);
+    } catch (err) {
+      handleError(err, 'loadMoreFeedPosts');
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  // 🔥 Intersection Observer 설정
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isLoadingMore) {
+          loadMoreFeedPosts();
+        }
+      },
+      {
+        rootMargin: '100px'
+      }
+    );
+
+    observerRef.current.observe(loadMoreRef.current);
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [hasNextPage, isLoadingMore]);
+
+  // ============================================================================
+  // 임시 저장 (Draft)
+  // ============================================================================
+  
+  const saveDraft = useCallback(() => {
+    if (!user?.id || (!photoId && !postId)) return;
+
+    try {
+      const draftData: DraftData = {
+        photoId: photoId || postInfo?.photoId || 0,
+        caption,
+        lastModified: new Date().toISOString(),
+        userId: user.id.toString(),
+        postId: mode === 'edit' ? postId : undefined
+      };
+
+      feedEditorAPI.saveDraftToMemory(draftData);
+    } catch (err) {
+      console.error('Draft 저장 실패:', err);
+    }
+  }, [caption, user?.id, photoId, postId, postInfo?.photoId, mode]);
+
+  // 캡션 변경 시 자동 임시 저장
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (caption !== originalCaption) {
+        saveDraft();
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [caption, originalCaption, saveDraft]);
+
+  // ============================================================================
+  // 좋아요 토글
+  // ============================================================================
+  
+  const handleLikeToggle = async (postId: number, currentIsLiked: boolean) => {
+    try {
+      const result = await feedEditorAPI.toggleLike(postId, !currentIsLiked);
+      
+      // 피드 목록에서 해당 포스트 업데이트
+      setFeedPosts(prev => prev.map(post => 
+        post.postId === postId 
+          ? { ...post, likeCount: result.likeCount, isLikedByMe: result.isLiked }
+          : post
+      ));
+
+      // 현재 편집 중인 포스트라면 postInfo도 업데이트
+      if (postInfo && postInfo.postId === postId) {
+        setPostInfo(prev => prev ? {
+          ...prev,
+          likeCount: result.likeCount,
+          isLikedByMe: result.isLiked
+        } : null);
       }
       
     } catch (err) {
-      console.error('Failed to save feed:', err)
-      const errorMessage = err instanceof Error ? err.message : '피드 저장에 실패했습니다.'
-      setError(errorMessage)
-      showToast(errorMessage, 'error')
+      handleError(err, 'handleLikeToggle');
+    }
+  };
+
+  // ============================================================================
+  // 저장/수정/삭제 처리
+  // ============================================================================
+  
+  const handleSave = async () => {
+    if (!user?.id) {
+      showToast('로그인이 필요합니다.', 'error');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setError(null);
+
+      let resultPostId: number | undefined;
+
+      if (mode === 'create' && photoId) {
+        // 🔥 새 게시물 생성
+        const request: CreatePostFromMyRoomRequest = {
+          photoId,
+          caption: caption.trim()
+        };
+
+        resultPostId = await feedEditorAPI.createPostFromMyRoom(request);
+        showToast('게시물이 성공적으로 저장되었습니다!', 'success');
+
+        // Draft 삭제
+        feedEditorAPI.deleteDraftFromMemory(user.id.toString(), photoId);
+
+      } else if (mode === 'edit' && postId) {
+        // 🔥 기존 게시물 수정
+        const request: UpdatePostRequest = {
+          caption: caption.trim()
+        };
+
+        await feedEditorAPI.updatePost(postId, request);
+        showToast('게시물이 성공적으로 수정되었습니다!', 'success');
+
+        // Draft 삭제
+        feedEditorAPI.deleteDraftFromMemory(user.id.toString(), undefined, postId);
+        resultPostId = postId;
+      }
+
+      // 외부 콜백 실행
+      if (onSave) {
+        await onSave(caption.trim(), resultPostId);
+      }
+
+      // 완료 콜백 실행
+      if (onComplete) {
+        onComplete(resultPostId);
+      }
+
+      // 피드 목록 새로고침
+      await loadInitialFeedPosts();
+
+    } catch (err) {
+      handleError(err, 'handleSave');
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }, [photoId, caption, isAuthenticated, user, onSave, onComplete])
+  };
 
-  // 취소 핸들러
-  const handleCancel = useCallback(() => {
-    if (caption.trim() && !isSaving) {
-      if (window.confirm('작성 중인 내용이 저장되지 않습니다. 정말 나가시겠습니까?')) {
-        onCancel?.()
+  const handleDelete = async () => {
+    if (!postId || mode !== 'edit') {
+      showToast('삭제할 수 없는 게시물입니다.', 'error');
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      setError(null);
+
+      await feedEditorAPI.deletePost(postId);
+      showToast('게시물이 삭제되었습니다.', 'success');
+
+      // Draft 삭제
+      if (user?.id) {
+        feedEditorAPI.deleteDraftFromMemory(user.id.toString(), undefined, postId);
       }
+
+      // 피드 목록에서 삭제된 포스트 제거
+      setFeedPosts(prev => prev.filter(post => post.postId !== postId));
+
+      // 완료 콜백 실행
+      if (onComplete) {
+        onComplete();
+      }
+
+      // 이전 페이지로 이동
+      router.back();
+
+    } catch (err) {
+      handleError(err, 'handleDelete');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  // ============================================================================
+  // 종료 확인 모달
+  // ============================================================================
+  
+  const hasUnsavedChanges = () => {
+    return caption.trim() !== originalCaption.trim();
+  };
+
+  const handleExit = () => {
+    if (hasUnsavedChanges()) {
+      setShowExitModal(true);
     } else {
-      onCancel?.()
-    }
-  }, [caption, isSaving, onCancel])
-
-  // 키보드 단축키
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // 입력 필드에 포커스가 있을 때는 저장 단축키만 처리
-      if (e.target instanceof HTMLTextAreaElement) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-          e.preventDefault()
-          handleSaveFeed()
+      // Draft 삭제
+      if (user?.id) {
+        if (mode === 'create' && photoId) {
+          feedEditorAPI.deleteDraftFromMemory(user.id.toString(), photoId);
+        } else if (mode === 'edit' && postId) {
+          feedEditorAPI.deleteDraftFromMemory(user.id.toString(), undefined, postId);
         }
-        return
       }
 
-      switch (e.key) {
-        case 'Escape':
-          if (!isSaving) {
-            handleCancel()
-          }
-          break
-        case 's':
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault()
-            handleSaveFeed()
-          }
-          break
+      if (onCancel) {
+        onCancel();
+      } else {
+        router.back();
+      }
+    }
+  };
+
+  const handleExitConfirm = () => {
+    // Draft 삭제
+    if (user?.id) {
+      if (mode === 'create' && photoId) {
+        feedEditorAPI.deleteDraftFromMemory(user.id.toString(), photoId);
+      } else if (mode === 'edit' && postId) {
+        feedEditorAPI.deleteDraftFromMemory(user.id.toString(), undefined, postId);
       }
     }
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleSaveFeed, handleCancel, isSaving])
+    setShowExitModal(false);
+
+    if (onCancel) {
+      onCancel();
+    } else {
+      router.back();
+    }
+  };
 
   // ============================================================================
-  // 유효성 검사
+  // 메인 렌더링 (로그인된 사용자만 도달)
   // ============================================================================
-
-  const canSave = !!(photoId && caption.trim() && !isSaving && !isLoading && isAuthenticated)
-
-  // ============================================================================
-  // 렌더링
-  // ============================================================================
-
+  
   return (
-    <div className={`relative w-full h-full bg-gray-50 ${className}`}>
-      {/* 헤더 */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            {onCancel && (
-              <button
-                onClick={handleCancel}
-                disabled={isSaving}
-                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-                aria-label="취소"
-              >
-                <XMarkIcon className="h-6 w-6" />
-              </button>
-            )}
-            <div>
-              <h1 className="text-lg font-semibold text-gray-900">
-                {mode === 'edit' ? '피드 편집' : '새 피드 만들기'}
-              </h1>
-              <p className="text-sm text-gray-500">
-                사진에 캡션을 추가하여 피드를 만들어보세요
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={handleSaveFeed}
-            disabled={!canSave}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors disabled:cursor-not-allowed"
-          >
-            {isSaving ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                저장 중...
-              </>
-            ) : (
-              <>
-                <CheckIcon className="h-4 w-4 mr-2" />
-                저장
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* 에러 메시지 */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 m-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
+    <div className={`min-h-screen bg-gray-50 ${className}`}>
+      {/* 🔥 Toast 메시지 */}
+      {toastMessage && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm ${
+          toastMessage.type === 'success' ? 'bg-green-500 text-white' :
+          toastMessage.type === 'error' ? 'bg-red-500 text-white' :
+          'bg-blue-500 text-white'
+        }`}>
+          <div className="flex items-center justify-between">
+            <span>{toastMessage.message}</span>
+            <button
+              onClick={() => setToastMessage(null)}
+              className="ml-3 text-white hover:text-gray-200"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
           </div>
         </div>
       )}
 
-      {/* 메인 컨텐츠 */}
-      <div className="max-w-2xl mx-auto p-4 space-y-6">
-        {/* 사진 미리보기 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-900">선택된 사진</h2>
-          </div>
-          
-          <div className="p-4">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-64 bg-gray-100 rounded-lg">
-                <div className="text-center">
-                  <svg className="animate-spin h-8 w-8 text-gray-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <p className="text-sm text-gray-500">사진 로딩 중...</p>
-                </div>
-              </div>
-            ) : photoInfo ? (
-              <div className="space-y-3">
-                <div className="relative">
-                  <img
-                    src={photoInfo.imgUrl}
-                    alt="선택된 사진"
-                    className="w-full h-64 object-cover rounded-lg"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = '/api/placeholder/400/300?text=Image+Not+Found';
-                    }}
-                  />
-                  <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs">
-                    ID: {photoInfo.photoId}
-                  </div>
-                </div>
-                <div className="text-sm text-gray-500">
-                  <p>파일명: {photoInfo.fileName}</p>
-                  {photoInfo.createdAt && (
-                    <p>업로드: {new Date(photoInfo.createdAt).toLocaleString()}</p>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-64 bg-gray-100 rounded-lg">
-                <div className="text-center">
-                  <PhotoIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">사진을 불러올 수 없습니다</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+      {/* 🔥 헤더 */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
+        <div className="max-w-2xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleExit}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                disabled={isSaving || isDeleting}
+              >
+                <ArrowLeftIcon className="h-6 w-6 text-gray-600" />
+              </button>
+              <h1 className="text-lg font-semibold text-gray-900">
+                {mode === 'edit' ? '게시물 편집' : '새 게시물'}
+              </h1>
+            </div>
 
-        {/* 캡션 입력 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-900">캡션 작성</h2>
-          </div>
-          
-          <div className="p-4">
-            <textarea
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              placeholder="이 사진에 대한 이야기를 들려주세요..."
-              className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              maxLength={200}
-              disabled={isSaving}
-            />
-            <div className="flex justify-between items-center mt-2">
-              <p className="text-xs text-gray-500">
-                Ctrl+S로 빠른 저장
-              </p>
-              <p className="text-xs text-gray-500">
-                {caption.length}/200자
-              </p>
+            <div className="flex items-center space-x-2">
+              {/* 삭제 버튼 (편집 모드에서만) */}
+              {mode === 'edit' && postInfo?.isMyPost && (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={isSaving || isDeleting}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors disabled:opacity-50"
+                >
+                  <TrashIcon className="h-5 w-5" />
+                </button>
+              )}
+
+              {/* 저장 버튼 */}
+              <button
+                onClick={handleSave}
+                disabled={isSaving || isDeleting || !hasUnsavedChanges()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>저장 중...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckIcon className="h-4 w-4" />
+                    <span>{mode === 'edit' ? '수정' : '게시'}</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
+      </header>
 
-        {/* 미리보기 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-900">피드 미리보기</h2>
+      {/* 🔥 메인 콘텐츠 */}
+      <main className="max-w-2xl mx-auto px-4 py-6">
+        {isLoading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">데이터를 불러오고 있습니다...</p>
           </div>
-          
-          <div className="p-4">
-            <div className="flex items-start space-x-3">
-              <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden flex-shrink-0">
-                {user?.profileImage ? (
-                  <img 
-                    src={user.profileImage} 
-                    alt={user.name} 
-                    className="w-full h-full object-cover" 
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <p className="text-red-800">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-2 text-red-600 hover:text-red-800 underline"
+            >
+              새로고침
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* 🔥 게시물 편집 영역 */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              {/* 이미지 표시 */}
+              <div className="aspect-square relative bg-gray-100">
+                {(photoInfo?.imgUrl || postInfo?.imgUrl) ? (
+                  <img
+                    src={photoInfo?.imgUrl || postInfo?.imgUrl}
+                    alt="게시물 이미지"
+                    className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full bg-blue-500 flex items-center justify-center text-white font-bold">
-                    {user?.name?.charAt(0) || 'U'}
+                  <div className="w-full h-full flex items-center justify-center">
+                    <PhotoIcon className="h-16 w-16 text-gray-400" />
+                  </div>
+                )}
+
+                {/* 이미지 오버레이 정보 */}
+                {photoInfo?.takenAt && (
+                  <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
+                    {new Date(photoInfo.takenAt).toLocaleDateString('ko-KR')}
                   </div>
                 )}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center space-x-2 mb-2">
-                  <p className="font-medium text-gray-900">{user?.name || '사용자'}</p>
-                  <p className="text-sm text-gray-500">
-                    @{(user as any)?.accountName || 'user'}
-                  </p>
-                </div>
-                {photoInfo && (
-                  <div className="mb-3">
+
+              {/* 캡션 입력 */}
+              <div className="p-4">
+                <div className="flex items-start space-x-3">
+                  {user?.profileImage ? (
                     <img
-                      src={photoInfo.imgUrl}
-                      alt="피드 사진"
-                      className="w-full max-w-sm h-48 object-cover rounded-lg"
+                      src={user.profileImage}
+                      alt={user.accountName}
+                      className="w-8 h-8 rounded-full"
                     />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                      <span className="text-xs text-gray-600">
+                        {user?.accountName?.[0]?.toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <span className="font-semibold text-sm">{user?.accountName}</span>
+                      {hasUnsavedChanges() && (
+                        <div className="flex items-center text-xs text-orange-600">
+                          <ClockIcon className="h-3 w-3 mr-1" />
+                          <span>임시 저장됨</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <textarea
+                      value={caption}
+                      onChange={(e) => setCaption(e.target.value)}
+                      placeholder="사진에 대한 설명을 작성해보세요..."
+                      className="w-full p-3 border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      rows={4}
+                      maxLength={500}
+                    />
+
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-xs text-gray-500">
+                        {caption.length}/500
+                      </span>
+                      {mode === 'edit' && postInfo && (
+                        <div className="text-xs text-gray-500">
+                          {new Date(postInfo.createdAt).toLocaleDateString('ko-KR')} 작성
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-                <p className="text-gray-800 whitespace-pre-wrap">
-                  {caption || '(캡션을 입력하세요)'}
-                </p>
-                <p className="text-xs text-gray-500 mt-2">방금 전</p>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
 
-      {/* 토스트 메시지 */}
-      {toastMessage && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
-          <div className={`px-4 py-2 rounded-lg text-white font-medium shadow-lg transition-all duration-300 ${
-            toastMessage.type === 'success' ? 'bg-green-500' : 'bg-red-500'
-          }`}>
-            {toastMessage.message}
+            {/* 🔥 피드 미리보기 (무한스크롤) */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-gray-900">최근 피드</h2>
+              
+              {feedPosts.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <PhotoIcon className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                  <p>아직 게시된 피드가 없습니다.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {feedPosts.map((post) => (
+                    <div key={post.postId} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                      {/* 작성자 정보 */}
+                      <div className="p-4 pb-2">
+                        <div className="flex items-center space-x-3">
+                          {post.authorProfileImage ? (
+                            <img
+                              src={post.authorProfileImage}
+                              alt={post.authorAccountName}
+                              className="w-8 h-8 rounded-full"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                              <span className="text-xs text-gray-600">
+                                {post.authorAccountName[0]?.toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-semibold text-sm">{post.authorAccountName}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(post.createdAt).toLocaleDateString('ko-KR')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 이미지 */}
+                      <div className="aspect-square relative">
+                        <img
+                          src={post.imgUrl}
+                          alt="피드 이미지"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+
+                      {/* 좋아요 및 캡션 */}
+                      <div className="p-4">
+                        <div className="flex items-center space-x-4 mb-2">
+                          <button
+                            onClick={() => handleLikeToggle(post.postId, post.isLikedByMe)}
+                            className="flex items-center space-x-1 text-gray-600 hover:text-red-500 transition-colors"
+                          >
+                            {post.isLikedByMe ? (
+                              <HeartIconSolid className="h-6 w-6 text-red-500" />
+                            ) : (
+                              <HeartIcon className="h-6 w-6" />
+                            )}
+                          </button>
+                        </div>
+
+                        {post.likeCount > 0 && (
+                          <p className="text-sm font-semibold mb-2">
+                            좋아요 {post.likeCount.toLocaleString()}개
+                          </p>
+                        )}
+
+                        {post.caption && (
+                          <p className="text-sm">
+                            <span className="font-semibold">{post.authorAccountName}</span>{' '}
+                            {post.caption}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* 🔥 무한스크롤 로딩 트리거 */}
+                  {hasNextPage && (
+                    <div ref={loadMoreRef} className="py-4">
+                      {isLoadingMore ? (
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                          <p className="text-gray-500 text-sm">더 많은 피드를 불러오는 중...</p>
+                        </div>
+                      ) : (
+                        <div className="text-center">
+                          <p className="text-gray-400 text-sm">스크롤하여 더 보기</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {!hasNextPage && feedPosts.length > 0 && (
+                    <div className="text-center py-4">
+                      <p className="text-gray-400 text-sm">모든 피드를 확인했습니다.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
+      </main>
+
+      {/* 🔥 종료 확인 모달 */}
+      {showExitModal && (
+        <ExitConfirmModal
+          isOpen={showExitModal}
+          onClose={() => setShowExitModal(false)}
+          onConfirm={handleExitConfirm}
+          title="편집을 종료하시겠습니까?"
+          message="저장하지 않은 변경사항이 있습니다. 정말 종료하시겠습니까?"
+          confirmText="종료"
+          cancelText="계속 편집"
+        />
       )}
 
-      {/* 전체 로딩 오버레이 */}
-      {(isLoading && !photoInfo) && (
-        <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center z-40">
-          <div className="text-center">
-            <svg className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p className="text-gray-700 font-medium">피드 에디터 준비 중...</p>
-          </div>
-        </div>
-      )}
-
-      {/* 개발 정보 (개발 모드에서만) */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-4 right-4 bg-black bg-opacity-70 text-white text-xs rounded p-3 z-30">
-          <div className="font-semibold mb-1">개발 정보</div>
-          <div>모드: {mode}</div>
-          <div>사용자: {user?.name || 'Unknown'}</div>
-          <div>Photo ID: {photoId || 'None'}</div>
-          <div>캡션 길이: {caption.length}</div>
-          <div>저장 가능: {canSave ? 'Yes' : 'No'}</div>
-        </div>
+      {/* 🔥 삭제 확인 모달 */}
+      {showDeleteConfirm && (
+        <ExitConfirmModal
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={handleDelete}
+          title="게시물을 삭제하시겠습니까?"
+          message="삭제된 게시물은 복구할 수 없습니다."
+          confirmText={isDeleting ? '삭제 중...' : '삭제'}
+          cancelText="취소"
+          confirmButtonClass="bg-red-600 hover:bg-red-700 focus:ring-red-500"
+        />
       )}
     </div>
-  )
-}
+  );
+};
 
-export default FeedEditor
+export default FeedEditor;

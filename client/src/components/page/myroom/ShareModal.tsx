@@ -3,7 +3,7 @@
 import { XMarkIcon, ShareIcon, PencilSquareIcon } from '@heroicons/react/24/outline'
 import React, { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { createApiSuccessToast } from '@/components/ui/Toast'
+import { createSuccessToast } from '@/components/ui/Toast'
 
 interface ImageItem {
   photoId: string
@@ -41,12 +41,9 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
   }, [image.photoId, onShareKakao, onClose])
 
   const handleFeedCreate = useCallback(() => {
-    const params = new URLSearchParams({
-      imageId: image.photoId,
-      imageSrc: encodeURIComponent(image.imgUrl),
-      imageAlt: '' // alt is removed from ImageItem, so pass empty string or remove if not needed
-    })
-    router.push(`/feeds?${params.toString()}`)
+    const params = new URLSearchParams({ photoId: String(image.photoId) })
+    
+    router.push(`/feed/edit?${params.toString()}`)
     onClose()
   }, [image.photoId, image.imgUrl, router, onClose])
 
@@ -60,9 +57,8 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
       
       // Toast가 있는 경우에만 사용
       if (showToast) {
-        const toast = createApiSuccessToast(
-          `${email.trim()} 이메일이 복사되었습니다!`,
-          { endpoint: 'clipboard', method: 'COPY' }
+        const toast = createSuccessToast(
+          `${email.trim()} 이메일이 복사되었습니다!`
         )
         showToast(toast)
       }
