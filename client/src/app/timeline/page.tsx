@@ -83,9 +83,10 @@ const TimelineItem = ({ post }: { post: any }) => {
 
   const handleUserClick = (e: React.MouseEvent) => {
     e.stopPropagation() // 클릭 이벤트 전파 방지
-    // 사용자 메일을 클릭하면 해당 사용자의 /profile/이메일 페이지로 이동
-    if (post.authorEmail) {
-      router.push(`/profile/${encodeURIComponent(post.authorEmail)}`)
+    // 사용자 클릭 시 [accountName] 라우팅으로 이동 (일관성 유지)
+    const accountName = post.authorAccountName;
+    if (accountName) {
+      router.push(`/${accountName}`)
     }
   }
 
@@ -117,7 +118,7 @@ const TimelineItem = ({ post }: { post: any }) => {
             className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer transition-colors"
             onClick={handleUserClick}
           >
-            {post.authorEmail}
+            @{post.authorAccountName}
           </p>
         </div>
       </div>

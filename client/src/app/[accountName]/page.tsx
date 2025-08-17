@@ -19,6 +19,9 @@ import { FeedLoadingSpinner } from '@/components/ui/LoadingSpinner'
 import api from '@/lib/axios'
 import { useAuthStore } from '@/stores/authStore'
 
+// 🔥 새로운 profileAPI 사용
+import { profileAPI } from '@/lib/api/profile'
+
 // 🔥 기존 무한스크롤 훅들 활용 - 백엔드 API 맞춤
 import { 
   useUserFeedInfiniteScroll,
@@ -38,6 +41,7 @@ interface ApiResponse<T> {
   data: T | null;
 }
 
+// imported profileAPI의 UserProfileData 타입과 동일하게 맞춤
 interface UserProfile {
   userId: number;
   accountName: string;
@@ -63,119 +67,8 @@ interface CursorPaginationParams {
 }
 
 // ============================================================================
-// API 함수들
+// UserProfile 타입과 imported profileAPI 타입 맞추기
 // ============================================================================
-
-const profileAPI = {
-  // 🔥 백엔드 API와 완전 일치: GET /feeds/user/account/{accountName}
-  getUserProfile: async (accountName: string): Promise<UserProfile> => {
-    // @ 기호 제거 (URL에서 온 경우)
-    const cleanAccountName = accountName.replace(/^@/, '');
-    
-    try {
-      console.log(`🔍 사용자 프로필 조회: ${cleanAccountName}`);
-      console.log(`🔍 API 요청 URL: /feeds/user/account/${cleanAccountName}?limit=1`);
-      
-      // 🔥 백엔드 FeedController.getUserFeedByAccountName 사용
-      const response = await api.get<ApiResponse<any>>(`/feeds/user/account/${cleanAccountName}?limit=1`);
-      
-      console.log(`📡 API 응답:`, response.data);
-      
-      if (response.data.error || !response.data.data) {
-        const errorMsg = response.data.message || '사용자를 찾을 수 없습니다.';
-        console.error(`❌ API 에러 응답:`, { error: response.data.error, message: errorMsg });
-        throw new Error(errorMsg);
-      }
-      
-      const feedData = response.data.data;
-      console.log(`✅ 사용자 프로필 조회 성공:`, feedData);
-      
-      // FeedWithPostsResponse를 UserProfile로 변환
-      return {
-        userId: feedData.userId,
-        accountName: feedData.accountName,
-        userName: feedData.userName,
-        userEmail: feedData.userEmail || '',
-        profileImage: feedData.profileImage,
-        prettyFace: feedData.prettyFace,
-        bio: feedData.bio,
-        followerCount: feedData.followerCount || 0,
-        followingCount: feedData.followingCount || 0,
-        postCount: feedData.postCount || 0,
-        isFollowing: feedData.isFollowing || false,
-        isOwnProfile: feedData.isOwnProfile || false,
-        joinedAt: feedData.joinedAt,
-        location: feedData.location,
-        website: feedData.website,
-      };
-      
-    } catch (error: any) {
-      console.error(`❌ 사용자 프로필 조회 실패:`, {
-        error,
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-      
-      // 더 구체적인 에러 메시지 제공
-      if (error.response?.status === 404) {
-        throw new Error(`사용자 ${cleanAccountName}을(를) 찾을 수 없습니다.`);
-      } else if (error.response?.status === 401) {
-        throw new Error('인증이 필요합니다. 로그인 후 다시 시도해주세요.');
-      } else if (error.response?.status >= 500) {
-        throw new Error('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
-      } else {
-        throw new Error(error.message || '알 수 없는 오류가 발생했습니다.');
-      }
-    }
-  },
-
-  // 🔥 백엔드 API와 완전 일치: POST /follows/{accountName}
-  followUser: async (accountName: string): Promise<void> => {
-    try {
-      console.log(`🔄 팔로우 요청: @${accountName}`);
-      await api.post(`/follows/${accountName}`);
-      console.log(`✅ 팔로우 성공`);
-    } catch (error) {
-      console.error('❌ 팔로우 실패:', error);
-      throw error;
-    }
-  },
-
-  // 🔥 백엔드 API와 완전 일치: DELETE /follows/{accountName}
-  unfollowUser: async (accountName: string): Promise<void> => {
-    try {
-      console.log(`🔄 언팔로우 요청: @${accountName}`);
-      await api.delete(`/follows/${accountName}`);
-      console.log(`✅ 언팔로우 성공`);
-    } catch (error) {
-      console.error('❌ 언팔로우 실패:', error);
-      throw error;
-    }
-  },
-
-  // 🔥 백엔드 API와 완전 일치: GET /follows/check/{accountName}
-  checkFollowStatus: async (accountName: string): Promise<boolean> => {
-    try {
-      const response = await api.get<ApiResponse<boolean>>(`/follows/check/${accountName}`);
-      return response.data.data || false;
-    } catch (error) {
-      console.error('팔로우 상태 확인 실패:', error);
-      return false;
-    }
-  },
-
-  // 🔥 백엔드 API와 완전 일치: GET /follows/count/{accountName}
-  getFollowCounts: async (accountName: string): Promise<{ followerCount: number; followingCount: number }> => {
-    try {
-      const response = await api.get<ApiResponse<any>>(`/follows/count/${accountName}`);
-      return response.data.data || { followerCount: 0, followingCount: 0 };
-    } catch (error) {
-      console.error('팔로우 수 조회 실패:', error);
-      return { followerCount: 0, followingCount: 0 };
-    }
-  }
-};
 
 // ============================================================================
 // UserFeedTimeline 컴포넌트
@@ -193,32 +86,90 @@ const UserFeedTimeline: React.FC<UserFeedTimelineProps> = ({
   const router = useRouter()
   const { isAuthenticated } = useAuthStore()
 
-  // 🔥 기존 useUserFeedInfiniteScroll 훅 활용
-  const {
-    items: posts,
-    loading,
-    error,
-    hasNext,
-    isLoadingMore,
-    isEmpty,
-    loadInitial,
-    loadMore,
-    refresh,
-    updateItem,
-  } = useUserFeedInfiniteScroll(accountName, {
-    enableDebug: process.env.NODE_ENV === 'development',
-    transformData: (post: any) => ({
-      ...post,
-      id: post.postId.toString(),
-      photoUrl: post.imgUrl,
-      authorId: post.authorAccountName,
-      authorName: post.authorAccountName,
-      authorAvatar: post.authorProfileImage,
-      likesCount: post.likeCount,
-      isLiked: post.isLikedByMe,
-      source: 'user' as const,
-    }),
-  })
+  // 🔥 새로운 profileAPI 사용
+  const [posts, setPosts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [hasNext, setHasNext] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [nextCursor, setNextCursor] = useState<number | null>(null)
+
+  const isEmpty = !loading && posts.length === 0
+
+  const loadInitial = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      const result = await profileAPI.getUserPosts(accountName, { limit: 12 })
+      
+      const transformedPosts = result.posts.map((post: any) => ({
+        ...post,
+        id: post.postId.toString(),
+        photoUrl: post.imgUrl,
+        authorId: post.authorAccountName,
+        authorName: post.authorAccountName,
+        authorAvatar: post.authorProfileImage,
+        likesCount: post.likeCount,
+        isLiked: post.isLikedByMe,
+        source: 'user' as const,
+      }))
+      
+      setPosts(transformedPosts)
+      setHasNext(result.hasNext)
+      setNextCursor(result.nextCursor)
+      
+    } catch (error: any) {
+      console.error('게시물 로딩 실패:', error)
+      setError(error.message || '게시물을 불러올 수 없습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }, [accountName])
+
+  const loadMore = useCallback(async () => {
+    if (!hasNext || isLoadingMore) return
+
+    try {
+      setIsLoadingMore(true)
+      
+      const result = await profileAPI.getUserPosts(accountName, { 
+        limit: 12, 
+        cursor: nextCursor || undefined 
+      })
+      
+      const transformedPosts = result.posts.map((post: any) => ({
+        ...post,
+        id: post.postId.toString(),
+        photoUrl: post.imgUrl,
+        authorId: post.authorAccountName,
+        authorName: post.authorAccountName,
+        authorAvatar: post.authorProfileImage,
+        likesCount: post.likeCount,
+        isLiked: post.isLikedByMe,
+        source: 'user' as const,
+      }))
+      
+      setPosts(prev => [...prev, ...transformedPosts])
+      setHasNext(result.hasNext)
+      setNextCursor(result.nextCursor)
+      
+    } catch (error: any) {
+      console.error('추가 게시물 로딩 실패:', error)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [accountName, hasNext, isLoadingMore, nextCursor])
+
+  const refresh = useCallback(() => {
+    setPosts([])
+    setNextCursor(null)
+    loadInitial()
+  }, [loadInitial])
+
+  const updateItem = useCallback((predicate: (item: any) => boolean, updater: (item: any) => any) => {
+    setPosts(prev => prev.map(item => predicate(item) ? updater(item) : item))
+  }, [])
 
   // 🔥 백엔드 API와 완전 일치: POST /likes/posts/{postId}
   const handleLikeToggle = useCallback(async (post: any) => {
@@ -261,7 +212,7 @@ const UserFeedTimeline: React.FC<UserFeedTimelineProps> = ({
   }, [updateItem, isAuthenticated]);
 
   const handlePostClick = useCallback((post: any) => {
-    router.push(`/post/${post.postId}`);
+    router.push(`/feeds/posts/${post.postId}`);
   }, [router]);
 
   // 초기 로드

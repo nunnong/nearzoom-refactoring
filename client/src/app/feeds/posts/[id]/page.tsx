@@ -6,12 +6,13 @@ import { useAuthStore } from '@/stores/authStore';
 import MyRoomHeader from '@/components/page/myroom/MyRoomHeader';
 import { ArrowLeftIcon, HeartIcon, PencilIcon, UserIcon, HomeIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
+import { profileAPI } from '@/lib/api/profile';
 
 interface PostDetailResponse {
   postId: number;
   photoId: number;
   imgUrl: string;
-  caption: string;
+  caption: string | null;
   createdAt: string;
   likeCount: number;
   isLikedByMe: boolean;
@@ -35,7 +36,7 @@ export default function PostDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editCaption, setEditCaption] = useState('');
 
-  // 게시물 로딩 (실제 API 호출)
+  // 게시물 로딩 (profileAPI 사용)
   useEffect(() => {
     const loadPostDetail = async () => {
       if (!postId || !isAuthenticated) return;
@@ -44,25 +45,18 @@ export default function PostDetailPage() {
         setLoading(true);
         setError(null);
 
-        // 실제 API 호출
-        const response = await fetch(`https://api.nearzoom.store/feeds/posts/${postId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        console.log('🔍 게시물 상세 조회 시작:', { postId, isAuthenticated });
 
-        if (!response.ok) {
-          throw new Error('게시물을 불러올 수 없습니다.');
-        }
-
-        const data = await response.json();
-        setPost(data);
-        setEditCaption(data.caption || '');
+        // profileAPI 사용으로 변경
+        const postData = await profileAPI.getPostDetail(postId);
         
-      } catch (error) {
-        console.error('게시물 로딩 실패:', error);
-        setError('게시물을 불러오는데 실패했습니다.');
+        console.log('✅ 게시물 상세 조회 성공:', postData);
+        setPost(postData);
+        setEditCaption(postData.caption || '');
+        
+      } catch (error: any) {
+        console.error('❌ 게시물 로딩 실패:', error);
+        setError(error.message || '게시물을 불러오는데 실패했습니다.');
       } finally {
         setLoading(false);
       }
@@ -75,26 +69,60 @@ export default function PostDetailPage() {
     router.back();
   };
 
-  const handleLike = () => {
-    if (post) {
+  const handleLike = async () => {
+    if (!post) return;
+
+    const wasLiked = post.isLikedByMe;
+    
+    // 낙관적 업데이트
+    setPost(prev => prev ? {
+      ...prev,
+      isLikedByMe: !prev.isLikedByMe,
+      likeCount: prev.isLikedByMe ? prev.likeCount - 1 : prev.likeCount + 1
+    } : null);
+
+    try {
+      if (wasLiked) {
+        await profileAPI.unlikePost(post.postId);
+      } else {
+        await profileAPI.likePost(post.postId);
+      }
+      console.log(`✅ 좋아요 ${wasLiked ? '취소' : '추가'} 성공`);
+    } catch (error: any) {
+      console.error('❌ 좋아요 처리 실패:', error);
+      // 에러 시 UI 되돌리기
       setPost(prev => prev ? {
         ...prev,
-        isLikedByMe: !prev.isLikedByMe,
-        likeCount: prev.isLikedByMe ? prev.likeCount - 1 : prev.likeCount + 1
+        isLikedByMe: wasLiked,
+        likeCount: wasLiked ? prev.likeCount + 1 : prev.likeCount - 1
       } : null);
     }
   };
 
-  const handleEdit = () => {
-    if (post && editCaption.trim()) {
+  const handleEdit = async () => {
+    if (!post || !editCaption.trim()) return;
+
+    try {
+      await profileAPI.updatePost(post.postId, editCaption.trim());
       setPost(prev => prev ? { ...prev, caption: editCaption.trim() } : null);
       setIsEditing(false);
+      console.log('✅ 게시물 수정 성공');
+    } catch (error: any) {
+      console.error('❌ 게시물 수정 실패:', error);
+      // 에러 메시지 표시 (간단하게 콘솔로만)
+      alert(error.message || '게시물 수정에 실패했습니다.');
     }
   };
 
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditCaption(post?.caption || '');
+  };
+
+  const handleAuthorClick = () => {
+    if (post?.authorAccountName) {
+      router.push(`/${post.authorAccountName}`);
+    }
   };
 
   if (authLoading) {
@@ -183,14 +211,17 @@ export default function PostDetailPage() {
           {/* 작성자 정보 */}
           <div className="p-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
+              <div 
+                className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                onClick={handleAuthorClick}
+              >
                 <img
                   src={post.authorProfileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.authorAccountName)}&size=40&background=random`}
                   alt={post.authorAccountName}
                   className="h-10 w-10 rounded-full ring-2 ring-gray-100"
                 />
                 <div>
-                  <p className="font-medium text-gray-900">@{post.authorAccountName}</p>
+                  <p className="font-medium text-gray-900 hover:text-blue-600 transition-colors">@{post.authorAccountName}</p>
                   <p className="text-sm text-gray-500">
                     {new Date(post.createdAt).toLocaleDateString('ko-KR')}
                   </p>

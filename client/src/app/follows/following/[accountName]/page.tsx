@@ -354,7 +354,7 @@ export default function FollowingPage() {
 
   // 프로필로 이동
   const handleProfileClick = (accountName: string) => {
-    router.push(`/profile/${accountName}`);
+    router.push(`/${accountName}`);
   };
 
   // 렌더링

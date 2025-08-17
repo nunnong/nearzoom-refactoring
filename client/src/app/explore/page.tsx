@@ -4,8 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
 import MyRoomHeader from '@/components/page/myroom/MyRoomHeader'
-import { getExploreTimeline } from '@/lib/api/timeline'
-import Masonry from 'react-masonry-css'
+import api from '@/lib/axios'
 
 // LoadingSpinner 컴포넌트
 const LoadingSpinner = ({ size = 'md', className = '', text }: { 
@@ -50,10 +49,10 @@ const ExplorePostItem = ({ post }: { post: any }) => {
 
   const handleUserClick = (e: React.MouseEvent) => {
     e.stopPropagation() // 클릭 이벤트 전파 방지
-    // 사용자 메일을 클릭하면 해당 사용자의 /profile/이메일 페이지로 이동
-    const userEmail = post.authorEmail || post.userEmail;
-    if (userEmail) {
-      router.push(`/profile/${encodeURIComponent(userEmail)}`)
+    // 사용자 클릭 시 [accountName] 라우팅으로 이동 (일관성 유지)
+    const accountName = post.authorAccountName;
+    if (accountName) {
+      router.push(`/${accountName}`)
     }
   }
 
@@ -100,7 +99,7 @@ const ExplorePostItem = ({ post }: { post: any }) => {
               className="text-white text-xs font-medium cursor-pointer hover:text-blue-300 transition-colors"
               onClick={handleUserClick}
             >
-              {post.authorEmail || post.userEmail || '사용자'}
+              @{post.authorAccountName || '사용자'}
             </p>
           </div>
         </div>
@@ -125,19 +124,25 @@ const ExplorePage: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      const result = await getExploreTimeline({ limit: 20 });
+      console.log('🔍 Explore API 호출 시작');
       
-      if (result.success && result.data) {
-        console.log('🔍 Explore API 응답 데이터:', result.data);
-        console.log('🔍 첫 번째 게시물 데이터:', result.data.posts[0]);
-        setExplorePosts(result.data.posts);
-      } else {
-        setError(result.error || 'Explore 게시물을 불러오는데 실패했습니다.');
-        console.error('❌ Explore 게시물 로딩 실패:', result.error);
+      // 🔥 직접 /feeds/explore API 사용
+      const response = await api.get('/feeds/explore?limit=50');
+      
+      console.log('📡 Explore API 응답:', response.data);
+      
+      if (response.data.error || !response.data.data) {
+        throw new Error(response.data.message || 'Explore 게시물을 불러오는데 실패했습니다.');
       }
-    } catch (error) {
+      
+      const posts = response.data.data.posts || [];
+      console.log(`✅ Explore 게시물 ${posts.length}개 로드 성공`);
+      
+      setExplorePosts(posts);
+      
+    } catch (error: any) {
       console.error('❌ Explore 게시물 로딩 중 에러:', error);
-      setError('Explore 게시물을 불러오는 중 오류가 발생했습니다.');
+      setError(error.message || 'Explore 게시물을 불러오는 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
