@@ -1,14 +1,15 @@
-// src/app/profile/[accountName]/page.tsx - 동적 프로필 페이지 (완전 수정)
+// src/app/profile/[accountName]/page.tsx - TypeScript 에러 수정된 버전
 
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import type { JSX } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
 import UserProfile from '@/components/page/profile/UserProfile'
 
 // 동적 프로필 페이지 컴포넌트
-const ProfilePage: React.FC = () => {
+const ProfilePage: React.FC = (): JSX.Element => {
   const router = useRouter()
   const params = useParams()
   const { user: currentUser, isAuthenticated, isLoading: authLoading } = useAuthStore()
@@ -108,7 +109,7 @@ const ProfilePage: React.FC = () => {
 
   // 본인 프로필인 경우는 이미 /my로 리다이렉트됨
   if (isMyProfile) {
-    return null
+    return <></>
   }
 
   // 다른 사용자 프로필 표시
