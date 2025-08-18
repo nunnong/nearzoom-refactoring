@@ -1,0 +1,112 @@
+@import 'tailwindcss';
+
+:root {
+  --background: #ffffff;
+  --foreground: #000000;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-noto-sans-kr: var(--font-noto-sans-kr);
+  --font-jua: var(--font-jua);
+  --font-black-han-sans: var(--font-black-han-sans);
+  --font-gamja-flower: var(--font-gamja-flower);
+  --font-gaegu: var(--font-gaegu);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #ffffff;
+    --foreground: #000000;
+  }
+}
+
+body {
+  background: #ffffff;
+  color: #000000;
+  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+@keyframes selectButton {
+  0% {
+    transform: scale(0.95);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes particles {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(var(--direction, -10px));
+  }
+}
+
+.cut-selector-particle-up {
+  --direction: -10px;
+}
+
+.cut-selector-particle-down {
+  --direction: 10px;
+}
+
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-scroll-left {
+  animation: scroll-left 20s linear infinite;
+}
+
+/* 폰트 클래스 정의 */
+.didot-font {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+}
+
+.jaso-sans-font {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+}
+
+/* 애니메이션 갤러리 스타일 */
+.gallery-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.gallery-item {
+  transition: all 0.3s ease;
+}
+
+.gallery-item:hover {
+  transform: scale(1.05);
+}
+
+/* 반응형 조정 */
+@media (max-width: 768px) {
+  .didot-font {
+    font-size: 2rem;
+  }
+}
