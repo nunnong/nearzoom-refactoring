@@ -8,8 +8,6 @@ public interface PhotoRepository extends JpaRepository<Photo, Long> {
 
     Optional<Photo> findByPhotoIdAndDeletedAtIsNull(Long photoId);
 
-    Optional<Photo> findByRoomIdAndDeletedAtIsNull(Long roomId);
-
     Optional<Photo> findByImgUrlAndRoomId(String imgUrl, Long roomId);
 
     default Photo getById(Long photoId) {

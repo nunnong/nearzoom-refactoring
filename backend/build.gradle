@@ -24,10 +24,7 @@ repositories {
 }
 
 dependencies {
-    //JWT 파싱 및 인증 Claim 추출 담당 의존성 추가(AuthUtil 클래스 추가되면서 의존성 추가됨)
-    //JWT로 사용자 인증/파싱할 때 반드시 필요!
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
-
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
     implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -39,26 +36,16 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-
-    //MyBatis 관련 의존성 추가
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3'
-
     implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.3'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.3'
-
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
-
-    // LiveKit Server SDK (최신 버전)
     implementation 'io.livekit:livekit-server:0.10.0'
-
-    // Retrofit2 (LiveKit SDK가 사용)
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
-
-    // Protobuf (LiveKit 응답 처리용)
     implementation 'com.google.protobuf:protobuf-java-util:3.21.12'
 }
 

@@ -7,11 +7,7 @@ public record PostListResponse(
     boolean hasNext,
     Long nextCursor
 ) {
-
-    public static PostListResponse empty() {
-        return new PostListResponse(List.of(), false, null);
-    }
-
+    
     public static PostListResponse of(List<PostResponse> posts) {
         return new PostListResponse(posts, false, null);
     }

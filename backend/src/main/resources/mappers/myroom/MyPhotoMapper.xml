@@ -61,7 +61,8 @@
   </update>
 
   <update id="softDeletePhoto">
-    DELETE FROM archive
+    DELETE
+    FROM archive
     WHERE user_id = #{userId}
       AND photo_id = #{photoId}
   </update>
@@ -74,43 +75,36 @@
       AND editable = 1
   </update>
 
-  <!-- Photo 테이블에 저장 -->
-  <insert id="savePhotoToMyPhoto" useGeneratedKeys="true" keyColumn="photo_id" keyProperty="photoId">
+  <insert id="savePhotoToMyPhoto" useGeneratedKeys="true" keyColumn="photo_id"
+    keyProperty="photoId">
     INSERT INTO photo (img_url, user_list, room_id, original_photo_id, created_at)
-    VALUES (
-      #{imageUrl},
-      #{userList},
-      #{roomId},
-      #{originalPhotoId},
-      NOW()
-    )
+    VALUES (#{imageUrl},
+            #{userList},
+            #{roomId},
+            #{originalPhotoId},
+            NOW())
   </insert>
 
-  <!-- Archive 테이블에 저장 -->
   <insert id="saveToArchive">
     INSERT INTO archive (user_id, photo_id, heart, editable, created_at, updated_at)
-    VALUES (
-      #{userId},
-      #{photoId},
-      0,  -- 기본값: 좋아요 안함
-      0,  -- 편집본은 편집 불가
-      #{originalCreatedAt},  -- 원본 사진의 생성 시간
-      NOW()  -- 편집한 시간
-    )
-  </insert>
-
-    <insert id="savePromptToArchive">
-    INSERT INTO archive (user_id, photo_id, heart, editable, created_at)
-    VALUES (
-             #{userId},
-             #{photoId},
-             0,  -- 기본값: 좋아요 안함
-             1,  -- 최초 사진은 편집 가능
-             NOW()
+    VALUES (#{userId},
+            #{photoId},
+            0, -- 기본값: 좋아요 안함
+            0, -- 편집본은 편집 불가
+            #{originalCreatedAt}, -- 원본 사진의 생성 시간
+            NOW() -- 편집한 시간
            )
   </insert>
 
-  <!-- 편집 권한 확인 -->
+  <insert id="savePromptToArchive">
+    INSERT INTO archive (user_id, photo_id, heart, editable, created_at)
+    VALUES (#{userId},
+            #{photoId},
+            0, -- 기본값: 좋아요 안함
+            1, -- 최초 사진은 편집 가능
+            NOW())
+  </insert>
+
   <select id="checkEditPermission" resultType="boolean">
     SELECT COUNT(*) > 0
     FROM archive

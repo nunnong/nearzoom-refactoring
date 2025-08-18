@@ -17,8 +17,5 @@ public record PostResponse(
     String authorAccountName,
     String authorProfileImage
 ) {
-    
-    public Long getCursor() {
-        return postId;
-    }
+
 }

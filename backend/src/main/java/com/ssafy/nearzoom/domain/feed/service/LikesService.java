@@ -9,7 +9,6 @@ import com.ssafy.nearzoom.domain.user.entity.User;
 import com.ssafy.nearzoom.domain.user.repository.UserRepository;
 import com.ssafy.nearzoom.global.auth.util.AuthUtil;
 import com.ssafy.nearzoom.global.exception.ApiException;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -65,13 +64,6 @@ public class LikesService {
             throw new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 게시물입니다.");
         }
         return likesRepository.countByPost_PostId(postId);
-    }
-
-    @Transactional(readOnly = true)
-    public List<Long> getLikedPostIds(Authentication authentication) {
-        UserAuthInfoResponse auth = AuthUtil.getUserAuthInfo(authentication);
-        User user = userRepository.getByEmailAndSocial(auth.email(), auth.social());
-        return likesRepository.findLikedPostIdsByUserId(user.getUserId());
     }
 
     @Deprecated

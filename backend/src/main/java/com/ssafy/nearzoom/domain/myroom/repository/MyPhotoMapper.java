@@ -2,7 +2,6 @@ package com.ssafy.nearzoom.domain.myroom.repository;
 
 import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoListCondition;
 import com.ssafy.nearzoom.domain.myroom.dto.MyPhotoResponse;
-import com.ssafy.nearzoom.domain.myroom.dto.PhotoInsertDto;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
@@ -25,8 +24,6 @@ public interface MyPhotoMapper {
     void softDeletePhoto(@Param("userId") Long userId, @Param("photoId") Long photoId);
 
     void markAsEdited(@Param("userId") Long userId, @Param("photoId") Long photoId);
-
-    void savePhotoToMyPhoto(PhotoInsertDto photoDto);
 
     void saveToArchive(@Param("userId") Long userId,
         @Param("photoId") Long photoId,

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ssafy.nearzoom.domain.myroom.repository.MyPhotoMapper">
+
+  <select id="findPhotosByCondition"
+    resultType="com.ssafy.nearzoom.domain.myroom.dto.MyPhotoResponse">
+    SELECT
+    p.photo_id AS photoId,
+    p.img_url AS imageUrl,
+    p.created_at AS createdAt,
+    a.heart AS heart,
+    a.editable AS editable,
+    p.user_list AS partnerEmails
+    FROM photo p
+    INNER JOIN archive a ON p.photo_id = a.photo_id
+    WHERE a.user_id = #{userId}
+
+    <if test="cond.startDate != null">
+      AND DATE(p.created_at) &gt;= #{cond.startDate}
+    </if>
+    <if test="cond.endDate != null">
+      AND DATE(p.created_at) &lt;= #{cond.endDate}
+    </if>
+    <if test="cond.heart != null">
+      <choose>
+        <when test="cond.heart">
+          AND a.heart = 1
+        </when>
+        <otherwise>
+          AND a.heart = 0
+        </otherwise>
+      </choose>
+    </if>
+
+    <if test="cond.partnerEmails != null and cond.partnerEmails.size() > 0">
+      <foreach item="email" collection="cond.partnerEmails" open="AND (" separator=" OR " close=")">
+        p.user_list LIKE CONCAT('%', #{email}, '%')
+      </foreach>
+    </if>
+
+    <if test="cond.cursor != null">
+      AND p.photo_id &lt; #{cond.cursor}
+    </if>
+
+    ORDER BY p.photo_id DESC
+    LIMIT #{cond.limit}
+  </select>
+
+  <update id="updateHeart">
+    UPDATE archive
+    SET heart =
+    <choose>
+      <when test="heart == true">1</when>
+      <otherwise>0</otherwise>
+    </choose>
+    WHERE user_id = #{userId}
+    AND photo_id = #{photoId}
+  </update>
+
+  <update id="softDeletePhoto">
+    DELETE FROM archive
+    WHERE user_id = #{userId}
+      AND photo_id = #{photoId}
+  </update>
+
+  <update id="markAsEdited">
+    UPDATE archive
+    SET editable = 0
+    WHERE user_id = #{userId}
+      AND photo_id = #{photoId}
+      AND editable = 1
+  </update>
+
+  <!-- Photo 테이블에 저장 -->
+  <insert id="savePhotoToMyPhoto" useGeneratedKeys="true" keyColumn="photo_id" keyProperty="photoId">
+    INSERT INTO photo (img_url, user_list, room_id, original_photo_id, created_at)
+    VALUES (
+      #{imageUrl},
+      #{userList},
+      #{roomId},
+      #{originalPhotoId},
+      NOW()
+    )
+  </insert>
+
+  <!-- Archive 테이블에 저장 -->
+  <insert id="saveToArchive">
+    INSERT INTO archive (user_id, photo_id, heart, editable, created_at)
+    VALUES (
+      #{userId},
+      #{photoId},
+      0,  -- 기본값: 좋아요 안함
+      0,  -- 편집본은 편집 불가
+      NOW()
+    )
+  </insert>
+
+  <!-- 편집 권한 확인 -->
+  <select id="checkEditPermission" resultType="boolean">
+    SELECT COUNT(*) > 0
+    FROM archive
+    WHERE user_id = #{userId}
+      AND photo_id = #{photoId}
+      AND editable = 1
+  </select>
+
+</mapper>

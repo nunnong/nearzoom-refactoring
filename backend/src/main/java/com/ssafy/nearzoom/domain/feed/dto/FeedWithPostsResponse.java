@@ -9,24 +9,11 @@ public record FeedWithPostsResponse(
     String accountName,
     String profileImage,
     LocalDateTime createdAt,
-    List<PostResponse> posts,    // 마이룸처럼 직접 리스트
+    List<PostResponse> posts,
     boolean isFollowing,
-    // 📱 마이룸 방식: 페이징 정보를 같은 레벨에 포함
-    boolean hasNext,             // 더 많은 게시물이 있는지
-    Long nextCursor              // 다음 페이지를 위한 커서
+    boolean hasNext,
+    Long nextCursor
 ) {
-
-    public FeedWithPostsResponse(
-        Long feedId,
-        Long userId,
-        String accountName,
-        String profileImage,
-        LocalDateTime createdAt,
-        List<PostResponse> posts,
-        boolean isFollowing
-    ) {
-        this(feedId, userId, accountName, profileImage, createdAt, posts, isFollowing, false, null);
-    }
 
     public static FeedWithPostsResponse withPaging(
         Long feedId,

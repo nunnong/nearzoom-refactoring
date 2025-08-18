@@ -48,7 +48,7 @@ public class RedisPhotoPromptRepository {
 
         String redisKey = "individual_job:" + jobId;
 
-        log.info("📝 Redis_Individual 저장 -> Key = {}", redisKey);
+        log.info("Redis_Individual 저장 -> Key = {}", redisKey);
 
         Map<String, String> jobInfo = new HashMap<>();
         jobInfo.put("room_id", String.valueOf(roomId));

@@ -2,9 +2,7 @@ pipeline {
     agent any
 
     environment {
-        // Jenkins Credential로 등록된 .env 파일 ID
         ENV_FILE_ID = '720df111-d8d6-4035-b618-1e03ae9ec433'
-        // Git 관련 환경변수 예시 (필요에 따라 수정)
         GIT_CREDENTIALS_ID = 'd719d5d7-c8aa-4e55-940d-c2963d52219e'
         GIT_REPO_URL = 'https://lab.ssafy.com/s13-webmobile1-sub1/S13P11A605.git'
         GIT_BRANCH = 'backend'
@@ -19,7 +17,6 @@ pipeline {
 
         stage('Setup Secrets') {
             steps {
-                // Jenkins Credential에 등록한 .env 파일을 작업공간에 복사
                 withCredentials([file(credentialsId: "${ENV_FILE_ID}", variable: 'ENV_FILE')]) {
                     sh '''
                         cd backend
@@ -32,7 +29,6 @@ pipeline {
 
         stage('Build') {
             steps {
-                // 빌드 필요시 gradle 빌드 등 수행 (원하면)
                 sh '''
                     cd backend
                     chmod +x gradlew
@@ -44,7 +40,6 @@ pipeline {
 
         stage('Docker Compose Up') {
             steps {
-                // docker compose로 모든 컨테이너 띄우기
                 sh '''
                     cd backend
                     docker compose down || true
