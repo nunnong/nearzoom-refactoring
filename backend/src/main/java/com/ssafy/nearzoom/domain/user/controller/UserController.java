@@ -16,7 +16,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
@@ -25,14 +33,6 @@ public class UserController {
 
     private final UserService userService;
 
-    // =========================================
-    // 🔥 누락된 엔드포인트들 추가
-    // =========================================
-
-    /**
-     * 🔥 프론트엔드에서 호출하는 /user/profile1 엔드포인트 (호환성)
-     * 실제로는 현재 사용자 프로필을 반환
-     */
     @GetMapping("/profile1")
     public ResponseEntity<ApiResponse<UserProfileResponse>> getProfile1(
         Authentication authentication) {
@@ -40,10 +40,6 @@ public class UserController {
         return ApiResponse.ok(profile);
     }
 
-    /**
-     * 🔥 /my 엔드포인트 추가 (리다이렉트용)
-     * 현재 사용자의 프로필 정보 반환
-     */
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<UserProfileResponse>> getMyProfile(
         Authentication authentication) {
@@ -51,9 +47,6 @@ public class UserController {
         return ApiResponse.ok(profile);
     }
 
-    /**
-     * 🔥 계정명으로 다른 사용자 프로필 조회
-     */
     @GetMapping("/profile/{accountName}")
     public ResponseEntity<ApiResponse<UserProfileResponse>> getUserProfileByAccountName(
         @PathVariable String accountName,
@@ -61,10 +54,6 @@ public class UserController {
         UserProfileResponse profile = userService.getUserProfileByAccountName(accountName);
         return ApiResponse.ok(profile);
     }
-
-    // =========================================
-    // 🔄 기존 메서드들 (그대로 유지)
-    // =========================================
 
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest request,
@@ -134,13 +123,6 @@ public class UserController {
         return ApiResponse.ok("회원탈퇴 완료!", null);
     }
 
-    // =========================================
-    // 🔍 프로필 관리 APIs (신규 추가)
-    // =========================================
-
-    /**
-     * 👤 현재 사용자 프로필 조회 (계정명 포함)
-     */
     @GetMapping("/profile")
     public ResponseEntity<ApiResponse<UserProfileResponse>> getCurrentUserProfile(
         Authentication authentication) {
@@ -148,9 +130,6 @@ public class UserController {
         return ApiResponse.ok(profile);
     }
 
-    /**
-     * ✏️ 사용자 프로필 업데이트 (계정명만 수정 가능)
-     */
     @PutMapping("/profile")
     public ResponseEntity<ApiResponse<Void>> updateProfile(
         Authentication authentication,
@@ -159,14 +138,12 @@ public class UserController {
         return ApiResponse.ok("프로필이 성공적으로 업데이트되었습니다.", null);
     }
 
-    /**
-     * ✅ 계정명 중복 확인
-     */
     @GetMapping("/check-account-name")
     public ResponseEntity<ApiResponse<CheckAccountNameResponse>> checkAccountNameAvailable(
         @RequestParam String accountName,
         Authentication authentication) {
-        CheckAccountNameResponse response = userService.checkAccountNameAvailable(accountName, authentication);
+        CheckAccountNameResponse response = userService.checkAccountNameAvailable(accountName,
+            authentication);
         return ApiResponse.ok(response);
     }
 
@@ -175,26 +152,22 @@ public class UserController {
         Authentication authentication,
         @RequestParam("prettyFaceUrl") String prettyFaceUrl) {
 
-        // 디버깅을 위한 로그 추가
         System.out.println("=== UserController.updatePrettyFace 호출 ===");
         System.out.println("Received prettyFaceUrl parameter: " + prettyFaceUrl);
 
         try {
-            // URL 유효성 검사
             if (prettyFaceUrl == null || prettyFaceUrl.trim().isEmpty()) {
                 System.out.println("ERROR: URL이 비어있음");
                 return ApiResponse.failedOf(HttpStatus.BAD_REQUEST,
                     "이미지 URL이 비어있습니다.");
             }
 
-            // URL 형식 검사
             if (!prettyFaceUrl.startsWith("http://") && !prettyFaceUrl.startsWith("https://")) {
                 System.out.println("ERROR: 잘못된 URL 형식: " + prettyFaceUrl);
                 return ApiResponse.failedOf(HttpStatus.BAD_REQUEST,
                     "유효하지 않은 URL 형식입니다.");
             }
 
-            // 사용자 인증 확인
             if (authentication == null || !authentication.isAuthenticated()) {
                 System.out.println("ERROR: 인증되지 않은 사용자");
                 return ApiResponse.failedOf(HttpStatus.UNAUTHORIZED,

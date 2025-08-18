@@ -8,7 +8,6 @@ import com.ssafy.nearzoom.domain.photoPrompt.dto.webhook.ImageProcessingFailedWe
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PhotoPrompt;
 import com.ssafy.nearzoom.domain.photoPrompt.entity.PromptStatus;
 import com.ssafy.nearzoom.domain.photoPrompt.repository.PhotoPromptRepository;
-import com.ssafy.nearzoom.domain.photoPrompt.repository.RedisPhotoPromptRepository;
 import com.ssafy.nearzoom.domain.room.constants.RedisKeyConstants;
 import com.ssafy.nearzoom.global.exception.ApiException;
 import java.time.Duration;
@@ -21,363 +20,302 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class WebhookService {
 
-  private final PhotoService photoService;
-  private final PhotoPromptRepository photoPromptRepository;
-  private final RedisPhotoPromptRepository redisPromptRepository;
-  private final RedisTemplate<String, String> redisTemplate;
-  private final ImageProcessingService imageProcessingService;
+    private final PhotoService photoService;
+    private final PhotoPromptRepository photoPromptRepository;
+    private final RedisTemplate<String, String> redisTemplate;
+    private final ImageProcessingService imageProcessingService;
 
-  // 개별 이미지 처리 완료 웹훅
-  public void webhookIndividualCompleted(ImageProcessingCompletedWebhook webhook) {
-    String jobKey = "individual_job:" + webhook.jobId();
+    public void webhookIndividualCompleted(ImageProcessingCompletedWebhook webhook) {
+        String jobKey = "individual_job:" + webhook.jobId();
 
-    log.info("Redis individual completed -> Key = individual_job:{}", jobKey);
+        log.info("Redis individual completed -> Key = individual_job:{}", jobKey);
 
-    photoService.saveIndividualImageToDB(webhook);
+        photoService.saveIndividualImageToDB(webhook);
 
-    log.info("🔥🔥🔥 개별 사진 Photo 테이블에 저장 완료 🔥🔥🔥");
+        log.info("개별 사진 Photo 테이블에 저장 완료 ");
 
-    imageProcessingService.IndividualCompleted(webhook.jobId(), webhook.data().processedImageUrl());
-  }
+        imageProcessingService.IndividualCompleted(webhook.jobId(),
+            webhook.data().processedImageUrl());
+    }
 
-  // 개별 이미지 처리 실패 웹훅
-  public void webhookIndividualFailed(ImageProcessingFailedWebhook webhook) {
-      final String jobId = webhook.jobId();
-      try {
-          Map<Object, Object> jobInfo = redisTemplate.opsForHash()
-              .entries("individual_job:" + jobId);
-          if (jobInfo.isEmpty()) {
-              return;
-          }
+    public void webhookIndividualFailed(ImageProcessingFailedWebhook webhook) {
+        final String jobId = webhook.jobId();
+        try {
+            Map<Object, Object> jobInfo = redisTemplate.opsForHash()
+                .entries("individual_job:" + jobId);
+            if (jobInfo.isEmpty()) {
+                return;
+            }
 
-          String jobType = (String) jobInfo.get("type");
-          if (!"individual".equals(jobType)) {
-              return;
-          }
+            String jobType = (String) jobInfo.get("type");
+            if (!"individual".equals(jobType)) {
+                return;
+            }
 
-          String promptId = (String) jobInfo.get("prompt_id");
-          if (promptId != null) {
-              try {
-                  updatePromptStatus(Long.valueOf(promptId), PromptStatus.FAIL);
-              } catch (Exception ignore) {
-              }
-          }
+            String promptId = (String) jobInfo.get("prompt_id");
+            if (promptId != null) {
+                try {
+                    updatePromptStatus(Long.valueOf(promptId), PromptStatus.FAIL);
+                } catch (Exception ignore) {
+                }
+            }
 
-          String batchId = (String) jobInfo.get("batch_id");
-          if (batchId != null) {
-              try {
-                  markBatchAsFailed(batchId, webhook);
-              } catch (Exception ignore) {
-              }
-          }
-      } catch (Exception e) {
-          // 의도적으로 억제: 웹훅 송신측의 재시도 폭주 방지
-          throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
-              "프레임 합성 실패 웹훅 처리 중 오류가 발생했습니다: " + e.getMessage());
-//          "프레임 합성 완료 웹훅 처리 중 오류가 발생했습니다: " + e.getMessage());
-      }
-  }
+            String batchId = (String) jobInfo.get("batch_id");
+            if (batchId != null) {
+                try {
+                    markBatchAsFailed(batchId, webhook);
+                } catch (Exception ignore) {
+                }
+            }
+        } catch (Exception e) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
+                "프레임 합성 실패 웹훅 처리 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
 
-  public void webhookFrameCompleted(FrameCompositionCompletedWebhook webhook) {
-      String jobId = webhook.jobId();
+    public void webhookFrameCompleted(FrameCompositionCompletedWebhook webhook) {
+        String jobId = webhook.jobId();
 
-      String frameJobKey = "frame_job:" + jobId;
-      log.info("webhook frame completed -> jobKey : {}", frameJobKey);
+        String frameJobKey = "frame_job:" + jobId;
+        log.info("webhook frame completed -> jobKey : {}", frameJobKey);
 
-      Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries(frameJobKey);
+        saveFrameCompletedResultToRedis(webhook);
 
-      saveFrameCompletedResultToRedis(webhook);
+        log.info("photoService.saveFinalComposedPhoto 호출");
+        photoService.saveFinalImageToDB(webhook);
 
-      log.info("🔥🔥🔥 photoService.saveFinalComposedPhoto 호출 🔥🔥🔥");
-      photoService.saveFinalImageToDB(webhook);
+        log.info("최종 사진 Photo 테이블에 저장 완료");
 
-      log.info("최종 사진 Photo 테이블에 저장 완료");
+        log.info("=== ImageProcessingService 완료 알림 ===");
+        imageProcessingService.FrameCompleted(jobId, webhook.data().finalImageUrl());
+    }
 
-      // 4️⃣ ImageProcessingService에 완료 알림
-      log.info("=== 4️⃣ ImageProcessingService 완료 알림 ===");
-      imageProcessingService.FrameCompleted(jobId, webhook.data().finalImageUrl());
-  }
+    public void webhookFrameFailed(FrameCompositionFailedWebhook webhook) {
+        String jobId = webhook.jobId();
+        long startTime = System.currentTimeMillis();
 
-  // 프레임 합성 실패 웹훅 상세 로깅
-  public void webhookFrameFailed(FrameCompositionFailedWebhook webhook) {
-      String jobId = webhook.jobId();
-      long startTime = System.currentTimeMillis();
+        log.error("=== 프레임 합성 실패 웹훅 처리 시작 ===");
+        log.error("JobId: {}", jobId);
+        log.error("수신 시간: {}", startTime);
+        log.error("Event: {}", webhook.event());
+        log.error("Timestamp: {}", webhook.timestamp());
 
-      log.error("=== ❌ 프레임 합성 실패 웹훅 처리 시작 ===");
-      log.error("JobId: {}", jobId);
-      log.error("수신 시간: {}", startTime);
-      log.error("Event: {}", webhook.event());
-      log.error("Timestamp: {}", webhook.timestamp());
+        if (webhook.error() != null) {
+            log.error("=== 에러 정보 상세 분석 ===");
+            log.error("Error Code: {}", webhook.error().code());
+            log.error("Error Message: {}", webhook.error().message());
+        } else {
+            log.warn("webhook.error()가 null입니다");
+        }
 
-      // 웹훅 에러 정보 상세 분석
-      if (webhook.error() != null) {
-          log.error("=== 에러 정보 상세 분석 ===");
-          log.error("Error Code: {}", webhook.error().code());
-          log.error("Error Message: {}", webhook.error().message());
-      } else {
-          log.warn("webhook.error()가 null입니다");
-      }
+        try {
+            log.info("=== Redis Frame Job 정보 조회 ===");
+            String frameJobKey = "frame_job:" + jobId;
+            Boolean keyExists = redisTemplate.hasKey(frameJobKey);
+            log.info("Frame Job 키: {}", frameJobKey);
+            log.info("키 존재 여부: {}", keyExists);
 
-      try {
-          // 1️⃣ Redis Frame Job 정보 조회
-          log.info("=== 1️⃣ Redis Frame Job 정보 조회 ===");
-          String frameJobKey = "frame_job:" + jobId;
-          Boolean keyExists = redisTemplate.hasKey(frameJobKey);
-          log.info("Frame Job 키: {}", frameJobKey);
-          log.info("키 존재 여부: {}", keyExists);
+            Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries(frameJobKey);
+            log.info("조회된 Frame Job 필드 개수: {}", jobInfo.size());
 
-          Map<Object, Object> jobInfo = redisTemplate.opsForHash().entries(frameJobKey);
-          log.info("조회된 Frame Job 필드 개수: {}", jobInfo.size());
+            if (jobInfo.isEmpty()) {
+                log.error("Frame Job 정보를 찾을 수 없습니다 - JobId: {}", jobId);
 
-          if (jobInfo.isEmpty()) {
-              log.error("❌ Frame Job 정보를 찾을 수 없습니다 - JobId: {}", jobId);
+                Set<String> allFrameKeys = redisTemplate.keys("frame_job:*");
+                log.info("현재 존재하는 frame_job 키들: {}", allFrameKeys);
 
-              // 다른 키 패턴들도 확인
-              Set<String> allFrameKeys = redisTemplate.keys("frame_job:*");
-              log.info("현재 존재하는 frame_job 키들: {}", allFrameKeys);
+                Set<String> jobIdKeys = redisTemplate.keys("*" + jobId + "*");
+                log.info("JobId 포함된 모든 키들: {}", jobIdKeys);
 
-              Set<String> jobIdKeys = redisTemplate.keys("*" + jobId + "*");
-              log.info("JobId 포함된 모든 키들: {}", jobIdKeys);
+                return;
+            }
 
-              return;
-          }
+            log.info("Frame Job 정보 발견! 상세 내용:");
+            for (Map.Entry<Object, Object> entry : jobInfo.entrySet()) {
+                log.info("  {}: {}", entry.getKey(), entry.getValue());
+            }
 
-          log.info("✅ Frame Job 정보 발견! 상세 내용:");
-          for (Map.Entry<Object, Object> entry : jobInfo.entrySet()) {
-              log.info("  {}: {}", entry.getKey(), entry.getValue());
-          }
+            log.info("=== 2️Job Type 확인 ===");
+            String jobType = (String) jobInfo.get("job_type");
+            log.info("Job Type: {}", jobType);
 
-          // 2️⃣ Job Type 확인
-          log.info("=== 2️⃣ Job Type 확인 ===");
-          String jobType = (String) jobInfo.get("job_type");
-          log.info("Job Type: {}", jobType);
+            if (!"frame_compose".equals(jobType)) {
+                log.error("잘못된 Job 타입 - JobId: {}, 예상: frame_compose, 실제: {}", jobId, jobType);
+                return;
+            }
+            log.info("Job Type 확인 완료");
 
-          if (!"frame_compose".equals(jobType)) {
-              log.error("❌ 잘못된 Job 타입 - JobId: {}, 예상: frame_compose, 실제: {}", jobId, jobType);
-              return;
-          }
-          log.info("✅ Job Type 확인 완료");
+            log.info("=== 3️실패 결과 Redis 저장 ===");
+            try {
+                saveFrameFailureResult(webhook);
+                log.info("실패 결과 Redis 저장 완료");
+            } catch (Exception e) {
+                log.error("실패 결과 Redis 저장 실패: {}", e.getMessage(), e);
+            }
 
-          // 3️⃣ 실패 결과 Redis에 저장
-          log.info("=== 3️⃣ 실패 결과 Redis 저장 ===");
-          try {
-              saveFrameFailureResult(webhook);
-              log.info("✅ 실패 결과 Redis 저장 완료");
-          } catch (Exception e) {
-              log.error("❌ 실패 결과 Redis 저장 실패: {}", e.getMessage(), e);
-          }
+            log.info("=== 배치 실패 마킹 ===");
+            String roomId = (String) jobInfo.get("room_id");
+            if (roomId != null) {
+                String batchKey = "room:" + roomId;
+                log.info("배치 키: {}", batchKey);
 
-          // 4️⃣ 배치를 실패로 마킹
-          log.info("=== 4️⃣ 배치 실패 마킹 ===");
-          String roomId = (String) jobInfo.get("room_id");
-          if (roomId != null) {
-              String batchKey = "room:" + roomId;
-              log.info("배치 키: {}", batchKey);
+                try {
+                    markBatchAsCompositionFailed(batchKey, webhook);
+                    log.info("배치 실패 마킹 완료");
+                } catch (Exception e) {
+                    log.error("배치 실패 마킹 실패: {}", e.getMessage(), e);
+                }
+            } else {
+                log.warn("roomId가 없어서 배치 실패 마킹 생략");
+            }
 
-              try {
-                  markBatchAsCompositionFailed(batchKey, webhook);
-                  log.info("✅ 배치 실패 마킹 완료");
-              } catch (Exception e) {
-                  log.error("❌ 배치 실패 마킹 실패: {}", e.getMessage(), e);
-              }
-          } else {
-              log.warn("⚠️ roomId가 없어서 배치 실패 마킹 생략");
-          }
+            long endTime = System.currentTimeMillis();
+            log.info("=== 프레임 합성 실패 웹훅 처리 완료 ===");
+            log.info("JobId: {}, 소요시간: {}ms", jobId, (endTime - startTime));
 
-          long endTime = System.currentTimeMillis();
-          log.info("=== ✅ 프레임 합성 실패 웹훅 처리 완료 ===");
-          log.info("JobId: {}, 소요시간: {}ms", jobId, (endTime - startTime));
+        } catch (Exception e) {
+            long endTime = System.currentTimeMillis();
+            log.error("=== 프레임 합성 실패 웹훅 처리 중 오류 ===");
+            log.error("JobId: {}, 소요시간: {}ms", jobId, (endTime - startTime));
+            log.error("오류 타입: {}", e.getClass().getSimpleName());
+            log.error("오류 메시지: {}", e.getMessage());
+            log.error("스택 트레이스: ", e);
 
-      } catch (Exception e) {
-          long endTime = System.currentTimeMillis();
-          log.error("=== ❌ 프레임 합성 실패 웹훅 처리 중 오류 ===");
-          log.error("JobId: {}, 소요시간: {}ms", jobId, (endTime - startTime));
-          log.error("오류 타입: {}", e.getClass().getSimpleName());
-          log.error("오류 메시지: {}", e.getMessage());
-          log.error("스택 트레이스: ", e);
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
+                "프레임 합성 실패 웹훅 처리 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
 
-          throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR,
-              "프레임 합성 실패 웹훅 처리 중 오류가 발생했습니다: " + e.getMessage());
-      }
-  }
+    private void saveFrameCompletedResultToRedis(FrameCompositionCompletedWebhook webhook) {
+        String resultKey = "compose_result:" + webhook.jobId();
+        Map<String, String> resultData = new HashMap<>();
 
-  //======= Redis에 저장 =======
+        resultData.put("event", webhook.event());
+        resultData.put("job_id", webhook.jobId());
+        resultData.put("timestamp", webhook.timestamp());
+        resultData.put("status", "SUCCESS");
 
-  private void saveFrameCompletedResultToRedis(FrameCompositionCompletedWebhook webhook) {
-      String resultKey = "compose_result:" + webhook.jobId();
-      Map<String, String> resultData = new HashMap<>();
+        if (webhook.data() != null) {
+            resultData.put("final_image_url", webhook.data().finalImageUrl());
 
-      resultData.put("event", webhook.event());
-      resultData.put("job_id", webhook.jobId());
-      resultData.put("timestamp", webhook.timestamp());
-      resultData.put("status", "SUCCESS");
+            if (webhook.data().individualImageUrls() != null) {
+                resultData.put("individual_images",
+                    String.join(",", webhook.data().individualImageUrls()));
+            }
 
-      if (webhook.data() != null) {
-          resultData.put("final_image_url", webhook.data().finalImageUrl());
+            if (webhook.data().frameInfo() != null) {
+                resultData.put("frame_color", webhook.data().frameInfo().color());
+                resultData.put("frame_layout", webhook.data().frameInfo().layout());
+            }
+        }
 
-          if (webhook.data().individualImageUrls() != null) {
-              resultData.put("individual_images",
-                  String.join(",", webhook.data().individualImageUrls()));
-          }
+        redisTemplate.opsForHash().putAll(resultKey, resultData);
+        redisTemplate.expire(resultKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
+    }
 
-          if (webhook.data().frameInfo() != null) {
-              resultData.put("frame_color", webhook.data().frameInfo().color());
-              resultData.put("frame_layout", webhook.data().frameInfo().layout());
-          }
-      }
+    private void saveFrameFailureResult(FrameCompositionFailedWebhook webhook) {
+        String resultKey = "compose_result:" + webhook.jobId();
+        Map<String, String> resultData = new HashMap<>();
 
-      redisTemplate.opsForHash().putAll(resultKey, resultData);
-      redisTemplate.expire(resultKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
-  }
+        resultData.put("event", webhook.event());
+        resultData.put("job_id", webhook.jobId());
+        resultData.put("timestamp", webhook.timestamp());
+        resultData.put("status", "FAILED");
 
-  private void saveFrameFailureResult(FrameCompositionFailedWebhook webhook) {
-      String resultKey = "compose_result:" + webhook.jobId();
-      Map<String, String> resultData = new HashMap<>();
+        if (webhook.error() != null) {
+            resultData.put("error_code", webhook.error().code());
+            resultData.put("error_message", webhook.error().message());
+        }
 
-      resultData.put("event", webhook.event());
-      resultData.put("job_id", webhook.jobId());
-      resultData.put("timestamp", webhook.timestamp());
-      resultData.put("status", "FAILED");
+        redisTemplate.opsForHash().putAll(resultKey, resultData);
+        redisTemplate.expire(resultKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
+    }
 
-      if (webhook.error() != null) {
-          resultData.put("error_code", webhook.error().code());
-          resultData.put("error_message", webhook.error().message());
-      }
+    private void markBatchAsFailed(String batchId, ImageProcessingFailedWebhook webhook) {
+        Map<String, String> batchUpdate = new HashMap<>();
+        batchUpdate.put("status", "failed");
+        batchUpdate.put("failed_job_id", webhook.jobId());
 
-      redisTemplate.opsForHash().putAll(resultKey, resultData);
-      redisTemplate.expire(resultKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
-  }
+        if (webhook.error() != null) {
+            batchUpdate.put("error_message",
+                String.format("개별 이미지 중 처리 실패: %s - %s",
+                    webhook.error().code(), webhook.error().message()));
+        }
 
-  // === 배치 상태 관리 메소드들 ===
+        redisTemplate.opsForHash().putAll(batchId, batchUpdate);
+        log.error("배치 실패로 마킹 - BatchId: {}, FailedJobId: {}", batchId, webhook.jobId());
+    }
 
-  private void markBatchAsFailed(String batchId, ImageProcessingFailedWebhook webhook) {
-      Map<String, String> batchUpdate = new HashMap<>();
-      batchUpdate.put("status", "failed");
-      batchUpdate.put("failed_job_id", webhook.jobId());
+    private void markBatchAsCompositionFailed(String batchId,
+        FrameCompositionFailedWebhook webhook) {
+        Map<String, String> batchUpdate = new HashMap<>();
+        batchUpdate.put("status", "failed");
+        batchUpdate.put("failed_compose_job_id", webhook.jobId());
 
-      if (webhook.error() != null) {
-          batchUpdate.put("error_message",
-              String.format("개별 이미지 중 처리 실패: %s - %s",
-                  webhook.error().code(), webhook.error().message()));
-      }
+        if (webhook.error() != null) {
+            batchUpdate.put("error_message",
+                String.format("프레임 합성 실패: %s - %s",
+                    webhook.error().code(), webhook.error().message()));
+        }
 
-      redisTemplate.opsForHash().putAll(batchId, batchUpdate);
-      log.error("배치 실패로 마킹 - BatchId: {}, FailedJobId: {}", batchId, webhook.jobId());
-  }
+        redisTemplate.opsForHash().putAll(batchId, batchUpdate);
+        log.error("배치 합성 실패로 마킹 - BatchId: {}, FailedComposeJobId: {}", batchId, webhook.jobId());
+    }
 
-  private void markBatchAsCompositionFailed(String batchId,
-      FrameCompositionFailedWebhook webhook) {
-      Map<String, String> batchUpdate = new HashMap<>();
-      batchUpdate.put("status", "failed");
-      batchUpdate.put("failed_compose_job_id", webhook.jobId());
+    private void updatePromptStatus(Long promptId, PromptStatus status) {
+        log.info("=== 프롬프트 상태 업데이트 시작 ===");
+        log.info("PromptId: {}, 목표 Status: {}", promptId, status);
 
-      if (webhook.error() != null) {
-          batchUpdate.put("error_message",
-              String.format("프레임 합성 실패: %s - %s",
-                  webhook.error().code(), webhook.error().message()));
-      }
+        try {
+            log.info("프롬프트 조회 중...");
+            Optional<PhotoPrompt> optionalPrompt = photoPromptRepository.findById(promptId);
 
-      redisTemplate.opsForHash().putAll(batchId, batchUpdate);
-      log.error("배치 합성 실패로 마킹 - BatchId: {}, FailedComposeJobId: {}", batchId, webhook.jobId());
-  }
+            PhotoPrompt photoPrompt = optionalPrompt.get();
+            log.info("프롬프트 조회 성공");
+            log.info("현재 상태 - ID: {}, Text: {}, Status: {}, CreatedAt: {}",
+                photoPrompt.getPromptId(),
+                photoPrompt.getPromptText(),
+                photoPrompt.getStatus(),
+                photoPrompt.getCreatedAt());
 
-//  private void updatePromptStatus(Long promptId, PromptStatus status) {
-//    try {
-//      PhotoPrompt photoPrompt = photoPromptRepository.findById(promptId).orElse(null);
-//      if (photoPrompt != null) {
-//        photoPrompt.updateStatus(status);
-//        photoPromptRepository.save(photoPrompt);
-//        log.info("프롬프트 상태 업데이트 - PromptId: {}, Status: {}", promptId, status);
-//      }
-//    } catch (Exception e) {
-//      log.warn("프롬프트 상태 업데이트 실패 - PromptId: {}, Error: {}", promptId, e.getMessage());
-//    }
-//  }
+            log.info("2상태 변경: {} → {}", photoPrompt.getStatus(), status);
+            PromptStatus oldStatus = photoPrompt.getStatus();
+            photoPrompt.updateStatus(status);
+            log.info("객체 상태 변경 완료: {} → {}", oldStatus, photoPrompt.getStatus());
 
-  //@Transactional(propagation = Propagation.REQUIRES_NEW)
-  private void updatePromptStatus(Long promptId, PromptStatus status) {
-      log.info("=== 🔍 프롬프트 상태 업데이트 시작 ===");
-      log.info("PromptId: {}, 목표 Status: {}", promptId, status);
+            log.info("DB 저장 시작...");
+            PhotoPrompt savedPrompt = photoPromptRepository.save(photoPrompt);
+            log.info("DB 저장 완료");
+            log.info("저장된 상태 - ID: {}, Status: {}, UpdatedAt: {}",
+                savedPrompt.getPromptId(),
+                savedPrompt.getStatus(),
+                savedPrompt.getUpdatedAt());
 
-      try {
-          // 1️⃣ 프롬프트 조회
-          log.info("1️⃣ 프롬프트 조회 중...");
-          Optional<PhotoPrompt> optionalPrompt = photoPromptRepository.findById(promptId);
+            log.info("저장 결과 재확인...");
+            PhotoPrompt reloadedPrompt = photoPromptRepository.findById(promptId).orElse(null);
+            if (reloadedPrompt != null) {
+                log.info("재확인 성공 - Status: {}", reloadedPrompt.getStatus());
+                if (!status.equals(reloadedPrompt.getStatus())) {
+                    log.error("상태 불일치! 목표: {}, 실제: {}", status, reloadedPrompt.getStatus());
+                }
+            } else {
+                log.error("재확인 실패 - 프롬프트가 사라짐");
+            }
 
-          PhotoPrompt photoPrompt = optionalPrompt.get();
-          log.info("✅ 프롬프트 조회 성공");
-          log.info("현재 상태 - ID: {}, Text: {}, Status: {}, CreatedAt: {}",
-              photoPrompt.getPromptId(),
-              photoPrompt.getPromptText(),
-              photoPrompt.getStatus(),
-              photoPrompt.getCreatedAt());
+            log.info("=== 프롬프트 상태 업데이트 완료 ===");
 
-          // 2️⃣ 상태 변경
-          log.info("2️⃣ 상태 변경: {} → {}", photoPrompt.getStatus(), status);
-          PromptStatus oldStatus = photoPrompt.getStatus();
-          photoPrompt.updateStatus(status);
-          log.info("객체 상태 변경 완료: {} → {}", oldStatus, photoPrompt.getStatus());
-
-          // 3️⃣ 저장
-          log.info("3️⃣ DB 저장 시작...");
-          PhotoPrompt savedPrompt = photoPromptRepository.save(photoPrompt);
-          log.info("✅ DB 저장 완료");
-          log.info("저장된 상태 - ID: {}, Status: {}, UpdatedAt: {}",
-              savedPrompt.getPromptId(),
-              savedPrompt.getStatus(),
-              savedPrompt.getUpdatedAt());
-
-          // 4️⃣ 저장 확인
-          log.info("4️⃣ 저장 결과 재확인...");
-          PhotoPrompt reloadedPrompt = photoPromptRepository.findById(promptId).orElse(null);
-          if (reloadedPrompt != null) {
-              log.info("✅ 재확인 성공 - Status: {}", reloadedPrompt.getStatus());
-              if (!status.equals(reloadedPrompt.getStatus())) {
-                  log.error("❌ 상태 불일치! 목표: {}, 실제: {}", status, reloadedPrompt.getStatus());
-              }
-          } else {
-              log.error("❌ 재확인 실패 - 프롬프트가 사라짐");
-          }
-
-          log.info("=== ✅ 프롬프트 상태 업데이트 완료 ===");
-
-      } catch (Exception e) {
-          log.error("=== ❌ 프롬프트 상태 업데이트 실패 ===");
-          log.error("PromptId: {}, 목표 Status: {}", promptId, status);
-          log.error("오류 타입: {}", e.getClass().getSimpleName());
-          log.error("오류 메시지: {}", e.getMessage());
-          log.error("스택 트레이스: ", e);
-
-          // 트랜잭션 상태 확인
-          try {
-              boolean isRollbackOnly = TransactionSynchronizationManager.isCurrentTransactionReadOnly();
-              log.error("현재 트랜잭션 읽기전용 여부: {}", isRollbackOnly);
-          } catch (Exception txEx) {
-              log.error("트랜잭션 상태 확인 실패: {}", txEx.getMessage());
-          }
-
-          // 🔍 예외를 다시 던지지 않음
-          log.warn("⚠️ 프롬프트 상태 업데이트 실패했지만 예외를 억제하여 웹훅 처리 계속 진행");
-      }
-  }
-//  @Deprecated
-//  public void handleImageProcessingCompleted(ImageProcessingCompletedWebhook webhook) {
-//    log.warn("Deprecated 메소드 호출 - handleImageProcessingCompleted: {}", webhook.jobId());
-//    // 기존 로직과의 호환성을 위해 개별 처리로 리다이렉트
-//    webhookIndividualCompleted(webhook);
-//  }
-//
-//  @Deprecated
-//  public void handleImageProcessingFailed(ImageProcessingFailedWebhook webhook) {
-//    log.warn("Deprecated 메소드 호출 - handleImageProcessingFailed: {}", webhook.jobId());
-//    // 기존 로직과의 호환성을 위해 개별 처리로 리다이렉트
-//    webhookIndividualFailed(webhook);
-//  }
+        } catch (Exception e) {
+            log.error("=== 프롬프트 상태 업데이트 실패 ===");
+            log.error("PromptId: {}, 목표 Status: {}", promptId, status);
+            log.error("오류 타입: {}", e.getClass().getSimpleName());
+            log.error("오류 메시지: {}", e.getMessage());
+            log.error("스택 트레이스: ", e);
+        }
+    }
 }

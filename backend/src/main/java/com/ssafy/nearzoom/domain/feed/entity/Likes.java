@@ -19,10 +19,10 @@ public class Likes {
     @EmbeddedId
     private LikesId likesId;
 
-    @MapsId("postId")  // feedId → postId로 변경
+    @MapsId("postId")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id", nullable = false)  // feed_id → post_id로 변경
-    private Post post;  // Feed → Post로 변경
+    private Post post;
 
     @MapsId("userId")
     @ManyToOne(fetch = FetchType.LAZY)

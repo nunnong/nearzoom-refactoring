@@ -10,9 +10,6 @@ import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/**
- * JWT 토큰 생성/파싱/만료 검증 등 JWT 관련 유틸리티
- */
 @Component
 public class JWTUtil {
 
@@ -64,10 +61,6 @@ public class JWTUtil {
             .get("email", String.class);
     }
 
-    public String getRole(String token) {
-        return Jwts.parser().setSigningKey(secretKey).build().parseClaimsJws(token).getBody()
-            .get("role", String.class);
-    }
 
     public Social getSocial(String token) {
         String socialStr = Jwts.parser().setSigningKey(secretKey).build().parseClaimsJws(token)
@@ -76,7 +69,6 @@ public class JWTUtil {
         return socialStr != null ? Social.valueOf(socialStr) : null;
     }
 
-    // 수정
     public String getCategory(String token) {
         return Jwts.parser().setSigningKey(secretKey).build().parseSignedClaims(token).getBody()
             .get("category", String.class);
@@ -85,15 +77,5 @@ public class JWTUtil {
     public Boolean isExpired(String token) {
         return Jwts.parser().setSigningKey(secretKey).build().parseClaimsJws(token).getBody()
             .getExpiration().before(new Date());
-    }
-
-    public long getExpiry(String token) {
-        return Jwts.parser()
-            .setSigningKey(secretKey)
-            .build()
-            .parseClaimsJws(token)
-            .getBody()
-            .getExpiration()
-            .getTime();
     }
 }

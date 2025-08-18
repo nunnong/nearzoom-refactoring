@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UserService {
 
-    // 🔥 사용하지 않는 JWTUtil 제거
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
 
@@ -85,13 +84,6 @@ public class UserService {
         return prettyFaceUrl;
     }
 
-    // =========================================
-    // 🔍 프로필 관리 기능들 (신규 추가)
-    // =========================================
-
-    /**
-     * 👤 현재 사용자 프로필 조회 (계정명 포함)
-     */
     @Transactional(readOnly = true)
     public UserProfileResponse getCurrentUserProfile(Authentication authentication) {
         UserAuthInfoResponse userAuthInfo = AuthUtil.getUserAuthInfo(authentication);
@@ -105,7 +97,7 @@ public class UserService {
             user.getUserId(),
             user.getAccountName(),
             user.getUserName(),
-            user.getUserEmail(),  // userEmail 필드를 사용
+            user.getUserEmail(),
             user.getProfileImage(),
             user.getPrettyFace()
         );
@@ -160,7 +152,8 @@ public class UserService {
      * ✅ 계정명 중복 확인
      */
     @Transactional(readOnly = true)
-    public CheckAccountNameResponse checkAccountNameAvailable(String accountName, Authentication authentication) {
+    public CheckAccountNameResponse checkAccountNameAvailable(String accountName,
+        Authentication authentication) {
         // 현재 사용자 정보 가져오기
         UserAuthInfoResponse userAuthInfo = AuthUtil.getUserAuthInfo(authentication);
         String email = userAuthInfo.email();

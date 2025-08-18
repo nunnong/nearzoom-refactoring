@@ -38,15 +38,7 @@ public class CustomOAuth2User implements OAuth2User {
         return oAuth2UserDto.email();
     }
 
-    public String getProfileImage() {
-        return oAuth2UserDto.profileImage();
-    }
-
     public Social getSocial() {
         return oAuth2UserDto.social();
-    }
-
-    public String getRole() {
-        return oAuth2UserDto.role();
     }
 }

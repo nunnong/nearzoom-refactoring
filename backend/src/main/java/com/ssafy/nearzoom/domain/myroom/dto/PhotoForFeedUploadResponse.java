@@ -6,6 +6,7 @@ public record PhotoForFeedUploadResponse(
     Long photoId,
     String imgUrl,
     LocalDateTime takenAt,
-    boolean alreadyInFeed  // 이미 피드에 올렸는지 여부
+    boolean alreadyInFeed
 ) {
+
 }

@@ -10,8 +10,9 @@ public record UserProfileResponse(
     String userProfileImage,
     String faceImageUrl
 ) {
-    // 기존 UserInfoResponse에서 변환
-    public static UserProfileResponse from(UserInfoResponse userInfo, Long userId, String accountName) {
+
+    public static UserProfileResponse from(UserInfoResponse userInfo, Long userId,
+        String accountName) {
         return new UserProfileResponse(
             userId,
             accountName,
@@ -22,7 +23,6 @@ public record UserProfileResponse(
         );
     }
 
-    // 🔥 User 엔티티에서 직접 변환하는 from 메서드 추가
     public static UserProfileResponse from(User user) {
         return new UserProfileResponse(
             user.getUserId(),

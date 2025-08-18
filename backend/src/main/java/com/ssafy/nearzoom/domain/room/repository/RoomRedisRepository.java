@@ -21,153 +21,156 @@ import org.springframework.stereotype.Repository;
 @Repository
 @RequiredArgsConstructor
 public class RoomRedisRepository {
-  private final RedisTemplate<String, String> redisTemplate;
 
-  public void saveInitialInfo(Long roomId, String liveKitUrl, User user, Room liveKitRoom, String participantIdentity) {
-    // 방 정보 저장 - host를 participantIdentity로 저장
-    Map<String, String> roomData = new HashMap<>();
-    roomData.put("roomId", String.valueOf(roomId));
-    roomData.put("serverUrl", liveKitUrl);
-    roomData.put("host", participantIdentity); // participantIdentity로 저장
-    roomData.put("createdAt", LocalDateTime.now().toString());
-    roomData.put("status", "active");
-    roomData.put("liveKitSid", liveKitRoom.getSid());
-    roomData.put("participants", user.getUserName());
-    roomData.put("participantCount", "1");
+    private final RedisTemplate<String, String> redisTemplate;
 
-    String roomKey = RedisKeyConstants.ROOM_KEY_PREFIX + roomId;
-    redisTemplate.opsForHash().putAll(roomKey, roomData);
-    redisTemplate.expire(roomKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
+    public void saveInitialInfo(Long roomId, String liveKitUrl, User user, Room liveKitRoom,
+        String participantIdentity) {
+        Map<String, String> roomData = new HashMap<>();
+        roomData.put("roomId", String.valueOf(roomId));
+        roomData.put("serverUrl", liveKitUrl);
+        roomData.put("host", participantIdentity);
+        roomData.put("createdAt", LocalDateTime.now().toString());
+        roomData.put("status", "active");
+        roomData.put("liveKitSid", liveKitRoom.getSid());
+        roomData.put("participants", user.getUserName());
+        roomData.put("participantCount", "1");
 
-    // 참가자 정보 저장 (identity 기반)
-    saveParticipantInfo(roomId, user.getUserName(), participantIdentity, user);
+        String roomKey = RedisKeyConstants.ROOM_KEY_PREFIX + roomId;
+        redisTemplate.opsForHash().putAll(roomKey, roomData);
+        redisTemplate.expire(roomKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
 
-    log.info("Initial room info saved. RoomId: {}, Host Identity: {}",
-        roomId, participantIdentity);
-  }
+        saveParticipantInfo(roomId, user.getUserName(), participantIdentity, user);
 
-  public void updateRoomMetadata(RoomMetaSaveRequest roomMetaSaveRequest, String roomKey) {
-    Map<String, String> metaData = new HashMap<>();
-    metaData.put("participants", String.join(",", roomMetaSaveRequest.participants()));
-    metaData.put("participantCount", String.valueOf(roomMetaSaveRequest.participants().size()));
-
-    redisTemplate.opsForHash().putAll(roomKey, metaData);
-    log.info("Room metadata updated for key: {}", roomKey);
-  }
-
-  public void saveParticipantInfo(Long roomId, String displayName, String identity, User user) {
-    // identity 기반으로 키 생성 (고유성 보장)
-    String participantKey = RedisKeyConstants.PARTICIPANT_KEY_PREFIX + roomId + ":" + identity;
-
-    Map<String, String> participantData = new HashMap<>();
-    participantData.put("displayName", displayName);
-    participantData.put("participantIdentity", identity);
-    participantData.put("roomId", String.valueOf(roomId));
-    participantData.put("userEmail", user.getUserEmail());
-    participantData.put("status", "active");
-    participantData.put("joinedAt", LocalDateTime.now().toString());
-
-    redisTemplate.opsForHash().putAll(participantKey, participantData);
-    redisTemplate.expire(participantKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
-
-    log.info("Participant info saved. RoomId: {}, DisplayName: {}, Identity: {}",
-        roomId, displayName, identity);
-  }
-
-  public void addParticipantToRoom(String existingParticipants, String displayName, String roomKey) {
-    List<String> participantList = new ArrayList<>();
-
-    if (existingParticipants != null && !existingParticipants.isEmpty()) {
-      participantList.addAll(Arrays.asList(existingParticipants.split(",")));
+        log.info("Initial room info saved. RoomId: {}, Host Identity: {}",
+            roomId, participantIdentity);
     }
 
-    // 테스트를 위해 같은 이름도 허용
-    participantList.add(displayName);
+    public void updateRoomMetadata(RoomMetaSaveRequest roomMetaSaveRequest, String roomKey) {
+        Map<String, String> metaData = new HashMap<>();
+        metaData.put("participants", String.join(",", roomMetaSaveRequest.participants()));
+        metaData.put("participantCount", String.valueOf(roomMetaSaveRequest.participants().size()));
 
-    redisTemplate.opsForHash().put(roomKey, "participants", String.join(",", participantList));
-    redisTemplate.opsForHash().put(roomKey, "participantCount", String.valueOf(participantList.size()));
-
-    log.info("Participant added to room. RoomKey: {}, DisplayName: {}, Total: {}",
-        roomKey, displayName, participantList.size());
-  }
-
-  public void updateParticipantStatus(Long roomId, String identity, String status) {
-    String participantKey = RedisKeyConstants.PARTICIPANT_KEY_PREFIX + roomId + ":" + identity;
-
-    if (!redisTemplate.hasKey(participantKey)) {
-      log.warn("Participant key not found: {}", participantKey);
-      return;
+        redisTemplate.opsForHash().putAll(roomKey, metaData);
+        log.info("Room metadata updated for key: {}", roomKey);
     }
 
-    redisTemplate.opsForHash().put(participantKey, "status", status);
-    redisTemplate.opsForHash().put(participantKey, "updatedAt", LocalDateTime.now().toString());
+    public void saveParticipantInfo(Long roomId, String displayName, String identity, User user) {
+        String participantKey = RedisKeyConstants.PARTICIPANT_KEY_PREFIX + roomId + ":" + identity;
 
-    log.info("Participant status updated. RoomId: {}, Identity: {}, Status: {}",
-        roomId, identity, status);
-  }
+        Map<String, String> participantData = new HashMap<>();
+        participantData.put("displayName", displayName);
+        participantData.put("participantIdentity", identity);
+        participantData.put("roomId", String.valueOf(roomId));
+        participantData.put("userEmail", user.getUserEmail());
+        participantData.put("status", "active");
+        participantData.put("joinedAt", LocalDateTime.now().toString());
 
-  public void removeParticipant(String displayName, String roomKey) {
-    String participantsString = (String) redisTemplate.opsForHash().get(roomKey, "participants");
+        redisTemplate.opsForHash().putAll(participantKey, participantData);
+        redisTemplate.expire(participantKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
 
-    if (participantsString == null || participantsString.trim().isEmpty()) {
-      log.warn("No participants found in room: {}", roomKey);
-      return;
+        log.info("Participant info saved. RoomId: {}, DisplayName: {}, Identity: {}",
+            roomId, displayName, identity);
     }
 
-    List<String> participantList = new ArrayList<>(Arrays.asList(participantsString.split(",")));
+    public void addParticipantToRoom(String existingParticipants, String displayName,
+        String roomKey) {
+        List<String> participantList = new ArrayList<>();
 
-    // 첫 번째로 발견되는 해당 이름을 제거
-    if (participantList.remove(displayName)) {
-      String updatedParticipants = participantList.isEmpty() ? "" : String.join(",", participantList);
+        if (existingParticipants != null && !existingParticipants.isEmpty()) {
+            participantList.addAll(Arrays.asList(existingParticipants.split(",")));
+        }
 
-      redisTemplate.opsForHash().put(roomKey, "participants", updatedParticipants);
-      redisTemplate.opsForHash().put(roomKey, "participantCount", String.valueOf(participantList.size()));
+        participantList.add(displayName);
 
-      log.info("Participant removed from room. RoomKey: {}, DisplayName: {}, Remaining: {}",
-          roomKey, displayName, participantList.size());
-    } else {
-      log.warn("Participant not found in room participants list. RoomKey: {}, DisplayName: {}",
-          roomKey, displayName);
+        redisTemplate.opsForHash().put(roomKey, "participants", String.join(",", participantList));
+        redisTemplate.opsForHash()
+            .put(roomKey, "participantCount", String.valueOf(participantList.size()));
+
+        log.info("Participant added to room. RoomKey: {}, DisplayName: {}, Total: {}",
+            roomKey, displayName, participantList.size());
     }
-  }
 
-  //방 종료 시 모든 참가자 상태를 'removed'로 변경
-  public void closeAllParticipants(Long roomId) {
-    String participantPattern = RedisKeyConstants.PARTICIPANT_KEY_PREFIX + roomId + ":*";
-    Set<String> participantKeys = redisTemplate.keys(participantPattern);
+    public void updateParticipantStatus(Long roomId, String identity, String status) {
+        String participantKey = RedisKeyConstants.PARTICIPANT_KEY_PREFIX + roomId + ":" + identity;
 
-    if (!participantKeys.isEmpty()) {
-      for (String participantKey : participantKeys) {
-        redisTemplate.opsForHash().put(participantKey, "status", "removed");
-        redisTemplate.opsForHash().put(participantKey, "removedAt", LocalDateTime.now().toString());
-        // 참가자 정보도 TTL 1시간으로 단축
-        redisTemplate.expire(participantKey, Duration.ofHours(1));
-      }
+        if (!redisTemplate.hasKey(participantKey)) {
+            log.warn("Participant key not found: {}", participantKey);
+            return;
+        }
 
-      log.info("All participants marked as removed for room: {}, Count: {}",
-          roomId, participantKeys.size());
+        redisTemplate.opsForHash().put(participantKey, "status", status);
+        redisTemplate.opsForHash().put(participantKey, "updatedAt", LocalDateTime.now().toString());
+
+        log.info("Participant status updated. RoomId: {}, Identity: {}, Status: {}",
+            roomId, identity, status);
     }
-  }
 
-  //방장 권한 이양 - identity 기반으로 변경
-  public void transferHostAuthority(Long roomId, String currentHostIdentity, String newHostIdentity, String roomKey) {
-    // 1. 방장 정보 업데이트 - identity로 저장
-    redisTemplate.opsForHash().put(roomKey, "host", newHostIdentity);
-    redisTemplate.opsForHash().put(roomKey, "hostTransferredAt", LocalDateTime.now().toString());
-    redisTemplate.opsForHash().put(roomKey, "previousHost", currentHostIdentity);
+    public void removeParticipant(String displayName, String roomKey) {
+        String participantsString = (String) redisTemplate.opsForHash()
+            .get(roomKey, "participants");
 
-    // 2. 방장 이양 히스토리 저장 (선택사항)
-    String historyKey = "host_transfer:" + roomId + ":" + System.currentTimeMillis();
-    Map<String, String> transferHistory = new HashMap<>();
-    transferHistory.put("roomId", String.valueOf(roomId));
-    transferHistory.put("fromHostIdentity", currentHostIdentity);
-    transferHistory.put("toHostIdentity", newHostIdentity);
-    transferHistory.put("transferredAt", LocalDateTime.now().toString());
+        if (participantsString == null || participantsString.trim().isEmpty()) {
+            log.warn("No participants found in room: {}", roomKey);
+            return;
+        }
 
-    redisTemplate.opsForHash().putAll(historyKey, transferHistory);
-    redisTemplate.expire(historyKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
+        List<String> participantList = new ArrayList<>(
+            Arrays.asList(participantsString.split(",")));
 
-    log.info("Host authority transferred in Redis. RoomId: {}, From Identity: {} To Identity: {}",
-        roomId, currentHostIdentity, newHostIdentity);
-  }
+        if (participantList.remove(displayName)) {
+            String updatedParticipants =
+                participantList.isEmpty() ? "" : String.join(",", participantList);
+
+            redisTemplate.opsForHash().put(roomKey, "participants", updatedParticipants);
+            redisTemplate.opsForHash()
+                .put(roomKey, "participantCount", String.valueOf(participantList.size()));
+
+            log.info("Participant removed from room. RoomKey: {}, DisplayName: {}, Remaining: {}",
+                roomKey, displayName, participantList.size());
+        } else {
+            log.warn(
+                "Participant not found in room participants list. RoomKey: {}, DisplayName: {}",
+                roomKey, displayName);
+        }
+    }
+
+    public void closeAllParticipants(Long roomId) {
+        String participantPattern = RedisKeyConstants.PARTICIPANT_KEY_PREFIX + roomId + ":*";
+        Set<String> participantKeys = redisTemplate.keys(participantPattern);
+
+        if (!participantKeys.isEmpty()) {
+            for (String participantKey : participantKeys) {
+                redisTemplate.opsForHash().put(participantKey, "status", "removed");
+                redisTemplate.opsForHash()
+                    .put(participantKey, "removedAt", LocalDateTime.now().toString());
+                redisTemplate.expire(participantKey, Duration.ofHours(1));
+            }
+
+            log.info("All participants marked as removed for room: {}, Count: {}",
+                roomId, participantKeys.size());
+        }
+    }
+
+    public void transferHostAuthority(Long roomId, String currentHostIdentity,
+        String newHostIdentity, String roomKey) {
+        redisTemplate.opsForHash().put(roomKey, "host", newHostIdentity);
+        redisTemplate.opsForHash()
+            .put(roomKey, "hostTransferredAt", LocalDateTime.now().toString());
+        redisTemplate.opsForHash().put(roomKey, "previousHost", currentHostIdentity);
+
+        String historyKey = "host_transfer:" + roomId + ":" + System.currentTimeMillis();
+        Map<String, String> transferHistory = new HashMap<>();
+        transferHistory.put("roomId", String.valueOf(roomId));
+        transferHistory.put("fromHostIdentity", currentHostIdentity);
+        transferHistory.put("toHostIdentity", newHostIdentity);
+        transferHistory.put("transferredAt", LocalDateTime.now().toString());
+
+        redisTemplate.opsForHash().putAll(historyKey, transferHistory);
+        redisTemplate.expire(historyKey, Duration.ofHours(RedisKeyConstants.REDIS_TTL_HOURS));
+
+        log.info(
+            "Host authority transferred in Redis. RoomId: {}, From Identity: {} To Identity: {}",
+            roomId, currentHostIdentity, newHostIdentity);
+    }
 }

@@ -23,138 +23,114 @@ public class FollowService {
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
 
-    /**
-     * 🔥 accountName으로 팔로우
-     */
     @Transactional
     public void followByAccountName(Authentication authentication, String accountName) {
         UserAuthInfoResponse userInfo = AuthUtil.getUserAuthInfo(authentication);
         User follower = userRepository.getByEmailAndSocial(userInfo.email(), userInfo.social());
 
-        // accountName으로 팔로우할 사용자 찾기
         User followee = userRepository.findByAccountName(accountName)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
         followRepository.save(Follow.of(follower, followee));
     }
 
-    /**
-     * 🔥 accountName으로 언팔로우
-     */
     @Transactional
     public void unfollowByAccountName(Authentication authentication, String accountName) {
         UserAuthInfoResponse userInfo = AuthUtil.getUserAuthInfo(authentication);
         User follower = userRepository.getByEmailAndSocial(userInfo.email(), userInfo.social());
 
-        // accountName으로 언팔로우할 사용자 찾기
         User followee = userRepository.findByAccountName(accountName)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
         followRepository.deleteByFollower_UserIdAndFollowee_UserId(
-                follower.getUserId(),
-                followee.getUserId()
+            follower.getUserId(),
+            followee.getUserId()
         );
     }
 
-    /**
-     * 🔥 accountName으로 팔로우 상태 확인
-     */
     @Transactional(readOnly = true)
     public Boolean isFollowingByAccountName(Authentication authentication, String accountName) {
         UserAuthInfoResponse loginUserInfo = AuthUtil.getUserAuthInfo(authentication);
-        User follower = userRepository.getByEmailAndSocial(loginUserInfo.email(), loginUserInfo.social());
+        User follower = userRepository.getByEmailAndSocial(loginUserInfo.email(),
+            loginUserInfo.social());
 
-        // accountName으로 팔로우 대상 찾기
         User followee = userRepository.findByAccountName(accountName)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
         return followRepository.existsByFollower_UserIdAndFollowee_UserId(
-                follower.getUserId(),
-                followee.getUserId()
+            follower.getUserId(),
+            followee.getUserId()
         );
     }
 
-    /**
-     * 🔥 accountName으로 팔로잉 목록 조회 - UserProfileResponse 사용
-     */
     @Transactional(readOnly = true)
     public List<UserProfileResponse> getFollowingByAccountName(String accountName) {
-        // accountName으로 사용자 찾기
+
         User user = userRepository.findByAccountName(accountName)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
         return followRepository.findFollowing(user.getUserId()).stream()
-                .map(followingUser -> new UserProfileResponse(
-                        followingUser.getUserId(),
-                        followingUser.getAccountName(),
-                        followingUser.getUserName(),
-                        followingUser.getUserEmail(),
-                        followingUser.getProfileImage(),
-                        followingUser.getPrettyFace()
-                ))
-                .toList();
+            .map(followingUser -> new UserProfileResponse(
+                followingUser.getUserId(),
+                followingUser.getAccountName(),
+                followingUser.getUserName(),
+                followingUser.getUserEmail(),
+                followingUser.getProfileImage(),
+                followingUser.getPrettyFace()
+            ))
+            .toList();
     }
 
-    /**
-     * 🔥 accountName으로 팔로워 목록 조회 - UserProfileResponse 사용
-     */
     @Transactional(readOnly = true)
     public List<UserProfileResponse> getFollowersByAccountName(String accountName) {
-        // accountName으로 사용자 찾기
+
         User user = userRepository.findByAccountName(accountName)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
         return followRepository.findFollowers(user.getUserId()).stream()
-                .map(followerUser -> new UserProfileResponse(
-                        followerUser.getUserId(),
-                        followerUser.getAccountName(),
-                        followerUser.getUserName(),
-                        followerUser.getUserEmail(),
-                        followerUser.getProfileImage(),
-                        followerUser.getPrettyFace()
-                ))
-                .toList();
+            .map(followerUser -> new UserProfileResponse(
+                followerUser.getUserId(),
+                followerUser.getAccountName(),
+                followerUser.getUserName(),
+                followerUser.getUserEmail(),
+                followerUser.getProfileImage(),
+                followerUser.getPrettyFace()
+            ))
+            .toList();
     }
 
-    /**
-     * 🔥 accountName으로 팔로우 수 조회
-     */
     @Transactional(readOnly = true)
     public FollowCountsResponse getCountsByAccountName(String accountName) {
         User user = userRepository.findByAccountName(accountName)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
-        // int → long 타입 변경
         long followers = followRepository.countByFollowee_UserId(user.getUserId());
         long following = followRepository.countByFollower_UserId(user.getUserId());
 
         return new FollowCountsResponse(followers, following);
     }
 
-    /**
-     * 🔥 accountName으로 상호 팔로우 목록 조회 - UserProfileResponse 사용
-     */
     @Transactional(readOnly = true)
-    public List<UserProfileResponse> getMutualFollowsByAccountName(Authentication authentication, String accountName) {
-        // 현재 로그인한 사용자 조회
+    public List<UserProfileResponse> getMutualFollowsByAccountName(Authentication authentication,
+        String accountName) {
+
         UserAuthInfoResponse loginUserInfo = AuthUtil.getUserAuthInfo(authentication);
-        User loginUser = userRepository.getByEmailAndSocial(loginUserInfo.email(), loginUserInfo.social());
+        User loginUser = userRepository.getByEmailAndSocial(loginUserInfo.email(),
+            loginUserInfo.social());
 
-        // accountName으로 대상 사용자 찾기
         User targetUser = userRepository.findByAccountName(accountName)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
-        // 상호 팔로우 목록 조회
         return followRepository.findMutualFollows(loginUser.getUserId(), targetUser.getUserId())
-                .stream()
-                .map(mutualUser -> new UserProfileResponse(
-                        mutualUser.getUserId(),
-                        mutualUser.getAccountName(),
-                        mutualUser.getUserName(),
-                        mutualUser.getUserEmail(),
-                        mutualUser.getProfileImage(),
-                        mutualUser.getPrettyFace()
-                ))
-                .toList();
+            .stream()
+            .map(mutualUser -> new UserProfileResponse(
+                mutualUser.getUserId(),
+                mutualUser.getAccountName(),
+                mutualUser.getUserName(),
+                mutualUser.getUserEmail(),
+                mutualUser.getProfileImage(),
+                mutualUser.getPrettyFace()
+            ))
+            .toList();
     }
 }

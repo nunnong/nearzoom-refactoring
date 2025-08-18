@@ -6,7 +6,8 @@ import lombok.Setter;
 @Getter
 @Setter
 public class PhotoInsertDto {
-    private Long photoId;  // This will be set by MyBatis after insert
+
+    private Long photoId;
     private String imageUrl;
     private String userList;
     private Long roomId;

@@ -13,8 +13,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class LikesId implements Serializable {
 
-    @Column(name = "post_id", nullable = false)  // feed_id → post_id로 변경
-    private Long postId;  // feedId → postId로 변경
+    @Column(name = "post_id", nullable = false)
+    private Long postId;
 
     @Column(name = "user_id", nullable = false)
     private Long userId;
@@ -37,7 +37,7 @@ public class LikesId implements Serializable {
             return false;
         }
         return Objects.equals(postId, that.postId) &&
-                Objects.equals(userId, that.userId);
+            Objects.equals(userId, that.userId);
     }
 
     @Override

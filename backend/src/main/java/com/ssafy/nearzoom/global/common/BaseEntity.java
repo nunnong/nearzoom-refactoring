@@ -41,7 +41,6 @@ public class BaseEntity {
         this.updatedAt = LocalDateTime.now().plusHours(9);
     }
 
-    // soft delete
     public void markDeleted() {
         this.deletedAt = LocalDateTime.now().plusHours(9);
     }

@@ -13,19 +13,19 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SwaggerConfig {
 
-  @Bean
-  public OpenAPI openAPI() {
-    return new OpenAPI()
-        .info(new Info()
-            .title("NEAR ZOOM API")
-            .version("1.0"))
-        .servers(List.of(new Server().url("http://localhost:8080")))  // 이 줄 추가!
-        .addSecurityItem(new SecurityRequirement().addList("Bearer Authentication"))
-        .components(new Components()
-            .addSecuritySchemes("Bearer Authentication",
-                new SecurityScheme()
-                    .type(SecurityScheme.Type.HTTP)
-                    .scheme("bearer")
-                    .bearerFormat("JWT")));
-  }
+    @Bean
+    public OpenAPI openAPI() {
+        return new OpenAPI()
+            .info(new Info()
+                .title("NEAR ZOOM API")
+                .version("1.0"))
+            .servers(List.of(new Server().url("http://localhost:8080")))
+            .addSecurityItem(new SecurityRequirement().addList("Bearer Authentication"))
+            .components(new Components()
+                .addSecuritySchemes("Bearer Authentication",
+                    new SecurityScheme()
+                        .type(SecurityScheme.Type.HTTP)
+                        .scheme("bearer")
+                        .bearerFormat("JWT")));
+    }
 }

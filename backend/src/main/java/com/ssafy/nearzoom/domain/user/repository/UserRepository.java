@@ -1,5 +1,3 @@
-// UserRepository.java - JOIN FETCH 제거 (User 엔티티에 feed 관계 없음)
-
 package com.ssafy.nearzoom.domain.user.repository;
 
 import com.ssafy.nearzoom.domain.user.entity.Social;
@@ -15,35 +13,23 @@ import org.springframework.data.repository.query.Param;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    // =========================================
-    // 🔍 기존 메서드들 (그대로 유지)
-    // =========================================
-
-    Optional<User> findByUserEmailAndSocialTypeAndDeletedAtIsNull(String userEmail, Social socialType);
+    Optional<User> findByUserEmailAndSocialTypeAndDeletedAtIsNull(String userEmail,
+        Social socialType);
 
     Optional<User> findByUserEmailAndSocialType(String userEmail, Social socialType);
 
     Optional<User> findByUserEmail(String userEmail);
 
-    // TODO: Optional은 null이아닌 빈 객체로 표현해야 한다는 뜻인데 @NonNull이 필요한지?
-    default @NonNull User getByEmailAndSocial(@NonNull String userEmail, @NonNull Social socialType) {
+    default @NonNull User getByEmailAndSocial(@NonNull String userEmail,
+        @NonNull Social socialType) {
         return findByUserEmailAndSocialType(userEmail, socialType)
             .orElseThrow(UserNotFoundException::new);
     }
 
-    //조회 단일 계정명(accountName)으로 사용자 조회
     Optional<User> findByAccountName(String accountName);
 
-    // UserRepository.java에 추가할 메서드들
-
-    /**
-     * 계정명 중복 확인
-     */
     boolean existsByAccountName(String accountName);
 
-    /**
-     * ✅ 계정명으로 사용자 조회 (삭제되지 않은 사용자만)
-     */
     @Query("""
         SELECT u FROM User u 
         WHERE u.accountName = :accountName 
@@ -51,38 +37,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
         """)
     Optional<User> findActiveByAccountName(@Param("accountName") String accountName);
 
-    /**
-     * ✅ 이메일로 사용자 조회
-     */
-    @Query("""
-        SELECT u FROM User u 
-        WHERE u.userEmail = :userEmail 
-        AND u.deletedAt IS NULL
-        """)
-    Optional<User> findByUserEmailWithFeed(@Param("userEmail") String userEmail);
-
-    /**
-     * ✅ 이메일과 소셜타입으로 사용자 조회
-     */
-    @Query("""
-        SELECT u FROM User u 
-        WHERE u.userEmail = :userEmail 
-        AND u.socialType = :socialType 
-        AND u.deletedAt IS NULL
-        """)
-    Optional<User> findByUserEmailAndSocialTypeWithFeed(
-        @Param("userEmail") String userEmail,
-        @Param("socialType") Social socialType
-    );
-
-    // =========================================
-    // 📱 마이룸 방식: JPQL + Pageable (Service에서 PageRequest 생성)
-    // =========================================
-
-    /**
-     * 📱 마이룸 방식: 계정명 검색 (커서 기반)
-     * Service에서 PageRequest.ofSize(limit + 1) 전달
-     */
     @Query("""
         SELECT u FROM User u 
         WHERE LOWER(u.accountName) LIKE LOWER(CONCAT('%', :accountName, '%')) 
@@ -96,13 +50,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
         Pageable pageable
     );
 
-    // =========================================
-    // 🔄 기존 메서드들 (Deprecated)
-    // =========================================
-
-    /**
-     * @deprecated 마이룸 방식으로 통일. searchByAccountNameOnly(accountName, cursor, pageable) 사용 권장
-     */
     @Deprecated
     @Query("""
         SELECT u FROM User u 
