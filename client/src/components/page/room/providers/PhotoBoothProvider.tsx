@@ -59,13 +59,13 @@ const createPhotoBoothStore = (roomName: string) => {
   console.log('🏗️ Creating PhotoBooth store for room:', roomName)
 
   // 모든 slice들을 통합한 store 생성
-  return create<PhotoBoothStore>()((set, get) => ({
+  return create<PhotoBoothStore>()((set, get, store) => ({
     ...createStateSlice(set, get, roomName),
     ...createCutSlice(set, get, roomName),
     ...createSelectSlice(set, get, roomName),
     ...createShootingSlice(set, get, roomName),
-    ...createPhotoCanvasSlice(set),
-    ...createCanvasSlice(set),
+    ...createPhotoCanvasSlice(set, get, store),
+    ...createCanvasSlice(set, get, store),
     ...createEditSlice(set, get, roomName),
     ...createRoomLeaderSlice(set),
   }))
@@ -81,7 +81,7 @@ export const PhotoBoothProvider = ({
   const room = useRoomContext()
 
   // useState를 사용하여 store를 한 번만 생성
-  const [store] = useState(() => {
+  const [store] = useState<ReturnType<typeof createPhotoBoothStore>>(() => {
     console.log(`Creating PhotoBooth store for room: ${roomName}`)
     return createPhotoBoothStore(roomName)
   })

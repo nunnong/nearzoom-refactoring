@@ -53,12 +53,12 @@ export const CursorProvider = ({
 
   // 통합된 커서 상태 (로컬/원격 구분 없이)
   const [localCursor, setLocalCursor] = useState<CursorPosition | null>(null)
-  const [isLocalCursorActive, setIsLocalCursorActive] = useState(false)
+  const [isLocalCursorActive, setIsLocalCursorActive] = useState<boolean>(false)
 
   // 사용자 정보 refs
-  const throttleRef = useRef<NodeJS.Timeout>()
-  const userIdRef = useRef<string>()
-  const userColorRef = useRef<string>()
+  const throttleRef = useRef<NodeJS.Timeout | undefined>(undefined)
+  const userIdRef = useRef<string | undefined>(undefined)
+  const userColorRef = useRef<string | undefined>(undefined)
   const encoder = new TextEncoder()
   const decoder = new TextDecoder()
 

@@ -54,7 +54,7 @@ export default function PhotoSelectComponent({
     
     // selectedPhotos 배열에서 null이 아닌 Photo 객체들의 imgUrl 추출
     const photoUrls = selectedPhotos
-      .filter(photo => photo !== null && photo !== undefined && typeof photo === 'object' && photo.imgUrl)
+      .filter((photo): photo is NonNullable<typeof photo> => photo !== null && photo !== undefined && typeof photo === 'object' && Boolean(photo.imgUrl))
       .map(photo => photo.imgUrl)
     
     console.log('📸 Extracted photo URLs from selectedPhotos:', photoUrls)
@@ -139,8 +139,8 @@ export default function PhotoSelectComponent({
       const selectedPhotoObjects = selectedImageUrls.map(url => {
         // selectedPhotos에서 해당 URL을 가진 Photo 객체 찾기
         const photoObj = selectedPhotos.find(photo => photo && photo.imgUrl === url)
-        return photoObj!
-      }).filter(Boolean) // null/undefined 제거
+        return photoObj
+      }).filter((photo): photo is NonNullable<typeof photo> => photo !== null && photo !== undefined) // null/undefined 제거
       
       console.log('🎨 Passing Photo objects to edit session:', selectedPhotoObjects)
       initializeEditSession(selectedPhotoObjects)
@@ -256,7 +256,7 @@ export default function PhotoSelectComponent({
           {/* Webcam 컴포넌트 */}
           <WebCam
             participants={participants}
-            localParticipant={localParticipant}
+            localParticipant={localParticipant as any}
           />
           
           {/* 컨트롤 패널 */}
