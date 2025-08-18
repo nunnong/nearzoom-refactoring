@@ -1,0 +1,357 @@
+'use client'
+
+import React, { useState, useRef, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { X, Edit } from 'lucide-react'
+import api from '@/lib/axios'
+import { resizeImage } from '@/utils/imageOptimizer'
+
+function UploadPhotoContent() {
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [optimizedBlob, setOptimizedBlob] = useState<Blob | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [currentReferenceImage, setCurrentReferenceImage] = useState<
+    string | null
+  >(null)
+  const [hasExistingImage, setHasExistingImage] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // 페이지 로드 시 기존 참조 이미지 확인
+  useEffect(() => {
+    checkExistingImage()
+  }, [])
+
+  const checkExistingImage = async () => {
+    try {
+      const response = await api.get('/user/userInfo')
+      const profile = response.data.data
+
+      if (profile.faceImageUrl) {
+        setCurrentReferenceImage(profile.faceImageUrl)
+        setHasExistingImage(true)
+      }
+    } catch (error) {
+      console.error('Failed to check existing image:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // returnUrl 파라미터를 항상 URL 그대로, localStorage에도 혹시 값 있으면 보조로 체크하게 설계
+  const getRedirectDestination = () => {
+    const returnUrl = searchParams.get('returnUrl')
+    const action = searchParams.get('action')
+
+    // [변경 포인트1]: localStorage 예비 체크 (콜백구간 잘못된 전달 대비)
+    const fallbackRedirect =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('redirectAfterLogin')
+        : null
+
+    if (returnUrl) {
+      // 공유받은 URL로 돌아가기
+      const decodedUrl = decodeURIComponent(returnUrl)
+      return decodedUrl
+    } else if (fallbackRedirect) {
+      // 혹시라도 남은 게 있으면 보조로 이동
+      localStorage.removeItem('redirectAfterLogin')
+      return fallbackRedirect
+    } else if (action === 'createRoom') {
+      // 메인페이지로 이동 (방 생성을 위해)
+      console.log('메인페이지로 이동 (방 생성 예정)')
+      return '/'
+    } else {
+      // 기본값: 메인페이지
+      console.log('기본 메인페이지로 이동')
+      return '/'
+    }
+  }
+
+  const handleImageSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      try {
+        console.log(
+          '원본 이미지 크기:',
+          (file.size / 1024 / 1024).toFixed(2) + 'MB'
+        )
+
+        // 이미지 최적화
+        const optimizedImage = await resizeImage(file)
+        console.log(
+          '최적화된 이미지 크기:',
+          (optimizedImage.size / 1024 / 1024).toFixed(2) + 'MB'
+        )
+
+        // 미리보기용 base64 변환
+        const reader = new FileReader()
+        reader.onload = e => {
+          const result = e.target?.result as string
+          setSelectedImage(result)
+        }
+        reader.readAsDataURL(optimizedImage)
+
+        // 업로드용 Blob 저장
+        setOptimizedBlob(optimizedImage)
+      } catch (error) {
+        console.error('이미지 최적화 실패:', error)
+        // 실패시 원본 사용
+        const reader = new FileReader()
+        reader.onload = e => {
+          const result = e.target?.result as string
+          setSelectedImage(result)
+        }
+        reader.readAsDataURL(file)
+        setOptimizedBlob(file)
+      }
+    }
+  }
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  // 저장/업로드 성공 후 리턴URL로 이동
+  const handleSave = async () => {
+    if (!selectedImage || !optimizedBlob) return
+
+    try {
+      setIsUploading(true)
+
+      // 최적화된 Blob 직접 사용
+      const formData = new FormData()
+      formData.append('file', optimizedBlob, 'profile.png')
+      formData.append('type', 'profile')
+
+      // 2단계: 이미지 업로드 API 호출 (URL을 반환받음)
+      const uploadResponse = await api.post(
+        'https://image.nearzoom.store/upload',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          withCredentials: false,
+        }
+      )
+
+      const imageUrl =
+        uploadResponse.data?.data?.file_url || uploadResponse.data?.file_url
+      if (!imageUrl) {
+        throw new Error('이미지 URL을 받아올 수 없습니다.')
+      }
+
+      await api.put('/user/save-face-image', null, {
+        params: {
+          prettyFaceUrl: imageUrl,
+        },
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      console.log('참조 이미지 저장 완료:', imageUrl)
+
+      // 업로드 처리 후 반드시 목적지로 이동
+      const destination = getRedirectDestination()
+
+      // localStorage 정리
+      localStorage.removeItem('redirectAfterLogin')
+
+      router.replace(destination)
+    } catch (error: any) {
+      console.error('참조 이미지 저장 실패:', error)
+      alert('참조 이미지 저장에 실패했습니다. 다시 시도해주세요.')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  // '시작하기', '취소', '나중에 등록', '닫기' 모두 동일하게 목적지로 이동
+  const handleSkip = () => {
+    const destination = getRedirectDestination()
+
+    // localStorage 정리
+    localStorage.removeItem('redirectAfterLogin')
+
+    router.replace(destination)
+  }
+
+  const handleClose = () => {
+    const destination = getRedirectDestination()
+
+    // localStorage 정리
+    localStorage.removeItem('redirectAfterLogin')
+
+    router.replace(destination)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-gray-600">로딩 중...</div>
+      </div>
+    )
+  }
+
+  const displayImage = selectedImage || currentReferenceImage
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="relative mx-4 w-96 max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl">
+        {/* X 버튼을 우측 상단에 절대 위치로 배치 */}
+        <button
+          onClick={handleClose}
+          className="absolute top-4 right-4 z-10 rounded-full p-2 transition-colors hover:bg-gray-100"
+        >
+          <X size={20} className="text-gray-600" />
+        </button>
+
+        {/* 헤더 */}
+        <div className="flex items-center justify-center border-b border-gray-100 p-4">
+          <div className="flex items-center space-x-2">
+            <span className="text-lg font-medium text-blue-500">이</span>
+            <span className="text-lg font-medium text-red-500">어</span>
+            <span className="text-lg font-medium text-yellow-500">줌</span>
+          </div>
+        </div>
+
+        {/* 컨텐츠 */}
+        <div className="p-6">
+          <h2 className="mb-3 text-xl font-medium text-gray-800">
+            {hasExistingImage ? '참조 사진 교체' : '참조 사진 등록'}
+          </h2>
+
+          <p className="mb-6 text-sm leading-relaxed text-gray-600">
+            {hasExistingImage
+              ? '새로운 참조 사진으로 교체하거나 현재 사진을 그대로 사용하세요.'
+              : '가장 잘 나온 사진 하나를 업로드해주세요. AI가 이를 참조하여 더 예쁘고 자연스러운 사진을 만들어 드립니다.'}
+          </p>
+
+          {/* AI 사진 합성용 태그 */}
+          <div className="mb-6 flex w-fit items-center space-x-2 rounded-full border border-blue-200 px-4 py-2 text-blue-600">
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 10V3L4 14h7v7l9-11h-7z"
+              />
+            </svg>
+            <span className="text-sm font-medium">AI 사진 합성용</span>
+          </div>
+
+          {/* 프로필 이미지 */}
+          <div className="mb-8 flex justify-center">
+            <div className="h-32 w-32 overflow-hidden rounded-full bg-gradient-to-br from-orange-200 via-green-200 to-blue-200 p-1">
+              <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-white">
+                {displayImage ? (
+                  <img
+                    src={displayImage}
+                    alt="참조 사진"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <svg viewBox="0 0 100 100" className="h-full w-full">
+                    <circle cx="50" cy="50" r="45" fill="#ff9999" />
+                    <circle cx="35" cy="40" r="3" fill="#000" />
+                    <circle cx="65" cy="40" r="3" fill="#000" />
+                    <path
+                      d="M 30 60 Q 50 75 70 60"
+                      stroke="#000"
+                      strokeWidth="2"
+                      fill="none"
+                    />
+                  </svg>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 업로드/교체 버튼 */}
+          {!selectedImage && (
+            <button
+              onClick={handleUploadClick}
+              className="mb-4 flex w-full items-center justify-center space-x-2 rounded-full bg-blue-50 py-3 text-blue-600 transition-colors hover:bg-blue-100"
+            >
+              <Edit size={16} />
+              <span className="font-medium">
+                {hasExistingImage ? '다른 사진으로 교체' : '사진 업로드'}
+              </span>
+            </button>
+          )}
+
+          {/* 저장 버튼 (새 이미지 선택시에만) */}
+          {selectedImage && (
+            <button
+              onClick={handleSave}
+              disabled={isUploading}
+              className="mb-3 w-full rounded-full bg-blue-600 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isUploading ? '저장 중...' : '저장하고 시작하기'}
+            </button>
+          )}
+
+          {/* 시작하기 버튼 (기존 이미지가 있을 때) */}
+          {hasExistingImage && !selectedImage && (
+            <button
+              onClick={handleSkip}
+              className="mb-3 w-full rounded-full bg-blue-600 py-3 font-medium text-white transition-colors hover:bg-blue-700"
+            >
+              시작하기
+            </button>
+          )}
+
+          {/* 취소/계속하기 버튼 */}
+          {selectedImage ? (
+            <button
+              onClick={() => setSelectedImage(null)}
+              className="w-full rounded-full py-3 font-medium text-gray-600 transition-colors hover:bg-gray-100"
+            >
+              취소
+            </button>
+          ) : (
+            <button
+              onClick={handleSkip}
+              className="w-full rounded-full py-3 font-medium text-gray-600 transition-colors hover:bg-gray-100"
+            >
+              {hasExistingImage ? '현재 사진 유지' : '나중에 등록'}
+            </button>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageSelect}
+            className="hidden"
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function UploadPhotoPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+          <div className="text-gray-600">로딩 중...</div>
+        </div>
+      }
+    >
+      <UploadPhotoContent />
+    </Suspense>
+  )
+}
