@@ -54,7 +54,6 @@ function UploadPhotoContent() {
     if (returnUrl) {
       // 공유받은 URL로 돌아가기
       const decodedUrl = decodeURIComponent(returnUrl)
-      console.log('공유받은 URL로 이동:', decodedUrl)
       return decodedUrl
     } else if (fallbackRedirect) {
       // 혹시라도 남은 게 있으면 보조로 이동

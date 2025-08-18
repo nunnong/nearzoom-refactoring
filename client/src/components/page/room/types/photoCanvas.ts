@@ -10,6 +10,7 @@ export interface ParticipantTransform {
   scaleX: number
   scaleY: number
   lastInteractionTime: number // 마지막 상호작용 시간 (z-index 관리용)
+  aspectRatio?: number // 실제 비디오 비율 (width/height)
 }
 
 export interface PhotoCanvasState {

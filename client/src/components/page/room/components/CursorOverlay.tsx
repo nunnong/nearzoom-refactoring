@@ -69,22 +69,6 @@ export const CursorOverlay: React.FC<CursorOverlayProps> = ({
   // 실시간 로컬 커서 (React state로 즉시 반응)
   const { localCursor, isActive } = useRealtimeLocalCursor()
 
-  // 디버깅용 로그 (하이브리드 시스템) - 비활성화
-  // console.log('🎯 CursorOverlay (Hybrid):', {
-  //   realtimeLocalCursor: localCursor
-  //     ? `${localCursor.userName} at ${localCursor.x},${localCursor.y}`
-  //     : null,
-  //   isLocalActive: isActive,
-  //   remoteCursors: remoteCursors.size,
-  //   remoteCursorsList: Array.from(remoteCursors.entries()).map(
-  //     ([id, cursor]) => ({
-  //       id,
-  //       user: cursor.userName,
-  //       pos: `${cursor.x},${cursor.y}`,
-  //     })
-  //   ),
-  // })
-
   return (
     <div className={`pointer-events-none absolute inset-0 z-0 ${className}`}>
       {/* 실시간 로컬 커서 표시 (즉시 반응) */}

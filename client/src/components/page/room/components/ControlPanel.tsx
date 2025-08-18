@@ -3,16 +3,22 @@
 import { cn } from '@/lib/utils'
 import { useLocalParticipant, useRoomContext } from '@livekit/components-react'
 import { Track } from 'livekit-client'
+import { useRouter } from 'next/navigation'
 
 interface ControlPanelProps {
   showLeaveButton?: boolean
+  globalVolume?: number
+  setGlobalVolume?: (volume: number) => void
 }
 
 export default function ControlPanel({
-  showLeaveButton = true
+  showLeaveButton = true,
+  globalVolume = 1.0,
+  setGlobalVolume
 }: ControlPanelProps) {
   const localParticipant = useLocalParticipant()
   const room = useRoomContext()
+  const router = useRouter()
 
   const handleMicToggle = () => {
     localParticipant.localParticipant?.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled)
@@ -23,8 +29,11 @@ export default function ControlPanel({
   }
 
   const handleLeaveRoom = () => {
-    if (room) {
-      room.disconnect()
+    if (confirm('정말 나가시겠습니까?')) {
+      if (room) {
+        room.disconnect()
+      }
+      router.push('/')
     }
   }
   const buttonBaseClasses =
@@ -32,6 +41,27 @@ export default function ControlPanel({
 
   return (
     <div className="rounded-2xl border border-white/30 bg-white/90 p-4 shadow-lg backdrop-blur-sm">
+      {/* 볼륨 컨트롤 */}
+      {setGlobalVolume && (
+        <div className="mb-4 space-y-2">
+          <label className="text-xs font-medium text-gray-700">
+            전체 볼륨: {Math.round(globalVolume * 100)}%
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.1"
+            value={globalVolume}
+            onChange={(e) => setGlobalVolume(parseFloat(e.target.value))}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+            style={{
+              background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${globalVolume * 100}%, #e5e7eb ${globalVolume * 100}%, #e5e7eb 100%)`
+            }}
+          />
+        </div>
+      )}
+
       {/* 컨트롤 버튼들 */}
       <div className="flex justify-center gap-4">
         {/* 마이크 버튼 */}
@@ -120,7 +150,7 @@ export default function ControlPanel({
               buttonBaseClasses,
               'bg-gradient-to-br from-gray-600 to-gray-700 text-white shadow-gray-600/30 hover:shadow-gray-600/40 hover:from-gray-500 hover:to-gray-600'
             )}
-            title="통화 종료"
+            title="나가기"
           >
             <svg
               className="h-6 w-6 stroke-current"

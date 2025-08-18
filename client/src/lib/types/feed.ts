@@ -142,11 +142,11 @@ export interface PostCard extends PostResponse {
   // UI 상태 관리용
   isLoading?: boolean
   isLiking?: boolean
-  
+
   // 추가 계산된 필드들
   timeAgo?: string
   formattedLikeCount?: string
-  
+
   // 🔐 인증 관련 UI 상태
   requiresAuth?: boolean
   isAuthError?: boolean
@@ -156,11 +156,11 @@ export interface PostCard extends PostResponse {
 export interface FeedPage extends FeedWithPostsResponse {
   // UI 상태 관리용
   isLoading?: boolean
-  
+
   // 추가 계산된 필드들
   totalPosts?: number
   formattedJoinDate?: string
-  
+
   // 🔐 인증 관련 UI 상태
   requiresAuth?: boolean
   isAuthError?: boolean
@@ -212,8 +212,8 @@ export type PhotoForFeedResponse = ApiResponse<PhotoForFeedUploadResponse>
 
 // 📱 마이룸 방식 페이징 파라미터 (limit + cursor)
 export interface CursorPaginationParams {
-  limit?: number  // 기본값: 20
-  cursor?: number | null  // 커서 (마지막 아이템 ID)
+  limit?: number // 기본값: 20
+  cursor?: number | null // 커서 (마지막 아이템 ID)
   // 🔐 인증 관련 (필요시)
   includePrivate?: boolean
 }
@@ -224,12 +224,18 @@ export interface SearchParams extends CursorPaginationParams {
 }
 
 // 📱 디바이스별 최적 limit 계산 (성능 최적화)
-export const getOptimalLimit = (deviceType: 'mobile' | 'tablet' | 'desktop'): number => {
+export const getOptimalLimit = (
+  deviceType: 'mobile' | 'tablet' | 'desktop'
+): number => {
   switch (deviceType) {
-    case 'mobile': return 12   // 모바일: 적은 수로 빠른 로딩
-    case 'tablet': return 18   // 태블릿: 중간
-    case 'desktop': return 24  // 데스크톱: 많은 수로 효율적 로딩
-    default: return 20
+    case 'mobile':
+      return 12 // 모바일: 적은 수로 빠른 로딩
+    case 'tablet':
+      return 18 // 태블릿: 중간
+    case 'desktop':
+      return 24 // 데스크톱: 많은 수로 효율적 로딩
+    default:
+      return 20
   }
 }
 
@@ -311,7 +317,10 @@ export interface AuthStatusResponse {
 // ============================================================================
 
 // PostResponse를 PostCard로 변환 (인증 상태 체크 포함)
-export const toPostCard = (post: PostResponse, isAuthenticated: boolean = true): PostCard => ({
+export const toPostCard = (
+  post: PostResponse,
+  isAuthenticated: boolean = true
+): PostCard => ({
   ...post,
   timeAgo: formatTimeAgo(post.createdAt),
   formattedLikeCount: formatLikeCount(post.likeCount),
@@ -322,7 +331,10 @@ export const toPostCard = (post: PostResponse, isAuthenticated: boolean = true):
 })
 
 // FeedWithPostsResponse를 FeedPage로 변환 (인증 상태 체크 포함)
-export const toFeedPage = (feed: FeedWithPostsResponse, isAuthenticated: boolean = true): FeedPage => ({
+export const toFeedPage = (
+  feed: FeedWithPostsResponse,
+  isAuthenticated: boolean = true
+): FeedPage => ({
   ...feed,
   totalPosts: feed.posts.length,
   formattedJoinDate: formatTimeAgo(feed.createdAt),
@@ -334,10 +346,10 @@ export const toFeedPage = (feed: FeedWithPostsResponse, isAuthenticated: boolean
 // 🔐 인증 오류 체크 함수
 export const isAuthenticationError = (error: any): boolean => {
   if (!error) return false
-  
+
   const status = error.response?.status
   const message = error.response?.data?.message || error.message || ''
-  
+
   return (
     status === 401 ||
     status === 403 ||
@@ -351,10 +363,10 @@ export const isAuthenticationError = (error: any): boolean => {
 // 🔐 토큰 만료 체크 함수
 export const isTokenExpiredError = (error: any): boolean => {
   if (!error) return false
-  
+
   const message = error.response?.data?.message || error.message || ''
   const code = error.response?.data?.code
-  
+
   return (
     code === 'TOKEN_EXPIRED' ||
     message.includes('token expired') ||
@@ -371,37 +383,41 @@ export const API_ENDPOINTS = {
   AUTH_REFRESH: '/auth/refresh',
   AUTH_STATUS: '/auth/status',
   AUTH_LOGOUT: '/auth/logout',
-  
+
   // 피드 관련 (마이룸 방식 무한 스크롤) - 🔐 모든 엔드포인트 인증 필수
-  EXPLORE: '/feeds/explore',  // ?limit=20&cursor=12345
-  TIMELINE: '/feeds/timeline',  // ?limit=20&cursor=12345 - 🔐 인증 필수 (팔로잉 기반)
-  USER_FEED_BY_ID: (userId: number) => `/feeds/user/${userId}`,  // ?limit=20&cursor=12345
-  USER_FEED_BY_ACCOUNT: (accountName: string) => `/feeds/user/account/${accountName}`,  // ?limit=20&cursor=12345
-  SEARCH_FEEDS: '/feeds/search',  // ?query=user&limit=10&cursor=12345
-  
+  EXPLORE: '/feeds/explore', // ?limit=20&cursor=12345
+  TIMELINE: '/feeds/timeline', // ?limit=20&cursor=12345 - 🔐 인증 필수 (팔로잉 기반)
+  USER_FEED_BY_ID: (userId: number) => `/feeds/user/${userId}`, // ?limit=20&cursor=12345
+  USER_FEED_BY_ACCOUNT: (accountName: string) =>
+    `/feeds/user/account/${accountName}`, // ?limit=20&cursor=12345
+  SEARCH_FEEDS: '/feeds/search', // ?query=user&limit=10&cursor=12345
+
   // 게시물 관련 - 🔐 모든 엔드포인트 인증 필수
   CREATE_POST_FROM_MYROOM: '/feeds/posts/from-myroom',
   POST_DETAIL: (postId: number) => `/feeds/posts/${postId}`,
   UPDATE_POST: (postId: number) => `/feeds/posts/${postId}`,
   DELETE_POST: (postId: number) => `/feeds/posts/${postId}`,
-  
+
   // 좋아요 관련 (PostId 기반) - 🔐 모든 엔드포인트 인증 필수
   LIKE_POST: (postId: number) => `/likes/posts/${postId}`,
   UNLIKE_POST: (postId: number) => `/likes/posts/${postId}`,
   CHECK_LIKE_STATUS: (postId: number) => `/likes/posts/${postId}/check`,
   GET_LIKE_COUNT: (postId: number) => `/likes/posts/${postId}/count`,
-  
+
   // 팔로우 관련 (accountName 기반) - 🔐 모든 엔드포인트 인증 필수
   FOLLOW: (accountName: string) => `/follows/${accountName}`,
   UNFOLLOW: (accountName: string) => `/follows/${accountName}`,
   CHECK_FOLLOW_STATUS: (accountName: string) => `/follows/check/${accountName}`,
   GET_FOLLOW_COUNTS: (accountName: string) => `/follows/count/${accountName}`,
-  GET_FOLLOWING_LIST: (accountName: string) => `/follows/following/${accountName}`,
-  GET_FOLLOWERS_LIST: (accountName: string) => `/follows/followers/${accountName}`,
+  GET_FOLLOWING_LIST: (accountName: string) =>
+    `/follows/following/${accountName}`,
+  GET_FOLLOWERS_LIST: (accountName: string) =>
+    `/follows/followers/${accountName}`,
   GET_MUTUAL_FOLLOWS: (accountName: string) => `/follows/mutual/${accountName}`,
-  
+
   // 마이룸 연동 - 🔐 인증 필수 (개인 사진 접근)
-  PHOTO_FOR_FEED_UPLOAD: (photoId: number) => `/myroom/photos/${photoId}/feed-upload-info`,
+  PHOTO_FOR_FEED_UPLOAD: (photoId: number) =>
+    `/myroom/photos/${photoId}/feed-upload-info`,
 } as const
 
 // ============================================================================
@@ -424,7 +440,7 @@ export const FEED_ERROR_CODES = {
   TOKEN_EXPIRED: 'TOKEN_EXPIRED',
   INVALID_TOKEN: 'INVALID_TOKEN',
   LOGIN_REQUIRED: 'LOGIN_REQUIRED',
-  
+
   // 일반 오류
   NETWORK_ERROR: 'NETWORK_ERROR',
   FORBIDDEN: 'FORBIDDEN',
@@ -437,7 +453,9 @@ export const FEED_ERROR_CODES = {
 } as const
 
 // 🔐 인증 오류 생성 헬퍼
-export const createAuthError = (message: string = '로그인이 필요합니다.'): FeedError => ({
+export const createAuthError = (
+  message: string = '로그인이 필요합니다.'
+): FeedError => ({
   code: FEED_ERROR_CODES.LOGIN_REQUIRED,
   message,
   isAuthError: true,
@@ -446,7 +464,9 @@ export const createAuthError = (message: string = '로그인이 필요합니다.
 })
 
 // 🔐 토큰 만료 오류 생성 헬퍼
-export const createTokenExpiredError = (message: string = '토큰이 만료되었습니다. 다시 로그인해주세요.'): FeedError => ({
+export const createTokenExpiredError = (
+  message: string = '토큰이 만료되었습니다. 다시 로그인해주세요.'
+): FeedError => ({
   code: FEED_ERROR_CODES.TOKEN_EXPIRED,
   message,
   isAuthError: true,
@@ -468,7 +488,7 @@ export function formatTimeAgo(dateString: string): string {
   if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}분 전`
   if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}시간 전`
   if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}일 전`
-  
+
   return date.toLocaleDateString('ko-KR')
 }
 
@@ -541,40 +561,40 @@ export interface CursorFeedsResult {
 // URL 파라미터 생성 함수
 export function buildPaginationQuery(params: CursorPaginationParams): string {
   const queryParams = new URLSearchParams()
-  
+
   if (params.limit) {
     queryParams.append('limit', params.limit.toString())
   }
-  
+
   if (params.cursor) {
     queryParams.append('cursor', params.cursor.toString())
   }
-  
+
   if (params.includePrivate) {
     queryParams.append('includePrivate', 'true')
   }
-  
+
   return queryParams.toString()
 }
 
 // 검색 파라미터 생성 함수
 export function buildSearchQuery(params: SearchParams): string {
   const queryParams = new URLSearchParams()
-  
+
   queryParams.append('query', params.query)
-  
+
   if (params.limit) {
     queryParams.append('limit', params.limit.toString())
   }
-  
+
   if (params.cursor) {
     queryParams.append('cursor', params.cursor.toString())
   }
-  
+
   if (params.includePrivate) {
     queryParams.append('includePrivate', 'true')
   }
-  
+
   return queryParams.toString()
 }
 
@@ -592,12 +612,12 @@ export function checkAuthenticationFromResponse<T>(response: ApiResponse<T>): {
     return {
       requiresAuth: true,
       tokenExpired: response.tokenExpired || false,
-      authError: response.tokenExpired 
+      authError: response.tokenExpired
         ? createTokenExpiredError()
         : createAuthError(),
     }
   }
-  
+
   return {
     requiresAuth: false,
     tokenExpired: false,
@@ -613,7 +633,7 @@ export function applyAuthErrorToInfiniteScroll(
   if (!authError || !authError.isAuthError) {
     return state
   }
-  
+
   return {
     ...state,
     isAuthError: true,
@@ -624,11 +644,9 @@ export function applyAuthErrorToInfiniteScroll(
 }
 
 // 인증 상태 체크 후 UI 상태 업데이트
-export function updateUIWithAuthState<T extends { requiresAuth?: boolean; isAuthError?: boolean }>(
-  item: T,
-  isAuthenticated: boolean,
-  hasAuthError: boolean = false
-): T {
+export function updateUIWithAuthState<
+  T extends { requiresAuth?: boolean; isAuthError?: boolean },
+>(item: T, isAuthenticated: boolean, hasAuthError: boolean = false): T {
   return {
     ...item,
     requiresAuth: !isAuthenticated,
@@ -641,21 +659,26 @@ export function updateUIWithAuthState<T extends { requiresAuth?: boolean; isAuth
 // ============================================================================
 
 // 인증 오류 응답 타입 가드
-export function isAuthErrorResponse(response: any): response is AuthErrorResponse {
+export function isAuthErrorResponse(
+  response: any
+): response is AuthErrorResponse {
   return (
     response &&
     response.error === true &&
     typeof response.code === 'string' &&
-    ['UNAUTHORIZED', 'TOKEN_EXPIRED', 'INVALID_TOKEN', 'LOGIN_REQUIRED'].includes(response.code)
+    [
+      'UNAUTHORIZED',
+      'TOKEN_EXPIRED',
+      'INVALID_TOKEN',
+      'LOGIN_REQUIRED',
+    ].includes(response.code)
   )
 }
 
 // 피드 오류 타입 가드
 export function isFeedError(error: any): error is FeedError {
   return (
-    error &&
-    typeof error.code === 'string' &&
-    typeof error.message === 'string'
+    error && typeof error.code === 'string' && typeof error.message === 'string'
   )
 }
 
@@ -693,11 +716,7 @@ export function logApiResponse<T>(
   if (process.env.NODE_ENV === 'development') {
     console.group(`🔍 API Response [${endpoint}]`)
     console.log('Response:', response)
-    console.log('Authentication:', {
-      isAuthenticated,
-      requiresAuth: response.requiresAuth,
-      tokenExpired: response.tokenExpired,
-    })
+
     if (response.error) {
       console.error('Error:', response.message)
     }

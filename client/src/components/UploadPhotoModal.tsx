@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { X, Edit } from 'lucide-react'
 import api from '@/lib/axios'
 import { resizeImage } from '@/utils/imageOptimizer'
+import { useAuthStore } from '@/stores/authStore'
 
 interface UploadPhotoModalProps {
   isOpen: boolean
@@ -23,6 +24,9 @@ export default function UploadPhotoModal({
   const [hasExistingImage, setHasExistingImage] = useState(false)
   const [loading, setLoading] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // authStore에서 setUser 함수 가져오기
+  const { user: currentUser, setUser } = useAuthStore()
 
   // 모달이 열릴 때마다 기존 이미지 확인
   useEffect(() => {
@@ -127,6 +131,16 @@ export default function UploadPhotoModal({
       })
 
       console.log('참조 이미지 저장 완료:', imageUrl)
+
+      // authStore의 user 정보 업데이트
+      if (currentUser) {
+        const updatedUser = {
+          ...currentUser,
+          faceImageUrl: imageUrl
+        }
+        setUser(updatedUser)
+        console.log('✅ authStore user 정보 업데이트:', updatedUser.faceImageUrl)
+      }
 
       // 완료 처리
       onComplete?.()

@@ -105,16 +105,28 @@ export default function PhotoCanvas({
         const participantCount = existingIds.length + index
         console.log(`➕ Adding participant to canvas via Yjs: ${id}`)
 
+        // Grid layout calculation
+        const gridCols = 2
+        const col = participantCount % gridCols
+        const row = Math.floor(participantCount / gridCols)
+        
+        // Position calculation for 512x512 canvas
+        const videoWidth = 220
+        const videoHeight = 165 // 4:3 ratio
+        const spacingX = (canvasSize.width - (videoWidth * gridCols)) / (gridCols + 1)
+        const spacingY = (canvasSize.height - (videoHeight * Math.ceil((participantCount + 1) / gridCols))) / (Math.ceil((participantCount + 1) / gridCols) + 1)
+        
         updatedParticipants[id] = {
           id,
-          x: Math.random() * 200,
-          y: Math.random() * 200,
-          width: 320,
-          height: 240,
+          x: spacingX + col * (videoWidth + spacingX),
+          y: spacingY + row * (videoHeight + spacingY),
+          width: videoWidth,
+          height: videoHeight,
           rotation: 0,
           scaleX: 1,
           scaleY: 1,
           lastInteractionTime: Date.now(),
+          aspectRatio: 4/3, // Default aspect ratio, will be updated when video loads
         }
       })
 
@@ -144,10 +156,26 @@ export default function PhotoCanvas({
     }
   }, [cameraTrackRefs, participants, roomName, selectedParticipant])
 
+  // 셔터 사운드 재생 함수
+  const playShutterSound = useCallback(() => {
+    try {
+      const audio = new Audio('/sounds/shutter.mp3')
+      audio.volume = 0.5 // 볼륨 50%로 설정
+      audio.play().catch(err => 
+        console.log('🔇 Shutter sound play failed:', err)
+      )
+    } catch (error) {
+      console.log('🔇 Audio creation failed:', error)
+    }
+  }, [])
+
   // 캡쳐 함수
   const captureImage = useCallback(() => {
     if (stageRef.current && onCapture) {
       console.log('📸 Capturing canvas image...')
+      
+      // 셔터 사운드 재생
+      playShutterSound()
 
       try {
         // Konva Stage를 이미지로 변환
@@ -160,15 +188,41 @@ export default function PhotoCanvas({
         console.log('✅ Canvas captured successfully')
 
         // 참가자들을 왼쪽에서 오른쪽 순서로 정렬하여 faceImageUrl 추출
+        console.log('🔍 === PARTICIPANTS MATCHING DEBUG ===')
+        console.log('Canvas participants:', Object.keys(participants))
+        console.log('LiveKit participants:', allParticipants.map(p => ({
+          identity: p.identity,
+          hasMetadata: !!p.metadata,
+          metadata: p.metadata ? JSON.parse(p.metadata || '{}') : null
+        })))
+        
         const sortedPersonIds = Object.entries(participants)
-          .sort(([, a], [, b]) => a.x - b.x)  // x 좌표 기준 정렬 (왼쪽 → 오른쪽)
+          .sort(([, a], [, b]) => (a.x + a.width/2) - (b.x + b.width/2))  // Center position sorting (left → right)
           .map(([participantId]) => {
             console.log(`🔍 Processing participant: ${participantId}, position: (${participants[participantId]?.x}, ${participants[participantId]?.y})`)
             
-            // LiveKit 참가자 찾기 (identity가 participantId를 포함하는 것 찾기)
-            const livekitParticipant = allParticipants.find(p => 
-              p.identity.includes(participantId)
+            // 1차: 정확한 매칭 시도
+            let livekitParticipant = allParticipants.find(p => 
+              p.identity === participantId
             )
+            
+            if (!livekitParticipant) {
+              console.log(`⚠️ Exact match failed for ${participantId}`)
+              console.log('Trying partial match...')
+              
+              // 2차: 부분 매칭 시도 (기존 로직)
+              livekitParticipant = allParticipants.find(p => 
+                p.identity.includes(participantId) || participantId.includes(p.identity)
+              )
+              
+              if (livekitParticipant) {
+                console.log(`✅ Partial match found: ${livekitParticipant.identity} for ${participantId}`)
+              } else {
+                console.log(`❌ No match found for ${participantId}`)
+              }
+            } else {
+              console.log(`✅ Exact match found: ${livekitParticipant.identity}`)
+            }
             
             if (livekitParticipant?.metadata) {
               try {
@@ -176,18 +230,36 @@ export default function PhotoCanvas({
                 console.log(`👤 Found metadata for ${participantId}:`, {
                   fullMetadata: metadata,
                   faceImageUrl: metadata.faceImageUrl ? metadata.faceImageUrl : 'null',
-                  hasUrl: !!metadata.faceImageUrl
+                  hasUrl: !!metadata.faceImageUrl,
+                  willReturn: metadata.faceImageUrl || ''
                 })
-                return metadata.faceImageUrl
+                return metadata.faceImageUrl || ''
               } catch (error) {
                 console.error(`❌ Failed to parse metadata for ${participantId}:`, error)
+                console.log('Raw metadata:', livekitParticipant.metadata)
+              }
+            } else {
+              console.log(`❌ No metadata found for ${participantId}`)
+              if (livekitParticipant) {
+                console.log('Participant exists but no metadata:', {
+                  identity: livekitParticipant.identity,
+                  hasMetadata: !!livekitParticipant.metadata,
+                  metadata: livekitParticipant.metadata
+                })
               }
             }
-            return null
+            console.log(`🔄 Returning empty string for ${participantId}`)
+            return ''
           })
-          .filter(url => url !== null)
 
         console.log(`🎯 Extracted ${sortedPersonIds.length} face image URLs in left-to-right order:`, sortedPersonIds)
+        console.log('🔍 === END PARTICIPANTS MATCHING DEBUG ===')
+        
+        // 빈 문자열 개수 체크
+        const emptyCount = sortedPersonIds.filter(id => id === '').length
+        if (emptyCount > 0) {
+          console.log(`⚠️ WARNING: ${emptyCount} empty strings found in personIds!`)
+        }
 
         // onCapture에 정렬된 personIds도 함께 전달
         onCapture(dataURL, sortedPersonIds)
@@ -195,7 +267,7 @@ export default function PhotoCanvas({
         console.error('❌ Failed to capture canvas:', error)
       }
     }
-  }, [onCapture, currentCutIndex, cutCount, participants, allParticipants])
+  }, [onCapture, currentCutIndex, cutCount, participants, allParticipants, playShutterSound])
 
   // isCapturing 상태 변화 감지하여 자동 캡쳐
   useEffect(() => {
@@ -250,10 +322,46 @@ export default function PhotoCanvas({
         video.muted = true
         video.playsInline = true
         video.style.display = 'none'
+        video.style.transform = 'scaleX(-1)'  // 거울모드 적용
 
         try {
           track.attach(video)
           document.body.appendChild(video)
+
+          // Video metadata 로드 시 실제 해상도 감지 및 참가자 크기 업데이트
+          video.onloadedmetadata = () => {
+            const actualWidth = video.videoWidth
+            const actualHeight = video.videoHeight
+            const aspectRatio = actualWidth / actualHeight
+            
+            console.log(`📐 Video dimensions detected for ${participantId}:`, {
+              width: actualWidth,
+              height: actualHeight,
+              aspectRatio: aspectRatio.toFixed(2)
+            })
+
+            // Calculate dynamic size based on aspect ratio (keep base width 320)
+            const baseWidth = 320
+            const dynamicHeight = Math.round(baseWidth / aspectRatio)
+            
+            // Update participant with aspect ratio and dynamic size
+            if (roomName && participants[participantId]) {
+              const updatedParticipants = {
+                ...participants,
+                [participantId]: {
+                  ...participants[participantId],
+                  width: baseWidth,
+                  height: dynamicHeight,
+                  aspectRatio: aspectRatio,
+                  scaleX: participants[participantId]?.scaleX || 1,
+                  scaleY: participants[participantId]?.scaleY || 1,
+                  lastInteractionTime: Date.now(),
+                }
+              }
+              updatePhotoCanvasState(roomName, { participants: updatedParticipants })
+              console.log(`🔄 Updated ${participantId} size to ${baseWidth}x${dynamicHeight} (${aspectRatio.toFixed(2)})`)
+            }
+          }
 
           newVideoElements[participantId] = video
 
@@ -317,8 +425,12 @@ export default function PhotoCanvas({
       const ctx = canvas.getContext('2d', { willReadFrequently: true })
       if (!ctx) return
 
-      // 비디오 현재 프레임 그리기
+      // 비디오 현재 프레임 그리기 (거울모드 적용)
+      ctx.save()
+      ctx.scale(-1, 1)  // 수평 반전
+      ctx.translate(-canvas.width, 0)  // 위치 조정
       ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height)
+      ctx.restore()
 
       // 크로마키 처리
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
@@ -388,12 +500,13 @@ export default function PhotoCanvas({
       const selectedNode = stage.findOne(`#${selectedId}`)
       if (selectedNode) {
         transformerRef.current.nodes([selectedNode])
-        transformerRef.current.getLayer()?.batchDraw()
+        // batchDraw 대신 draw() 한 번만 사용하여 성능 최적화
+        transformerRef.current.getLayer()?.draw()
       }
     } else if (transformerRef.current) {
       // 선택 해제 시 Transformer 제거
       transformerRef.current.nodes([])
-      transformerRef.current.getLayer()?.batchDraw()
+      transformerRef.current.getLayer()?.draw()
     }
   }, [selectedId])
 
@@ -490,8 +603,8 @@ export default function PhotoCanvas({
             width: participants[participantId]?.width || 320,
             height: participants[participantId]?.height || 240,
             rotation: participants[participantId]?.rotation || 0,
-            scaleX: 1,
-            scaleY: 1,
+            scaleX: participants[participantId]?.scaleX || -1, // Always maintain mirror mode
+            scaleY: participants[participantId]?.scaleY || 1,
             lastInteractionTime: Date.now(),
           },
         }
@@ -545,6 +658,7 @@ export default function PhotoCanvas({
         height={canvasSize.height}
         className="overflow-hidden rounded-xl border-2 border-gray-300 shadow-lg"
         onClick={handleStageClick}
+        onTap={handleStageClick}
       >
         {/* 배경 레이어 */}
         <Layer>
@@ -585,7 +699,7 @@ export default function PhotoCanvas({
         {/* 참가자 비디오 레이어 */}
         <Layer>
           {/* LiveKit 참가자 비디오들 (VirtualBackground 지원) - Z-Index 정렬됨 */}
-          {sortedCameraTracksByZIndex.map((trackRef, index) => {
+          {sortedCameraTracksByZIndex.map((trackRef) => {
             const participantId = trackRef.participant.identity
             const videoElement = videoElements[participantId]
             const processedCanvas = processedCanvases[participantId]
@@ -632,6 +746,8 @@ export default function PhotoCanvas({
                   width={currentTransform.width}
                   height={currentTransform.height}
                   rotation={currentTransform.rotation || 0}
+                  scaleX={currentTransform.scaleX || 1}
+                  scaleY={currentTransform.scaleY || 1}
                   image={displayImage}
                   stroke={
                     selectedId === `video-${participantId}`
@@ -644,6 +760,17 @@ export default function PhotoCanvas({
                     console.log(
                       `📹 Video clicked: ${participantId} - bringing to front`
                     )
+                    // 선택된 노드를 최상위로 이동
+                    e.target.moveToTop()
+                    handleSelect(`video-${participantId}`)
+                  }}
+                  onTap={e => {
+                    e.cancelBubble = true
+                    console.log(
+                      `📹 Video tapped: ${participantId} - bringing to front`
+                    )
+                    // 선택된 노드를 최상위로 이동
+                    e.target.moveToTop()
                     handleSelect(`video-${participantId}`)
                   }}
                   onDragEnd={e => {
@@ -664,6 +791,8 @@ export default function PhotoCanvas({
                           width: currentTransform.width,
                           height: currentTransform.height,
                           rotation: currentTransform.rotation || 0,
+                          scaleX: participants[participantId]?.scaleX || 1,
+                          scaleY: participants[participantId]?.scaleY || 1,
                           lastInteractionTime: Date.now(),
                         },
                       }
@@ -677,18 +806,28 @@ export default function PhotoCanvas({
                     const scaleX = node.scaleX()
                     const scaleY = node.scaleY()
 
+                    // Use absolute value for size calculation (mirror mode fix)
+                    const absScaleX = Math.abs(scaleX)
+                    const absScaleY = Math.abs(scaleY)
+
+                    // Calculate new dimensions with absolute scale
+                    const newWidth = Math.max(
+                      50,
+                      (participants[participantId]?.width || 320) * absScaleX
+                    )
+                    const newHeight = Math.max(
+                      50,
+                      (participants[participantId]?.height || 240) * absScaleY
+                    )
+
                     console.log(`🔄 Video transformed: ${participantId}`, {
                       x: node.x(),
                       y: node.y(),
-                      width: Math.max(
-                        5,
-                        (participants[participantId]?.width || 320) * scaleX
-                      ),
-                      height: Math.max(
-                        5,
-                        (participants[participantId]?.height || 240) * scaleY
-                      ),
+                      width: newWidth,
+                      height: newHeight,
                       rotation: node.rotation(),
+                      scaleX: absScaleX,
+                      scaleY: absScaleY,
                     })
 
                     // Transform 완료 시 Yjs에 최종 상태 저장
@@ -700,15 +839,10 @@ export default function PhotoCanvas({
                           x: node.x(),
                           y: node.y(),
                           rotation: node.rotation(),
-                          width: Math.max(
-                            5,
-                            (participants[participantId]?.width || 320) * scaleX
-                          ),
-                          height: Math.max(
-                            5,
-                            (participants[participantId]?.height || 240) *
-                              scaleY
-                          ),
+                          width: newWidth,
+                          height: newHeight,
+                          scaleX: 1,
+                          scaleY: 1,
                           lastInteractionTime: Date.now(),
                         },
                       }
@@ -716,9 +850,13 @@ export default function PhotoCanvas({
                         participants: updatedParticipants,
                       })
 
-                      // Transform 완료 후 스케일 리셋
-                      node.scaleX(1)
-                      node.scaleY(1)
+                      // Transform 완료 후 스케일 리셋 (거울모드 유지)
+                      requestAnimationFrame(() => {
+                        node.scaleX(1)
+                        node.scaleY(1)
+                        node.width(newWidth)
+                        node.height(newHeight)
+                      })
                     }
                   }}
                 />
@@ -735,7 +873,7 @@ export default function PhotoCanvas({
               borderStrokeWidth={2}
               anchorStroke="#4ECDC4"
               anchorFill="white"
-              anchorSize={8}
+              anchorSize={window.matchMedia && window.matchMedia('(pointer: coarse)').matches ? 16 : 8}
               anchorCornerRadius={2}
               boundBoxFunc={(oldBox, newBox) => {
                 // 최소 크기 제한

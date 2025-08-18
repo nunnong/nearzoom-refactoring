@@ -77,15 +77,12 @@ export const CursorProvider = ({
     if (username && room?.localParticipant) {
       userIdRef.current = room.localParticipant.identity || username
       userColorRef.current = generateUserColor(userIdRef.current)
-      // console.log('🎯 User ID initialized:', userIdRef.current)
     }
   }, [username, room?.localParticipant])
 
   // LiveKit Data Packet 수신 처리
   useEffect(() => {
     if (!room) return
-    
-    // console.log('🎯 Setting up LiveKit cursor data listener')
     
     const handleDataReceived = (
       payload: Uint8Array, 

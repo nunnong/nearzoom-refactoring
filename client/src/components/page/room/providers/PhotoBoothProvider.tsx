@@ -199,9 +199,6 @@ export const PhotoBoothProvider = ({
       const storedPhotos = loadPhotosFromStorage(roomNameToSet)
 
       if (storedPhotos.length > 0) {
-        console.log(
-          `📂 Loaded ${storedPhotos.length} photos from localStorage for host`
-        )
         store.setState({ capturedImages: storedPhotos })
       }
     } else {

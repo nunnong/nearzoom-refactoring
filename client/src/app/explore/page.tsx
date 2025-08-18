@@ -32,10 +32,6 @@ const ExplorePostItem = ({ post }: { post: any }) => {
   const router = useRouter()
   const { user } = useAuthStore() // 현재 사용자 정보 가져오기
 
-  // 디버깅: post 데이터 확인
-  console.log('🔍 ExplorePostItem post 데이터:', post);
-  console.log('🔍 post.userEmail:', post.userEmail);
-  console.log('🔍 post.authorEmail:', post.authorEmail);
 
   const handleLike = (e: React.MouseEvent) => {
     e.stopPropagation() // 클릭 이벤트 전파 방지

@@ -655,7 +655,6 @@ const FeedViewer: React.FC<FeedViewerProps> = ({
       (entries) => {
         const [entry] = entries;
         if (entry.isIntersecting) {
-          console.log('🔥 무한스크롤 트리거됨');
           loadMoreFeeds();
         }
       },

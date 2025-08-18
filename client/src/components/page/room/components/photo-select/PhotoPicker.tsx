@@ -4,14 +4,12 @@ import Image from 'next/image'
 
 interface PhotoPickerProps {
   photos: string[]
-  cutCount: number
   selected: string[]
   onSelect: (selected: string[]) => void
 }
 
 export default function PhotoPicker({
   photos,
-  cutCount,
   selected,
   onSelect,
 }: PhotoPickerProps) {
@@ -20,12 +18,8 @@ export default function PhotoPicker({
     if (newSelected.includes(photo)) {
       newSelected = newSelected.filter(p => p !== photo)
     } else {
-      if (newSelected.length < cutCount) {
-        newSelected.push(photo)
-      } else {
-        newSelected.shift()
-        newSelected.push(photo)
-      }
+      // 자유 선택 - 제한 없음
+      newSelected.push(photo)
     }
     onSelect(newSelected)
   }
@@ -34,12 +28,25 @@ export default function PhotoPicker({
     const index = selected.indexOf(photo)
     return index >= 0 ? index + 1 : null
   }
-
+  
   return (
     <div>
       <h3 className="mb-3 text-center text-lg font-semibold text-gray-800">
-        사진 선택 ({selected.length}/{cutCount})
+        사진 선택 ({selected.length}장 선택됨)
       </h3>
+      
+      {/* 선택 안내 메시지 */}
+      <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 p-3 text-center">
+        <p className="text-sm text-blue-700">
+          📸 1장, 2장 또는 4장을 선택하세요.
+        </p>
+        {selected.length > 0 && ![1, 2, 4].includes(selected.length) && (
+          <p className="text-xs text-orange-600 mt-1">
+            현재 {selected.length}장 선택됨 - 유효한 개수가 아닙니다.
+          </p>
+        )}
+      </div>
+      
       <div className="grid grid-cols-2 gap-4">
         {photos.map((photo, idx) => {
           const order = getPhotoOrder(photo)

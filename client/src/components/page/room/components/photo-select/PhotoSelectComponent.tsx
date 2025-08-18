@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useParticipants, useLocalParticipant } from '@livekit/components-react'
 import ControlPanel from '../ControlPanel'
 import FrameColorSelector from '../photo-select/FrameColorSelector'
-import PhotoCutSelector from '../photo-select/PhotoCutSelector'
 import PhotoPicker from '../photo-select/PhotoPicker'
 import Preview from '../photo-select/Preview'
 import StartButton from '../photo-select/StartButton'
@@ -30,7 +29,6 @@ export default function PhotoSelectComponent({
   const [showWelcomeModal, setShowWelcomeModal] = useState(true)
 
   // Yjs store에서 상태 가져오기
-  const cutCount = usePhotoBoothStore(state => state.cutCount)
   const selectedPhotos = usePhotoBoothStore(state => state.selectedPhotos) // Photo objects array
   const frameColor = usePhotoBoothStore(state => state.frameColor)
   const capturedImages = usePhotoBoothStore(state => state.capturedImages)
@@ -38,7 +36,6 @@ export default function PhotoSelectComponent({
   const roomName = usePhotoBoothStore(state => state.roomName)
 
   // Yjs store 액션들
-  const setCutCount = usePhotoBoothStore(state => state.setCutCount)
   const setSelectedPhotos = usePhotoBoothStore(state => state.setSelectedPhotos)
   const setFrameColor = usePhotoBoothStore(state => state.setFrameColor)
   const setPhotoBoothState = usePhotoBoothStore(
@@ -66,24 +63,9 @@ export default function PhotoSelectComponent({
     return photoUrls.length > 0 ? photoUrls : []
   }, [selectedPhotos])
 
-  // 촬영된 사진 개수에 따라 최대 선택 가능한 컷 수 결정
-  const maxAvailableCuts = useMemo(() => {
-    const photoCount = capturedPhotos.length
-    console.log('📸 Available photo count:', photoCount)
-    
-    if (photoCount >= 4) return 4
-    if (photoCount >= 2) return 2
-    if (photoCount >= 1) return 1
-    return 1 // 최소 1컷은 선택 가능하도록
-  }, [capturedPhotos.length])
+  // cutCount 관련 로직 제거 - 자유 선택으로 변경
 
-  // cutCount가 사용 가능한 사진 수를 초과하면 자동으로 조정
-  useMemo(() => {
-    if (cutCount > maxAvailableCuts) {
-      console.log(`📸 Adjusting cutCount from ${cutCount} to ${maxAvailableCuts}`)
-      setCutCount(maxAvailableCuts)
-    }
-  }, [cutCount, maxAvailableCuts, setCutCount])
+  // cutCount 자동 조정 제거 - 사용자가 자유롭게 선택할 수 있도록
 
   // PhotoPicker를 위한 선택된 이미지 URL 배열 (로컬 상태)
   const [selectedImageUrls, setSelectedImageUrls] = useState<string[]>([])
@@ -91,17 +73,17 @@ export default function PhotoSelectComponent({
   // API 호출 로딩 상태
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // selectedPhotos가 변경되면 selectedImageUrls도 업데이트
-  useMemo(() => {
-    if (!selectedPhotos || !Array.isArray(selectedPhotos)) {
-      setSelectedImageUrls([])
-      return
+  // selectedPhotos 초기 동기화 (로컬 선택이 비어있을 때만)
+  useEffect(() => {
+    // 초기 로드 시에만 Yjs store에서 로컬로 동기화
+    if (selectedImageUrls.length === 0 && selectedPhotos && Array.isArray(selectedPhotos)) {
+      const urls = selectedPhotos
+        .filter(photo => photo !== null && photo !== undefined && typeof photo === 'object' && photo.imgUrl)
+        .map(photo => photo!.imgUrl)
+      if (urls.length > 0) {
+        setSelectedImageUrls(urls)
+      }
     }
-    
-    const urls = selectedPhotos
-      .filter(photo => photo !== null && photo !== undefined && typeof photo === 'object' && photo.imgUrl)
-      .map(photo => photo!.imgUrl)
-    setSelectedImageUrls(urls)
   }, [selectedPhotos])
 
   const frameColors = useMemo(() => [
@@ -113,11 +95,7 @@ export default function PhotoSelectComponent({
     '#2D3243',
   ], [])
 
-  // 컷수 변경 핸들러
-  const handleCutCountChange = useCallback((count: number) => {
-    setCutCount(count)
-    setSelectedImageUrls([]) // 로컬 선택 초기화
-  }, [setCutCount])
+  // 컷수 변경 핸들러 제거 - 자유 선택으로 변경
 
   // PhotoPicker 선택 변경 핸들러
   const handlePhotoSelection = useCallback((urls: string[]) => {
@@ -126,8 +104,10 @@ export default function PhotoSelectComponent({
 
   // 완료 핸들러
   const handleComplete = useCallback(async () => {
-    if (selectedImageUrls.length !== cutCount) {
-      alert('먼저 사진을 선택해주세요.')
+    // 유효한 선택 개수 확인 (1, 2, 또는 4장)
+    const validCounts = [1, 2, 4]
+    if (!validCounts.includes(selectedImageUrls.length)) {
+      alert('1장, 2장 또는 4장을 선택해주세요.')
       return
     }
 
@@ -148,7 +128,6 @@ export default function PhotoSelectComponent({
         frameColor: frameColor
       }
 
-      console.log('요청 데이터:', requestData)
       
       const response = await api.post(API_ENDPOINTS.PHOTO_SELECTION, requestData)
       
@@ -175,13 +154,13 @@ export default function PhotoSelectComponent({
     } finally {
       setIsSubmitting(false)
     }
-  }, [selectedImageUrls, cutCount, frameColor, capturedPhotos, roomName, setPhotoBoothState, initializeEditSession])
+  }, [selectedImageUrls, frameColor, capturedPhotos, roomName, setPhotoBoothState, initializeEditSession])
 
   // 완료 버튼 비활성화 상태
-  const isCompleteDisabled = useMemo(() => 
-    selectedImageUrls.length !== cutCount || isSubmitting,
-    [selectedImageUrls.length, cutCount, isSubmitting]
-  )
+  const isCompleteDisabled = useMemo(() => {
+    const validCounts = [1, 2, 4]
+    return !validCounts.includes(selectedImageUrls.length) || isSubmitting
+  }, [selectedImageUrls.length, isSubmitting])
 
   // Modal close handler
   const handleWelcomeModalClose = useCallback(() => {
@@ -204,17 +183,10 @@ export default function PhotoSelectComponent({
                   사진 선택
                 </h2>
                 
-                <div className="flex justify-center">
-                  <PhotoCutSelector 
-                    cutCount={cutCount} 
-                    onChange={handleCutCountChange}
-                    maxAvailable={maxAvailableCuts}
-                  />
-                </div>
+                {/* PhotoCutSelector 제거 - 자유 선택으로 변경 */}
                 
                 <PhotoPicker
                   photos={capturedPhotos}
-                  cutCount={cutCount}
                   selected={selectedImageUrls}
                   onSelect={handlePhotoSelection}
                 />
@@ -238,7 +210,7 @@ export default function PhotoSelectComponent({
                   <div className="mb-2 text-sm text-gray-500 sm:text-base">미리보기</div>
                   <div className="flex justify-center">
                     <Preview
-                      cutCount={cutCount}
+                      cutCount={selectedImageUrls.length}
                       selectedPhotos={selectedImageUrls}
                       frameColor={frameColor}
                       className="max-w-full"
@@ -262,10 +234,10 @@ export default function PhotoSelectComponent({
                       ) : (
                         <>
                           <span className="hidden sm:inline">
-                            {cutCount}장의 사진을 모두 선택해주세요
+                            1장, 2장 또는 4장을 선택해주세요
                           </span>
                           <span className="sm:hidden">
-                            {cutCount}장 선택 필요
+                            1, 2 또는 4장 선택 필요
                           </span>
                         </>
                       )}

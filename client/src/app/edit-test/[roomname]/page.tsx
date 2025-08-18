@@ -21,17 +21,6 @@ export default function RoomTestPage() {
   const router = useRouter()
   const { isAuthenticated, isLoading: authLoading, user, setUser } = useAuthStore()
 
-  // 사용자 상태 디버깅
-  useEffect(() => {
-    console.log('=== 사용자 상태 디버깅 ===')
-    console.log('isAuthenticated:', isAuthenticated)
-    console.log('authLoading:', authLoading)
-    console.log('user 전체 객체:', user)
-    console.log('user?.faceImageUrl:', user?.faceImageUrl)
-    console.log('user?.faceImageUrl 타입:', typeof user?.faceImageUrl)
-    console.log('user?.faceImageUrl 존재 여부:', !!user?.faceImageUrl)
-  }, [isAuthenticated, authLoading, user])
-
   const roomId = params.roomname as string
   const [results, setResults] = useState<Record<string, ApiResult>>({})
   const [loading, setLoading] = useState<Record<string, boolean>>({})
@@ -95,7 +84,6 @@ export default function RoomTestPage() {
       if (!isAuthenticated) {
         if (hasToken) {
           // 토큰은 있는데 아직 인증되지 않은 상태 - 조금 더 대기
-          console.log('토큰 존재, AuthProvider 초기화 대기 중...')
           timeoutId = setTimeout(() => {
             setAuthCheckComplete(true)
           }, 2000) // 2초 후 최종 체크
@@ -362,11 +350,6 @@ export default function RoomTestPage() {
     setLoading(prev => ({ ...prev, 'face-image': true }))
     
     try {
-      console.log('=== 얼굴 사진 저장 시작 (두 단계 업로드) ===')
-      console.log('selectedImage:', selectedImage)
-      console.log('selectedImage.name:', selectedImage.name)
-      console.log('selectedImage.size:', selectedImage.size)
-      console.log('selectedImage.type:', selectedImage.type)
       
       // 1단계: 외부 이미지 서버에 업로드
       const formData = new FormData()

@@ -200,8 +200,6 @@ const profileSettingsAPI = {
   // 🔥 GET /user/check-account-name - 계정명 중복 확인
   checkAccountName: async (accountName: string): Promise<void> => {
     try {
-      console.log('🔍 계정명 중복 확인:', accountName);
-      
       const response = await api.get<ApiResponse<void>>(
         `/user/check-account-name?accountName=${encodeURIComponent(accountName)}`
       );

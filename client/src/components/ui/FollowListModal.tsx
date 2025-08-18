@@ -105,8 +105,6 @@ const followListAPI = {
   // 🔥 GET /follows/followers/{accountName} - 팔로워 목록 조회
   getFollowersByAccountName: async (accountName: string): Promise<BackendUserProfileResponse[]> => {
     try {
-      console.log(`🔍 팔로워 목록 조회: ${accountName}`);
-      
       const response = await api.get<ApiResponse<BackendUserProfileResponse[]>>(
         `/follows/followers/${accountName}`
       );
@@ -116,8 +114,6 @@ const followListAPI = {
       }
       
       const followers = response.data.data || [];
-      console.log(`✅ 팔로워 목록 조회 성공: ${followers.length}명`);
-      
       return followers;
     } catch (error) {
       console.error('❌ 팔로워 목록 조회 실패:', error);
@@ -128,8 +124,6 @@ const followListAPI = {
   // 🔥 GET /follows/following/{accountName} - 팔로잉 목록 조회
   getFollowingByAccountName: async (accountName: string): Promise<BackendUserProfileResponse[]> => {
     try {
-      console.log(`🔍 팔로잉 목록 조회: ${accountName}`);
-      
       const response = await api.get<ApiResponse<BackendUserProfileResponse[]>>(
         `/follows/following/${accountName}`
       );
@@ -139,7 +133,6 @@ const followListAPI = {
       }
       
       const following = response.data.data || [];
-      console.log(`✅ 팔로잉 목록 조회 성공: ${following.length}명`);
       
       return following;
     } catch (error) {

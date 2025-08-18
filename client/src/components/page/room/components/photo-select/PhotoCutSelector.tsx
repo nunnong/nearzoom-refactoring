@@ -6,14 +6,16 @@ interface PhotoCutSelectorProps {
   cutCount: number
   onChange: (count: number) => void
   maxAvailable?: number
+  availablePhotos?: number
 }
 
-export default function PhotoCutSelector({ cutCount, onChange, maxAvailable = 4 }: PhotoCutSelectorProps) {
+export default function PhotoCutSelector({ cutCount, onChange, maxAvailable = 4, availablePhotos = 0 }: PhotoCutSelectorProps) {
   return (
     <div className="text-center">
       <div className="relative mx-auto flex w-64 flex-wrap rounded-lg bg-[#D0D6ED]/50 p-0.5 text-sm shadow-sm">
         {[1, 2, 4].map(n => {
-          const isAvailable = n <= maxAvailable
+          // 실제 사진 수에 따라 선택 가능 여부 결정
+          const isAvailable = availablePhotos >= n
           const isDisabled = !isAvailable
           
           return (
@@ -49,9 +51,9 @@ export default function PhotoCutSelector({ cutCount, onChange, maxAvailable = 4 
           )
         })}
       </div>
-      {maxAvailable < 4 && (
+      {availablePhotos < 4 && availablePhotos > 0 && (
         <p className="mt-2 text-xs text-gray-500">
-          촬영된 사진: {maxAvailable}장 (최대 {maxAvailable}컷까지 선택 가능)
+          촬영된 사진: {availablePhotos}장 ({availablePhotos >= 4 ? '모든 컷' : availablePhotos >= 2 ? '1-2컷' : '1컷만'} 선택 가능)
         </p>
       )}
     </div>

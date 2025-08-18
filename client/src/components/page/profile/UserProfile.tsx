@@ -336,7 +336,6 @@ const UserProfile: React.FC<UserProfileProps> = ({
     setError(null);
 
     try {
-      console.log(`🔥 ${accountName}의 프로필 데이터 로드 시작`);
 
       const userInfo = await userProfileAPI.getUserByAccountName(accountName);
       setUserProfile(userInfo);
@@ -359,7 +358,6 @@ const UserProfile: React.FC<UserProfileProps> = ({
         setPosts(postsResult.value);
       }
 
-      console.log(`✅ ${accountName}의 프로필 데이터 로드 완료`);
 
     } catch (err: any) {
       console.error(`❌ ${accountName}의 프로필 로드 실패:`, err);
