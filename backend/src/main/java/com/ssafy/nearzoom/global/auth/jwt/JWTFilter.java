@@ -1,5 +1,6 @@
 package com.ssafy.nearzoom.global.auth.jwt;
 
+import com.ssafy.nearzoom.domain.user.entity.Social;
 import com.ssafy.nearzoom.global.auth.oauth2.dto.CustomOAuth2User;
 import com.ssafy.nearzoom.global.auth.oauth2.dto.OAuth2UserDto;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -43,13 +44,16 @@ public class JWTFilter extends OncePerRequestFilter {
         }
 
         String category = jwtUtil.getCategory(token);
+
         if (!"access".equals(category)) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return;
         }
 
         String email = jwtUtil.getEmail(token);
-        OAuth2UserDto dto = new OAuth2UserDto(email);
+        Social social = jwtUtil.getSocial(token);
+
+        OAuth2UserDto dto = new OAuth2UserDto(email, social);
         CustomOAuth2User principal = new CustomOAuth2User(dto);
 
         Authentication authentication = new UsernamePasswordAuthenticationToken(

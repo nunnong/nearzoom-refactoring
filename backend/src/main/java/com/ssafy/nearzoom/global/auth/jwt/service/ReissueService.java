@@ -32,7 +32,7 @@ public class ReissueService {
         }
 
         String newAccessToken = jwtUtil.createAccessToken(name, email, social);
-        String newRefreshToken = jwtUtil.createRefreshToken(email);
+        String newRefreshToken = jwtUtil.createRefreshToken(email, social);
 
         refreshTokenService.save(email, newRefreshToken);
 

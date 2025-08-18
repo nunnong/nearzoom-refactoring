@@ -17,6 +17,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @EntityListeners(AuditingEntityListener.class)
 public class BaseEntity {
 
+    @Column(updatable = false)
     @CreatedDate
     @Comment("생성일")
     private LocalDateTime createdAt;
@@ -32,17 +33,16 @@ public class BaseEntity {
 
     @PrePersist
     public void prePersist() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now().plusHours(9);
     }
 
     @PreUpdate
     public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now().plusHours(9);
     }
 
-    // soft delete
     public void markDeleted() {
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = LocalDateTime.now().plusHours(9);
     }
 
     public void restore() {

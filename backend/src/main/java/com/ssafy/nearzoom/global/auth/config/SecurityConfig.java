@@ -32,8 +32,9 @@ public class SecurityConfig {
         http.cors(cors -> cors.configurationSource(request -> {
             CorsConfiguration config = new CorsConfiguration();
 
-            config.setAllowedOrigins(List.of("http://localhost:3000"));
-            config.setAllowedMethods(List.of("GET", "POST", "DELETE", "PATCH"));
+            config.setAllowedOrigins(List.of("https://nearzoom.store", "https://www.nearzoom.store",
+                "http://localhost:3000"));
+            config.setAllowedMethods(List.of("GET", "POST", "DELETE", "PATCH", "PUT", "OPTIONS"));
             config.setAllowedHeaders(List.of("*"));
             config.setAllowCredentials(true);
             config.setExposedHeaders(List.of("Set-Cookie", "Authorization"));
@@ -69,7 +70,9 @@ public class SecurityConfig {
 
         http.authorizeHttpRequests(
             (auth) -> auth
-                .requestMatchers("/auth/refresh", "user/logout").permitAll()
+                .requestMatchers("/auth/refresh", "/user/logout", "/webhooks/**", "/oauth2/**",
+                    "/login/oauth2/**")
+                .permitAll()
                 .anyRequest().authenticated());
 
         http.sessionManagement(

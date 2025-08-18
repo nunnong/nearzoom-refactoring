@@ -1,0 +1,52 @@
+pipeline {
+    agent any
+
+    environment {
+        ENV_FILE_ID = '720df111-d8d6-4035-b618-1e03ae9ec433'
+        GIT_CREDENTIALS_ID = 'd719d5d7-c8aa-4e55-940d-c2963d52219e'
+        GIT_REPO_URL = 'https://lab.ssafy.com/s13-webmobile1-sub1/S13P11A605.git'
+        GIT_BRANCH = 'backend'
+    }
+
+    stages {
+        stage('Clone') {
+            steps {
+                git credentialsId: "${GIT_CREDENTIALS_ID}", url: "${GIT_REPO_URL}", branch: "${GIT_BRANCH}"
+            }
+        }
+
+        stage('Setup Secrets') {
+            steps {
+                withCredentials([file(credentialsId: "${ENV_FILE_ID}", variable: 'ENV_FILE')]) {
+                    sh '''
+                        cd backend
+                        cp "$ENV_FILE" .env
+                        chmod 644 .env
+                    '''
+                }
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh '''
+                    cd backend
+                    chmod +x gradlew
+                    ./gradlew clean build -x test --no-daemon
+                    cp build/libs/nearzoom-0.0.1-SNAPSHOT.jar app.jar
+                '''
+            }
+        }
+
+        stage('Docker Compose Up') {
+            steps {
+                sh '''
+                    cd backend
+                    docker compose down || true
+                    docker compose up -d --build
+                    docker compose ps
+                '''
+            }
+        }
+    }
+}

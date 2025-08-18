@@ -10,9 +10,6 @@ import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/**
- * JWT 토큰 생성/파싱/만료 검증 등 JWT 관련 유틸리티
- */
 @Component
 public class JWTUtil {
 
@@ -35,7 +32,7 @@ public class JWTUtil {
         return Jwts.builder()
             .claim("name", name)
             .claim("email", email)
-            .claim("social", social)
+            .claim("social", social.name())
             .claim("category", "access")
             .issuedAt(new Date())
             .expiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
@@ -43,9 +40,10 @@ public class JWTUtil {
             .compact();
     }
 
-    public String createRefreshToken(String email) {
+    public String createRefreshToken(String email, Social social) {
         return Jwts.builder()
             .claim("email", email)
+            .claim("social", social.name())
             .claim("category", "refresh")
             .issuedAt(new Date())
             .expiration(new Date(System.currentTimeMillis() + refreshTokenExpiration))
@@ -63,17 +61,14 @@ public class JWTUtil {
             .get("email", String.class);
     }
 
-    public String getRole(String token) {
-        return Jwts.parser().setSigningKey(secretKey).build().parseClaimsJws(token).getBody()
-            .get("role", String.class);
-    }
 
     public Social getSocial(String token) {
-        return Jwts.parser().setSigningKey(secretKey).build().parseClaimsJws(token).getBody()
-            .get("social", Social.class);
+        String socialStr = Jwts.parser().setSigningKey(secretKey).build().parseClaimsJws(token)
+            .getBody()
+            .get("social", String.class);    // 무조건 String.class로!
+        return socialStr != null ? Social.valueOf(socialStr) : null;
     }
 
-    // 수정
     public String getCategory(String token) {
         return Jwts.parser().setSigningKey(secretKey).build().parseSignedClaims(token).getBody()
             .get("category", String.class);
@@ -82,15 +77,5 @@ public class JWTUtil {
     public Boolean isExpired(String token) {
         return Jwts.parser().setSigningKey(secretKey).build().parseClaimsJws(token).getBody()
             .getExpiration().before(new Date());
-    }
-
-    public long getExpiry(String token) {
-        return Jwts.parser()
-            .setSigningKey(secretKey)
-            .build()
-            .parseClaimsJws(token)
-            .getBody()
-            .getExpiration()
-            .getTime();
     }
 }
