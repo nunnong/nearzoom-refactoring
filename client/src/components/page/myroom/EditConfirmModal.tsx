@@ -38,7 +38,7 @@ const EditConfirmModal: React.FC<EditConfirmModalProps> = ({
     console.log(`photoId: ${image.photoId}로 피드 편집 페이지 이동`)
     
     // 피드 편집 페이지로 이동
-    router.push(`/feed/edit?photoId=${image.photoId}`)
+    router.push(`/drawing?photoId=${image.photoId}`)
     
     // 모달 닫기
     onConfirm()
