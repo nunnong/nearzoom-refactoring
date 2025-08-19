@@ -29,34 +29,27 @@ function ScrollToTopButton() {
   const scrollToTop = () => {
     window.scrollTo({
       top: 0,
-      behavior: 'smooth'
+      behavior: 'smooth',
     })
   }
 
   return (
     <button
       onClick={scrollToTop}
-      className={`
-        fixed bottom-8 right-8 z-50 w-12 h-12 
-        bg-black/80 hover:bg-black text-white
-        backdrop-blur-sm border border-white/10 hover:border-white/20
-        rounded-full shadow-lg hover:shadow-xl
-        transition-all duration-300 ease-out
-        flex items-center justify-center group
-        ${isVisible 
-          ? 'opacity-100 translate-y-0 pointer-events-auto' 
-          : 'opacity-0 translate-y-4 pointer-events-none'
-        }
-      `}
+      className={`group fixed right-8 bottom-8 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-black/80 text-white shadow-lg backdrop-blur-sm transition-all duration-300 ease-out hover:border-white/20 hover:bg-black hover:shadow-xl ${
+        isVisible
+          ? 'pointer-events-auto translate-y-0 opacity-100'
+          : 'pointer-events-none translate-y-4 opacity-0'
+      } `}
       aria-label="맨 위로 가기"
     >
       {/* TOP 텍스트 */}
-      <span className="text-xs font-medium tracking-wide group-hover:scale-110 transition-transform duration-200">
+      <span className="text-xs font-medium tracking-wide transition-transform duration-200 group-hover:scale-110">
         TOP
       </span>
-      
+
       {/* 호버 시 배경 효과 */}
-      <div className="absolute inset-0 bg-gradient-to-r from-gray-600/20 to-white/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+      <div className="absolute inset-0 rounded-full bg-gradient-to-r from-gray-600/20 to-white/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
     </button>
   )
 }
@@ -105,31 +98,37 @@ function HamburgerMenuComponent({
       {/* 햄버거 버튼 */}
       <button
         onClick={() => setIsMenuOpen(!isMenuOpen)}
-        className="flex flex-col justify-center items-center w-8 h-8 space-y-1"
+        className="flex h-8 w-8 flex-col items-center justify-center space-y-1"
       >
-        <span className={`block h-0.5 w-6 bg-black transition-all duration-300 ${isMenuOpen ? 'rotate-45 translate-y-1.5' : ''}`}></span>
-        <span className={`block h-0.5 w-6 bg-black transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}></span>
-        <span className={`block h-0.5 w-6 bg-black transition-all duration-300 ${isMenuOpen ? '-rotate-45 -translate-y-1.5' : ''}`}></span>
+        <span
+          className={`block h-0.5 w-6 bg-black transition-all duration-300 ${isMenuOpen ? 'translate-y-1.5 rotate-45' : ''}`}
+        ></span>
+        <span
+          className={`block h-0.5 w-6 bg-black transition-all duration-300 ${isMenuOpen ? 'opacity-0' : ''}`}
+        ></span>
+        <span
+          className={`block h-0.5 w-6 bg-black transition-all duration-300 ${isMenuOpen ? '-translate-y-1.5 -rotate-45' : ''}`}
+        ></span>
       </button>
 
       {/* 드롭다운 메뉴 */}
       {isMenuOpen && (
-        <div className="absolute right-0 top-12 bg-white border border-gray-200 rounded-lg shadow-lg py-2 min-w-48 z-50">
+        <div className="absolute top-12 right-0 z-50 min-w-48 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
           <button
             onClick={handleUploadSelfie}
-            className="block w-full text-left px-4 py-2 text-black hover:bg-gray-100 transition-colors jaso-sans-font"
+            className="jaso-sans-font block w-full px-4 py-2 text-left text-black transition-colors hover:bg-gray-100"
           >
             UPLOAD SELFIE
           </button>
           <button
             onClick={handleAccount}
-            className="block w-full text-left px-4 py-2 text-black hover:bg-gray-100 transition-colors jaso-sans-font"
+            className="jaso-sans-font block w-full px-4 py-2 text-left text-black transition-colors hover:bg-gray-100"
           >
             ACCOUNT
           </button>
           <button
             onClick={handleLogout}
-            className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100 transition-colors jaso-sans-font"
+            className="jaso-sans-font block w-full px-4 py-2 text-left text-red-600 transition-colors hover:bg-gray-100"
           >
             LOGOUT
           </button>
@@ -150,6 +149,7 @@ function NavigationMenu({
   onUploadSelfie,
   onAccount,
   user,
+  isCreatingRoom,
 }: {
   isLoggedIn: boolean
   onLogin: () => void
@@ -160,6 +160,7 @@ function NavigationMenu({
   onUploadSelfie: () => void
   onAccount: () => void
   user?: { name?: string; email?: string; profileImage?: string } | null
+  isCreatingRoom?: boolean
 }) {
   const startButtonRef = useRef<HTMLButtonElement>(null)
 
@@ -169,9 +170,10 @@ function NavigationMenu({
     const loadAndAnimate = async () => {
       const w = window as any
       if (!w.gsap) {
-        await new Promise<void>((resolve) => {
+        await new Promise<void>(resolve => {
           const script = document.createElement('script')
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js'
+          script.src =
+            'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js'
           script.onload = () => resolve()
           document.head.appendChild(script)
         })
@@ -200,25 +202,35 @@ function NavigationMenu({
   }, [isLoggedIn])
 
   return (
-    <div className=" mb-1 flex items-center justify-center gap-12">
+    <div className="mb-1 flex items-center justify-center gap-12">
       {isLoggedIn ? (
         <>
           <button
             onClick={onMyPage}
-            className=" text-xl font-medium text-black transition-colors hover:text-gray-600"
+            className="text-xl font-medium text-black transition-colors hover:text-gray-600"
           >
             ALBUM
           </button>
           <button
             ref={startButtonRef}
-            onClick={onStart}
-            className="didot-font bg-black px-8 py-3 text-xl rounded-xl font-medium text-white transition-colors hover:bg-gray-800"
+            onClick={isCreatingRoom ? undefined : onStart}
+            disabled={isCreatingRoom}
+            className={`didot-font relative rounded-xl px-8 py-3 text-xl font-medium transition-colors ${
+              isCreatingRoom
+                ? 'cursor-not-allowed bg-gray-600 opacity-75'
+                : 'bg-black text-white hover:bg-gray-800'
+            }`}
           >
-            START
+            {isCreatingRoom && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+              </div>
+            )}
+            <span className={isCreatingRoom ? 'opacity-30' : ''}>START</span>
           </button>
           <button
             onClick={onMyFeed}
-            className=" text-xl font-medium text-black transition-colors hover:text-gray-600"
+            className="text-xl font-medium text-black transition-colors hover:text-gray-600"
           >
             FEED
           </button>
@@ -233,12 +245,12 @@ function NavigationMenu({
           </button>
           <button
             onClick={onLogin}
-            className="didot-font bg-black rounded-xl px-5 py-2 text-xl font-medium text-white transition-colors hover:bg-gray-800"
+            className="didot-font rounded-xl bg-black px-5 py-2 text-xl font-medium text-white transition-colors hover:bg-gray-800"
           >
             LOGIN
           </button>
           <button
-            className="font-semibold cursor-not-allowed text-xl text-black opacity-50 transition-colors hover:text-gray-600"
+            className="cursor-not-allowed text-xl font-semibold text-black opacity-50 transition-colors hover:text-gray-600"
             disabled
           >
             FEED
@@ -257,7 +269,8 @@ function GallerySection() {
 
   useEffect(() => {
     const script = document.createElement('script')
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js'
+    script.src =
+      'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js'
     script.onload = () => {
       const { gsap } = window as any
       if (galleryRef.current && containerRef.current) {
@@ -277,7 +290,7 @@ function GallerySection() {
           repeat: -1,
           modifiers: {
             x: gsap.utils.unitize((x: number) =>
-              (-x >= galleryWidth / 2) ? -initialOffset : x
+              -x >= galleryWidth / 2 ? -initialOffset : x
             ),
           },
         })
@@ -292,52 +305,64 @@ function GallerySection() {
   }, [])
 
   return (
-    <div className="relative w-full overflow-hidden select-none" style={{ height: '66vh', marginTop: '1vh', userSelect: 'none' }}>
-      <div ref={containerRef} className="w-full h-full flex items-center overflow-hidden">
+    <div
+      className="relative w-full overflow-hidden select-none"
+      style={{ height: '66vh', marginTop: '1vh', userSelect: 'none' }}
+    >
+      <div
+        ref={containerRef}
+        className="flex h-full w-full items-center overflow-hidden"
+      >
         <div
           ref={galleryRef}
           className="flex items-center"
-          style={{ gap: '0.25vw', width: 'max-content', willChange: 'transform' }}
+          style={{
+            gap: '0.25vw',
+            width: 'max-content',
+            willChange: 'transform',
+          }}
         >
-        {extendedImages.map((image, index) => (
-          <div
-            key={index}
-            className="overflow-hidden flex-shrink-0 rounded-none"
-            style={{
-              width: '42vw',
-              minWidth: '320px',
-              maxWidth: '830px',
-              aspectRatio: '3/2',        // <-- 이 부분
-              minHeight: '38vh',
-              maxHeight: '68vh',
-              background: '#eaeaea'
-            }}
-          >
-            <div className="relative w-full h-full">
-              <Image
-                src={image.src}
-                alt={image.alt}
-                fill
-                style={{ objectFit: 'cover' }}
-                priority={index < 3}
-                sizes="(max-width: 900px) 100vw, 42vw"
-                draggable={false}
-              />
+          {extendedImages.map((image, index) => (
+            <div
+              key={index}
+              className="flex-shrink-0 overflow-hidden rounded-none"
+              style={{
+                width: '42vw',
+                minWidth: '320px',
+                maxWidth: '830px',
+                aspectRatio: '3/2', // <-- 이 부분
+                minHeight: '38vh',
+                maxHeight: '68vh',
+                background: '#eaeaea',
+              }}
+            >
+              <div className="relative h-full w-full">
+                <Image
+                  src={image.src}
+                  alt={image.alt}
+                  fill
+                  style={{ objectFit: 'cover' }}
+                  priority={index < 3}
+                  sizes="(max-width: 900px) 100vw, 42vw"
+                  draggable={false}
+                />
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
         </div>
 
         {/* 하단 그라데이션 오버레이 - 스크롤 힌트 (조금 위로) */}
-        <div className="absolute bottom-6 left-0 right-0 h-32 bg-gradient-to-t from-black/30 via-black/10 to-transparent pointer-events-none"></div>
+        <div className="pointer-events-none absolute right-0 bottom-6 left-0 h-32 bg-gradient-to-t from-black/30 via-black/10 to-transparent"></div>
 
         {/* 스크롤 힌트 애니메이션 (그라데이션과 함께 위로) */}
-        <div className="absolute bottom-12 left-1/2 transform -translate-x-1/2 z-10">
-          <div className="flex flex-col items-center animate-bounce text-white">
-            <div className="w-6 h-10 border-2 border-white/70 rounded-full flex justify-center mb-2">
-              <div className="w-1 h-3 bg-white/70 rounded-full mt-2 animate-pulse"></div>
+        <div className="absolute bottom-12 left-1/2 z-10 -translate-x-1/2 transform">
+          <div className="flex animate-bounce flex-col items-center text-white">
+            <div className="mb-2 flex h-10 w-6 justify-center rounded-full border-2 border-white/70">
+              <div className="mt-2 h-3 w-1 animate-pulse rounded-full bg-white/70"></div>
             </div>
-            <p className="text-xs font-medium tracking-wider opacity-80">SCROLL</p>
+            <p className="text-xs font-medium tracking-wider opacity-80">
+              SCROLL
+            </p>
           </div>
         </div>
       </div>
@@ -362,10 +387,10 @@ export default function CreativePage() {
     isCreatingRoom,
   } = useAuth()
 
-  // START 버튼 핸들러: 대기실로 이동
+  // START 버튼 핸들러: 방 생성 후 이동
   const handleStart = () => {
     if (isLoggedIn) {
-      router.push('/groupcall/waiting')
+      handleAfterLoginClick()
     } else {
       handleLogin()
     }
@@ -404,9 +429,9 @@ export default function CreativePage() {
       {/* 헤더 영역 */}
       <div className="pt-6 pb-8">
         {/* 로고 + 프로필 */}
-        <div className="relative w-full h-32 md:h-40 lg:h-48 flex items-center justify-center">
+        <div className="relative flex h-32 w-full items-center justify-center md:h-40 lg:h-48">
           <div className="flex items-center gap-1 md:gap-2 lg:gap-3">
-            <div className="relative w-12 h-16 md:w-16 md:h-20 lg:w-24 lg:h-28">
+            <div className="relative h-16 w-12 md:h-20 md:w-16 lg:h-28 lg:w-24">
               <Image
                 src="/letter-nn.png"
                 alt="N"
@@ -416,7 +441,7 @@ export default function CreativePage() {
                 priority
               />
             </div>
-            <div className="relative w-12 h-16 md:w-16 md:h-20 lg:w-24 lg:h-28">
+            <div className="relative h-16 w-12 md:h-20 md:w-16 lg:h-28 lg:w-24">
               <Image
                 src="/letter-ee.png"
                 alt="E"
@@ -426,7 +451,7 @@ export default function CreativePage() {
                 priority
               />
             </div>
-            <div className="relative w-14 h-18 md:w-18 md:h-22 lg:w-26 lg:h-30">
+            <div className="relative h-18 w-14 md:h-22 md:w-18 lg:h-30 lg:w-26">
               <Image
                 src="/letter-aa.png"
                 alt="A"
@@ -436,7 +461,7 @@ export default function CreativePage() {
                 priority
               />
             </div>
-            <div className="relative w-12 h-16 md:w-16 md:h-20 lg:w-24 lg:h-28">
+            <div className="relative h-16 w-12 md:h-20 md:w-16 lg:h-28 lg:w-24">
               <Image
                 src="/letter-rr.png"
                 alt="R"
@@ -448,7 +473,7 @@ export default function CreativePage() {
             </div>
             {/* 공백 */}
             <div className="w-3 md:w-4 lg:w-6"></div>
-            <div className="relative w-12 h-16 md:w-16 md:h-20 lg:w-24 lg:h-28">
+            <div className="relative h-16 w-12 md:h-20 md:w-16 lg:h-28 lg:w-24">
               <Image
                 src="/letter-zz.png"
                 alt="Z"
@@ -459,7 +484,7 @@ export default function CreativePage() {
               />
             </div>
             {/* O 글자 크기 조정 */}
-            <div className="relative w-14 h-18 md:w-18 md:h-22 lg:w-26 lg:h-30">
+            <div className="relative h-18 w-14 md:h-22 md:w-18 lg:h-30 lg:w-26">
               <Image
                 src="/letter-oo.png"
                 alt="O"
@@ -469,7 +494,7 @@ export default function CreativePage() {
                 priority
               />
             </div>
-            <div className="relative w-14 h-18 md:w-18 md:h-22 lg:w-26 lg:h-30">
+            <div className="relative h-18 w-14 md:h-22 md:w-18 lg:h-30 lg:w-26">
               <Image
                 src="/letter-oo.png"
                 alt="O"
@@ -480,7 +505,7 @@ export default function CreativePage() {
               />
             </div>
             {/* M 글자 크기 조정 */}
-            <div className="relative w-16 h-20 md:w-19 md:h-23 lg:w-30 lg:h-34">
+            <div className="relative h-20 w-16 md:h-23 md:w-19 lg:h-34 lg:w-30">
               <Image
                 src="/letter-mm.png"
                 alt="M"
@@ -492,17 +517,17 @@ export default function CreativePage() {
             </div>
           </div>
           {isLoggedIn && (
-            <div className="absolute right-4 top-4 md:right-6 md:top-6 lg:right-8 lg:top-8 flex items-center gap-4">
+            <div className="absolute top-4 right-4 flex items-center gap-4 md:top-6 md:right-6 lg:top-8 lg:right-8">
               {/* 프로필 원형 아바타 - 소셜 계정 프로필 사진과 연결 */}
-              <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200 shadow-md">
+              <div className="h-12 w-12 overflow-hidden rounded-full border-2 border-gray-200 shadow-md">
                 {user?.profileImage ? (
                   <Image
                     src={user.profileImage}
                     alt="프로필 사진"
                     width={48}
                     height={48}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
+                    className="h-full w-full object-cover"
+                    onError={e => {
                       // 프로필 이미지 로드 실패 시 fallback
                       const target = e.target as HTMLImageElement
                       target.style.display = 'none'
@@ -512,14 +537,17 @@ export default function CreativePage() {
                   />
                 ) : null}
                 {/* Fallback: 프로필 이미지가 없을 때 이니셜 표시 */}
-                <div 
-                  className={`w-full h-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center ${
+                <div
+                  className={`flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 ${
                     user?.profileImage ? 'hidden' : 'flex'
                   }`}
                 >
-                  <span className="text-white text-lg font-bold">
-                    {user?.name ? user.name.charAt(0).toUpperCase() : 
-                     user?.email ? user.email.charAt(0).toUpperCase() : 'U'}
+                  <span className="text-lg font-bold text-white">
+                    {user?.name
+                      ? user.name.charAt(0).toUpperCase()
+                      : user?.email
+                        ? user.email.charAt(0).toUpperCase()
+                        : 'U'}
                   </span>
                 </div>
               </div>
@@ -544,9 +572,9 @@ export default function CreativePage() {
           onUploadSelfie={handleUploadSelfie}
           onAccount={handleAccount}
           user={user}
+          isCreatingRoom={isCreatingRoom}
         />
       </div>
-      
 
       {/* 이미지 갤러리 */}
       <GallerySection />
