@@ -6,7 +6,14 @@ export const authService = {
   // 소셜 로그인 URL 생성
   getSocialLoginUrl: (provider: SocialType): string => {
     const providerLower = provider.toLowerCase()
-    return `${API_BASE_URL}/oauth2/authorization/${providerLower}`
+    const baseUrl = `${API_BASE_URL}/oauth2/authorization/${providerLower}`
+    
+    // 로컬 개발 환경에서만 client=localhost 파라미터 추가
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      return `${baseUrl}?client=localhost`
+    }
+    
+    return baseUrl
   },
 
   // Access Token 갱신
