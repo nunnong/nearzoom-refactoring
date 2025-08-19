@@ -42,6 +42,17 @@ public class CustomSuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         Cookie cookie = CookieUtil.createRefreshTokenCookie(refreshToken);
         response.addCookie(cookie);
 
-        response.sendRedirect(redirectUrl);
+        String targetUrl = determineTargetUrl(request);
+        response.sendRedirect(targetUrl);
+    }
+
+    private String determineTargetUrl(HttpServletRequest request) {
+        String clientParam = request.getParameter("client");
+        
+        if ("localhost".equals(clientParam)) {
+            return "http://localhost:3000/callback";
+        }
+        
+        return redirectUrl;
     }
 }
