@@ -239,11 +239,11 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(({
               />
 
               {/* 돋보기 버튼 (호버 시 중앙 표시) */}
-              <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100">
+              <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100 pointer-events-none">
                 <button
                   onClick={() => handleImageZoom(image)}
                   aria-label="이미지 확대"
-                  className="p-3 rounded-full bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-colors"
+                  className="p-3 rounded-full bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-colors pointer-events-auto"
                 >
                   <MagnifyingGlassIcon className="h-6 w-6 text-white" />
                 </button>
