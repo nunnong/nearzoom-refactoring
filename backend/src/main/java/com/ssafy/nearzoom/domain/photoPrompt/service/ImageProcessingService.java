@@ -38,7 +38,7 @@ public class ImageProcessingService {
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public void processIndividualStart(Long roomId,
+    public String processIndividualStart(Long roomId,
         String imageUrl, List<String> personIds, ProcessingOptions options,
         String promptId) {
         try {
@@ -49,7 +49,9 @@ public class ImageProcessingService {
             String jobId = response.data().jobId();
             log.info("이미지 서버로부터 받은 JobId:{}", jobId);
 
-            redisPromptRepository.saveIndividualJobInfo(jobId, roomId, imageUrl, options, promptId);
+          redisPromptRepository.saveIndividualJobInfo(jobId, roomId, imageUrl, options, promptId);
+
+          return jobId; // jobId 반환
 
         } catch (Exception e) {
             log.error("개별 이미지 처리 실패 - RoomId: {}, Error: {}", roomId, e.getMessage());

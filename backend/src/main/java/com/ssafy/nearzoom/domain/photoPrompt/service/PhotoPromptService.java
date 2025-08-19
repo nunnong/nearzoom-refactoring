@@ -42,7 +42,7 @@ public class PhotoPromptService {
         redisPromptRepository.saveSettings(basicSettingsRequest);
     }
 
-    public void saveIndividualImageBackground(HttpServletRequest request,
+    public Map<String, Object> saveIndividualImageBackground(HttpServletRequest request,
         IndividualBackgroundRequest backgroundRequest) {
         validateUser(request);
 
@@ -67,14 +67,23 @@ public class PhotoPromptService {
         redisPromptRepository.saveBackground(backgroundRequest, promptId);
 
         try {
-            imageProcessingService.processIndividualStart(
-                backgroundRequest.roomId(),
-                backgroundRequest.imageUrl(),
-                backgroundRequest.personIds(),
-                processingOptions,
-                promptId
-            );
-            log.info("이미지 서버 전송 완료 - Room:{}", roomId);
+          // jobId를 반환받도록 수정
+          String jobId = imageProcessingService.processIndividualStart(
+              backgroundRequest.roomId(),
+              backgroundRequest.imageUrl(),
+              backgroundRequest.personIds(),
+              processingOptions,
+              promptId
+          );
+
+          log.info("이미지 서버 전송 완료 - Room:{}, JobId:{}", roomId, jobId);
+
+          // 결과 반환
+          Map<String, Object> result = new HashMap<>();
+          result.put("jobId", jobId);
+          result.put("promptId", promptId);
+          result.put("status", "processing_started");
+          return result;
 
         } catch (Exception e) {
             log.error("이미지 서버 전송 실패 - RoomId: {}, Error: {}", roomId, e.getMessage());
