@@ -38,6 +38,7 @@ public class CustomSuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         Authentication authentication) throws IOException {
 
         CustomOAuth2User customUserDetail = (CustomOAuth2User) authentication.getPrincipal();
+        String name = customUserDetail.getName();
         String email = customUserDetail.getEmail();
         Social social = customUserDetail.getSocial();
 
@@ -48,11 +49,11 @@ public class CustomSuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         Cookie cookie = CookieUtil.createRefreshTokenCookie(refreshToken);
         response.addCookie(cookie);
 
-        String targetUrl = determineTargetUrl(request, email, social);
+        String targetUrl = determineTargetUrl(request, name, email, social);
         response.sendRedirect(targetUrl);
     }
 
-    private String determineTargetUrl(HttpServletRequest request, String email, Social social) {
+    private String determineTargetUrl(HttpServletRequest request, String name, String email, Social social) {
         boolean isLocalhost = false;
         
         try {
@@ -86,7 +87,7 @@ public class CustomSuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         
         if (isLocalhost) {
             // 로컬 개발 환경: access token을 URL 파라미터로 포함
-            String accessToken = jwtUtil.createAccessToken(email, social);
+            String accessToken = jwtUtil.createAccessToken(name, email, social);
             log.info("Redirecting to localhost callback with access token for development");
             return "http://localhost:3000/callback?token=" + accessToken;
         }
