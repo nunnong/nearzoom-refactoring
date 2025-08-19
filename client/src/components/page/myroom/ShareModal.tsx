@@ -15,7 +15,7 @@ interface ImageItem {
   isLiked?: boolean
   isEdited?: boolean
   hashtags?: string[]
-  partnerEmails?: string
+  partnerEmails?: string | string[]
   takenAt?: string  // 촬영 날짜 추가
   createdAt?: string  // 생성 날짜 추가
 }
@@ -135,14 +135,16 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
   }, [router, onClose])
 
   // 메모이제이션된 값들
-  const partnerEmails = useMemo(() => {
-    if (!image?.partnerEmails) return null
-    return image.partnerEmails.split(',').map(email => email.trim())
+  const partnerEmailsList = useMemo(() => {
+    const raw = image?.partnerEmails
+    if (!raw) return null
+    if (Array.isArray(raw)) return raw.map(email => email.trim())
+    return raw.split(',').map(email => email.trim())
   }, [image?.partnerEmails])
 
   const hasPartnerEmails = useMemo(() => {
-    return partnerEmails && partnerEmails.length > 0
-  }, [partnerEmails])
+    return partnerEmailsList && partnerEmailsList.length > 0
+  }, [partnerEmailsList])
 
   // 조건부 return은 모든 Hooks 이후에
   if (!isOpen || !image) return null
@@ -191,33 +193,21 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
               </div>
             </div>
 
-            {/* Email List - Vertical */}
+            {/* 함께 찍은 사람 - EditConfirmModal과 동일한 배지 형태 */}
             {hasPartnerEmails ? (
               <div className="flex-1">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">함께 찍은 사람</h4>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">With</h4>
                 <div className="space-y-2">
-                                     {partnerEmails?.map((email, index) => (
-                    <div 
-                      key={index}
-                      className="flex items-center space-x-2"
-                    >
-                      <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                  <div>
+                    {partnerEmailsList?.map((email, index) => (
                       <span 
-                        className="text-sm text-green-600 font-medium cursor-pointer hover:text-green-700 transition-colors"
-                        onClick={() => handleEmailClick(email)}
-                        title="클릭하여 프로필 보기"
+                        key={index}
+                        className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full mr-2 mb-1 text-sm font-medium"
                       >
-                        {email}
+                        @{email}
                       </span>
-                      <button
-                        onClick={() => handleEmailCopy(email)}
-                        className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-                        title="이메일 복사"
-                      >
-                        복사
-                      </button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
             ) : (

@@ -64,8 +64,10 @@ export interface ImageItem {
   alt?: string
   isLiked?: boolean
   isEdited?: boolean
-  editable?: number         // 1: 편집 가능, 0: 편집 불가능
+  editable?: number    
   hashtags?: string[]
+  createdAt?: string
+  partnerEmails?: string | string[]
 }
 
 interface ImageArchiveProps {
@@ -145,16 +147,10 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(({
   }, [])
 
   const handleEditConfirm = useCallback(async () => {
-    if (imageToEdit) {
-      try {
-        await onEdit?.(imageToEdit.photoId, 'new_edited_image_url')
-        setEditModalOpen(false)
-        setImageToEdit(null)
-      } catch (error) {
-        console.error('이미지 편집 실패:', error)
-      }
-    }
-  }, [imageToEdit, onEdit])
+    // 편집 시작: 모달만 닫고 상태 정리 (저장은 /drawing에서 수행)
+    setEditModalOpen(false)
+    setImageToEdit(null)
+  }, [])
 
   const handleEditCancel = useCallback(() => {
     setEditModalOpen(false)
@@ -242,14 +238,18 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(({
                 }}
               />
 
-              {/* 돋보기 아이콘 (호버 시 표시) */}
-              <div className="absolute top-2 left-2 opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100">
-                <div className="p-2 bg-white/20 backdrop-blur-sm rounded-full">
-                  <MagnifyingGlassIcon className="h-4 w-4 text-white" />
-                </div>
+              {/* 돋보기 버튼 (호버 시 중앙 표시) */}
+              <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100">
+                <button
+                  onClick={() => handleImageZoom(image)}
+                  aria-label="이미지 확대"
+                  className="p-3 rounded-full bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-colors"
+                >
+                  <MagnifyingGlassIcon className="h-6 w-6 text-white" />
+                </button>
               </div>
 
-              <div className="absolute inset-0 bg-black/0 transition-all duration-300 ease-in-out group-hover:bg-black/40" />
+              <div className="absolute inset-0 bg-black/0 transition-all duration-300 ease-in-out group-hover:bg-black/40 pointer-events-none" />
 
               <div className="absolute top-2 right-2 opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100">
                 <button

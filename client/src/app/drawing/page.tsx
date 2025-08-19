@@ -745,14 +745,9 @@ const DrawingContent: React.FC = () => {
 
     } catch (error) {
       console.error('❌ Failed to save image:', error)
-      console.error('❌ Error type:', typeof error)
-      console.error('❌ Error constructor:', error?.constructor?.name)
       
       // 에러 객체의 모든 속성 로깅
       if (error && typeof error === 'object') {
-        console.error('❌ Error properties:', Object.keys(error))
-        console.error('❌ Error values:', Object.values(error))
-        
         // Error 객체의 속성들 안전하게 접근
         const errorObj = error as any
         if (errorObj.message) {

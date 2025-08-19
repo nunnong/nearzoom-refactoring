@@ -32,14 +32,41 @@ const EditConfirmModal: React.FC<EditConfirmModalProps> = ({
 
   if (!isOpen || !image) return null
 
-  // 1. /feed/edit?photoId=... 형태로 이동하게 변경
+  // 그림판(DrawingCanvas)으로 이동: /drawing?id=...&src=...&returnUrl=...
   const handleEditClick = () => {
-    console.log('EditConfirmModal 편집하기 버튼 클릭됨')
-    console.log(`photoId: ${image.photoId}로 피드 편집 페이지 이동`)
-    
-    // 피드 편집 페이지로 이동
-    router.push(`/drawing?photoId=${image.photoId}`)
-    
+    if (!image?.photoId || !image?.imgUrl) {
+      console.error('[EditConfirmModal] 유효하지 않은 이미지 데이터', image)
+      return
+    }
+
+    const id = image.photoId
+    const srcRaw = image.imgUrl
+    const src = encodeURIComponent(srcRaw)
+    const returnUrl = '/myroom'
+    const targetUrl = `/drawing?id=${id}&src=${src}&returnUrl=${returnUrl}`
+
+    try {
+      console.log('[EditConfirmModal] 그림판으로 이동 시도', { id, srcRaw, targetUrl })
+      router.push(targetUrl)
+    } catch (e) {
+      console.error('[EditConfirmModal] router.push 실패, 폴백으로 이동', e)
+      if (typeof window !== 'undefined') {
+        window.location.href = targetUrl
+      }
+    }
+
+    // 폴백: 잠시 후 위치가 바뀌지 않았으면 강제로 이동
+    if (typeof window !== 'undefined') {
+      const before = window.location.pathname + window.location.search
+      setTimeout(() => {
+        const current = window.location.pathname + window.location.search
+        if (current === before) {
+          console.warn('[EditConfirmModal] URL 변경 감지 못함, 강제 이동 실행')
+          window.location.href = targetUrl
+        }
+      }, 400)
+    }
+
     // 모달 닫기
     onConfirm()
   }
