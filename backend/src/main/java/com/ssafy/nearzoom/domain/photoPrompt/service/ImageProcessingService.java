@@ -60,6 +60,7 @@ public class ImageProcessingService {
             updatePromptStatus(Long.valueOf(promptId), PromptStatus.FAIL);
           }
         }
+          return imageUrl;
     }
 
     public void IndividualCompleted(String jobId, String processedImageUrl) {
