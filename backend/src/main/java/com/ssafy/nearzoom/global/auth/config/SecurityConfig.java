@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
@@ -24,11 +25,17 @@ public class SecurityConfig {
 
     private final CustomOAuth2UserService customOAuth2UserService;
     private final CustomSuccessHandler customSuccessHandler;
-    private final CustomOAuth2AuthorizationRequestResolver customOAuth2AuthorizationRequestResolver;
     private final JWTUtil jwtUtil;
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http)
+    public CustomOAuth2AuthorizationRequestResolver customOAuth2AuthorizationRequestResolver(
+            ClientRegistrationRepository clientRegistrationRepository) {
+        return new CustomOAuth2AuthorizationRequestResolver(clientRegistrationRepository);
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http,
+            CustomOAuth2AuthorizationRequestResolver customOAuth2AuthorizationRequestResolver)
         throws Exception {
 
         http.cors(cors -> cors.configurationSource(request -> {
