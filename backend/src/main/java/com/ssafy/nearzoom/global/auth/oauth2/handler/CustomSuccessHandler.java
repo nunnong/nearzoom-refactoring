@@ -48,11 +48,13 @@ public class CustomSuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         Cookie cookie = CookieUtil.createRefreshTokenCookie(refreshToken);
         response.addCookie(cookie);
 
-        String targetUrl = determineTargetUrl(request);
+        String targetUrl = determineTargetUrl(request, email, social);
         response.sendRedirect(targetUrl);
     }
 
-    private String determineTargetUrl(HttpServletRequest request) {
+    private String determineTargetUrl(HttpServletRequest request, String email, Social social) {
+        boolean isLocalhost = false;
+        
         try {
             // OAuth state 파라미터에서 클라이언트 정보 추출
             String state = request.getParameter("state");
@@ -68,21 +70,25 @@ public class CustomSuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                 String client = (String) stateMap.get("client");
                 
                 if ("localhost".equals(client)) {
-                    log.info("Redirecting to localhost callback for development");
-                    return "http://localhost:3000/callback";
+                    isLocalhost = true;
                 }
             }
             
             // Fallback: 기존 쿼리 파라미터 방식도 지원
             String clientParam = request.getParameter("client");
             if ("localhost".equals(clientParam)) {
-                log.info("Redirecting to localhost callback via query parameter");
-                return "http://localhost:3000/callback";
+                isLocalhost = true;
             }
             
         } catch (Exception e) {
             log.warn("Failed to parse OAuth state parameter: {}", e.getMessage());
-            // 파싱 실패 시 기본값으로 fallback
+        }
+        
+        if (isLocalhost) {
+            // 로컬 개발 환경: access token을 URL 파라미터로 포함
+            String accessToken = jwtUtil.createAccessToken(email, social);
+            log.info("Redirecting to localhost callback with access token for development");
+            return "http://localhost:3000/callback?token=" + accessToken;
         }
         
         log.info("Redirecting to production callback: {}", redirectUrl);
