@@ -47,16 +47,7 @@ function CallbackContent() {
           throw new Error(`OAuth2 인증 실패: ${error}`)
         }
 
-        // refresh token으로 access token 요청
-        const tokenResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
-          method: 'POST',
-          credentials: 'include',
-        })
-        if (!tokenResponse.ok) {
-          throw new Error('Access token 요청 실패')
-        }
-
-        // 다양한 토큰 파라미터 이름 확인
+        // 다양한 토큰 파라미터 이름 확인 (URL 파라미터를 먼저 체크)
         const token = searchParams.get('token') || 
                      searchParams.get('access_token') || 
                      searchParams.get('accessToken')
@@ -66,11 +57,11 @@ function CallbackContent() {
         let accessToken: string
 
         if (token) {
-          // 1단계: URL에 토큰이 있으면 사용
+          // 1단계: URL에 토큰이 있으면 사용 (로컬 개발 환경)
           console.log('✅ URL 파라미터에서 토큰 사용')
           accessToken = token
         } else {
-          // 2단계: 토큰이 없으면 refresh 엔드포인트 호출
+          // 2단계: 토큰이 없으면 refresh 엔드포인트 호출 (운영 환경)
           console.log('🔄 URL에 토큰이 없어서 refresh 엔드포인트 호출')
           
           const tokenResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
