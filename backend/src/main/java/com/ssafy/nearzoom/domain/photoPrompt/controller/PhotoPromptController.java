@@ -100,16 +100,19 @@ public class PhotoPromptController {
         @RequestBody IndividualBackgroundRequest imageRequest) {
 
         try {
-            photoPromptService.saveIndividualImageBackground(request, imageRequest);
+          Map<String, Object> result = photoPromptService.saveIndividualImageBackground(request, imageRequest);
 
-            return ResponseEntity.ok(new ApiResponse<>(false,
-                "기본 설정이 성공적으로 저장되었습니다.",
-                Map.of(
-                    "roomId", imageRequest.roomId(),
-                    "backgroundType", imageRequest.backgroundType(),
-                    "personIds", imageRequest.personIds(),
-                    "status", "이미지 서버로 전송 완료"
-                )));
+          Map<String, Object> responseData = new HashMap<>();
+          responseData.put("roomId", imageRequest.roomId());
+          responseData.put("backgroundType", imageRequest.backgroundType());
+          responseData.put("personIds", imageRequest.personIds());
+          responseData.put("jobId", result.get("jobId")); // jobId 추가
+          responseData.put("promptId", result.get("promptId")); // promptId 추가
+          responseData.put("status", "이미지 처리가 시작되었습니다");
+
+          return ResponseEntity.ok(new ApiResponse<>(false,
+              "배경 설정이 성공적으로 저장되고 처리가 시작되었습니다.",
+              responseData));
 
         } catch (ApiException e) {
             return ApiResponse.failedOf(e);
