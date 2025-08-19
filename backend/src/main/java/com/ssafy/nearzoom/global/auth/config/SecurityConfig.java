@@ -3,6 +3,7 @@ package com.ssafy.nearzoom.global.auth.config;
 import com.ssafy.nearzoom.global.auth.jwt.JWTFilter;
 import com.ssafy.nearzoom.global.auth.jwt.JWTUtil;
 import com.ssafy.nearzoom.global.auth.oauth2.handler.CustomSuccessHandler;
+import com.ssafy.nearzoom.global.auth.oauth2.resolver.CustomOAuth2AuthorizationRequestResolver;
 import com.ssafy.nearzoom.global.auth.oauth2.service.CustomOAuth2UserService;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
@@ -23,6 +24,7 @@ public class SecurityConfig {
 
     private final CustomOAuth2UserService customOAuth2UserService;
     private final CustomSuccessHandler customSuccessHandler;
+    private final CustomOAuth2AuthorizationRequestResolver customOAuth2AuthorizationRequestResolver;
     private final JWTUtil jwtUtil;
 
     @Bean
@@ -64,6 +66,9 @@ public class SecurityConfig {
             OAuth2LoginAuthenticationFilter.class);
 
         http.oauth2Login(oauth2 -> oauth2
+            .authorizationEndpoint(authorization -> authorization
+                .authorizationRequestResolver(customOAuth2AuthorizationRequestResolver)
+            )
             .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
             .successHandler(customSuccessHandler)
         );
