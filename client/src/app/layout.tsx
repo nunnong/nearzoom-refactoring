@@ -77,6 +77,28 @@ const roboto = Roboto({
 export const metadata: Metadata = {
   title: 'NearZoom',
   description: '실시간 원격 촬영 서비스',
+  openGraph: {
+    title: 'NearZoom',
+    description: '실시간 원격 촬영 서비스',
+    url: 'https://nearzoom.store',
+    siteName: 'NearZoom',
+    images: [
+      {
+        url: '/opengraph.png',
+        width: 1200,
+        height: 630,
+        alt: 'NearZoom - 실시간 원격 촬영 서비스',
+      }
+    ],
+    locale: 'ko_KR',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'NearZoom',
+    description: '실시간 원격 촬영 서비스',
+    images: ['/opengraph.png'],
+  },
 }
 
 export default function RootLayout({
