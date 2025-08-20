@@ -2,88 +2,77 @@ import type { Metadata } from 'next'
 
 import './globals.css'
 import AuthProvider from '@/providers/AuthProvider'
+// 웹폰트 import
+import {
+  Geist,
+  Geist_Mono,
+  Noto_Sans_KR,
+  Jua,
+  Gamja_Flower,
+  Black_Han_Sans,
+  Gaegu,
+  Nanum_Myeongjo,
+  Roboto,
+} from 'next/font/google'
 
-// 개발 환경에서는 폰트 로딩 건너뛰기
-const isDevelopment = process.env.NODE_ENV === 'development'
+const geistSans = Geist({
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
+})
 
-// 웹폰트 import (운영 환경에서만)
-let geistSans: any, geistMono: any, notoSansKR: any, jua: any, blackHanSans: any, gamjaFlower: any, gaegu: any, nanumMyeongjo: any, roboto: any
+const geistMono = Geist_Mono({
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
+})
 
-if (!isDevelopment) {
-  const {
-    Geist,
-    Geist_Mono,
-    Noto_Sans_KR,
-    Jua,
-    Gamja_Flower,
-    Black_Han_Sans,
-    Gaegu,
-    Nanum_Myeongjo,
-    Roboto,
-  } = require('next/font/google')
+// 깔끔한 폰트
+const notoSansKR = Noto_Sans_KR({
+  variable: '--font-noto-sans-kr',
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+})
 
-  geistSans = Geist({
-    variable: '--font-geist-sans',
-    subsets: ['latin'],
-  })
+// 귀여운 폰트
+const jua = Jua({
+  variable: '--font-jua',
+  subsets: ['latin'],
+  weight: ['400'],
+})
 
-  geistMono = Geist_Mono({
-    variable: '--font-geist-mono',
-    subsets: ['latin'],
-  })
+// 힙한 폰트
+const blackHanSans = Black_Han_Sans({
+  variable: '--font-black-han-sans',
+  subsets: ['latin'],
+  weight: ['400'],
+})
 
-  // 깔끔한 폰트
-  notoSansKR = Noto_Sans_KR({
-    variable: '--font-noto-sans-kr',
-    subsets: ['latin'],
-    weight: ['400', '500', '700'],
-  })
+// 손글씨 폰트
+const gamjaFlower = Gamja_Flower({
+  variable: '--font-gamja-flower',
+  subsets: ['latin'],
+  weight: ['400'],
+})
 
-  // 귀여운 폰트
-  jua = Jua({
-    variable: '--font-jua',
-    subsets: ['latin'],
-    weight: ['400'],
-  })
+// 삐뚤빼뚤한 폰트
+const gaegu = Gaegu({
+  variable: '--font-gaegu',
+  subsets: ['latin'],
+  weight: ['300', '400', '700'],
+})
 
-  // 힙한 폰트
-  blackHanSans = Black_Han_Sans({
-    variable: '--font-black-han-sans',
-    subsets: ['latin'],
-    weight: ['400'],
-  })
+// 우아한 폰트
+const nanumMyeongjo = Nanum_Myeongjo({
+  variable: '--font-nanum-myeongjo',
+  subsets: ['latin'],
+  weight: ['400', '700', '800'],
+})
 
-  // 손글씨 폰트
-  gamjaFlower = Gamja_Flower({
-    variable: '--font-gamja-flower',
-    subsets: ['latin'],
-    weight: ['400'],
-  })
-
-  // 삐뚤빼뚤한 폰트
-  gaegu = Gaegu({
-    variable: '--font-gaegu',
-    subsets: ['latin'],
-    weight: ['300', '400', '700'],
-  })
-
-  // 우아한 폰트
-  nanumMyeongjo = Nanum_Myeongjo({
-    variable: '--font-nanum-myeongjo',
-    subsets: ['latin'],
-    weight: ['400', '700', '800'],
-  })
-
-  // 모던 폰트
-  roboto = Roboto({
-    variable: '--font-roboto',
-    subsets: ['latin'],
-    weight: ['400', '500', '700'],
-  })
-} else {
-  // 개발 환경에서는 빈 객체로 대체
-  geistSans = geistMono = notoSansKR = jua = blackHanSans = gamjaFlower = gaegu = nanumMyeongjo = roboto = { variable: '' }
-}
+// 모던 폰트
+const roboto = Roboto({
+  variable: '--font-roboto',
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+})
 
 export const metadata: Metadata = {
   title: 'NearZoom',
