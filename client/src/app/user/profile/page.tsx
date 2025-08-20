@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { UserIcon } from '@heroicons/react/24/outline'
 import { FeedLoadingSpinner } from '@/components/ui/LoadingSpinner'
@@ -31,7 +31,7 @@ interface UserProfile {
   website?: string;
 }
 
-const UserProfilePage: React.FC = () => {
+const UserProfileContent: React.FC = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, isAuthenticated } = useAuthStore()
@@ -247,5 +247,17 @@ const UserProfilePage: React.FC = () => {
     </div>
   );
 };
+
+const UserProfilePage: React.FC = () => {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <FeedLoadingSpinner size="lg" text="로딩 중..." />
+      </div>
+    }>
+      <UserProfileContent />
+    </Suspense>
+  )
+}
 
 export default UserProfilePage;
