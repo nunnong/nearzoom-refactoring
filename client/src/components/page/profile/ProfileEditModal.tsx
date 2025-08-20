@@ -13,7 +13,8 @@ import {
   PencilSquareIcon,
   ArrowPathIcon
 } from '@heroicons/react/24/outline'
-import { useAuth } from '@/hooks/auth/useAuth'
+import { useRouter } from 'next/navigation'
+import { useAuthStore } from '@/stores/authStore'
 import api from '@/lib/axios'
 
 // ============================================================================
@@ -166,7 +167,8 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
   onClose, 
   onProfileUpdate 
 }) => {
-  const { user, isAuthenticated, handleLogin } = useAuth();
+  const { user, isAuthenticated } = useAuthStore();
+  const router = useRouter();
   const profileAPI = ProfileAPIService.getInstance();
   
   // 상태 관리
@@ -435,7 +437,7 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
             <button
               onClick={() => {
                 onClose();
-                handleLogin();
+                router.push('/login');
               }}
               className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
             >

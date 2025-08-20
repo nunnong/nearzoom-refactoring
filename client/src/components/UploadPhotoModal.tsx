@@ -15,16 +15,18 @@ interface UploadPhotoModalProps {
 export default function UploadPhotoModal({
   isOpen,
   onClose,
-  onComplete
+  onComplete,
 }: UploadPhotoModalProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [optimizedBlob, setOptimizedBlob] = useState<Blob | null>(null)
   const [isUploading, setIsUploading] = useState(false)
-  const [currentReferenceImage, setCurrentReferenceImage] = useState<string | null>(null)
+  const [currentReferenceImage, setCurrentReferenceImage] = useState<
+    string | null
+  >(null)
   const [hasExistingImage, setHasExistingImage] = useState(false)
   const [loading, setLoading] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  
+
   // authStore에서 setUser 함수 가져오기
   const { user: currentUser, setUser } = useAuthStore()
 
@@ -51,16 +53,24 @@ export default function UploadPhotoModal({
     }
   }
 
-  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0]
     if (file) {
       try {
-        console.log('원본 이미지 크기:', (file.size / 1024 / 1024).toFixed(2) + 'MB')
-        
+        console.log(
+          '원본 이미지 크기:',
+          (file.size / 1024 / 1024).toFixed(2) + 'MB'
+        )
+
         // 이미지 최적화
         const optimizedImage = await resizeImage(file)
-        console.log('최적화된 이미지 크기:', (optimizedImage.size / 1024 / 1024).toFixed(2) + 'MB')
-        
+        console.log(
+          '최적화된 이미지 크기:',
+          (optimizedImage.size / 1024 / 1024).toFixed(2) + 'MB'
+        )
+
         // 미리보기용 base64 변환
         const reader = new FileReader()
         reader.onload = e => {
@@ -68,10 +78,9 @@ export default function UploadPhotoModal({
           setSelectedImage(result)
         }
         reader.readAsDataURL(optimizedImage)
-        
+
         // 업로드용 Blob 저장
         setOptimizedBlob(optimizedImage)
-        
       } catch (error) {
         console.error('이미지 최적화 실패:', error)
         // 실패시 원본 사용
@@ -136,15 +145,14 @@ export default function UploadPhotoModal({
       if (currentUser) {
         const updatedUser = {
           ...currentUser,
-          faceImageUrl: imageUrl
+          faceImageUrl: imageUrl,
         }
         setUser(updatedUser)
-        console.log('✅ authStore user 정보 업데이트:', updatedUser.faceImageUrl)
+        console.log(' authStore user 정보 업데이트:', updatedUser.faceImageUrl)
       }
 
       // 완료 처리
       onComplete?.()
-      
     } catch (error: any) {
       console.error('참조 이미지 저장 실패:', error)
       alert('참조 이미지 저장에 실패했습니다. 다시 시도해주세요.')
@@ -163,39 +171,16 @@ export default function UploadPhotoModal({
   const displayImage = selectedImage || currentReferenceImage
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
       <div className="relative mx-4 w-96 max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl">
-        {/* X 버튼을 우측 상단에 절대 위치로 배치 */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-10 rounded-full p-2 transition-colors hover:bg-gray-100"
-        >
-          <X size={20} className="text-gray-600" />
-        </button>
-
-        {/* 헤더 */}
-        <div className="flex items-center justify-center border-b border-gray-100 p-4">
-          <div className="flex items-center space-x-2">
-            <span className="text-lg font-medium text-blue-500">이</span>
-            <span className="text-lg font-medium text-red-500">어</span>
-            <span className="text-lg font-medium text-yellow-500">줌</span>
-          </div>
+        {/* 헤더 - 로고 */}
+        <div className="flex items-center justify-center pt-4 pb-2 mt-4">
+          <img src="/vogue_logo.png" alt="vogue" className="h-4 w-auto" />
         </div>
-
+        
         {/* 컨텐츠 */}
-        <div className="p-6">
-          <h2 className="mb-3 text-xl font-medium text-gray-800">
-            {hasExistingImage ? '참조 사진 교체' : '참조 사진 등록'}
-          </h2>
-
-          <p className="mb-6 text-sm leading-relaxed text-gray-600">
-            {hasExistingImage
-              ? '새로운 참조 사진으로 교체하거나 현재 사진을 그대로 사용하세요.'
-              : '가장 잘 나온 사진 하나를 업로드해주세요. AI가 이를 참조하여 더 예쁘고 자연스러운 사진을 만들어 드립니다.'}
-          </p>
-
-          {/* AI 사진 합성용 태그 */}
-          <div className="mb-6 flex w-fit items-center space-x-2 rounded-full border border-blue-200 px-4 py-2 text-blue-600">
+        <div className="p-6 text-center">
+          <div className="mx-auto mb-6 flex w-fit items-center space-x-2 rounded-full border border-gray-300 px-4 py-2 text-gray-700">
             <svg
               className="h-4 w-4"
               fill="none"
@@ -243,7 +228,7 @@ export default function UploadPhotoModal({
           {!selectedImage && (
             <button
               onClick={handleUploadClick}
-              className="mb-4 flex w-full items-center justify-center space-x-2 rounded-full bg-blue-50 py-3 text-blue-600 transition-colors hover:bg-blue-100"
+              className="mb-4 flex w-full items-center justify-center space-x-2 rounded-full bg-gray-100 py-3 text-gray-700 transition-colors hover:bg-gray-200"
             >
               <Edit size={16} />
               <span className="font-medium">
@@ -257,7 +242,7 @@ export default function UploadPhotoModal({
             <button
               onClick={handleSave}
               disabled={isUploading}
-              className="mb-3 w-full rounded-full bg-blue-600 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mb-3 w-full rounded-full bg-black py-3 font-medium text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isUploading ? '저장 중...' : '저장하고 시작하기'}
             </button>
@@ -267,26 +252,9 @@ export default function UploadPhotoModal({
           {hasExistingImage && !selectedImage && (
             <button
               onClick={handleComplete}
-              className="mb-3 w-full rounded-full bg-blue-600 py-3 font-medium text-white transition-colors hover:bg-blue-700"
+              className="mb-3 w-full rounded-full bg-black py-3 font-medium text-white transition-colors hover:bg-gray-800"
             >
               시작하기
-            </button>
-          )}
-
-          {/* 취소/나중에 버튼 */}
-          {selectedImage ? (
-            <button
-              onClick={() => setSelectedImage(null)}
-              className="w-full rounded-full py-3 font-medium text-gray-600 transition-colors hover:bg-gray-100"
-            >
-              취소
-            </button>
-          ) : (
-            <button
-              onClick={handleComplete}
-              className="w-full rounded-full py-3 font-medium text-gray-600 transition-colors hover:bg-gray-100"
-            >
-              {hasExistingImage ? '현재 사진 유지' : '나중에 등록'}
             </button>
           )}
 

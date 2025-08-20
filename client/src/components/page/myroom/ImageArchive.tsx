@@ -4,12 +4,12 @@ import React, { useState, useCallback, forwardRef } from 'react'
 import Masonry from 'react-masonry-css'
 import {
   HeartIcon,
-  HeartIcon as HeartSolidIcon,
   ShareIcon,
   TrashIcon,
   PencilIcon,
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline'
+import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid'
 
 import DeleteConfirmModal from './DeleteConfirmModal'
 import ShareModal from './ShareModal'
@@ -103,11 +103,13 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(
     const [zoomModalOpen, setZoomModalOpen] = useState(false)
     const [imageToZoom, setImageToZoom] = useState<ImageItem | null>(null)
 
-    // 반응형 컬럼 설정
+    // 반응형 컬럼 설정 - 사진을 더 작게 만들기 위해 컬럼 수 증가
     const breakpointColumns = {
-      default: 4,
-      1100: 3,
-      700: 2,
+      default: 6,
+      1400: 5,
+      1100: 4,
+      800: 3,
+      600: 2,
       500: 1,
     }
 
@@ -247,16 +249,7 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(
                   }}
                 />
 
-                {/* 돋보기 버튼 (호버 시 중앙 표시) */}
-                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100">
-                  <button
-                    onClick={() => handleImageZoom(image)}
-                    aria-label="이미지 확대"
-                    className="pointer-events-auto rounded-full bg-white/20 p-3 backdrop-blur-sm transition-colors hover:bg-white/30"
-                  >
-                    <MagnifyingGlassIcon className="h-6 w-6 text-white" />
-                  </button>
-                </div>
+                {/* 돋보기 버튼 제거 - 이미지를 클릭하면 바로 확대됨 */}
 
                 <div className="pointer-events-none absolute inset-0 bg-black/0 transition-all duration-300 ease-in-out group-hover:bg-black/40" />
 
@@ -267,9 +260,9 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(
                     aria-label={image.isLiked ? 'Unlike image' : 'Like image'}
                   >
                     {image.isLiked ? (
-                      <HeartSolidIcon className="h-4 w-4 text-red-500" />
+                      <HeartSolidIcon className="h-5 w-5 text-red-600 fill-current" />
                     ) : (
-                      <HeartIcon className="h-4 w-4 text-white" />
+                      <HeartIcon className="h-5 w-4 text-white stroke-2" />
                     )}
                   </button>
                 </div>

@@ -1,5 +1,5 @@
 // =============================================================================
-// 📁 /components/page/profile/UserProfile.tsx - 문법 오류 수정된 버전
+// /components/page/profile/UserProfile.tsx - 문법 오류 수정된 버전
 // =============================================================================
 
 'use client'
@@ -18,10 +18,10 @@ import {
 } from '@heroicons/react/24/outline'
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid'
 
-// 🔥 올바른 아키텍처: api from '@/lib/axios' 사용
+// 올바른 아키텍처: api from '@/lib/axios' 사용
 import api from '@/lib/axios'
 
-// 🔥 올바른 아키텍처: Zustand 토큰 스토어
+// 올바른 아키텍처: Zustand 토큰 스토어
 import { useAuthStore } from '@/stores/authStore'
 
 // ============================================================================
@@ -34,7 +34,7 @@ interface ApiResponse<T> {
   data: T;
 }
 
-// 🔥 실제 백엔드 UserProfileResponse 타입
+// 실제 백엔드 UserProfileResponse 타입
 interface UserProfileResponse {
   userId: number;
   accountName: string;
@@ -44,7 +44,7 @@ interface UserProfileResponse {
   faceImageUrl: string | null;
 }
 
-// 🔥 실제 백엔드 PostResponse 타입
+//  실제 백엔드 PostResponse 타입
 interface PostResponse {
   postId: number;
   photoId: number;
@@ -59,13 +59,13 @@ interface PostResponse {
   authorProfileImage: string | null;
 }
 
-// 🔥 실제 백엔드 FollowCountsResponse 타입
+//  실제 백엔드 FollowCountsResponse 타입
 interface FollowCountsResponse {
   followerCount: number;
   followingCount: number;
 }
 
-// 🔥 PostListResponse 타입
+// PostListResponse 타입
 interface PostListResponse {
   posts: PostResponse[];
   hasNext: boolean;
@@ -88,6 +88,33 @@ const safeGetFirstChar = (str: string | null | undefined, fallback: string = 'U'
 // ============================================================================
 
 const userProfileAPI = {
+  // 🔥 GET /user/my - 내 프로필 조회
+  getMyProfile: async (): Promise<UserProfileResponse> => {
+    console.log(`🔍 API 요청: GET /user/my`);
+    
+    try {
+      const response = await api.get<ApiResponse<UserProfileResponse>>('/user/my');
+      
+      if (response.data.error || !response.data.data) {
+        throw new Error(response.data.message || '내 프로필을 불러올 수 없습니다.');
+      }
+      
+      console.log('✅ 내 프로필 조회 성공:', response.data.data);
+      return response.data.data;
+      
+    } catch (error: any) {
+      console.error('❌ 내 프로필 조회 실패:', error);
+      
+      if (error.response?.status === 401) {
+        throw new Error('로그인이 필요합니다.');
+      } else if (error.response?.status === 500) {
+        throw new Error('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+      }
+      
+      throw new Error(error.response?.data?.message || '내 프로필을 불러올 수 없습니다.');
+    }
+  },
+
   // 🔥 GET /user/profile/{accountName} - 사용자 프로필 조회
   getUserByAccountName: async (accountName: string): Promise<UserProfileResponse> => {
     console.log(`🔍 API 요청: GET /user/profile/${accountName}`);
@@ -101,11 +128,9 @@ const userProfileAPI = {
         throw new Error(response.data.message || '사용자 프로필을 불러올 수 없습니다.');
       }
       
-      console.log('✅ 사용자 프로필 조회 성공:', response.data.data);
       return response.data.data;
       
     } catch (error: any) {
-      console.error('❌ 사용자 프로필 조회 실패:', error);
       
       if (error.response?.status === 404) {
         throw new Error('사용자를 찾을 수 없습니다.');
@@ -119,7 +144,6 @@ const userProfileAPI = {
 
   // 🔥 사용자 게시물 조회 - Explore에서 필터링
   getUserPosts: async (accountName: string, limit: number = 20): Promise<PostResponse[]> => {
-    console.log(`🔍 사용자 게시물 조회: ${accountName}`);
     
     try {
       const response = await api.get<ApiResponse<{ posts: PostResponse[], hasNext: boolean, nextCursor: number | null }>>('/feeds/explore', {
@@ -127,7 +151,8 @@ const userProfileAPI = {
       });
       
       if (response.data.error || !response.data.data) {
-        throw new Error(response.data.message || '게시물을 불러올 수 없습니다.');
+        console.warn('게시물 조회 실패, 빈 배열 반환');
+        return [];
       }
       
       const userPosts = response.data.data.posts.filter(
@@ -146,27 +171,86 @@ const userProfileAPI = {
     }
   },
 
-  // 🔥 GET /follows/count/{accountName} - 팔로우 통계 조회
-  getFollowStats: async (accountName: string): Promise<FollowCountsResponse> => {
-    console.log(`🔍 API 요청: GET /follows/count/${accountName}`);
+  // 🔥 사용자 게시물 수 조회 - 간단한 카운트만
+  getPostCount: async (accountName: string): Promise<number> => {
+    console.log(`🔍 게시물 수 조회: ${accountName}`);
     
     try {
-      const response = await api.get<ApiResponse<FollowCountsResponse>>(
-        `/follows/count/${accountName}`
-      );
+      // 더 많은 게시물을 가져와서 정확한 카운트
+      const response = await api.get<ApiResponse<{ posts: PostResponse[], hasNext: boolean, nextCursor: number | null }>>('/feeds/explore', {
+        params: { limit: 1000 } // 더 많은 게시물을 가져와서 정확한 카운트
+      });
       
       if (response.data.error || !response.data.data) {
-        console.warn('팔로우 통계 조회 실패, 기본값 반환');
-        return { followerCount: 0, followingCount: 0 };
+        console.warn('게시물 수 조회 실패, 기본값 0 반환');
+        return 0;
       }
       
-      console.log('✅ 팔로우 통계 조회 성공:', response.data.data);
-      return response.data.data;
+      console.log('📊 API 응답 데이터:', response.data.data);
+      console.log('📝 전체 게시물 수:', response.data.data.posts.length);
+      
+      // 각 게시물의 authorAccountName 확인
+      response.data.data.posts.forEach((post, index) => {
+        console.log(`게시물 ${index + 1}:`, {
+          postId: post.postId,
+          authorAccountName: post.authorAccountName,
+          caption: post.caption?.substring(0, 30) + '...'
+        });
+      });
+      
+      const userPostCount = response.data.data.posts.filter(
+        post => post.authorAccountName === accountName
+      ).length;
+      
+      console.log(`✅ ${accountName}의 게시물 수: ${userPostCount}개 (전체 ${response.data.data.posts.length}개 중)`);
+      return userPostCount;
       
     } catch (error: any) {
-      console.error('❌ 팔로우 통계 조회 실패:', error);
-      return { followerCount: 0, followingCount: 0 };
+      console.error('❌ 게시물 수 조회 실패:', error);
+      console.warn('게시물 수 조회에 실패했지만 기본값 0을 반환합니다.');
+      return 0;
     }
+  },
+
+  // 🔥 GET /follows/count/{accountName} - 팔로우 통계 조회
+  getFollowStats: async (accountName: string): Promise<FollowCountsResponse> => {
+    console.log(`🔍 팔로우 통계 조회 시도: ${accountName}`);
+    
+    // 여러 가능한 엔드포인트를 시도
+    const endpoints = [
+      `/follows/count/${accountName}`,
+      `/user/my/follows/count`,
+      `/follows/my/count`,
+      `/user/${accountName}/follows/count`
+    ];
+    
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`🔍 시도 중: GET ${endpoint}`);
+        
+        const response = await api.get<ApiResponse<FollowCountsResponse>>(endpoint);
+        
+        if (response.data.error || !response.data.data) {
+          console.warn(`${endpoint} 응답 오류, 다음 엔드포인트 시도`);
+          continue;
+        }
+        
+        console.log(`✅ 팔로우 통계 조회 성공 (${endpoint}):`, response.data.data);
+        return response.data.data;
+        
+      } catch (error: any) {
+        console.warn(`❌ ${endpoint} 실패:`, error.response?.status, error.response?.data?.message || error.message);
+        
+        // 404가 아닌 다른 오류는 다음 엔드포인트 시도
+        if (error.response?.status !== 404) {
+          continue;
+        }
+      }
+    }
+    
+    // 모든 엔드포인트가 실패한 경우 기본값 반환
+    console.warn('⚠️ 모든 팔로우 통계 엔드포인트 실패, 기본값 0 반환');
+    return { followerCount: 0, followingCount: 0 };
   },
 
   // 🔥 팔로우/언팔로우 토글

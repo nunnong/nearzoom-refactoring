@@ -17,7 +17,7 @@ interface SearchBoxProps {
 
 const SearchBox: React.FC<SearchBoxProps> = ({
   onFiltersChange,
-  placeholder = '메일로 검색하세요...',
+  placeholder = '친구 아이디나 이메일로 검색하세요...',
 }) => {
   const [searchValue, setSearchValue] = useState<string>('')
   const [filters, setFilters] = useState<Filter[]>([])
@@ -27,12 +27,24 @@ const SearchBox: React.FC<SearchBoxProps> = ({
 
   // 날짜 관련 함수
   const addDateFilter = (start: string, end?: string) => {
-    const dateValue = end ? `${start} ~ ${end}` : start
+    let displayText = ''
+    let value = ''
+    
+    if (end) {
+      // 범위 날짜
+      displayText = `${start} ~ ${end}`
+      value = `${start} ~ ${end}`
+    } else {
+      // 단일 날짜
+      displayText = `${start}`
+      value = start
+    }
+    
     const newFilter: Filter = {
       id: Date.now().toString(),
       type: 'date',
-      value: dateValue,
-      display: dateValue
+      value: value,
+      display: `📅 ${displayText}`
     }
 
     const updatedFilters = [...filters, newFilter]
@@ -83,7 +95,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({
     if (existingEditFilter) {
       // 기존 필터가 있으면 토글
       const newValue = existingEditFilter.value === 'edited' ? 'not_edited' : 'edited'
-      const newDisplay = newValue === 'edited' ? '✏️ 편집됨' : '📝 편집안됨'
+      const newDisplay = newValue === 'edited' ? ' 편집됨' : ' 편집안됨'
       
       const updatedFilters = filters.map(f => 
         f.type === 'edited' 
@@ -98,7 +110,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({
         id: Date.now().toString(),
         type: 'edited',
         value: 'edited',
-        display: '✏️ 편집됨'
+        display: '편집됨'
       }
 
       const updatedFilters = [...filters, newFilter]
@@ -138,16 +150,9 @@ const SearchBox: React.FC<SearchBoxProps> = ({
   }
 
   const removeFilter = (filterId: string) => {
-    console.log('🗑️ 필터 제거 시도:', filterId)
-    console.log('🗑️ 제거 전 필터들:', filters)
-    
     const updatedFilters = filters.filter(f => f.id !== filterId)
-    console.log('🗑️ 제거 후 필터들:', updatedFilters)
-    
     setFilters(updatedFilters)
     onFiltersChange?.(updatedFilters)
-    
-    console.log('✅ 필터 제거 완료, onFiltersChange 호출됨')
   }
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>): void => {
@@ -177,54 +182,83 @@ const SearchBox: React.FC<SearchBoxProps> = ({
   return (
     <div className="w-full max-w-2xl">
       {/* 검색 입력창 */}
-      <div className="flex h-12 items-center border-[3px] border-[#C4C8DA] bg-white rounded-lg px-3">
-        <MagnifyingGlassIcon className="h-5 w-5 text-gray-400 mr-3" />
+      <div className="flex h-12 items-center bg-black rounded-lg px-4 relative">
         <input
           type="text"
           value={searchValue}
           onChange={handleInputChange}
           onKeyPress={handleKeyPress}
-          placeholder={placeholder}
-          className="flex-1 bg-transparent outline-none text-sm text-gray-900 font-medium"
+          placeholder="친구 아이디/이메일 검색"
+          className="flex-1 bg-transparent outline-none text-sm text-gray-300 font-medium placeholder-gray-400"
         />
-        <button
-          onClick={addHeartFilter}
-          className={`ml-2 p-2 transition-colors ${
-            filters.some(f => f.type === 'heart')
-              ? 'text-red-500 bg-red-50 rounded-full' // 꽉 찬 하트
-              : 'text-gray-400 hover:text-red-500' // 회색 하트
-          }`}
-          title={filters.some(f => f.type === 'heart') ? '좋아요 필터 적용됨' : '좋아요 필터 추가'}
-        >
-          <HeartIcon className="h-5 w-5" />
-        </button>
-        
-        <button
-          onClick={addEditedFilter}
-          className={`ml-2 p-2 transition-colors ${
-            filters.some(f => f.type === 'edited')
-              ? 'text-purple-500 bg-purple-50 rounded-full'
-              : 'text-gray-400 hover:text-blue-500'
-          }`}
-          title={filters.some(f => f.type === 'edited') ? '편집됨 필터 적용됨' : '편집됨 필터 추가'}
-        >
-          <PencilIcon className="h-5 w-5" />
-        </button>
-        <button
-          onClick={() => setShowDatePicker(true)}
-          className="ml-2 p-2 text-gray-400 hover:text-gray-600 transition-colors"
-          title="날짜 필터 추가"
-        >
-          <CalendarIcon className="h-5 w-5" />
-        </button>
         {searchValue && (
           <button
-            onClick={() => addFilter(searchValue)}
-            className="ml-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors"
+            onClick={() => setSearchValue('')}
+            className="ml-2 w-6 h-6 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 transition-colors"
+            title="검색어 지우기"
           >
-            추가
+            <XMarkIcon className="h-4 w-4 text-white" />
           </button>
         )}
+        
+        {/* 필터 버튼들 - 검색창 안에 통합 */}
+        <div className="flex items-center ml-2">
+          <button
+            onClick={addHeartFilter}
+            className={`p-2 transition-colors ${
+              filters.some(f => f.type === 'heart')
+                ? 'text-red-500' // 꽉 찬 하트
+                : 'text-gray-400 hover:text-white' // 회색 하트
+            }`}
+            title={filters.some(f => f.type === 'heart') ? '좋아요 필터 적용됨' : '좋아요 필터 추가'}
+          >
+            <HeartIcon className="h-5 w-5" />
+          </button>
+          
+          <button
+            onClick={addEditedFilter}
+            className={`ml-1 p-2 transition-colors ${
+              filters.some(f => f.type === 'edited')
+                ? 'text-purple-500' // 편집됨 필터 적용됨
+                : 'text-gray-400 hover:text-white' // 편집됨 필터 추가
+            }`}
+            title={filters.some(f => f.type === 'edited') ? '편집됨 필터 적용됨' : '편집됨 필터 추가'}
+          >
+            <PencilIcon className="h-5 w-5" />
+          </button>
+          
+          <button
+            onClick={() => setShowDatePicker(true)}
+            className={`ml-1 p-2 transition-colors ${
+              filters.some(f => f.type === 'date')
+                ? 'text-blue-500' // 날짜 필터 적용됨
+                : 'text-gray-400 hover:text-white' // 날짜 필터 추가
+            }`}
+            title={filters.some(f => f.type === 'date') ? '날짜 필터 적용됨' : '날짜 필터 추가'}
+          >
+            <CalendarIcon className="h-5 w-5" />
+          </button>
+          
+          {searchValue && (
+            <button
+              onClick={() => addFilter(searchValue)}
+              className="ml-2 px-3 py-1 bg-white text-black text-xs rounded hover:bg-gray-200 transition-colors"
+            >
+              추가
+            </button>
+          )}
+        </div>
+        
+        <MagnifyingGlassIcon className="ml-2 h-5 w-5 text-white" />
+      </div>
+      {/* 하단 선 */}
+      <div className="w-full h-px bg-white mt-1"></div>
+      
+      {/* 검색 도움말 */}
+      <div className="mt-2 text-center">
+        <p className="text-xs text-gray-400">
+          💡 친구의 아이디나 이메일을 입력하면 함께 찍은 사진을 찾을 수 있어요
+        </p>
       </div>
 
       {/* 필터 버튼들 */}
@@ -240,6 +274,9 @@ const SearchBox: React.FC<SearchBoxProps> = ({
               )}
               {filter.type === 'edited' && (
                 <PencilIcon className="h-3 w-3 mr-1" />
+              )}
+              {filter.type === 'date' && (
+                <CalendarIcon className="h-3 w-3 mr-1" />
               )}
               <span>{filter.display}</span>
               <button

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { UserIcon } from '@heroicons/react/24/outline'
 import { FeedLoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { useAuthStore } from '@/stores/authStore'
@@ -32,12 +32,12 @@ interface UserProfile {
 }
 
 const UserProfilePage: React.FC = () => {
-  const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, isAuthenticated } = useAuthStore()
 
-  // URL 파라미터에서 accountName 추출
-  const accountName = typeof params.accountName === 'string' ? params.accountName : ''
+  // 쿼리 파라미터에서 accountName 추출
+  const accountName = searchParams.get('accountName') || ''
 
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -112,16 +112,8 @@ const UserProfilePage: React.FC = () => {
         } : null);
       }
       
-    } catch (error: any) {
-      console.error('팔로우 토글 실패:', {
-        error,
-        message: error.message,
-        profile: profile?.accountName,
-        isAuthenticated
-      });
-      
-      // 사용자에게 에러 메시지 표시
-      alert(error.message || '팔로우 처리에 실패했습니다.');
+    } catch (error) {
+      console.error('팔로우 토글 실패:', error);
     } finally {
       setIsFollowLoading(false);
     }
@@ -136,7 +128,7 @@ const UserProfilePage: React.FC = () => {
   };
 
   const handleShare = async () => {
-    const url = `${window.location.origin}/${accountName}`;
+    const url = `${window.location.origin}/user/profile?accountName=${encodeURIComponent(accountName)}`;
     
     if (navigator.share) {
       try {

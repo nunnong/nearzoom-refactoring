@@ -98,7 +98,6 @@ const EditConfirmModal: React.FC<EditConfirmModalProps> = ({
         <div className="mb-6 space-y-4">
           {/* 날짜 정보 */}
           <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-2">생성 날짜</h4>
             <div className="text-sm text-gray-600">
               {image.createdAt ? (
                 new Date(image.createdAt).toLocaleDateString('ko-KR', {
@@ -164,7 +163,7 @@ const EditConfirmModal: React.FC<EditConfirmModalProps> = ({
           </button>
           <button
             onClick={handleEditClick}
-            className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-black text-white rounded-md hover:bg-gray-700 transition-colors"
           >
             <PencilIcon className="h-4 w-4" />
             <span>편집하기</span>

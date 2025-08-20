@@ -308,34 +308,6 @@ export default function PostDetailPage() {
             )}
           </div>
         </div>
-
-        {/* 추천 액션 */}
-        <div className="mt-6 bg-white rounded-lg shadow-sm p-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-3">추천</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <button
-              onClick={() => router.push('/timeline')}
-              className="flex items-center space-x-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
-            >
-              <HomeIcon className="h-5 w-5 text-gray-400" />
-              <div>
-                <p className="text-sm font-medium text-gray-900">타임라인</p>
-                <p className="text-xs text-gray-500">최신 게시물 보기</p>
-              </div>
-            </button>
-            
-            <button
-              onClick={() => router.push('/explore')}
-              className="flex items-center space-x-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
-            >
-              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
-              <div>
-                <p className="text-sm font-medium text-gray-900">탐색</p>
-                <p className="text-xs text-gray-500">새로운 게시물 발견</p>
-              </div>
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

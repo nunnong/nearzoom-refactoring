@@ -163,7 +163,6 @@ export default function CompletionModal({
                   as="h3"
                   className="animate-pulse text-2xl font-bold text-gray-800"
                 >
-                  📸 촬영 완료! 📸
                 </Dialog.Title>
 
                 <div className="space-y-2 text-center">

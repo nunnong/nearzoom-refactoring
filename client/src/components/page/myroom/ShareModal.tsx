@@ -153,14 +153,14 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="mx-4 w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 p-4">
+        <div className="flex items-center justify-between border-b border-gray-300 p-4">
           <div className="flex items-center space-x-2">
-            <ShareIcon className="h-5 w-5 text-blue-500" />
-            <h3 className="text-lg font-semibold text-gray-900">공유하기</h3>
+            <ShareIcon className="h-5 w-5 text-black" />
+            <h3 className="text-lg font-semibold text-black">공유하기</h3>
           </div>
           <button
             onClick={onClose}
-            className="flex items-center space-x-2 rounded-md px-3 py-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            className="flex items-center space-x-2 rounded-md px-3 py-2 text-gray-600 hover:bg-gray-100 hover:text-black transition-colors"
             aria-label="Close modal"
           >
             <XMarkIcon className="h-5 w-5" />
@@ -172,10 +172,10 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
         <div className="p-6">
           {/* Copy Success Message */}
           {copySuccess && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+            <div className="mb-4 p-3 bg-gray-100 border border-gray-300 rounded-md">
               <div className="flex items-center justify-center space-x-2">
-                <span className="text-green-600">✓</span>
-                <p className="text-sm font-medium text-green-800">{copySuccess}</p>
+                <span className="text-black">✓</span>
+                <p className="text-sm font-medium text-black">{copySuccess}</p>
               </div>
             </div>
           )}
@@ -184,11 +184,11 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
           <div className="flex items-start space-x-4 mb-6">
             {/* Image Preview */}
             <div className="flex-shrink-0">
-              <div className="overflow-hidden rounded-lg border-2 border-gray-200">
+              <div className="overflow-hidden rounded-lg border-2 border-gray-300">
                 <img
                   src={image.imgUrl}
                   alt="공유할 사진"
-                  className="h-16 w-16 object-cover"
+                  className="h-24 w-24 object-cover"
                 />
               </div>
             </div>
@@ -196,13 +196,13 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
             {/* 함께 찍은 사람 - EditConfirmModal과 동일한 배지 형태 */}
             {hasPartnerEmails ? (
               <div className="flex-1">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">With</h4>
+                <h4 className="text-sm font-medium text-black mb-2">With</h4>
                 <div className="space-y-2">
                   <div>
                     {partnerEmailsList?.map((email, index) => (
                       <span 
                         key={index}
-                        className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full mr-2 mb-1 text-sm font-medium"
+                        className="inline-block bg-gray-200 text-black px-3 py-1 rounded-full mr-2 mb-1 text-sm font-medium"
                       >
                         @{email}
                       </span>
@@ -212,34 +212,34 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
               </div>
             ) : (
               <div className="flex-1">
-                <h4 className="text-sm font-medium text-gray-500 mb-2">함께 찍은 사람</h4>
-                <p className="text-sm text-gray-400">함께 찍은 사람이 없습니다</p>
+                <h4 className="text-sm font-medium text-gray-600 mb-2">함께 찍은 사람</h4>
+                <p className="text-sm text-gray-500">함께 찍은 사람이 없습니다</p>
               </div>
             )}
           </div>
 
           {/* Date Information Section */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">📅 날짜 정보</h4>
+          <div className="mb-6 p-4 bg-gray-100 rounded-lg border border-gray-300">
+            <h4 className="text-sm font-medium text-black mb-3"> 날짜 정보</h4>
             <div className="space-y-2">
               {image.takenAt && (
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-500">📸 촬영:</span>
-                  <span className="text-sm text-gray-900 font-medium">
+                  <span className="text-xs text-gray-600"> 촬영:</span>
+                  <span className="text-sm text-black font-medium">
                     {formatDate(image.takenAt)}
                   </span>
                 </div>
               )}
               {image.createdAt && (
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-500">💾 저장:</span>
-                  <span className="text-sm text-gray-900 font-medium">
+                  <span className="text-xs text-gray-600"> 저장:</span>
+                  <span className="text-sm text-black font-medium">
                     {formatDate(image.createdAt)}
                   </span>
                 </div>
               )}
               {!image.takenAt && !image.createdAt && (
-                <p className="text-sm text-gray-400">날짜 정보가 없습니다</p>
+                <p className="text-sm text-gray-500">날짜 정보가 없습니다</p>
               )}
             </div>
           </div>
@@ -249,16 +249,16 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
             {/* Feed Create */}
             <button
               onClick={handleFeedCreate}
-              className="flex w-full items-center space-x-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:outline-none"
+              className="flex w-full items-center space-x-3 rounded-lg border border-gray-300 p-3 text-left transition-colors hover:bg-gray-100 focus:ring-2 focus:ring-black focus:ring-offset-2 focus:outline-none"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-black">
                 <PencilSquareIcon className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="font-medium text-gray-900">
+                <p className="font-medium text-black">
                   피드 게시물 작성하기
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-600">
                   사진과 함께 게시물을 작성해보세요
                 </p>
               </div>
@@ -267,14 +267,14 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
             {/* Download Button */}
             <button
               onClick={handleDownload}
-              className="flex w-full items-center space-x-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2"
+              className="flex w-full items-center space-x-3 rounded-lg border border-gray-300 p-3 text-left transition-colors hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-black">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-white"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
               </div>
               <div>
-                <p className="font-medium text-gray-900">사진 다운로드</p>
-                <p className="text-sm text-gray-500">사진을 다운로드하여 저장해보세요</p>
+                <p className="font-medium text-black">사진 다운로드</p>
+                <p className="text-sm text-gray-600">사진을 다운로드하여 저장해보세요</p>
               </div>
             </button>
           </div>

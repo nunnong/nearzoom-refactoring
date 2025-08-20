@@ -34,15 +34,15 @@ function ScrollToTopButton() {
   }
 
   return (
-    <button
-      onClick={scrollToTop}
-      className={`group fixed right-8 bottom-8 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-black/80 text-white shadow-lg backdrop-blur-sm transition-all duration-300 ease-out hover:border-white/20 hover:bg-black hover:shadow-xl ${
-        isVisible
-          ? 'pointer-events-auto translate-y-0 opacity-100'
-          : 'pointer-events-none translate-y-4 opacity-0'
-      } `}
-      aria-label="맨 위로 가기"
-    >
+            <button
+          onClick={scrollToTop}
+          className={`group fixed right-8 bottom-8 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-black/80 text-white shadow-lg backdrop-blur-sm transition-all duration-300 ease-out hover:border-white/20 hover:bg-black hover:shadow-xl hover:cursor-pointer active:scale-95 ${
+            isVisible
+              ? 'pointer-events-auto translate-y-0 opacity-100'
+              : 'pointer-events-none translate-y-4 opacity-0'
+          } `}
+          aria-label="맨 위로 가기"
+        >
       {/* TOP 텍스트 */}
       <span className="text-xs font-medium tracking-wide transition-transform duration-200 group-hover:scale-110">
         TOP
@@ -98,7 +98,7 @@ function HamburgerMenuComponent({
       {/* 햄버거 버튼 */}
       <button
         onClick={() => setIsMenuOpen(!isMenuOpen)}
-        className="flex h-8 w-8 flex-col items-center justify-center space-y-1"
+        className="flex h-8 w-8 flex-col items-center justify-center space-y-1 hover:cursor-pointer transition-transform active:scale-95"
       >
         <span
           className={`block h-0.5 w-6 bg-black transition-all duration-300 ${isMenuOpen ? 'translate-y-1.5 rotate-45' : ''}`}
@@ -116,19 +116,19 @@ function HamburgerMenuComponent({
         <div className="absolute top-12 right-0 z-50 min-w-48 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
           <button
             onClick={handleUploadSelfie}
-            className="jaso-sans-font block w-full px-4 py-2 text-left text-black transition-colors hover:bg-gray-100"
+            className="jaso-sans-font block w-full px-4 py-2 text-left text-black transition-all hover:bg-gray-100 hover:cursor-pointer active:scale-95"
           >
             UPLOAD SELFIE
           </button>
           <button
             onClick={handleAccount}
-            className="jaso-sans-font block w-full px-4 py-2 text-left text-black transition-colors hover:bg-gray-100"
+            className="jaso-sans-font block w-full px-4 py-2 text-left text-black transition-all hover:bg-gray-100 hover:cursor-pointer active:scale-95"
           >
             ACCOUNT
           </button>
           <button
             onClick={handleLogout}
-            className="jaso-sans-font block w-full px-4 py-2 text-left text-red-600 transition-colors hover:bg-gray-100"
+            className="jaso-sans-font block w-full px-4 py-2 text-left text-red-600 transition-all hover:bg-gray-100 hover:cursor-pointer active:scale-95"
           >
             LOGOUT
           </button>
@@ -207,7 +207,7 @@ function NavigationMenu({
         <>
           <button
             onClick={onMyPage}
-            className="text-xl font-medium text-black transition-colors hover:text-gray-600"
+            className="text-xl font-medium text-black transition-all hover:text-gray-600 hover:cursor-pointer active:scale-95"
           >
             ALBUM
           </button>
@@ -215,10 +215,10 @@ function NavigationMenu({
             ref={startButtonRef}
             onClick={isCreatingRoom ? undefined : onStart}
             disabled={isCreatingRoom}
-            className={`didot-font relative rounded-xl px-8 py-3 text-xl font-medium transition-colors ${
+            className={`didot-font relative rounded-xl px-8 py-3 text-xl font-medium transition-all ${
               isCreatingRoom
                 ? 'cursor-not-allowed bg-gray-600 opacity-75'
-                : 'bg-black text-white hover:bg-gray-800'
+                : 'bg-black text-white hover:bg-gray-800 hover:cursor-pointer active:scale-95'
             }`}
           >
             {isCreatingRoom && (
@@ -230,7 +230,7 @@ function NavigationMenu({
           </button>
           <button
             onClick={onMyFeed}
-            className="text-xl font-medium text-black transition-colors hover:text-gray-600"
+            className="text-xl font-medium text-black transition-all hover:text-gray-600 hover:cursor-pointer active:scale-95"
           >
             FEED
           </button>
@@ -245,7 +245,7 @@ function NavigationMenu({
           </button>
           <button
             onClick={onLogin}
-            className="didot-font rounded-xl bg-black px-5 py-2 text-xl font-medium text-white transition-colors hover:bg-gray-800"
+            className="didot-font rounded-xl bg-black px-5 py-2 text-xl font-medium text-white transition-all hover:bg-gray-800 hover:cursor-pointer active:scale-95"
           >
             LOGIN
           </button>
@@ -288,11 +288,6 @@ function GallerySection() {
           duration: 46, // 천천히
           ease: 'none',
           repeat: -1,
-          modifiers: {
-            x: gsap.utils.unitize((x: number) =>
-              -x >= galleryWidth / 2 ? -initialOffset : x
-            ),
-          },
         })
       }
     }
@@ -306,8 +301,24 @@ function GallerySection() {
 
   return (
     <div
-      className="relative w-full overflow-hidden select-none"
+      className="relative w-full overflow-hidden select-none cursor-pointer"
       style={{ height: '66vh', marginTop: '1vh', userSelect: 'none' }}
+      onClick={() => {
+        // AboutUsSection의 "HOW IT WORKS" 부분이 화면 위쪽에 걸리도록 스크롤
+        const aboutUsSection = document.querySelector('[class*="pt-16"]')
+        if (aboutUsSection) {
+          aboutUsSection.scrollIntoView({ 
+            behavior: 'smooth',
+            block: 'start'
+          })
+        } else {
+          // fallback: 화면 높이의 80% 정도로 스크롤
+          window.scrollTo({
+            top: window.innerHeight * 0.8,
+            behavior: 'smooth'
+          })
+        }
+      }}
     >
       <div
         ref={containerRef}
@@ -333,7 +344,6 @@ function GallerySection() {
                 aspectRatio: '3/2', // <-- 이 부분
                 minHeight: '38vh',
                 maxHeight: '68vh',
-                background: '#eaeaea',
               }}
             >
               <div className="relative h-full w-full">
@@ -346,6 +356,8 @@ function GallerySection() {
                   sizes="(max-width: 900px) 100vw, 42vw"
                   draggable={false}
                 />
+                {/* 사진 위에만 덮이는 회색 오버레이 */}
+                <div className="absolute inset-0 bg-gray-200/20"></div>
               </div>
             </div>
           ))}

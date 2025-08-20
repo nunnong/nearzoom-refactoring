@@ -46,31 +46,68 @@ interface RandomPhotoGridProps {
 // ============================================================================
 
 const likesAPI = {
-  // 🔥 POST /posts/{postId}/like - 좋아요 토글 (백엔드와 일치)
-  toggleLike: async (postId: number): Promise<{ isLiked: boolean; likeCount: number }> => {
-    console.log('🔥 좋아요 토글 API 요청:', { postId });
+  // 🔥 POST /likes/posts/{postId} - 좋아요 추가 (백엔드와 일치)
+  addLike: async (postId: number): Promise<void> => {
+    console.log('🔥 좋아요 추가 API 요청:', { postId });
 
     try {
-      // 🔥 올바른 아키텍처: api 인스턴스 사용 → 자동으로 인터셉터에서 토큰 처리 및 갱신
-      const response = await api.post<ApiResponse<{ isLiked: boolean; likeCount: number }>>(
-        `/posts/${postId}/like`
-      );
+      const response = await api.post<ApiResponse<void>>(`/likes/posts/${postId}`);
       
       if (response.data.error) {
-        throw new Error(response.data.message || '좋아요 처리에 실패했습니다.');
+        throw new Error(response.data.message || '좋아요 추가에 실패했습니다.');
       }
       
-      console.log('🔥 좋아요 토글 성공:', response.data.data);
-      return response.data.data;
+      console.log('🔥 좋아요 추가 성공');
       
     } catch (error: any) {
-      console.error('🚨 좋아요 토글 실패:', error);
+      console.error('🚨 좋아요 추가 실패:', error);
       
       if (error.response?.status === 401) {
         throw new Error('로그인이 필요합니다.');
       }
       
-      throw new Error(error.response?.data?.message || '좋아요 처리에 실패했습니다.');
+      throw new Error(error.response?.data?.message || '좋아요 추가에 실패했습니다.');
+    }
+  },
+
+  // 🔥 DELETE /likes/posts/{postId} - 좋아요 취소 (백엔드와 일치)
+  removeLike: async (postId: number): Promise<void> => {
+    console.log('🔥 좋아요 취소 API 요청:', { postId });
+
+    try {
+      const response = await api.delete<ApiResponse<void>>(`/likes/posts/${postId}`);
+      
+      if (response.data.error) {
+        throw new Error(response.data.message || '좋아요 취소에 실패했습니다.');
+      }
+      
+      console.log('🔥 좋아요 취소 성공');
+      
+    } catch (error: any) {
+      console.error('🚨 좋아요 취소 실패:', error);
+      
+      if (error.response?.status === 401) {
+        throw new Error('로그인이 필요합니다.');
+      }
+      
+      throw new Error(error.response?.data?.message || '좋아요 취소에 실패했습니다.');
+    }
+  },
+
+  // 🔥 좋아요 토글 (기존 함수와 호환성 유지)
+  toggleLike: async (postId: number, isCurrentlyLiked: boolean): Promise<void> => {
+    console.log('🔥 좋아요 토글 API 요청:', { postId, isCurrentlyLiked });
+
+    try {
+      if (isCurrentlyLiked) {
+        await likesAPI.removeLike(postId);
+      } else {
+        await likesAPI.addLike(postId);
+      }
+      
+    } catch (error: any) {
+      console.error('🚨 좋아요 토글 실패:', error);
+      throw error;
     }
   },
 };
@@ -172,15 +209,18 @@ const RandomPhotoGrid: React.FC<RandomPhotoGridProps> = ({
       ));
       
       // 🔥 백엔드 API 호출 (인터셉터가 자동으로 토큰 처리)
-      const result = await likesAPI.toggleLike(postId);
+      await likesAPI.toggleLike(postId, feed.isLiked);
       
-      // 서버 응답으로 정확한 상태 업데이트
+      // 서버 응답으로 정확한 상태 업데이트 (낙관적 업데이트 결과 사용)
+      const newIsLiked = !feed.isLiked;
+      const newLikeCount = feed.isLiked ? feed.likesCount - 1 : feed.likesCount + 1;
+      
       setLocalPhotos(prev => prev.map(photo => 
         photo.postId === postId 
           ? {
               ...photo,
-              isLiked: result.isLiked,
-              likesCount: result.likeCount
+              isLiked: newIsLiked,
+              likesCount: newLikeCount
             }
           : photo
       ));
@@ -189,13 +229,13 @@ const RandomPhotoGrid: React.FC<RandomPhotoGridProps> = ({
       if (onLikeToggle) {
         const updatedFeed = {
           ...feed,
-          isLiked: result.isLiked,
-          likesCount: result.likeCount
+          isLiked: newIsLiked,
+          likesCount: newLikeCount
         };
         onLikeToggle(updatedFeed);
       }
       
-      console.log('✅ 좋아요 토글 성공:', result);
+      console.log('✅ 좋아요 토글 성공:', { isLiked: newIsLiked, likeCount: newLikeCount });
       
     } catch (error: any) {
       console.error('❌ 좋아요 토글 실패:', error);
@@ -227,7 +267,7 @@ const RandomPhotoGrid: React.FC<RandomPhotoGridProps> = ({
         return newSet;
       });
     }
-  }, [isAuthenticated, accessToken, user, likingPosts, onLikeToggle, logout]);
+  }, [isAuthenticated, accessToken, user?.accountName, onLikeToggle, logout]);
 
   // ============================================================================
   // 이벤트 핸들러들 (🔥 수정된 프로필 클릭 핸들러 적용)

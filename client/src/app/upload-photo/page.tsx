@@ -172,7 +172,6 @@ function UploadPhotoContent() {
     }
   }
 
-  // '시작하기', '취소', '나중에 등록', '닫기' 모두 동일하게 목적지로 이동
   const handleSkip = () => {
     const destination = getRedirectDestination()
 
@@ -202,143 +201,123 @@ function UploadPhotoContent() {
   const displayImage = selectedImage || currentReferenceImage
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="relative mx-4 w-96 max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl">
-        {/* X 버튼을 우측 상단에 절대 위치로 배치 */}
-        <button
-          onClick={handleClose}
-          className="absolute top-4 right-4 z-10 rounded-full p-2 transition-colors hover:bg-gray-100"
-        >
-          <X size={20} className="text-gray-600" />
-        </button>
+    <>
+      
+      {/* 모달 컨테이너 */}
+      <div className="relative z-10 flex min-h-screen items-center justify-center">
+        <div className="relative mx-4 w-96 max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl">
+          {/* X 버튼을 우측 상단에 절대 위치로 배치 */}
+          <button
+            onClick={handleClose}
+            className="absolute top-4 right-4 z-10 rounded-full p-2 transition-colors hover:bg-gray-100"
+          >
+            <X size={20} className="text-gray-600" />
+          </button>
 
-        {/* 헤더 */}
-        <div className="flex items-center justify-center border-b border-gray-100 p-4">
-          <div className="flex items-center space-x-2">
-            <span className="text-lg font-medium text-blue-500">이</span>
-            <span className="text-lg font-medium text-red-500">어</span>
-            <span className="text-lg font-medium text-yellow-500">줌</span>
-          </div>
-        </div>
-
-        {/* 컨텐츠 */}
-        <div className="p-6">
-          <h2 className="mb-3 text-xl font-medium text-gray-800">
-            {hasExistingImage ? '참조 사진 교체' : '참조 사진 등록'}
-          </h2>
-
-          <p className="mb-6 text-sm leading-relaxed text-gray-600">
-            {hasExistingImage
-              ? '새로운 참조 사진으로 교체하거나 현재 사진을 그대로 사용하세요.'
-              : '가장 잘 나온 사진 하나를 업로드해주세요. AI가 이를 참조하여 더 예쁘고 자연스러운 사진을 만들어 드립니다.'}
-          </p>
-
-          {/* AI 사진 합성용 태그 */}
-          <div className="mb-6 flex w-fit items-center space-x-2 rounded-full border border-blue-200 px-4 py-2 text-blue-600">
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 10V3L4 14h7v7l9-11h-7z"
-              />
-            </svg>
-            <span className="text-sm font-medium">AI 사진 합성용</span>
-          </div>
-
-          {/* 프로필 이미지 */}
-          <div className="mb-8 flex justify-center">
-            <div className="h-32 w-32 overflow-hidden rounded-full bg-gradient-to-br from-orange-200 via-green-200 to-blue-200 p-1">
-              <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-white">
-                {displayImage ? (
-                  <img
-                    src={displayImage}
-                    alt="참조 사진"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <svg viewBox="0 0 100 100" className="h-full w-full">
-                    <circle cx="50" cy="50" r="45" fill="#ff9999" />
-                    <circle cx="35" cy="40" r="3" fill="#000" />
-                    <circle cx="65" cy="40" r="3" fill="#000" />
-                    <path
-                      d="M 30 60 Q 50 75 70 60"
-                      stroke="#000"
-                      strokeWidth="2"
-                      fill="none"
-                    />
-                  </svg>
-                )}
+          {/* 헤더 */}
+          <div className="flex items-center justify-center mt-4">
+            <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2">
+                <img
+                  src="/vogue_logo.png"
+                  alt="wiarzoom"
+                  className="h-4 w-auto"
+                />
               </div>
             </div>
           </div>
 
-          {/* 업로드/교체 버튼 */}
-          {!selectedImage && (
-            <button
-              onClick={handleUploadClick}
-              className="mb-4 flex w-full items-center justify-center space-x-2 rounded-full bg-blue-50 py-3 text-blue-600 transition-colors hover:bg-blue-100"
-            >
-              <Edit size={16} />
-              <span className="font-medium">
-                {hasExistingImage ? '다른 사진으로 교체' : '사진 업로드'}
-              </span>
-            </button>
-          )}
+          {/* 컨텐츠 */}
+          <div className="p-6 text-center">
+            <div className="mx-auto mb-6 flex w-fit items-center space-x-2 rounded-full border border-blue-200 px-4 py-2 text-blue-600">
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
+              </svg>
+              <span className="text-sm font-medium">AI 사진 합성 참조 사진</span>
+            </div>
 
-          {/* 저장 버튼 (새 이미지 선택시에만) */}
-          {selectedImage && (
-            <button
-              onClick={handleSave}
-              disabled={isUploading}
-              className="mb-3 w-full rounded-full bg-blue-600 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isUploading ? '저장 중...' : '저장하고 시작하기'}
-            </button>
-          )}
+            {/* 프로필 이미지 */}
+            <div className="mb-8 flex justify-center">
+              <div className="h-32 w-32 overflow-hidden rounded-full bg-gradient-to-br from-orange-200 via-green-200 to-blue-200 p-1">
+                <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-white">
+                  {displayImage ? (
+                    <img
+                      src={displayImage}
+                      alt="참조 사진"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <svg viewBox="0 0 100 100" className="h-full w-full">
+                      <circle cx="50" cy="50" r="45" fill="#ff9999" />
+                      <circle cx="35" cy="40" r="3" fill="#000" />
+                      <circle cx="65" cy="40" r="3" fill="#000" />
+                      <path
+                        d="M 30 60 Q 50 75 70 60"
+                        stroke="#000"
+                        strokeWidth="2"
+                        fill="none"
+                      />
+                    </svg>
+                  )}
+                </div>
+              </div>
+            </div>
 
-          {/* 시작하기 버튼 (기존 이미지가 있을 때) */}
-          {hasExistingImage && !selectedImage && (
-            <button
-              onClick={handleSkip}
-              className="mb-3 w-full rounded-full bg-blue-600 py-3 font-medium text-white transition-colors hover:bg-blue-700"
-            >
-              시작하기
-            </button>
-          )}
+            {/* 업로드/교체 버튼 */}
+            {!selectedImage && (
+              <button
+                onClick={handleUploadClick}
+                className="mb-4 flex w-full items-center justify-center space-x-2 rounded-full bg-blue-50 py-3 text-blue-600 transition-colors hover:bg-blue-100"
+              >
+                <Edit size={16} />
+                <span className="font-medium">
+                  {hasExistingImage ? '다른 사진으로 교체' : '사진 업로드'}
+                </span>
+              </button>
+            )}
 
-          {/* 취소/계속하기 버튼 */}
-          {selectedImage ? (
-            <button
-              onClick={() => setSelectedImage(null)}
-              className="w-full rounded-full py-3 font-medium text-gray-600 transition-colors hover:bg-gray-100"
-            >
-              취소
-            </button>
-          ) : (
-            <button
-              onClick={handleSkip}
-              className="w-full rounded-full py-3 font-medium text-gray-600 transition-colors hover:bg-gray-100"
-            >
-              {hasExistingImage ? '현재 사진 유지' : '나중에 등록'}
-            </button>
-          )}
+            {/* 저장 버튼 (새 이미지 선택시에만) */}
+            {selectedImage && (
+              <button
+                onClick={handleSave}
+                disabled={isUploading}
+                className="mb-3 w-full rounded-full bg-blue-600 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isUploading ? '저장 중...' : '저장하고 시작하기'}
+              </button>
+            )}
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleImageSelect}
-            className="hidden"
-          />
+            {/* 시작하기 버튼 (기존 이미지가 있을 때) */}
+            {hasExistingImage && !selectedImage && (
+              <button
+                onClick={handleSkip}
+                className="mb-3 w-full rounded-full bg-blue-600 py-3 font-medium text-white transition-colors hover:bg-blue-700"
+              >
+                취소
+              </button>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }
 

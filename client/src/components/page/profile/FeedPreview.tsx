@@ -18,7 +18,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/hooks/auth/useAuth'
+import { useAuthStore } from '@/stores/authStore'
 
 // 🔥 백엔드 연동
 import api from '@/lib/axios'
@@ -136,8 +136,6 @@ const feedPreviewAPI = {
   ): Promise<FeedWithPostsResponse> => {
     const params: Record<string, any> = { limit };
     if (cursor) params.cursor = cursor;
-
-    console.log('🔥 API 요청 - GET /feeds/user/account/' + accountName, params);
 
     const response = await api.get<ApiResponse<FeedWithPostsResponse>>(
       `/feeds/user/account/${accountName}`,
@@ -271,7 +269,8 @@ interface AuthGuardProps {
 }
 
 const AuthGuard: React.FC<AuthGuardProps> = ({ children, className = '' }) => {
-  const { isAuthenticated, isLoading, handleLogin } = useAuth();
+  const { isAuthenticated, isLoading } = useAuthStore();
+  const router = useRouter();
 
   // 로딩 중일 때
   if (isLoading) {
@@ -301,7 +300,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, className = '' }) => {
         
         <div className="flex flex-col sm:flex-row gap-2">
           <button
-            onClick={handleLogin}
+            onClick={() => router.push('/login')}
             className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
           >
             로그인하러 가기
@@ -318,7 +317,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, className = '' }) => {
         
         <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
           <div className="flex items-start space-x-2">
-            <ExclamationTriangleIcon className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+            <ExclamationTriangleIcon className="h-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
             <div className="text-xs text-blue-800">
               <strong>안전한 서비스:</strong> 모든 피드 기능은 로그인한 사용자만 이용할 수 있습니다.
             </div>
@@ -350,7 +349,7 @@ function FeedPreview({
   enableInfiniteScroll = false
 }: FeedPreviewProps): React.ReactElement {
   const router = useRouter();
-  const { user, isAuthenticated, handleLogin } = useAuth();
+  const { user, isAuthenticated } = useAuthStore();
   
   // 상태 관리
   const [localFeed, setLocalFeed] = useState<UserFeedData>(feed);
@@ -396,11 +395,11 @@ function FeedPreview({
     
     // 인증 에러인 경우 로그인 페이지로 이동
     if (errorMessage.includes('로그인이 필요') || errorMessage.includes('권한이 없')) {
-      setTimeout(() => handleLogin(), 2000);
+      setTimeout(() => router.push('/login'), 2000);
     }
     
     setTimeout(() => setError(null), 5000);
-  }, [showToast, handleLogin]);
+  }, [showToast, router]);
 
   // 크기별 스타일 정의
   const sizeConfig = useMemo(() => ({
@@ -431,7 +430,7 @@ function FeedPreview({
   const refreshFeedData = useCallback(async () => {
     if (!isAuthenticated) {
       showToast('로그인이 필요합니다.', 'error');
-      setTimeout(() => handleLogin(), 1500);
+      setTimeout(() => router.push('/login'), 1500);
       return;
     }
 
@@ -470,7 +469,7 @@ function FeedPreview({
     } finally {
       setIsRefreshing(false);
     }
-  }, [localFeed.accountName, previewPostLimit, onFeedUpdate, handleError, showToast, isAuthenticated, handleLogin]);
+  }, [localFeed.accountName, previewPostLimit, onFeedUpdate, handleError, showToast, isAuthenticated, router]);
 
   // 추가 게시물 로드 (인증 체크 포함)
   const loadMorePosts = useCallback(async () => {
@@ -573,7 +572,7 @@ function FeedPreview({
     if (isFollowing || !isAuthenticated) {
       if (!isAuthenticated) {
         showToast('로그인이 필요합니다.', 'error');
-        setTimeout(() => handleLogin(), 1500);
+        setTimeout(() => router.push('/login'), 1500);
       }
       return;
     }
@@ -640,7 +639,7 @@ function FeedPreview({
     onFollowChange, 
     showToast, 
     handleError,
-    handleLogin
+    router
   ]);
 
   // 좋아요 핸들러 (인증 체크 포함)
@@ -648,7 +647,7 @@ function FeedPreview({
     if (isLiking || !isAuthenticated || localFeed.posts.length === 0) {
       if (!isAuthenticated) {
         showToast('로그인이 필요합니다.', 'error');
-        setTimeout(() => handleLogin(), 1500);
+        setTimeout(() => router.push('/login'), 1500);
       }
       return;
     }
@@ -726,7 +725,7 @@ function FeedPreview({
     onLikeChange, 
     showToast, 
     handleError,
-    handleLogin
+    router
   ]);
 
   // 공유 핸들러
@@ -1084,7 +1083,7 @@ function FeedPreview({
             {/* 로그인 버튼 (인증되지 않은 경우) */}
             {!isAuthenticated && (
               <button
-                onClick={handleLogin}
+                onClick={() => router.push('/login')}
                 className={`${sizeConfig[size].button} bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors`}
               >
                 로그인 필요
@@ -1103,7 +1102,7 @@ function FeedPreview({
               <p className="text-sm text-red-600">{error}</p>
               {error.includes('로그인이 필요') && (
                 <button
-                  onClick={handleLogin}
+                  onClick={() => router.push('/login')}
                   className="text-sm text-red-700 underline hover:text-red-900 mt-1"
                 >
                   로그인하러 가기
@@ -1202,7 +1201,8 @@ export const useFeedPreview = (initialFeed: UserFeedData) => {
   const [feed, setFeed] = useState<UserFeedData>(initialFeed);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated, handleLogin } = useAuth();
+  const { isAuthenticated } = useAuthStore();
+  const router = useRouter();
 
   const updateFeed = useCallback((updatedFeed: UserFeedData) => {
     setFeed(updatedFeed);
@@ -1212,7 +1212,7 @@ export const useFeedPreview = (initialFeed: UserFeedData) => {
     if (!isAuthenticated) {
       const errorMessage = '로그인이 필요합니다.';
       setError(errorMessage);
-      setTimeout(() => handleLogin(), 2000);
+      setTimeout(() => router.push('/login'), 2000);
       throw new Error(errorMessage);
     }
 
@@ -1233,7 +1233,7 @@ export const useFeedPreview = (initialFeed: UserFeedData) => {
       // 인증 관련 에러 처리
       if (err?.response?.status === 401 || err?.response?.status === 403) {
         errorMessage = '인증이 만료되었습니다. 다시 로그인해주세요.';
-        setTimeout(() => handleLogin(), 2000);
+        setTimeout(() => router.push('/login'), 2000);
       }
       
       setError(errorMessage);
@@ -1241,7 +1241,7 @@ export const useFeedPreview = (initialFeed: UserFeedData) => {
     } finally {
       setIsLoading(false);
     }
-  }, [feed.accountName, isAuthenticated, handleLogin]);
+  }, [feed.accountName, isAuthenticated, router]);
 
   return {
     feed,

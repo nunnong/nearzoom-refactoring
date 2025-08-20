@@ -149,23 +149,28 @@ export default function RoomTestSocialPage() {
   // 참조 사진 업로드 모달 표시
   if (pageState === 'photo_upload') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="mb-4 text-xl font-semibold text-gray-700">
-            방에 입장하기 전에
+      <>
+        {/* 페이지 전체 배경 */}
+        
+        {/* 모달 컨테이너 */}
+        <div className="relative z-10 flex min-h-screen items-center justify-center">
+          <div className="text-center">
+            <div className="mb-4 text-xl font-semibold text-gray-700">
+              방에 입장하기 전에
+            </div>
+            <div className="text-gray-500">
+              AI 사진 합성을 위한 참조 사진을 설정해주세요
+            </div>
           </div>
-          <div className="text-gray-500">
-            AI 사진 합성을 위한 참조 사진을 설정해주세요
-          </div>
-        </div>
 
-        {/* 참조 사진 업로드 모달 */}
-        <UploadPhotoModal
-          isOpen={showPhotoModal}
-          onClose={() => setShowPhotoModal(false)}
-          onComplete={handlePhotoComplete}
-        />
-      </div>
+          {/* 참조 사진 업로드 모달 */}
+          <UploadPhotoModal
+            isOpen={showPhotoModal}
+            onClose={() => setShowPhotoModal(false)}
+            onComplete={handlePhotoComplete}
+          />
+        </div>
+      </>
     )
   }
 

@@ -237,13 +237,9 @@ export default function UploadSelfieModal({
           <X size={20} className="text-gray-600" />
         </button>
 
-        {/* 헤더 */}
-        <div className="flex items-center justify-center border-b border-gray-100 p-4">
-          <div className="flex items-center space-x-2">
-            <span className="text-lg font-medium text-blue-500">이</span>
-            <span className="text-lg font-medium text-red-500">어</span>
-            <span className="text-lg font-medium text-yellow-500">줌</span>
-          </div>
+        {/* 헤더 - 로고 */}
+        <div className="flex items-center justify-center pt-4 pb-2 mt-4">
+          <img src="/vogue_logo.png" alt="vogue" className="h-4 w-auto" />
         </div>
 
         {/* 컨텐츠 */}

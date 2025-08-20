@@ -295,11 +295,31 @@ export const profileAPI = {
     console.log(`🔍 API 요청: POST /follows/${accountName}`)
 
     try {
-      await api.post(`/follows/${accountName}`)
-      console.log('✅ 팔로우 성공')
+      const response = await api.post(`/follows/${accountName}`)
+      console.log('✅ 팔로우 성공:', response)
     } catch (error: any) {
-      console.error('❌ 팔로우 실패:', error)
-      throw new Error(error.response?.data?.message || '팔로우에 실패했습니다.')
+      console.error('❌ 팔로우 실패:', {
+        error,
+        message: error.message,
+        response: error.response,
+        status: error.response?.status,
+        data: error.response?.data,
+        stack: error.stack,
+      })
+
+      if (error.response?.status === 401) {
+        throw new Error('로그인이 필요합니다.')
+      } else if (error.response?.status === 404) {
+        throw new Error('사용자를 찾을 수 없습니다.')
+      } else if (error.response?.status === 409) {
+        throw new Error('이미 팔로우 중인 사용자입니다.')
+      } else {
+        throw new Error(
+          error.response?.data?.message ||
+            error.message ||
+            '팔로우에 실패했습니다.'
+        )
+      }
     }
   },
 
@@ -307,13 +327,31 @@ export const profileAPI = {
     console.log(`🔍 API 요청: DELETE /follows/${accountName}`)
 
     try {
-      await api.delete(`/follows/${accountName}`)
-      console.log('✅ 언팔로우 성공')
+      const response = await api.delete(`/follows/${accountName}`)
+      console.log('✅ 언팔로우 성공:', response)
     } catch (error: any) {
-      console.error('❌ 언팔로우 실패:', error)
-      throw new Error(
-        error.response?.data?.message || '언팔로우에 실패했습니다.'
-      )
+      console.error('❌ 언팔로우 실패:', {
+        error,
+        message: error.message,
+        response: error.response,
+        status: error.response?.status,
+        data: error.response?.data,
+        stack: error.stack,
+      })
+
+      if (error.response?.status === 401) {
+        throw new Error('로그인이 필요합니다.')
+      } else if (error.response?.status === 404) {
+        throw new Error('사용자를 찾을 수 없습니다.')
+      } else if (error.response?.status === 409) {
+        throw new Error('팔로우하지 않은 사용자입니다.')
+      } else {
+        throw new Error(
+          error.response?.data?.message ||
+            error.message ||
+            '언팔로우에 실패했습니다.'
+        )
+      }
     }
   },
 
