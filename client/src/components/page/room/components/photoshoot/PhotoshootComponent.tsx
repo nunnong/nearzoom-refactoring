@@ -40,11 +40,16 @@ export default function PhotoshootComponent({
 
   // PhotoBooth actions
   const completeCapture = usePhotoBoothStore(state => state.completeCapture)
-  const setPhotoBoothState = usePhotoBoothStore(state => state.setPhotoBoothState)
+  const setPhotoBoothState = usePhotoBoothStore(
+    state => state.setPhotoBoothState
+  )
   const resetCutIndex = usePhotoBoothStore(state => state.resetCutIndex)
 
   // 캔버스 캡쳐 완료 핸들러
-  const handleCaptureComplete = async (imageData: string, personIds?: string[]) => {
+  const handleCaptureComplete = async (
+    imageData: string,
+    personIds?: string[]
+  ) => {
     console.log('📷 Photo captured, completing capture process')
     console.log('🎭 Person IDs received:', personIds)
     await completeCapture(imageData, personIds)
@@ -52,8 +57,6 @@ export default function PhotoshootComponent({
   }
 
   const cutLabels = ['1컷', '2컷', '3컷', '4컷']
-
-
 
   return (
     <div
@@ -75,7 +78,7 @@ export default function PhotoshootComponent({
           </div>
 
           {/* PhotoCanvas 영역 */}
-          <div className="flex flex-1 items-center justify-center">
+          <div className="flex items-center justify-center">
             <div className="relative">
               {/* 개선된 PhotoCanvas 사용 (DummyPhotoCanvas 로직 적용) */}
               <PhotoCanvas onCapture={handleCaptureComplete} />
@@ -105,7 +108,6 @@ export default function PhotoshootComponent({
       <aside className="w-full shrink-0 md:w-[300px] lg:w-80">
         <PhotoShootSidebar showStartButton={true} showLeaveButton={true} />
       </aside>
-
     </div>
   )
 }
