@@ -4,10 +4,12 @@ import {
   XMarkIcon,
   ShareIcon,
   PencilSquareIcon,
+  LinkIcon,
 } from '@heroicons/react/24/outline'
 import React, { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSuccessToast } from '@/components/ui/Toast'
+import { shareLink, generatePhotoShareUrl } from '@/utils/shareUtils'
 
 interface ImageItem {
   photoId: string
@@ -134,6 +136,41 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
     onClose()
   }, [router, onClose])
 
+  const handleLinkShare = useCallback(async () => {
+    if (!image) return
+    
+    try {
+      const shareUrl = generatePhotoShareUrl(image.photoId)
+      const result = await shareLink({
+        title: 'NearZoom 사진',
+        text: '함께 찍은 추억을 확인해보세요!',
+        url: shareUrl
+      })
+      
+      if (result === 'shared') {
+        setCopySuccess('링크가 공유되었습니다!')
+      } else if (result === 'copied') {
+        setCopySuccess('링크가 클립보드에 복사되었습니다!')
+      } else {
+        setCopySuccess(result) // 에러 메시지
+      }
+      
+      // 3초 후 성공 메시지 제거
+      setTimeout(() => setCopySuccess(null), 3000)
+      
+      // Toast가 있는 경우에만 사용
+      if (showToast && (result === 'shared' || result === 'copied')) {
+        const message = result === 'shared' ? '링크가 공유되었습니다!' : '링크가 클립보드에 복사되었습니다!'
+        const toast = createSuccessToast(message)
+        showToast(toast)
+      }
+    } catch (error) {
+      console.error('링크 공유 실패:', error)
+      setCopySuccess('링크 공유에 실패했습니다.')
+      setTimeout(() => setCopySuccess(null), 3000)
+    }
+  }, [image, showToast])
+
   // 메모이제이션된 값들
   const partnerEmailsList = useMemo(() => {
     const raw = image?.partnerEmails
@@ -246,6 +283,24 @@ const ShareModal: React.FC<ShareModalProps> = React.memo(({
 
           {/* Share Options */}
           <div className="space-y-3">
+            {/* Link Share */}
+            <button
+              onClick={handleLinkShare}
+              className="flex w-full items-center space-x-3 rounded-lg border border-gray-300 p-3 text-left transition-colors hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600">
+                <LinkIcon className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="font-medium text-black">
+                  링크 공유하기
+                </p>
+                <p className="text-sm text-gray-600">
+                  사진 링크를 공유하거나 복사해보세요
+                </p>
+              </div>
+            </button>
+
             {/* Feed Create */}
             <button
               onClick={handleFeedCreate}

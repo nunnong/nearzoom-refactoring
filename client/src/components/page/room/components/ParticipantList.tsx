@@ -3,6 +3,7 @@
 import { useParticipants, useLocalParticipant } from '@livekit/components-react'
 import StartButton from './StartButton'
 import { usePhotoBoothStore } from '../providers/PhotoBoothProvider'
+import { shareLink } from '@/utils/shareUtils'
 
 interface ParticipantListProps {
   showStartButton?: boolean
@@ -51,11 +52,22 @@ export default function ParticipantList({
   const handleCopyUrl = async () => {
     try {
       const currentUrl = window.location.href
-      await navigator.clipboard.writeText(currentUrl)
-      alert('URL이 복사되었습니다!')
+      const result = await shareLink({
+        title: 'NearZoom 포토부스',
+        text: '함께 사진을 찍어보세요!',
+        url: currentUrl
+      })
+      
+      if (result === 'shared') {
+        console.log('방 링크가 공유되었습니다!')
+      } else if (result === 'copied') {
+        alert('URL이 클립보드에 복사되었습니다!')
+      } else {
+        alert(`공유 실패: ${result}`)
+      }
     } catch (err) {
-      console.error('복사 실패:', err)
-      alert('복사에 실패했습니다.')
+      console.error('공유 실패:', err)
+      alert('공유에 실패했습니다.')
     }
   }
 
@@ -102,7 +114,7 @@ export default function ParticipantList({
                 d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
               />
             </svg>
-            <span className="text-xs font-semibold">복사</span>
+            <span className="text-xs font-semibold">공유</span>
           </div>
         </button>
       </div>
