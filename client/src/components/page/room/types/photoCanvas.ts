@@ -42,8 +42,8 @@ export const CANVAS_CONFIG = {
 } as const
 
 export const DEFAULT_PARTICIPANT_CONFIG = {
-  width: 320,
-  height: 240,
+  width: 300,
+  height: 225,
   scaleX: 1,
   scaleY: 1,
   rotation: 0,

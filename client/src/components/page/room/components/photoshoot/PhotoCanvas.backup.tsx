@@ -93,8 +93,8 @@ export default function PhotoCanvas({
           id,
           x: 100 + (participantCount % 3) * 350,
           y: 100 + Math.floor(participantCount / 3) * 280,
-          width: 320,
-          height: 240,
+          width: 300,
+          height: 225,
           rotation: 0,
           scaleX: 1,
           scaleY: 1,
@@ -434,8 +434,8 @@ export default function PhotoCanvas({
             id: participantId,
             x: participants[participantId]?.x || 100,
             y: participants[participantId]?.y || 100,
-            width: participants[participantId]?.width || 320,
-            height: participants[participantId]?.height || 240,
+            width: participants[participantId]?.width || 300,
+            height: participants[participantId]?.height || 225,
             rotation: participants[participantId]?.rotation || 0,
             scaleX: 1,
             scaleY: 1,
@@ -524,8 +524,8 @@ export default function PhotoCanvas({
             const currentTransform = participants[participantId] || {
               x: 50 + index * 200,
               y: 50 + index * 100,
-              width: 320,
-              height: 240,
+              width: 300,
+              height: 225,
               rotation: 0,
             }
             
@@ -600,8 +600,8 @@ export default function PhotoCanvas({
                     console.log(`🔄 Video transformed: ${participantId}`, {
                       x: node.x(),
                       y: node.y(),
-                      width: Math.max(5, (participants[participantId]?.width || 320) * scaleX),
-                      height: Math.max(5, (participants[participantId]?.height || 240) * scaleY),
+                      width: Math.max(5, (participants[participantId]?.width || 300) * scaleX),
+                      height: Math.max(5, (participants[participantId]?.height || 225) * scaleY),
                       rotation: node.rotation()
                     })
                     
@@ -614,8 +614,8 @@ export default function PhotoCanvas({
                           x: node.x(),
                           y: node.y(),
                           rotation: node.rotation(),
-                          width: Math.max(5, (participants[participantId]?.width || 320) * scaleX),
-                          height: Math.max(5, (participants[participantId]?.height || 240) * scaleY),
+                          width: Math.max(5, (participants[participantId]?.width || 300) * scaleX),
+                          height: Math.max(5, (participants[participantId]?.height || 225) * scaleY),
                           lastInteractionTime: Date.now()
                         }
                       }

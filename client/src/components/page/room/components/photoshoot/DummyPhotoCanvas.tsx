@@ -411,8 +411,8 @@ export default function DummyPhotoCanvas() {
             const currentTransform = participants[participantId] || {
               x: 50 + index * 200,
               y: 50 + index * 100,
-              width: 320,
-              height: 240,
+              width: 300,
+              height: 225,
               rotation: 0,
             }
             
@@ -487,8 +487,8 @@ export default function DummyPhotoCanvas() {
                     console.log(`🔄 Video transformed: ${participantId}`, {
                       x: node.x(),
                       y: node.y(),
-                      width: Math.max(5, (participants[participantId]?.width || 320) * scaleX),
-                      height: Math.max(5, (participants[participantId]?.height || 240) * scaleY),
+                      width: Math.max(5, (participants[participantId]?.width || 300) * scaleX),
+                      height: Math.max(5, (participants[participantId]?.height || 225) * scaleY),
                       rotation: node.rotation()
                     })
                     
@@ -501,8 +501,8 @@ export default function DummyPhotoCanvas() {
                           x: node.x(),
                           y: node.y(),
                           rotation: node.rotation(),
-                          width: Math.max(5, (participants[participantId]?.width || 320) * scaleX),
-                          height: Math.max(5, (participants[participantId]?.height || 240) * scaleY),
+                          width: Math.max(5, (participants[participantId]?.width || 300) * scaleX),
+                          height: Math.max(5, (participants[participantId]?.height || 225) * scaleY),
                           lastInteractionTime: Date.now()
                         }
                       }

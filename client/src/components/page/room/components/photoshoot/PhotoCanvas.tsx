@@ -111,8 +111,8 @@ export default function PhotoCanvas({
         const row = Math.floor(participantCount / gridCols)
         
         // Position calculation for 512x512 canvas
-        const videoWidth = 220
-        const videoHeight = 165 // 4:3 ratio
+        const videoWidth = 300
+        const videoHeight = 225 // 4:3 ratio
         const spacingX = (canvasSize.width - (videoWidth * gridCols)) / (gridCols + 1)
         const spacingY = (canvasSize.height - (videoHeight * Math.ceil((participantCount + 1) / gridCols))) / (Math.ceil((participantCount + 1) / gridCols) + 1)
         
@@ -340,18 +340,18 @@ export default function PhotoCanvas({
               aspectRatio: aspectRatio.toFixed(2)
             })
 
-            // Calculate dynamic size based on aspect ratio (keep base width 320)
-            const baseWidth = 320
-            const dynamicHeight = Math.round(baseWidth / aspectRatio)
+            // Fixed size - no dynamic sizing
+            const fixedWidth = 300
+            const fixedHeight = 225
             
-            // Update participant with aspect ratio and dynamic size
+            // Update participant with fixed size
             if (roomName && participants[participantId]) {
               const updatedParticipants = {
                 ...participants,
                 [participantId]: {
                   ...participants[participantId],
-                  width: baseWidth,
-                  height: dynamicHeight,
+                  width: fixedWidth,
+                  height: fixedHeight,
                   aspectRatio: aspectRatio,
                   scaleX: participants[participantId]?.scaleX || 1,
                   scaleY: participants[participantId]?.scaleY || 1,
@@ -359,7 +359,7 @@ export default function PhotoCanvas({
                 }
               }
               updatePhotoCanvasState(roomName, { participants: updatedParticipants })
-              console.log(`🔄 Updated ${participantId} size to ${baseWidth}x${dynamicHeight} (${aspectRatio.toFixed(2)})`)
+              console.log(`🔄 Updated ${participantId} size to ${fixedWidth}x${fixedHeight} (fixed size)`)
             }
           }
 
@@ -600,8 +600,8 @@ export default function PhotoCanvas({
             id: participantId,
             x: participants[participantId]?.x || 100,
             y: participants[participantId]?.y || 100,
-            width: participants[participantId]?.width || 320,
-            height: participants[participantId]?.height || 240,
+            width: participants[participantId]?.width || 300,
+            height: participants[participantId]?.height || 225,
             rotation: participants[participantId]?.rotation || 0,
             scaleX: participants[participantId]?.scaleX || -1, // Always maintain mirror mode
             scaleY: participants[participantId]?.scaleY || 1,
@@ -706,8 +706,8 @@ export default function PhotoCanvas({
             const currentTransform = participants[participantId] || {
               x: Math.random() * 200,
               y: Math.random() * 200,
-              width: 320,
-              height: 240,
+              width: 300,
+              height: 225,
               rotation: 0,
             }
 
@@ -813,11 +813,11 @@ export default function PhotoCanvas({
                     // Calculate new dimensions with absolute scale
                     const newWidth = Math.max(
                       50,
-                      (participants[participantId]?.width || 320) * absScaleX
+                      (participants[participantId]?.width || 300) * absScaleX
                     )
                     const newHeight = Math.max(
                       50,
-                      (participants[participantId]?.height || 240) * absScaleY
+                      (participants[participantId]?.height || 225) * absScaleY
                     )
 
                     console.log(`🔄 Video transformed: ${participantId}`, {

@@ -228,8 +228,8 @@ export default function ParticipantVideo({
         x: node.x(),
         y: node.y(),
         rotation: node.rotation(),
-        width: Math.max(5, (participants[participantId]?.width || 320) * scaleX),
-        height: Math.max(5, (participants[participantId]?.height || 240) * scaleY),
+        width: Math.max(5, (participants[participantId]?.width || 300) * scaleX),
+        height: Math.max(5, (participants[participantId]?.height || 225) * scaleY),
         lastInteractionTime: Date.now()
       }
     }
@@ -246,8 +246,8 @@ export default function ParticipantVideo({
     id: participant.identity,
     x: 100 + index * 50,
     y: 100 + index * 50,
-    width: 320,
-    height: 240,
+    width: 300,
+    height: 225,
     rotation: 0,
     scaleX: 1,
     scaleY: 1,
