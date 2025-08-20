@@ -1,11 +1,11 @@
 // constants/api.ts
 // nearzoom.store로 강제 설정
-// export const API_BASE_URL = 'https://api.nearzoom.store'
-export const API_BASE_URL = 'http://localhost:8080'
+export const API_BASE_URL = 'https://api.nearzoom.store'
+// export const API_BASE_URL = 'http://localhost:8080'
 
 // nearzoom.store로 강제 설정
-// export const FRONTEND_BASE_URL = 'https://nearzoom.store'
-export const FRONTEND_BASE_URL = 'http://localhost:3000'
+export const FRONTEND_BASE_URL = 'https://nearzoom.store'
+// export const FRONTEND_BASE_URL = 'http://localhost:3000'
 
 export const API_ENDPOINTS = {
   // Auth
