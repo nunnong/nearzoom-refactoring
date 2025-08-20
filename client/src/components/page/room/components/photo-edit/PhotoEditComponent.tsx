@@ -37,6 +37,9 @@ export default function PhotoEditComponent() {
     frameColor,
     roomName,
     
+    // Room leader state
+    isRoomLeader,
+    roomLeader,
     
     // Edit slice actions
     setBackgroundType,
@@ -97,6 +100,19 @@ export default function PhotoEditComponent() {
     const response = await api.post(API_ENDPOINTS.PHOTO_BACKGROUND, requestData)
     console.log('🎨 Background processing complete:', response.data)
     
+    // Extract and store jobId with original image URL
+    const jobId = response.data?.data?.jobId
+    if (jobId) {
+      const existingJobs = JSON.parse(localStorage.getItem('jobIds') || '[]')
+      const jobData = {
+        jobId: jobId,
+        originalImageUrl: currentPhotoUrl
+      }
+      existingJobs.push(jobData)
+      localStorage.setItem('jobIds', JSON.stringify(existingJobs))
+      console.log(`💾 Saved job data:`, jobData)
+    }
+    
     return response.data
   }, [
     currentEditIndex, 
@@ -110,7 +126,7 @@ export default function PhotoEditComponent() {
   ])
 
   const handleNext = useCallback(async () => {
-    if (!isCurrentPhotoComplete()) return
+    if (!isCurrentPhotoComplete() || !isRoomLeader) return
 
     setIsProcessing(true)
     try {
@@ -125,14 +141,14 @@ export default function PhotoEditComponent() {
       
     } catch (error: any) {
       console.error('🎨 Background processing failed:', error)
-      alert(`배경 처리에 실패했습니다: ${error.message}`)
+      alert(`Background processing failed: ${error.message}`)
     } finally {
       setIsProcessing(false)
     }
-  }, [isCurrentPhotoComplete, processBackground, saveAndProceedNext])
+  }, [isCurrentPhotoComplete, isRoomLeader, processBackground, saveAndProceedNext])
 
   const handleComplete = useCallback(async () => {
-    if (!isCurrentPhotoComplete()) return
+    if (!isCurrentPhotoComplete() || !isRoomLeader) return
 
     setIsProcessing(true)
     try {
@@ -147,11 +163,11 @@ export default function PhotoEditComponent() {
       
     } catch (error: any) {
       console.error('🎨 Final background processing failed:', error)
-      alert(`배경 처리에 실패했습니다: ${error.message}`)
+      alert(`Background processing failed: ${error.message}`)
     } finally {
       setIsProcessing(false)
     }
-  }, [isCurrentPhotoComplete, processBackground, saveAndProceedNext, completeEditing])
+  }, [isCurrentPhotoComplete, isRoomLeader, processBackground, saveAndProceedNext, completeEditing])
 
   const isLastPhoto = useMemo(() => 
     currentEditIndex === selectedPhotoUrls.length - 1, 
@@ -159,8 +175,8 @@ export default function PhotoEditComponent() {
   )
   
   const canProceed = useMemo(() => 
-    isCurrentPhotoComplete() && !isProcessing, 
-    [isCurrentPhotoComplete, isProcessing]
+    isCurrentPhotoComplete() && !isProcessing && isRoomLeader, 
+    [isCurrentPhotoComplete, isProcessing, isRoomLeader]
   )
 
   return (
@@ -257,7 +273,7 @@ export default function PhotoEditComponent() {
                         disabled={!canProceed}
                         className="w-full max-w-xs sm:w-54"
                       >
-                        {isProcessing ? 'PROCESSING...' : '편집 완료'}
+                        {isProcessing ? 'PROCESSING...' : 'COMPLETE'}
                       </StartButton>
                     ) : (
                       <StartButton
@@ -269,11 +285,17 @@ export default function PhotoEditComponent() {
                       </StartButton>
                     )}
 
+                    {/* Room Leader Info */}
+                    {!isRoomLeader && roomLeader && (
+                      <div className="text-center text-xs text-gray-500 sm:text-sm">
+                        <span className="font-medium">{roomLeader}</span> is the room leader
+                      </div>
+                    )}
+
                     {/* 진행 상황 표시 */}
                     <p className="text-center text-xs text-gray-500 sm:text-sm">
                       <span className="hidden sm:inline">
-                        {currentEditIndex + 1}번째 사진 / 총{' '}
-                        {selectedPhotoUrls.length}컷
+                        Photo {currentEditIndex + 1} of {selectedPhotoUrls.length}
                       </span>
                       <span className="sm:hidden">
                         {currentEditIndex + 1}/{selectedPhotoUrls.length}
@@ -284,10 +306,12 @@ export default function PhotoEditComponent() {
                     {!canProceed && (
                       <div className="text-center text-xs text-red-500">
                         {isProcessing 
-                          ? '배경을 처리하고 있습니다...'
+                          ? 'Processing background...'
+                          : !isRoomLeader
+                          ? 'Only room leader can edit photos'
                           : backgroundType === 'color' 
-                          ? '색상을 선택해주세요' 
-                          : '프롬프트를 입력해주세요'
+                          ? 'Please select a color' 
+                          : 'Please enter a prompt'
                         }
                       </div>
                     )}

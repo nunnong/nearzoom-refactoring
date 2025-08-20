@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, forwardRef } from 'react'
+import React, { useState, useCallback, forwardRef, useEffect } from 'react'
 import Masonry from 'react-masonry-css'
 import {
   HeartIcon,
@@ -14,6 +14,31 @@ import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid'
 import DeleteConfirmModal from './DeleteConfirmModal'
 import ShareModal from './ShareModal'
 import EditConfirmModal from './EditConfirmModal'
+
+// CSS animations for processing effects
+const processingStyles = `
+  @keyframes processingGlow {
+    0% { 
+      box-shadow: 0 0 20px rgba(251, 191, 36, 0.3), 0 0 40px rgba(251, 191, 36, 0.2);
+      border-color: rgb(251, 191, 36);
+    }
+    100% { 
+      box-shadow: 0 0 30px rgba(251, 191, 36, 0.5), 0 0 60px rgba(251, 191, 36, 0.3);
+      border-color: rgb(245, 158, 11);
+    }
+  }
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  @keyframes scanLine {
+    0% { top: 0%; opacity: 1; }
+    50% { top: 50%; opacity: 0.8; }
+    100% { top: 100%; opacity: 0; }
+  }
+`
 
 // 이미지 확대 모달 컴포넌트
 const ImageZoomModal = ({
@@ -78,6 +103,19 @@ export interface ImageItem {
   partnerEmails?: string | string[]
 }
 
+interface ProcessingJob {
+  jobId: string
+  originalImageUrl?: string
+  status: 'processing' | 'completed' | 'failed'
+  progress: number
+  currentStepImage?: string
+  artifacts?: {
+    final?: string
+    gpt?: string
+  }
+  error?: string | null
+}
+
 interface ImageArchiveProps {
   images: ImageItem[]
   onLoadMore?: () => Promise<void>
@@ -102,6 +140,7 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(
     const [loadingMore, setLoadingMore] = useState(false)
     const [zoomModalOpen, setZoomModalOpen] = useState(false)
     const [imageToZoom, setImageToZoom] = useState<ImageItem | null>(null)
+    const [processingJobs, setProcessingJobs] = useState<ProcessingJob[]>([])
 
     // 반응형 컬럼 설정 - 사진을 더 작게 만들기 위해 컬럼 수 증가
     const breakpointColumns = {
@@ -110,6 +149,16 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(
       1100: 4,
       800: 3,
       600: 2,
+      500: 1,
+    }
+
+    // 진행중인 이미지용 컬럼 설정 - 컬럼 수를 절반으로 줄여서 이미지를 2배 크게 표시
+    const processingBreakpointColumns = {
+      default: 3,
+      1400: 2,
+      1100: 2,
+      800: 2,
+      600: 1,
       500: 1,
     }
 
@@ -193,6 +242,116 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(
       }
     }, [onLoadMore, loadingMore])
 
+    // Job status polling
+    useEffect(() => {
+      const loadProcessingJobs = () => {
+        const jobData = JSON.parse(localStorage.getItem('jobIds') || '[]')
+        if (jobData.length > 0) {
+          setProcessingJobs(
+            jobData.map((job: any) => ({
+              jobId: typeof job === 'string' ? job : job.jobId,
+              originalImageUrl: typeof job === 'object' ? job.originalImageUrl : undefined,
+              status: 'processing' as const,
+              progress: 0,
+            }))
+          )
+        }
+      }
+
+      const checkAvailableStepImages = async (jobId: string) => {
+        const baseUrl = `https://image.nearzoom.store/media/jobs/${jobId}`
+        const stepImages = [
+          'gpt_result.jpg',
+          'temp_step_1.jpg', 
+          'temp_step_2.jpg',
+          'temp_step_3.jpg'
+        ]
+        
+        // Check images in reverse order to get the latest available
+        for (let i = stepImages.length - 1; i >= 0; i--) {
+          try {
+            const imageUrl = `${baseUrl}/${stepImages[i]}`
+            const response = await fetch(imageUrl, { method: 'HEAD' })
+            if (response.ok) {
+              return imageUrl
+            }
+          } catch (error) {
+            // Continue to next image
+          }
+        }
+        return null
+      }
+
+      const pollJobStatus = async (jobId: string) => {
+        try {
+          const response = await fetch(`https://image.nearzoom.store/jobs/${jobId}`)
+          if (response.ok) {
+            const jobData = await response.json()
+            
+            // Check for available step images
+            const currentStepImage = await checkAvailableStepImages(jobId)
+            
+            handleJobStatusUpdate(jobId, { ...jobData, currentStepImage })
+          }
+        } catch (error) {
+          console.error(`Job status polling failed for ${jobId}:`, error)
+        }
+      }
+
+      const handleJobStatusUpdate = (jobId: string, jobData: any) => {
+        if (jobData.status === 'completed' || jobData.status === 'failed') {
+          console.log(`💾 Job ${jobId} ${jobData.status}:`, jobData)
+          
+          // Remove from processing display
+          setProcessingJobs(prev => prev.filter(job => job.jobId !== jobId))
+          
+          // Remove from localStorage
+          const existingJobData = JSON.parse(localStorage.getItem('jobIds') || '[]')
+          const updatedJobData = existingJobData.filter((job: any) => {
+            const currentJobId = typeof job === 'string' ? job : job.jobId
+            return currentJobId !== jobId
+          })
+          localStorage.setItem('jobIds', JSON.stringify(updatedJobData))
+          
+          if (jobData.status === 'completed') {
+            console.log(`✅ Job completed: ${jobId}`)
+          } else {
+            console.log(`❌ Job failed: ${jobId}`, jobData.error)
+          }
+        } else {
+          // Update progress for processing jobs
+          setProcessingJobs(prev => 
+            prev.map(job => 
+              job.jobId === jobId 
+                ? { 
+                    ...job, 
+                    status: jobData.status, 
+                    progress: Math.max(0, jobData.progress),
+                    currentStepImage: jobData.currentStepImage,
+                    error: jobData.error 
+                  }
+                : job
+            )
+          )
+        }
+      }
+
+      // Initial load
+      loadProcessingJobs()
+
+      // Set up polling interval
+      const intervalId = setInterval(() => {
+        const currentJobData = JSON.parse(localStorage.getItem('jobIds') || '[]')
+        currentJobData.forEach((job: any) => {
+          const jobId = typeof job === 'string' ? job : job.jobId
+          pollJobStatus(jobId)
+        })
+      }, 5000) // Poll every 5 seconds
+
+      // Cleanup interval on unmount
+      return () => clearInterval(intervalId)
+    }, [])
+
     // 이미지가 없을 때 표시할 메시지
     if (images.length === 0) {
       return (
@@ -218,6 +377,115 @@ const ImageArchive = forwardRef<HTMLDivElement, ImageArchiveProps>(
 
     return (
       <>
+        {/* Processing Animation Styles */}
+        <style jsx>{processingStyles}</style>
+        
+        {/* Processing Jobs Section */}
+        {processingJobs.length > 0 && (
+          <div className="mb-6 rounded-2xl bg-white p-6 shadow-lg">
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">
+              Processing Images ({processingJobs.length})
+            </h3>
+            <Masonry
+              breakpointCols={processingBreakpointColumns}
+              className="-ml-6 flex w-auto"
+              columnClassName="pl-6 bg-clip-padding"
+            >
+              {processingJobs.map((job) => (
+                <div
+                  key={job.jobId}
+                  className="group relative mb-8 transform overflow-hidden rounded-lg border-2 border-yellow-400 bg-yellow-50 transition-all duration-300 animate-pulse"
+                  style={{
+                    boxShadow: '0 0 20px rgba(251, 191, 36, 0.3), 0 0 40px rgba(251, 191, 36, 0.2)',
+                    animation: 'processingGlow 2s ease-in-out infinite alternate'
+                  }}
+                >
+                  {/* Image Area */}
+                  <div className="relative aspect-square w-full">
+                    {job.currentStepImage ? (
+                      <img
+                        src={job.currentStepImage}
+                        alt="Processing step"
+                        className="h-full w-full rounded-t-lg object-cover"
+                        loading="lazy"
+                      />
+                    ) : job.originalImageUrl ? (
+                      <div className="relative h-full w-full">
+                        <img
+                          src={job.originalImageUrl}
+                          alt="Original image being processed"
+                          className="h-full w-full rounded-t-lg object-cover"
+                          loading="lazy"
+                        />
+                        {/* Shimmer overlay effect */}
+                        <div 
+                          className="absolute inset-0 rounded-t-lg"
+                          style={{
+                            background: 'linear-gradient(110deg, transparent 40%, rgba(255,255,255,0.5) 50%, transparent 60%)',
+                            animation: 'shimmer 2s infinite linear'
+                          }}
+                        />
+                        {/* Scanning line effect */}
+                        <div 
+                          className="absolute left-0 right-0 h-0.5 bg-yellow-400 opacity-80"
+                          style={{
+                            animation: 'scanLine 3s ease-in-out infinite'
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center rounded-t-lg bg-gradient-to-br from-yellow-100 to-yellow-200">
+                        <div className="text-center">
+                          <div className="mx-auto mb-2 h-8 w-8 animate-spin rounded-full border-2 border-yellow-400 border-t-transparent"></div>
+                          <p className="text-xs font-medium text-yellow-700">Starting...</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Processing Overlay with progress-based blur */}
+                    <div 
+                      className="absolute inset-0"
+                      style={{
+                        backgroundColor: `rgba(0, 0, 0, ${0.3 - (job.progress / 100) * 0.15})`,
+                        backdropFilter: `blur(${2 - (job.progress / 100) * 1.5}px)`
+                      }}
+                    />
+                    
+                    {/* Progress Info Overlay */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 text-white">
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-xs font-medium">
+                          {job.progress === 0 ? '🔍 Analyzing...' :
+                           job.progress < 30 ? '⚙️ Processing...' :
+                           job.progress < 70 ? '🎨 Applying effects...' :
+                           job.progress < 90 ? '✨ Finalizing...' : '🏁 Almost done...'}
+                        </span>
+                        <div className="flex items-center space-x-1">
+                          {job.status === 'processing' && (
+                            <div className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent"></div>
+                          )}
+                          <span className="text-xs font-medium">
+                            {job.progress > 0 ? `${job.progress}%` : 'Starting...'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="h-1 w-full rounded-full bg-white/30">
+                        <div
+                          className="h-1 rounded-full bg-white transition-all duration-300"
+                          style={{ width: `${Math.max(0, job.progress)}%` }}
+                        />
+                      </div>
+                      {job.error && (
+                        <p className="mt-1 text-xs text-red-300">{job.error}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </Masonry>
+          </div>
+        )}
+
         {/* 이미지가 들어오는 부분만 흰색 둥근 박스 */}
         <div className="rounded-2xl bg-white p-6 shadow-lg">
           <Masonry
